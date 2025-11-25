@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0 (2025-11-25)
+
+
+### Features
+
+* initialize NextSpace repo ([f5d83a6](https://github.com/berkmancenter/nextspace/commit/f5d83a625dfc04784624bd74750f69c42f70a8d8))
+
 ## [1.2.0](https://github.com/berkmancenter/nextspace/compare/v1.1.0...v1.2.0) (2025-11-25)
 
 
