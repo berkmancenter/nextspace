@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/berkmancenter/nextspace/compare/v1.0.0...v1.1.0) (2025-11-25)
+
+
+### Features
+
+* merge ([07cb5dc](https://github.com/berkmancenter/nextspace/commit/07cb5dc5ac4fc17dac0c8f0714dcbb9c513eabcb))
+* **pages/backchannel.tsx:** new intro text ([2669904](https://github.com/berkmancenter/nextspace/commit/2669904c3719d1ffc690ccad525be4a289a1b8e9))
+
 ## 1.0.0 (2025-11-25)
 
 
