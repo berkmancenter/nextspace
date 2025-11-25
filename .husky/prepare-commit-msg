@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# Check if this is an interactive commit (no -m flag used)
+if [ "$2" = "" ]; then
+  # Run commitizen for interactive commits
+  exec < /dev/tty && npx cz --hook || true
+else
+  # For non-interactive commits (using -m flag), check for breaking changes
+  echo "Non-interactive commit detected. Performing breaking changes check..."
+  
+  # Restore terminal input for the prompt
+  exec < /dev/tty
+  
+  read -p "Does this commit introduce breaking changes? (y/N): " breaking
+  
+  if [ "$breaking" = "y" ] || [ "$breaking" = "Y" ]; then
+    echo ""
+    echo "⚠️  BREAKING CHANGE DETECTED!"
+    echo "Please ensure your commit message includes:"
+    echo "  • A '!' in the header (e.g., 'feat!: add API v2')"
+    echo "  • And/or a 'BREAKING CHANGE:' footer"
+    echo ""
+    echo "You can amend your commit message using:"
+    echo "  git commit --amend"
+    echo ""
+    exit 1
+  fi
+fi

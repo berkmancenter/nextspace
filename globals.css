@@ -1,0 +1,25 @@
+@import "tailwindcss";
+:root {
+  --bg-image: url("/top-bg.svg");
+}
+
+.bg-header {
+  background-image: var(--bg-image);
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+@theme {
+  --color-medium-slate-blue: #4845d2;
+  --color-neutral-900: #0b0d0e;
+  --color-light-blue: #a5b4fc;
+
+  @keyframes rotate-bg {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
