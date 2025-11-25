@@ -200,19 +200,18 @@ function BackchannelRoom() {
               </h1>
               <div className="mt-4 mx-2 lg:mx-28 text-lg text-gray-500">
                 <p>
-                  This is an experimental LLM backchannel, here to help
-                  today&apos;s moderator steer the discussion toward what the
-                  audience cares about most.
+                  This is the LLM backchannel, here to help today&apos;s
+                  moderator steer the discussion toward what the audience cares
+                  about most.
                 </p>
                 <p className="mt-4">
-                  Send reactions, questions, or topics you want more of. If a
-                  bunch of you say the same thing, it&apos;ll be flagged for the
-                  mod.
+                  Send reactions, questions, or topics you want more of, and the
+                  moderator will get a digestible summary.
                 </p>
                 <p className="mt-4">
-                  The backchannel is not human, can&apos;t identify you, and
-                  won&apos;t pass your messages directly to the mod. Please
-                  share your feedback on the tool at <b>brk.mn/feedback!</b>
+                  Please note that a pseudonymized message transcript will be
+                  visible to our engineering team. Please share your feedback on
+                  the tool at <b>brk.mn/feedback!</b>, and enjoy the event!
                 </p>
               </div>
               <Button
