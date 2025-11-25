@@ -1,5 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
+/**
+ * API route to handle user logout by clearing the session cookie.
+ * @param req The incoming request object
+ * @param res The outgoing response object
+ * @returns A JSON response indicating successful logout
+ */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse

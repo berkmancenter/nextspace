@@ -21,7 +21,7 @@ This view displays what an event participant uses to send in questions and feedb
 This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
 
 - **components/**
-  Frontend components used across the app; see [docs/](https://github.com/berkmancenter/nextspace/blob/docs) for a detailed breakdown of each component.
+  Frontend components used across the app; see [docs/](https://berkmancenter.github.io/nextspace/) for a detailed breakdown of each component.
 
 - **docs/**
   Auto-generated static HTML files for code documentation.
@@ -35,19 +35,35 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
     - **view/**
       - **[*id*].tsx**
         Checks the `[id]` and renders an `EventStatus` component.
+  - **api/**
+    Client-side public API routes; see [Next.js docs](https://nextjs.org/docs/pages/building-your-application/routing/api-routes)
+    - **logout.ts**
+      Route to handle user logout by clearing the session cookie.
+    - **request.ts**
+      Route to handle requests with authentication.
+    - **session.ts**
+      Route to handle setting the session cookie upon user login.
   - **\_app.tsx**
     Custom App file to initialize all pages; see [Next.js docs](https://nextjs.org/docs/pages/building-your-application/routing/custom-app).
   - **\_document.tsx**
     Custom Document used to render pages; see [Next.js docs](https://nextjs.org/docs/pages/building-your-application/routing/custom-document).
+  - **login.tsx**
+    Renders the login page for users to authenticate.
+  - **logout.tsx**
+    Handles the logout process by clearing session and redirecting to login.
   - **moderator.tsx**
     Render the moderator view; see "App views overview".
   - **backchannel.tsx**
     Render the backchannel (participant) view; see "App views overview".
+  - **signup.tsx**
+    Allows users to create an account with username, email, and password.
 
 - **utils/**
   Various utilities used across the app; see [docs/](https://github.com/berkmancenter/nextspace/blob/docs) for a detailed breakdown of each method.
   - **Api.ts**
     Helper methods for fetching data from the LLM Engine API.
+  - **Decrypt.ts**
+    Decrypts a JWT token to retrieve cookie payload.
   - **ErrorHandler.ts**
     Checks if router query parameters are valid.
   - **Helpers.ts**
@@ -67,7 +83,7 @@ NEXT_PUBLIC_SOCKET_URL: the URL to the socket.io instance you are interacting wi
 NEXT_PUBLIC_DEFAULT_TOPIC_ID: the ID of the default topic that you are submitting new events to; used within the event creation form
 NEXT_PUBLIC_ZOOM_URL_PATTERN: optional - Zoom URL regex pattern to match against on event creation form, Defaults to "/https:\/\/[\w-]*\.?zoom.us\/.*/g". Must be string.
 NEXT_PUBLIC_ZOOM_DOMAIN: optional - Zoom domain for validation error messages. Defaults to zoom.us.
-SESSION_SECRET: crypto key used to encrypt session cookie. Please see key requirements: https://github.com/panva/jose/issues/210#jwe-alg.
+SESSION_SECRET: crypto key used to encrypt session cookie. Please see at https://github.com/panva/jose/issues/210#jwe-alg.
 ```
 
 ### Install and run
@@ -162,19 +178,4 @@ Nextspace is [AGPL 3.0 licensed](./LICENSE).
 
 ## Contributing
 
-This repo will frequently switch contributors and may likely be open sourced down the road. To keep the codebase more easily maintainable by various contributors, we encourage the practices included below.
-
-### Use Conventional Commit Messages
-
-Commit messages can follow the [Conventional Commit Message](https://www.conventionalcommits.org/en/v1.0.0/) pattern of `<type>: <description>`. Types can include any of the examples below.
-
-feat: - A new feature
-fix: - A bug fix
-chore: - Routine tasks, maintenance, dependencies
-docs: - Documentation changes
-style: - Code style/formatting changes (not affecting logic)
-refactor: - Code changes that neither fix bugs nor add features
-test: - Adding or correcting tests
-perf: - Performance improvements
-
-It is recommended that you run the command `npm run commit`, which runs hooks to enforce correct commit message format via [husky](https://typicode.github.io/husky/) and [commitlint](https://commitlint.js.org/).
+Please see [CONTRIBUTING.md](https://github.com/berkmancenter/nextspace/blob/main/CONTRIBUTING.md).

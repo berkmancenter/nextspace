@@ -1,6 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { EncryptJWT } from "jose";
 
+/**
+ * API route to handle setting the session cookie upon user login.
+ * @param req The incoming request object
+ * @param res The outgoing response object
+ * @returns A JSON response indicating successful cookie set
+ */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
