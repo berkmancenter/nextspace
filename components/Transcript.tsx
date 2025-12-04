@@ -63,13 +63,19 @@ export const Transcript = forwardRef(function Transcript(
               <div className="flex flex-row gap-x-3">
                 <span
                   className="time text-sm text-slate-400"
-                  data-datetime={new Date().toISOString()}
+                  data-datetime={
+                    message.createdAt
+                      ? new Date(message.createdAt).toISOString()
+                      : ""
+                  }
                 >
-                  {new Date().toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: true,
-                  })}
+                  {message.createdAt
+                    ? new Date(message.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                      })
+                    : ""}
                 </span>
               </div>
               <p>{message.body.text ? message.body.text : message.body}</p>
