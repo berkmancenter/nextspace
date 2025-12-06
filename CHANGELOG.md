@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0](https://github.com/berkmancenter/nextspace/compare/v1.1.0...v1.2.0) (2025-12-06)
+
+
+### Features
+
+* add env variable for about link in footer, remove other footer links for now ([75287dd](https://github.com/berkmancenter/nextspace/commit/75287ddd0c71c1a654d48596d73131771fab56c8))
+* add env variable for about link in footer, remove other links ([259e9b8](https://github.com/berkmancenter/nextspace/commit/259e9b8a1e0f44311c739a8b3fb10ce5ca0da2ca))
+
+
+### Bug Fixes
+
+* **components/transcript.tsx:** timestamps ([079e256](https://github.com/berkmancenter/nextspace/commit/079e256976ad2b522d98adf049e39773411d0281))
+
 ## [1.1.0](https://github.com/berkmancenter/nextspace/compare/v1.0.0...v1.1.0) (2025-11-25)
 
 
