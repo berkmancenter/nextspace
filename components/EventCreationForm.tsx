@@ -15,6 +15,12 @@ import {
   Snackbar,
   TextField,
   Typography,
+  Step,
+  Stepper,
+  StepLabel,
+  useTheme,
+  useMediaQuery,
+  MobileStepper,
 } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -26,17 +32,33 @@ import { components } from "../types";
 import { Conversation } from "../types.internal";
 import { createConversationFromData, Api } from "../utils/Helpers";
 
+const steps = [
+  "Event Details",
+  "Conversation Configuration",
+  "Agent Configuration",
+  "Moderators & Speakers",
+];
+
 /**
  * EventCreationForm component
  *
- * Displays the Event Creation form.
- * Allows users to create an event, choosing the platform, conversation type (and its configuration), and providing the Zoom meeting information
+ * Displays the Event Creation form as a multi-step wizard.
+ * Step 1: Event Details (name, description, zoom URL, time)
+ * Step 2: Conversation Configuration (platforms, agent)
+ * Step 3: Agent Configuration (model, bot name)
+ * Step 4: Moderators & Speakers (moderator and speaker information)
  * @returns A React component displaying the Event Creation form.
  */
 export const EventCreationForm: React.FC = ({}) => {
   const router = useRouter();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  const [activeStep, setActiveStep] = useState(0);
 
   const [eventNameHasError, setEventNameHasError] = useState<boolean>(false);
+  const [eventName, setEventName] = useState<string>("");
+  const [eventDescription, setEventDescription] = useState<string>("");
 
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [selectedConvType, setSelectedConvType] = useState<string | null>(null);
@@ -70,6 +92,15 @@ export const EventCreationForm: React.FC = ({}) => {
   const [conversationData, setConversationData] = useState<Conversation | null>(
     null
   );
+
+  // Moderators and Speakers state
+  const [moderators, setModerators] = useState<
+    Array<{ name: string; bio: string }>
+  >([{ name: "", bio: "" }]);
+  const [speakers, setSpeakers] = useState<
+    Array<{ name: string; bio: string }>
+  >([{ name: "", bio: "" }]);
+  const [showModerators, setShowModerators] = useState<boolean>(false);
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -106,9 +137,9 @@ export const EventCreationForm: React.FC = ({}) => {
       fetchServerConfig();
   }, [supportedModels, availablePlatforms, conversationTypes]);
 
-  const formIsValid = (formData: FormData) => {
+  const validateStep1 = () => {
     // Check that required fields are present
-    if (!formData.get("name")) {
+    if (!eventName || eventName.trim() === "") {
       setFormError("Event Name is required");
       return false;
     }
@@ -123,6 +154,11 @@ export const EventCreationForm: React.FC = ({}) => {
       return false;
     }
 
+    setFormError(null);
+    return true;
+  };
+
+  const validateStep2 = () => {
     // Check that at least one platform is selected
     if (selectedPlatforms.length === 0) {
       setFormError("At least one platform must be selected");
@@ -135,26 +171,97 @@ export const EventCreationForm: React.FC = ({}) => {
       return false;
     }
 
-    // Check form validity using HTML validation
-    if (!formRef.current?.checkValidity()) {
-      setFormError("Please fill out all required fields.");
-      return false;
-    }
-
     setFormError(null);
     return true;
   };
 
+  const validateStep3 = () => {
+    // Step 3 fields are optional or have defaults, so always valid
+    setFormError(null);
+    return true;
+  };
+
+  // Moderator management functions
+  const addModerator = () => {
+    setModerators([...moderators, { name: "", bio: "" }]);
+  };
+
+  const removeModerator = (index: number) => {
+    if (moderators.length > 1) {
+      setModerators(moderators.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateModerator = (
+    index: number,
+    field: "name" | "bio",
+    value: string
+  ) => {
+    const updated = [...moderators];
+    updated[index][field] = value;
+    setModerators(updated);
+  };
+
+  // Speaker management functions
+  const addSpeaker = () => {
+    setSpeakers([...speakers, { name: "", bio: "" }]);
+  };
+
+  const removeSpeaker = (index: number) => {
+    if (speakers.length > 1) {
+      setSpeakers(speakers.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateSpeaker = (
+    index: number,
+    field: "name" | "bio",
+    value: string
+  ) => {
+    const updated = [...speakers];
+    updated[index][field] = value;
+    setSpeakers(updated);
+  };
+
+  const handleNext = () => {
+    if (activeStep === 0 && !validateStep1()) {
+      return;
+    }
+    if (activeStep === 1 && !validateStep2()) {
+      return;
+    }
+    if (activeStep === 2 && !validateStep3()) {
+      return;
+    }
+    setActiveStep((prevStep) => prevStep + 1);
+  };
+
+  const handleBack = () => {
+    setActiveStep((prevStep) => prevStep - 1);
+    setFormError(null);
+  };
+
   const sendData = (formData: FormData) => {
-    // Validate form data
-    if (!formIsValid(formData)) return;
+    // Validate step 3 before submission (though it's currently always valid)
+    if (!validateStep3()) return;
+
+    // Filter out empty moderators and speakers
+    const validModerators = showModerators
+      ? moderators.filter((m) => m.name.trim() !== "" || m.bio.trim() !== "")
+      : [];
+    const validSpeakers = speakers.filter(
+      (s) => s.name.trim() !== "" || s.bio.trim() !== ""
+    );
 
     let body: any = {
-      name: formData.get("name"),
+      name: eventName,
+      ...(eventDescription && { description: eventDescription }),
       ...(zoomMeetingTime && { scheduledTime: zoomMeetingTime }),
       platforms: selectedPlatforms,
       type: selectedConvType,
       topicId: process.env.NEXT_PUBLIC_DEFAULT_TOPIC_ID,
+      ...(validModerators.length > 0 && { moderators: validModerators }),
+      ...(validSpeakers.length > 0 && { presenters: validSpeakers }),
     };
 
     const model = supportedModels!.find(
@@ -211,6 +318,34 @@ export const EventCreationForm: React.FC = ({}) => {
         elevation={3}
         sx={{ p: 4, maxWidth: 800, mx: "auto", mt: 4, mb: 4 }}
       >
+        {isMobile ? (
+          <MobileStepper
+            variant="dots"
+            steps={steps.length}
+            position="static"
+            activeStep={activeStep}
+            sx={{
+              mb: 2,
+              justifyContent: "center",
+              background: "transparent",
+            }}
+            nextButton={<span />}
+            backButton={<span />}
+          />
+        ) : (
+          <Stepper
+            activeStep={activeStep}
+            orientation="horizontal"
+            sx={{ mb: 4 }}
+          >
+            {steps.map((label) => (
+              <Step key={label}>
+                <StepLabel>{label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+        )}
+
         {formError && (
           <Snackbar
             open={Boolean(formError)}
@@ -232,203 +367,224 @@ export const EventCreationForm: React.FC = ({}) => {
             </Alert>
           </Snackbar>
         )}
+
         <Box component="form" noValidate action="#" ref={formRef}>
-          <Typography variant="h5" component="h2" gutterBottom>
-            Event Details
-          </Typography>
-          <TextField
-            name="name"
-            label="Event Name"
-            id="thread-name"
-            required
-            fullWidth
-            variant="outlined"
-            margin="normal"
-            helperText={
-              eventNameHasError ? "Enter a name for your event." : null
-            }
-            onBlur={() =>
-              setEventNameHasError(
-                !formRef.current?.elements.namedItem("name") ||
-                  !(
-                    formRef.current.elements.namedItem(
-                      "name"
-                    ) as HTMLInputElement
-                  ).value
-              )
-            }
-            error={eventNameHasError}
-          />
-          <TextField
-            fullWidth
-            label="Zoom Meeting URL"
-            name="zoomMeetingUrl"
-            id="zoom-meeting-url"
-            value={zoomMeetingUrl}
-            onChange={(e) => setZoomMeetingUrl(e.target.value)}
-            onBlur={() =>
-              // Check format on unfocus
-              setZoomMeetingUrlHasError(
-                !zoomMeetingUrl ||
-                  zoomMeetingUrl.length < 10 ||
-                  (zoomMeetingUrl.length > 0 &&
-                    !zoomMeetingUrl.match(zoomMeetingUrlPattern))
-              )
-            }
-            error={zoomMeetingUrlHasError}
-            helperText={
-              zoomMeetingUrlHasError
-                ? zoomMeetingUrl.length > 0 &&
-                  !zoomMeetingUrl.match(zoomMeetingUrlPattern)
-                  ? zoomUrlDomainError
-                  : "Enter the Zoom Meeting URL for transcription purposes."
-                : null
-            }
-            variant="outlined"
-            margin="normal"
-            required
-          />
-
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <DateTimePicker
-              label="Meeting Day/Time"
-              onChange={(newValue) =>
-                setZoomMeetingTime(
-                  newValue?.isValid() ? newValue?.toISOString() : ""
-                )
-              }
-              slotProps={{
-                textField: {
-                  margin: "normal",
-                  fullWidth: true,
-                  helperText:
-                    "Enter the meeting start time if it begins more than 15 minutes from now.",
-                },
-              }}
-            />
-          </LocalizationProvider>
-
-          <Box sx={{ mt: 4 }}>
-            <Typography variant="h5" component="h2" gutterBottom>
-              Conversation Configuration
-            </Typography>
-            {/* Platform Selection */}
-            <FormControl
-              component="fieldset"
-              fullWidth
-              margin="normal"
-              sx={{
-                border: "1px solid rgba(0, 0, 0, 0.23)",
-                borderRadius: 1,
-                p: 2,
-                "&:focus-within": {
-                  borderColor: "primary.main",
-                  borderWidth: "2px",
-                },
-              }}
-            >
-              <FormLabel
-                component="legend"
-                sx={{
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  color: "rgba(0, 0, 0, 0.87)",
-                }}
-              >
-                Where do you want your audience to interact?
-              </FormLabel>
-              <FormGroup sx={{ mt: -1 }}>
-                {(availablePlatforms || []).map((platform) => (
-                  <FormControlLabel
-                    key={platform.name}
-                    control={
-                      <Checkbox
-                        checked={selectedPlatforms.indexOf(platform.name) > -1}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedPlatforms([
-                              ...selectedPlatforms,
-                              platform.name,
-                            ]);
-                          } else {
-                            setSelectedPlatforms(
-                              selectedPlatforms.filter(
-                                (item) => item !== platform.name
-                              )
-                            );
-                          }
-                        }}
-                      />
-                    }
-                    label={platform.label || platform.name}
-                  />
-                ))}
-              </FormGroup>
-            </FormControl>
-
-            {/* Type Selection TODO the UI calls this Agent but we refer to it as conversation type. Change?*/}
-            <FormControl
-              component="fieldset"
-              fullWidth
-              required
-              margin="normal"
-              sx={{
-                border: "1px solid rgba(0, 0, 0, 0.23)",
-                borderRadius: 1,
-                p: 2,
-                "&:focus-within": {
-                  borderColor: "primary.main",
-                  borderWidth: "2px",
-                },
-              }}
-            >
-              <FormLabel
-                component="legend"
-                sx={{
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  color: "rgba(0, 0, 0, 0.87)",
-                }}
-              >
-                Agent that you will be using
-              </FormLabel>
-              <RadioGroup
-                value={selectedConvType}
-                name="selectedConvType"
-                onChange={(e) => {
-                  setSelectedConvType(e.target.value);
-                }}
-                sx={{ mt: -1 }}
-              >
-                {(conversationTypes || []).map((option, index) => (
-                  <div key={option.name}>
-                    <FormControlLabel
-                      value={option.name}
-                      control={<Radio required={index === 0} />} // ← Makes validation work
-                      label={option.label}
-                      sx={
-                        index === 0
-                          ? {
-                              "& .MuiFormControlLabel-asterisk": {
-                                display: "none",
-                              },
-                            }
-                          : {}
-                      }
-                    />
-                    <div className="text-gray-600 text-sm ml-8 -mt-2">
-                      {option.description}
-                    </div>
-                  </div>
-                ))}
-              </RadioGroup>
-            </FormControl>
-          </Box>
-          {/* Agent Configuration Forms */}
-          {selectedConvType && (
-            <Box sx={{ mt: 4 }}>
+          {/* Step 1: Event Details */}
+          {activeStep === 0 && (
+            <Box>
               <Typography variant="h5" component="h2" gutterBottom>
-                Agent Configuration (Advanced Settings)
+                Event Details
+              </Typography>
+              <TextField
+                name="name"
+                label="Event Name"
+                id="thread-name"
+                helperText="Enter a name for your event."
+                fullWidth
+                variant="outlined"
+                margin="normal"
+                required
+                value={eventName}
+                onChange={(e) => setEventName(e.target.value)}
+                error={eventNameHasError}
+                onBlur={() =>
+                  setEventNameHasError(!eventName || eventName.trim() === "")
+                }
+              />
+
+              <TextField
+                name="description"
+                label="Event Description"
+                id="event-description"
+                helperText="Provide a detailed description of your event (optional)."
+                fullWidth
+                variant="outlined"
+                margin="normal"
+                multiline
+                rows={6}
+                value={eventDescription}
+                onChange={(e) => setEventDescription(e.target.value)}
+              />
+
+              <TextField
+                name="zoomUrl"
+                label="Zoom Meeting URL"
+                id="zoom-url"
+                value={zoomMeetingUrl}
+                fullWidth
+                onChange={(e) => setZoomMeetingUrl(e.target.value)}
+                onBlur={() =>
+                  // Check format on unfocus
+                  setZoomMeetingUrlHasError(
+                    !zoomMeetingUrl ||
+                      zoomMeetingUrl.length < 10 ||
+                      (zoomMeetingUrl.length > 0 &&
+                        !zoomMeetingUrl.match(zoomMeetingUrlPattern))
+                  )
+                }
+                error={zoomMeetingUrlHasError}
+                helperText={
+                  zoomMeetingUrlHasError
+                    ? zoomMeetingUrl.length > 0 &&
+                      !zoomMeetingUrl.match(zoomMeetingUrlPattern)
+                      ? zoomUrlDomainError
+                      : "Enter the Zoom Meeting URL for transcription purposes."
+                    : null
+                }
+                variant="outlined"
+                margin="normal"
+                required
+              />
+
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DateTimePicker
+                  label="Meeting Day/Time"
+                  onChange={(newValue) =>
+                    setZoomMeetingTime(
+                      newValue?.isValid() ? newValue?.toISOString() : ""
+                    )
+                  }
+                  slotProps={{
+                    textField: {
+                      margin: "normal",
+                      fullWidth: true,
+                      helperText:
+                        "Enter the meeting start time if it begins more than 15 minutes from now.",
+                    },
+                  }}
+                />
+              </LocalizationProvider>
+            </Box>
+          )}
+
+          {/* Step 2: Conversation Configuration */}
+          {activeStep === 1 && (
+            <Box>
+              <Typography variant="h5" component="h2" gutterBottom>
+                Conversation Configuration
+              </Typography>
+
+              {/* Platform Selection */}
+              <FormControl
+                component="fieldset"
+                fullWidth
+                margin="normal"
+                sx={{
+                  border: "1px solid rgba(0, 0, 0, 0.23)",
+                  borderRadius: 1,
+                  p: 2,
+                  "&:focus-within": {
+                    borderColor: "primary.main",
+                    borderWidth: "2px",
+                  },
+                }}
+              >
+                <FormLabel
+                  component="legend"
+                  sx={{
+                    fontSize: "0.875rem",
+                    fontWeight: 500,
+                    color: "rgba(0, 0, 0, 0.87)",
+                  }}
+                >
+                  Where do you want your audience to interact?
+                </FormLabel>
+                <FormGroup sx={{ mt: -1 }}>
+                  {(availablePlatforms || []).map((platform) => (
+                    <FormControlLabel
+                      key={platform.name}
+                      control={
+                        <Checkbox
+                          checked={
+                            selectedPlatforms.indexOf(platform.name) > -1
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedPlatforms([
+                                ...selectedPlatforms,
+                                platform.name,
+                              ]);
+                            } else {
+                              setSelectedPlatforms(
+                                selectedPlatforms.filter(
+                                  (item) => item !== platform.name
+                                )
+                              );
+                            }
+                          }}
+                        />
+                      }
+                      label={platform.label || platform.name}
+                    />
+                  ))}
+                </FormGroup>
+              </FormControl>
+
+              {/* Type Selection TODO the UI calls this Agent but we refer to it as conversation type. Change?*/}
+              <FormControl
+                component="fieldset"
+                fullWidth
+                required
+                margin="normal"
+                sx={{
+                  border: "1px solid rgba(0, 0, 0, 0.23)",
+                  borderRadius: 1,
+                  p: 2,
+                  "&:focus-within": {
+                    borderColor: "primary.main",
+                    borderWidth: "2px",
+                  },
+                }}
+              >
+                <FormLabel
+                  component="legend"
+                  sx={{
+                    fontSize: "0.875rem",
+                    fontWeight: 500,
+                    color: "rgba(0, 0, 0, 0.87)",
+                  }}
+                >
+                  Agent that you will be using
+                </FormLabel>
+                <RadioGroup
+                  value={selectedConvType}
+                  name="selectedConvType"
+                  onChange={(e) => {
+                    setSelectedConvType(e.target.value);
+                  }}
+                  sx={{ mt: -1 }}
+                >
+                  {(conversationTypes || []).map((option, index) => (
+                    <div key={option.name}>
+                      <FormControlLabel
+                        value={option.name}
+                        control={<Radio required={index === 0} />}
+                        label={option.label}
+                        sx={
+                          index === 0
+                            ? {
+                                "& .MuiFormControlLabel-asterisk": {
+                                  display: "none",
+                                },
+                              }
+                            : {}
+                        }
+                      />
+                      <div className="text-gray-600 text-sm ml-8 -mt-2">
+                        {option.description}
+                      </div>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </FormControl>
+            </Box>
+          )}
+
+          {/* Step 3: Agent Configuration */}
+          {activeStep === 2 && (
+            <Box>
+              <Typography variant="h5" component="h2" gutterBottom>
+                Agent Configuration
               </Typography>
               <FormControl
                 component="fieldset"
@@ -490,17 +646,241 @@ export const EventCreationForm: React.FC = ({}) => {
             </Box>
           )}
 
-          <Box sx={{ mt: 4, textAlign: "right" }}>
+          {/* Step 4: Moderators & Speakers */}
+          {activeStep === 3 && (
+            <Box sx={{ maxHeight: "600px", overflowY: "auto", pr: 1 }}>
+              {/* About the Speakers Section */}
+              <Typography variant="h5" component="h2" gutterBottom>
+                About the Speakers
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Add information about the event speakers (optional)
+              </Typography>
+
+              {speakers.map((speaker, index) => (
+                <Box
+                  key={index}
+                  sx={{
+                    mb: 3,
+                    p: 2,
+                    border: "1px solid rgba(0, 0, 0, 0.12)",
+                    borderRadius: 1,
+                    position: "relative",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mb: 1,
+                    }}
+                  >
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Speaker {index + 1}
+                    </Typography>
+                    {speakers.length > 1 && (
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() => removeSpeaker(index)}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </Box>
+                  <TextField
+                    label="Name"
+                    value={speaker.name}
+                    onChange={(e) =>
+                      updateSpeaker(index, "name", e.target.value)
+                    }
+                    fullWidth
+                    variant="outlined"
+                    margin="normal"
+                  />
+                  <TextField
+                    label="Bio"
+                    value={speaker.bio}
+                    onChange={(e) =>
+                      updateSpeaker(index, "bio", e.target.value)
+                    }
+                    fullWidth
+                    variant="outlined"
+                    margin="normal"
+                    multiline
+                    rows={6}
+                  />
+                </Box>
+              ))}
+
+              <Button variant="outlined" onClick={addSpeaker} sx={{ mb: 2 }}>
+                + Add Another Speaker
+              </Button>
+
+              {/* About the Moderators Section */}
+              <Box sx={{ mt: 2 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mb: 2,
+                  }}
+                >
+                  <Typography
+                    variant="h5"
+                    component="h2"
+                    gutterBottom
+                    sx={{ mb: 0 }}
+                  >
+                    About the Moderators
+                  </Typography>
+
+                  {showModerators && (
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        setShowModerators(false);
+                        setModerators([{ name: "", bio: "" }]);
+                      }}
+                    >
+                      Remove All
+                    </Button>
+                  )}
+                </Box>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2 }}
+                >
+                  Add information about the event moderators (optional)
+                </Typography>
+
+                {showModerators && (
+                  <>
+                    {moderators.map((moderator, index) => (
+                      <Box
+                        key={index}
+                        sx={{
+                          mb: 3,
+                          p: 2,
+                          border: "1px solid rgba(0, 0, 0, 0.12)",
+                          borderRadius: 1,
+                          position: "relative",
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            mb: 1,
+                          }}
+                        >
+                          <Typography
+                            variant="subtitle2"
+                            color="text.secondary"
+                          >
+                            Moderator {index + 1}
+                          </Typography>
+                          {moderators.length > 1 && (
+                            <Button
+                              size="small"
+                              color="error"
+                              onClick={() => removeModerator(index)}
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </Box>
+                        <TextField
+                          label="Name"
+                          value={moderator.name}
+                          onChange={(e) =>
+                            updateModerator(index, "name", e.target.value)
+                          }
+                          fullWidth
+                          variant="outlined"
+                          margin="normal"
+                          placeholder="Enter moderator's name"
+                        />
+                        <TextField
+                          label="Bio"
+                          value={moderator.bio}
+                          onChange={(e) =>
+                            updateModerator(index, "bio", e.target.value)
+                          }
+                          fullWidth
+                          variant="outlined"
+                          margin="normal"
+                          multiline
+                          rows={6}
+                          placeholder="Enter moderator's biography, background, and expertise..."
+                        />
+                      </Box>
+                    ))}
+                  </>
+                )}
+
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    if (!showModerators) {
+                      setShowModerators(true);
+                    } else {
+                      addModerator();
+                    }
+                  }}
+                >
+                  {showModerators
+                    ? "+ Add Another Moderator"
+                    : "+ Add Moderators"}
+                </Button>
+              </Box>
+            </Box>
+          )}
+
+          {/* Navigation Buttons */}
+          <Box sx={{ mt: 4, display: "flex", justifyContent: "space-between" }}>
             <Button
-              type="submit"
               variant="outlined"
-              onClick={(e) => {
-                e.preventDefault();
-                if (formRef.current) sendData(new FormData(formRef.current));
-              }}
+              disabled={activeStep === 0}
+              onClick={handleBack}
+              type="button"
+              sx={{ mr: { xs: 1, sm: 0 } }}
             >
-              Create Conversation
+              Back
             </Button>
+
+            {activeStep === steps.length - 1 ? (
+              <Button
+                type="button"
+                variant="contained"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (formRef.current) sendData(new FormData(formRef.current));
+                }}
+                sx={{
+                  ml: { xs: 1, sm: 0 },
+                  fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                }}
+              >
+                Create Conversation
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="contained"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNext();
+                }}
+                sx={{ ml: { xs: 1, sm: 0 } }}
+              >
+                Next
+              </Button>
+            )}
           </Box>
         </Box>
       </Paper>
