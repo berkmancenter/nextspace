@@ -16,7 +16,7 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
-function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
+function EventAssistantRoom() {
   const router = useRouter();
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -192,10 +192,13 @@ function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
                     <div key={`msg-${i}`} className="w-full lg:w-3/4 px-2">
                       <div className="flex flex-col lg:flex-row gap-x-5.5">
                         <p className="flex flex-col min-w-24 items-center text-sm text-neutral-600 mb-1 lg:mb-0 lg:mt-2">
-                          {new Date().toLocaleTimeString("en-US", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                          {new Date(message.createdAt!).toLocaleTimeString(
+                            "en-US",
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }
+                          )}
                           {message.pseudonym === "Event Assistant" && (
                             <>
                               <span className="hidden lg:inline-block h-full border-l-2 border-l-dark-blue opacity-50 border-dotted my-1"></span>
@@ -249,7 +252,7 @@ function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
                         <DirectMessage
                           key={`msg-${i}`}
                           text={message.body}
-                          date={new Date()}
+                          date={new Date(message.createdAt!)}
                           theme={
                             message.pseudonym === "Event Assistant"
                               ? "assistant"
