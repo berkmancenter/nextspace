@@ -17,11 +17,8 @@ interface FooterProps {
 export const Footer = ({ className = "" }: FooterProps) => {
   const currentYear = new Date().getFullYear();
 
-  // TODO actual URLs
   const footerLinks = [
-    { label: "About", url: "/terms" },
-    { label: "Privacy Policy", url: "/privacy" },
-    { label: "Accessibility", url: "/accessibility" },
+    { label: "About", url: process.env.NEXT_PUBLIC_ABOUT_URL! },
   ];
 
   return (
@@ -41,6 +38,7 @@ export const Footer = ({ className = "" }: FooterProps) => {
               <div key={link.label} className="flex items-center">
                 <Link
                   href={link.url}
+                  target="_blank"
                   className="text-gray-600 hover:text-medium-slate-blue text-sm transition-colors duration-200"
                 >
                   {link.label}
