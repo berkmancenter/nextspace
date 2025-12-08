@@ -24,6 +24,7 @@ export default async function handler(
   const cookie = await new EncryptJWT({
     access: sessionData.accessToken,
     refresh: sessionData.refreshToken,
+    userId: sessionData.userId,
   })
     .setProtectedHeader({ alg: "dir", enc: "A128CBC-HS256" })
     .setExpirationTime("30 days")
