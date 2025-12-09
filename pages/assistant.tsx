@@ -16,7 +16,7 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
-function EventAssistantRoom() {
+function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
   const router = useRouter();
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -36,6 +36,7 @@ function EventAssistantRoom() {
   useEffect(() => {
     if (socket || joining) return;
     setJoining(true);
+
     JoinSession(
       (result) => {
         setPseudonym(result.pseudonym);
@@ -49,9 +50,10 @@ function EventAssistantRoom() {
       },
       (error) => {
         setErrorMessage(error);
-      }
+      },
+      isAuthenticated
     );
-  }, [socket, joining]);
+  }, [socket, joining, isAuthenticated]);
 
   useEffect(() => {
     if (!socket) return;

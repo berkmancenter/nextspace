@@ -24,11 +24,7 @@ import {
 } from "../utils";
 
 import { Transcript } from "../components/";
-import { CheckAuthHeader, DefaultEase } from "../utils/Helpers";
-
-export const getServerSideProps = async (context: { req: any }) => {
-  return CheckAuthHeader(context.req.headers);
-};
+import { DefaultEase } from "../utils/Helpers";
 
 function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
   const router = useRouter();

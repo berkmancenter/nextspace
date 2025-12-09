@@ -219,12 +219,33 @@ export const SendData = async (
  * On failure, it logs the error and calls the error callback with an error message.
  * @param success - Callback function to call on successful join, with token and pseudonym.
  * @param errorCallback - Callback function to call on error, with an error message.
+ * @param isAuthenticated - Indicating if the user is authenticated.
  */
 export const JoinSession = async (
   success: (result: { userId: string; pseudonym: string }) => void,
-  errorCallback: (err: string) => void
+  errorCallback: (err: string) => void,
+  isAuthenticated?: boolean
 ) => {
   try {
+    // Get existing tokens if authenticated
+    if (isAuthenticated) {
+      const cookieRes = await fetch("/api/cookie");
+      const cookieData = await cookieRes.json();
+
+      if (cookieRes.status === 200 && cookieData.tokens) {
+        // User is already logged in, set tokens and return
+        Api.get().SetTokens(
+          cookieData.tokens.access,
+          cookieData.tokens.refresh
+        );
+        success({
+          userId: cookieData.userId,
+          pseudonym: cookieData.username,
+        });
+        return;
+      }
+    }
+
     // Get new pseudonym for session
     const pseudonymResponse = await RetrieveData("auth/newPseudonym");
 
@@ -237,6 +258,22 @@ export const JoinSession = async (
       registerResponse.tokens.access.token,
       registerResponse.tokens.refresh.token
     );
+
+    // Set session cookie via local API route
+    await fetch("/api/session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        username: pseudonymResponse.pseudonym,
+        // Use the access, refresh tokens and userId from the register response
+        userId: registerResponse.user.id,
+        accessToken: registerResponse.tokens.access.token,
+        refreshToken: registerResponse.tokens.refresh.token,
+      }),
+    });
+
     success({
       userId: registerResponse.user.id,
       pseudonym: pseudonymResponse.pseudonym,
@@ -373,8 +410,7 @@ export const createConversationFromData = async (
  * @returns An object containing the isAuthenticated property
  */
 export const CheckAuthHeader = (headers: Record<string, string>) => {
-  const isAuthenticated =
-    headers && headers["x-is-authenticated"] === "true";
+  const isAuthenticated = headers && headers["x-is-authenticated"] === "true";
   return {
     props: {
       isAuthenticated,
