@@ -22,8 +22,13 @@ import {
 
 import { DirectMessage } from "../components";
 import { components } from "../types";
+import { CheckAuthHeader } from "../utils/Helpers";
 
-function BackchannelRoom() {
+export const getServerSideProps = async (context: { req: any }) => {
+  return CheckAuthHeader(context.req.headers);
+};
+
+function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
   const router = useRouter();
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -59,9 +64,10 @@ function BackchannelRoom() {
       },
       (error) => {
         setErrorMessage(error);
-      }
+      },
+      isAuthenticated
     );
-  }, [joining]);
+  }, [joining, isAuthenticated]);
 
   useEffect(() => {
     if (!socket) return;
@@ -285,6 +291,7 @@ function BackchannelRoom() {
                   <div className="w-11/12 lg:w-4/5">
                     {/* Quick Response Buttons */}
                     <div className="flex flex-row justify-center gap-x-2 md:gap-x-3 items-center text-xs p-2">
+                      <p>{`Pseudonym: ${pseudonym}`}</p>
                       <QuickResponseButton label="Let's move on" icon="😀" />
                       <QuickResponseButton label="That's cool" icon="🌟" />
                       <QuickResponseButton label="I'm confused" icon="😵‍💫" />
