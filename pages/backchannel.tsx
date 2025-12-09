@@ -291,7 +291,6 @@ function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
                   <div className="w-11/12 lg:w-4/5">
                     {/* Quick Response Buttons */}
                     <div className="flex flex-row justify-center gap-x-2 md:gap-x-3 items-center text-xs p-2">
-                      <p>{`Pseudonym: ${pseudonym}`}</p>
                       <QuickResponseButton label="Let's move on" icon="😀" />
                       <QuickResponseButton label="That's cool" icon="🌟" />
                       <QuickResponseButton label="I'm confused" icon="😵‍💫" />
