@@ -278,7 +278,7 @@ export const JoinSession = async (
         accessToken: registerResponse.tokens.access.token,
         refreshToken: registerResponse.tokens.refresh.token,
         // End user session in 1 day
-        expiration: 60 * 60 * 24,
+        expirationFromNow: 60 * 60 * 24,
       }),
     });
 
