@@ -20,6 +20,13 @@ export default async function handler(
   const sessionData = req.body;
   const secret = new TextEncoder().encode(process.env.SESSION_SECRET!);
 
+  if (sessionData.expiration && typeof sessionData.expiration !== "number") {
+    res
+      .status(400)
+      .json({ error: "Expiration must be a number representing seconds." });
+    return;
+  }
+
   // Create encrypted JWT cookie
   const cookie = await new EncryptJWT({
     access: sessionData.accessToken,
@@ -27,7 +34,7 @@ export default async function handler(
     userId: sessionData.userId,
   })
     .setProtectedHeader({ alg: "dir", enc: "A128CBC-HS256" })
-    .setExpirationTime("30 days")
+    .setExpirationTime(sessionData.expiration || "30 days")
     .setSubject(sessionData.username)
     .setIssuedAt()
     .encrypt(secret);
@@ -36,7 +43,9 @@ export default async function handler(
     "Set-Cookie",
     `nextspace-session=${cookie}; HttpOnly; ${
       process.env.NODE_ENV === "production" ? "Secure" : ""
-    }; SameSite=Strict; Max-Age=${30 * 24 * 60 * 60}; Path=/`
+    }; SameSite=Strict; Max-Age=${
+      sessionData.expiration || 30 * 24 * 60 * 60
+    }; Path=/`
   );
   res.status(200).json({ message: "Successfully set cookie!" });
 }
