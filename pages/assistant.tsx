@@ -7,7 +7,13 @@ import { Send } from "@mui/icons-material";
 import { Element, scroller } from "react-scroll";
 
 import { DirectMessage } from "../components";
-import { Api, JoinSession, RetrieveData, SendData } from "../utils";
+import {
+  Api,
+  JoinSession,
+  RefreshToken,
+  RetrieveData,
+  SendData,
+} from "../utils";
 import { components } from "../types";
 import { PseudonymousMessage } from "../types.internal";
 import { CheckAuthHeader } from "../utils/Helpers";
@@ -44,6 +50,7 @@ function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
         let socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
           auth: { token: Api.get().GetTokens().access },
         });
+
         // Set the socket instance in state
         setSocket(socketLocal);
         setJoining(false);
@@ -77,76 +84,119 @@ function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
     }
 
     async function fetchConversationData() {
-      RetrieveData(
-        `conversations/${router.query.conversationId}`,
-        Api.get().GetTokens().access!
-      )
-        .then(async (conversation: any) => {
-          if (!conversation) {
-            setErrorMessage("Conversation not found.");
-            return;
-          }
-          if ("error" in conversation) {
-            setErrorMessage(
-              conversation.message?.message || "Error retrieving conversation."
-            );
-            return;
-          }
-          // Check if the event has an event assistant agent
-          // TODO: This should really be a property of the conversation, not inferred from agents
-          const hasEventAssistant = conversation.agents.some(
+      let conversation;
+
+      try {
+        conversation = await RetrieveData(
+          `conversations/${router.query.conversationId}`,
+          Api.get().GetTokens().access!
+        );
+      } catch (e) {
+        console.error("Error retrieving conversation:", e);
+        setErrorMessage("Failed to fetch conversation data.");
+        return;
+      }
+
+      if (!conversation) {
+        setErrorMessage("Conversation not found.");
+        return;
+      }
+
+      // If 401 Unauthorized, refresh the token
+      if (
+        conversation.message &&
+        conversation.message.code === 401 &&
+        Api.get().GetTokens().refresh &&
+        typeof Api.get().GetTokens().refresh === "string"
+      ) {
+        // Refresh the token
+        const tokensResponse = await RefreshToken(
+          Api.get().GetTokens().refresh as string
+        );
+        if (!tokensResponse || "error" in tokensResponse) {
+          setErrorMessage("Session expired. Please log in again.");
+          return;
+        }
+        Api.get().SetTokens(
+          tokensResponse.access.token,
+          tokensResponse.refresh.token
+        );
+
+        // Retry the request with the new token
+        fetchConversationData();
+        return null;
+      }
+      if ("error" in conversation) {
+        setErrorMessage(
+          conversation.message?.message || "Error retrieving conversation."
+        );
+        return;
+      }
+
+      if (!conversation.agents || conversation.agents.length === 0) {
+        setErrorMessage("No agents found in this conversation.");
+        return;
+      }
+      // Check if the event has an event assistant agent
+      // TODO: This should really be a property of the conversation, not inferred from agents
+      const hasEventAssistant = conversation.agents.some(
+        (agent: components["schemas"]["Agent"]) =>
+          agent.agentType === "eventAssistant"
+      );
+
+      if (hasEventAssistant) {
+        setAgentId(
+          conversation.agents.find(
             (agent: components["schemas"]["Agent"]) =>
               agent.agentType === "eventAssistant"
+          )?.id
+        );
+        // If user pre-authenticated, retrieve DM history
+        if (isAuthenticated && userId && agentId) {
+          const channel = `direct-${userId}-${agentId}`;
+          const dmHistory = await RetrieveData(
+            `messages/${router.query.conversationId}?channel=${channel}`,
+            Api.get().GetTokens().access!
           );
-          if (hasEventAssistant)
-            setAgentId(
-              conversation.agents.find(
-                (agent: components["schemas"]["Agent"]) =>
-                  agent.agentType === "eventAssistant"
-              )?.id
-            );
-          else {
-            setErrorMessage(
-              "This conversation does not have an event assistant agent."
-            );
-            return;
-          }
-          if (!socket || !socket.auth) {
-            return;
-          }
+          if (dmHistory && Array.isArray(dmHistory)) setMessages(dmHistory);
+        }
+      } else {
+        setErrorMessage(
+          "This conversation does not have an event assistant agent."
+        );
+        return;
+      }
+      if (!socket || !socket.auth) {
+        return;
+      }
 
-          if (!socket.hasListeners("message:new"))
-            socket.on("message:new", (data) => {
-              if (process.env.NODE_ENV !== "production")
-                console.log("New message:", data);
+      if (!socket.hasListeners("message:new"))
+        socket.on("message:new", (data) => {
+          if (process.env.NODE_ENV !== "production")
+            console.log("New message:", data);
 
-              setMessages((prev) => [...prev, data]);
+          setMessages((prev) => [...prev, data]);
 
-              scroller.scrollTo("end", {
-                duration: 800,
-                delay: 0,
-                offset: 200,
-                smooth: "easeInOutQuart",
-                containerId: "scroll-container",
-              });
-              if (data.pseudonym === "Event Assistant")
-                setWaitingForResponse(false);
-            });
+          scroller.scrollTo("end", {
+            duration: 800,
+            delay: 0,
+            offset: 200,
+            smooth: "easeInOutQuart",
+            containerId: "scroll-container",
+          });
+          if (data.pseudonym === "Event Assistant")
+            setWaitingForResponse(false);
+        });
 
-          if (agentId && userId)
-            socket.emit("conversation:join", {
-              conversationId: router.query.conversationId,
-              token: Api.get().GetTokens().access,
-              channel: { name: `direct-${userId}-${agentId}` },
-            });
-        })
-        .catch((error) => {
-          console.error("Error fetching conversation data:", error);
-          setErrorMessage("Failed to fetch conversation data.");
+      if (agentId && userId)
+        socket.emit("conversation:join", {
+          conversationId: router.query.conversationId,
+          token: Api.get().GetTokens().access,
+          channel: { name: `direct-${userId}-${agentId}` },
         });
     }
     fetchConversationData();
-  }, [socket, router, userId, agentId]);
+  }, [socket, router, userId, agentId, isAuthenticated]);
 
   async function sendMessage(message: string) {
     if (!Api.get().GetTokens() || !message) return;
@@ -273,7 +323,7 @@ function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
                       {/* Message Input */}
                       <Box display="flex" alignItems="center" padding="8px">
                         <div className="flex flex-col w-full">
-                          <div className="border-[1px] border-b-0 border-[#A5B4FC] rounded-t-lg p-2 font-bold text-sm uppercase">
+                          <div className="border-[1px] border-b-0 border-[#A5B4FC] rounded-t-lg p-2 font-bold text-sm ">
                             Writing as {pseudonym}
                           </div>
                           <TextField
