@@ -3,7 +3,7 @@ import decryptCookie from "../../utils/Decrypt";
 import { JWTDecryptResult } from "jose";
 
 /**
- * API Route to simply see if user has stored cookie and then decrypt it, return tokens
+ * API Route to simply see if user has stored cookie and then decrypt it, return tokens and user info
  * @param req - NextApiRequest object
  * @param res - NextApiResponse object
  */

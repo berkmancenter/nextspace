@@ -37,6 +37,8 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
         Checks the `[id]` and renders an `EventStatus` component.
   - **api/**
     Client-side public API routes; see [Next.js docs](https://nextjs.org/docs/pages/building-your-application/routing/api-routes)
+    - **cookie.ts**
+      Route to see if user has stored cookie and then decrypt it, return tokens and user info.
     - **logout.ts**
       Route to handle user logout by clearing the session cookie.
     - **request.ts**
