@@ -20,10 +20,14 @@ export default async function handler(
   const sessionData = req.body;
   const secret = new TextEncoder().encode(process.env.SESSION_SECRET!);
 
-  if (sessionData.expiration && typeof sessionData.expiration !== "number") {
+  // Check if expirationFromNow is a number if provided
+  if (
+    sessionData.expirationFromNow &&
+    typeof sessionData.expirationFromNow !== "number"
+  ) {
     res
       .status(400)
-      .json({ error: "Expiration must be a number representing seconds." });
+      .json({ error: "expirationFromNow must be a number in seconds." });
     return;
   }
 
@@ -34,18 +38,22 @@ export default async function handler(
     userId: sessionData.userId,
   })
     .setProtectedHeader({ alg: "dir", enc: "A128CBC-HS256" })
-    .setExpirationTime(sessionData.expiration || "30 days")
+    .setExpirationTime(
+      sessionData.expirationFromNow
+        ? Math.floor(Date.now() / 1000) + sessionData.expirationFromNow
+        : "30d"
+    )
     .setSubject(sessionData.username)
     .setIssuedAt()
     .encrypt(secret);
+
+  const maxAge = sessionData.expirationFromNow || 30 * 24 * 60 * 60;
 
   res.setHeader(
     "Set-Cookie",
     `nextspace-session=${cookie}; HttpOnly; ${
       process.env.NODE_ENV === "production" ? "Secure" : ""
-    }; SameSite=Strict; Max-Age=${
-      sessionData.expiration || 30 * 24 * 60 * 60
-    }; Path=/`
+    }; SameSite=Strict; Max-Age=${maxAge}; Path=/`
   );
   res.status(200).json({ message: "Successfully set cookie!" });
 }
