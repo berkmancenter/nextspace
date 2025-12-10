@@ -5,9 +5,9 @@ import { JWTDecryptResult } from "jose";
 
 export async function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
+  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
   try {
     const token = (await cookies()).get("nextspace-session")?.value;
-    const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
     // If no token and trying to access admin, redirect to signup, else mark as not authenticated
     if (!token) {
       if (isAdminRoute) {
@@ -37,7 +37,8 @@ export async function middleware(request: NextRequest) {
     // jwtDecrypt will throw an error when the token is invalid
     console.error("Middleware auth error:", e);
     const url = request.nextUrl.clone();
-    url.pathname = "/signup";
+    // Redirect to signup if trying to access admin routes
+    if (isAdminRoute) url.pathname = "/signup";
     return NextResponse.redirect(url);
   }
 }
