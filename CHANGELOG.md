@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/berkmancenter/nextspace/compare/v1.2.0...v1.2.1) (2025-12-08)
+
+
+### Bug Fixes
+
+* assistant page not preserving message time ([6c0b11f](https://github.com/berkmancenter/nextspace/commit/6c0b11f871ac49e14f2a7e9d1d33920231b8d7af))
+
 ## [1.2.0](https://github.com/berkmancenter/nextspace/compare/v1.1.0...v1.2.0) (2025-12-08)
 
 
