@@ -63,6 +63,12 @@ export class Api {
       refresh: null,
     };
   }
+  ClearTokens() {
+    this.API_TOKENS = {
+      access: null,
+      refresh: null,
+    };
+  }
 
   async GetConfig() {
     if (!this.configCache) {
