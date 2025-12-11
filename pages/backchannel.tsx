@@ -22,8 +22,13 @@ import {
 
 import { DirectMessage } from "../components";
 import { components } from "../types";
+import { CheckAuthHeader } from "../utils/Helpers";
 
-function BackchannelRoom() {
+export const getServerSideProps = async (context: { req: any }) => {
+  return CheckAuthHeader(context.req.headers);
+};
+
+function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
   const router = useRouter();
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -59,9 +64,10 @@ function BackchannelRoom() {
       },
       (error) => {
         setErrorMessage(error);
-      }
+      },
+      isAuthenticated
     );
-  }, [joining]);
+  }, [joining, isAuthenticated]);
 
   useEffect(() => {
     if (!socket) return;

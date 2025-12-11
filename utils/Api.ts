@@ -3,6 +3,8 @@
  * @file Helper methods for fetching data from the LLM Facilitator API
  */
 
+import { Api } from "./Helpers";
+
 /**
  * Authenticate the user with the API.
  * @returns Promise with access and refresh tokens
@@ -63,6 +65,25 @@ export const RefreshToken = async (refreshToken: string) => {
       headers: options.headers,
       body: options.body,
     });
+
+    // If 401 Unauthorized, all tokens have expired, clear local session
+    if (response.status === 401) {
+      const logoutResponse = await fetch("/api/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      // Clear tokens from local Api instance
+      Api.get().ClearTokens();
+      Api.get().ClearAdminTokens();
+
+      if (!logoutResponse.ok) {
+        throw new Error("Logout failed");
+      }
+      return;
+    }
 
     if (!response.ok) {
       throw new Error("Network response was not ok");

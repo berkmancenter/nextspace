@@ -12,7 +12,7 @@ export default async function decryptCookie(
     if (!token) throw new Error("No token found");
     const secret = new TextEncoder().encode(process.env.SESSION_SECRET!);
     const cookie = await jwtDecrypt(token, secret);
-    return cookie.payload;
+    return cookie;
   } catch (error) {
     console.error("Failed to decrypt cookie:", error);
     return null;

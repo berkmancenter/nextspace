@@ -89,7 +89,7 @@ describe("EventAssistantRoom", () => {
 
     let container;
     await act(async () => {
-      const result = render(<EventAssistantRoom />);
+      const result = render(<EventAssistantRoom isAuthenticated={false} />);
       container = result.container;
     });
 
@@ -105,7 +105,7 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     await waitFor(() => {
@@ -125,7 +125,7 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     await waitFor(() => {
@@ -147,7 +147,7 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     await waitFor(() => {
@@ -165,7 +165,7 @@ describe("EventAssistantRoom", () => {
     (RetrieveData as jest.Mock).mockResolvedValue(null);
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     await waitFor(() => {
@@ -183,7 +183,7 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     await waitFor(() => {
@@ -200,7 +200,7 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     await waitFor(() => {
@@ -218,7 +218,7 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     // Simulate socket connection
@@ -243,7 +243,7 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     await waitFor(() => {
@@ -261,7 +261,7 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     // Simulate socket connection
@@ -311,7 +311,7 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     // Simulate socket connection
@@ -341,7 +341,7 @@ describe("EventAssistantRoom", () => {
     (SendData as jest.Mock).mockResolvedValue({ success: true });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     // Simulate socket connection
@@ -379,7 +379,7 @@ describe("EventAssistantRoom", () => {
     (SendData as jest.Mock).mockResolvedValue({ success: true });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     // Simulate socket connection
@@ -409,7 +409,7 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     // Simulate socket connection
@@ -439,7 +439,7 @@ describe("EventAssistantRoom", () => {
     );
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     // Simulate socket connection
@@ -468,10 +468,17 @@ describe("EventAssistantRoom", () => {
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-456", agentType: "eventAssistant" }],
     });
+
+    // Print all mock data
+    console.log("Full mock data:", {
+      calls: (RetrieveData as jest.Mock).mock.calls,
+      results: (RetrieveData as jest.Mock).mock.results,
+      instances: (RetrieveData as jest.Mock).mock.instances,
+    });
     (SendData as jest.Mock).mockResolvedValue({ success: true });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     // Simulate socket connection
@@ -501,7 +508,7 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     await waitFor(() => {
@@ -516,7 +523,7 @@ describe("EventAssistantRoom", () => {
     (RetrieveData as jest.Mock).mockRejectedValue(new Error("Network error"));
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     await waitFor(() => {
@@ -532,7 +539,7 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     // Simulate socket connection
@@ -571,7 +578,7 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      render(<EventAssistantRoom />);
+      render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     // Simulate socket connection
@@ -610,12 +617,80 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      const { rerender } = render(<EventAssistantRoom />);
-      rerender(<EventAssistantRoom />);
+      const { rerender } = render(
+        <EventAssistantRoom isAuthenticated={false} />
+      );
+      rerender(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     await waitFor(() => {
       expect(JoinSession).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("conversation history is shown if user is already authenticated", async () => {
+    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
+      onSuccess({ pseudonym: "TestUser", userId: "user-123" });
+    });
+
+    const mockHistory = [
+      {
+        body: "This is a past message.",
+        pseudonym: "TestUser",
+        createdAt: new Date(Date.now() - 100000).toISOString(),
+      },
+      {
+        body: "This is a past response.",
+        pseudonym: "Event Assistant",
+        createdAt: new Date(Date.now() - 90000).toISOString(),
+      },
+    ];
+
+    // Mock RetrieveData to return different values based on the endpoint
+    (RetrieveData as jest.Mock).mockImplementation((endpoint) => {
+      if (endpoint === "conversations/test-conversation-id") {
+        return Promise.resolve({
+          agents: [{ id: "agent-456", agentType: "eventAssistant" }],
+        });
+      }
+      if (
+        endpoint ===
+        "messages/test-conversation-id?channel=direct-user-123-agent-456"
+      ) {
+        return Promise.resolve([...mockHistory]);
+      }
+      return Promise.resolve(null);
+    });
+
+    await act(async () => {
+      render(<EventAssistantRoom isAuthenticated={true} />);
+    });
+
+    // Simulate socket connection
+    await act(async () => {
+      const connectHandler = mockSocket.on.mock.calls.find(
+        (call) => call[0] === "connect"
+      )?.[1];
+      if (connectHandler) connectHandler();
+    });
+
+    await waitFor(() => {
+      expect(RetrieveData).toHaveBeenCalledWith(
+        "conversations/test-conversation-id",
+        "mock-access-token"
+      );
+    });
+
+    await waitFor(() => {
+      expect(RetrieveData).toHaveBeenCalledWith(
+        "messages/test-conversation-id?channel=direct-user-123-agent-456",
+        "mock-access-token"
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("This is a past message.")).toBeInTheDocument();
+      expect(screen.getByText("This is a past response.")).toBeInTheDocument();
     });
   });
 });
