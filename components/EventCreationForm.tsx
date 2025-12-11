@@ -73,6 +73,10 @@ export const EventCreationForm: React.FC = ({}) => {
 
   const formRef = useRef<HTMLFormElement>(null);
 
+  const setFieldFocus = (fieldName: string) => {
+    (formRef.current?.elements.namedItem(fieldName) as HTMLElement)?.focus();
+  };
+
   useEffect(() => {
     if (selectedConvType) {
       const type = conversationTypes?.find((a) => a.name === selectedConvType);
@@ -80,7 +84,7 @@ export const EventCreationForm: React.FC = ({}) => {
         setBotName(type.label || type.name);
       }
     }
-  }, [selectedConvType]);
+  }, [conversationTypes, selectedConvType]);
 
   useEffect(() => {
     async function fetchServerConfig() {
@@ -110,16 +114,19 @@ export const EventCreationForm: React.FC = ({}) => {
     // Check that required fields are present
     if (!formData.get("name")) {
       setFormError("Event Name is required");
+      setFieldFocus("name");
       return false;
     }
 
     // Check zoom fields
     if (!zoomMeetingUrl) {
       setFormError("Zoom Meeting URL is required");
+      setFieldFocus("zoomMeetingUrl");
       return false;
     }
     if (!zoomMeetingUrl.match(zoomMeetingUrlPattern)) {
       setFormError(zoomUrlDomainError);
+      setFieldFocus("zoomMeetingUrl");
       return false;
     }
 
@@ -317,6 +324,7 @@ export const EventCreationForm: React.FC = ({}) => {
               component="fieldset"
               fullWidth
               margin="normal"
+              id="platforms-select"
               sx={{
                 border: "1px solid rgba(0, 0, 0, 0.23)",
                 borderRadius: 1,
