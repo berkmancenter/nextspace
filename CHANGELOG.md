@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/berkmancenter/nextspace/compare/v1.2.1...v1.3.0) (2025-12-11)
+
+
+### Features
+
+* add event desc, speakers, moderators to and event creation form, break into multi steps ([6923fc3](https://github.com/berkmancenter/nextspace/commit/6923fc3cdcfc7d34d5eb9575a38b5ca67aba6a06))
+
 ## [1.2.1](https://github.com/berkmancenter/nextspace/compare/v1.2.0...v1.2.1) (2025-12-08)
 
 
