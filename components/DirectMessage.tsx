@@ -25,11 +25,11 @@ export const DirectMessage: FC<DirectMessageProps> = ({
   theme = "none",
 }) => {
   const [isMessageSent, setIsMessageSent] = useState(false);
-  let themeClass = "w-full my-1";
+  let themeClass = "w-full my-1 px-4";
   if (theme === "assistant")
-    themeClass = `${themeClass} bg-light-gray rounded-2xl p-4`;
+    themeClass = `${themeClass} bg-light-gray rounded-2xl`;
   else if (theme === "backchannel")
-    themeClass = `${themeClass} bg-[#E0E7FF] rounded-lg p-4`;
+    themeClass = `${themeClass} bg-[#E0E7FF] rounded-lg`;
 
   useEffect(() => {
     setTimeout(() => {
@@ -42,7 +42,7 @@ export const DirectMessage: FC<DirectMessageProps> = ({
     <Box display="flex" flexDirection="column" rowGap=".5rem">
       <div className={`block ${themeClass}`}>
         {theme === "assistant" && (
-          <p className="py-3 text-xs text-dark-blue font-bold uppercase">
+          <p className="pt-2 pb-3 text-xs text-dark-blue font-bold uppercase">
             Event Assistant
           </p>
         )}
