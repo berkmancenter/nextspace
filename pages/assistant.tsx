@@ -10,7 +10,8 @@ import { DirectMessage } from "../components";
 import { Api, JoinSession, RetrieveData, SendData } from "../utils";
 import { components } from "../types";
 import { PseudonymousMessage } from "../types.internal";
-import { CheckAuthHeader } from "../utils/Helpers";
+import { CheckAuthHeader, randomizedSvgShape } from "../utils/Helpers";
+import { animate, AnimatePresence, cubicBezier, motion } from "motion/react";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -25,6 +26,10 @@ function EventAssistantRoom() {
   const [waitingForResponse, setWaitingForResponse] = useState(false);
 
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
+
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+
   const [currentMessage, setCurrentMessage] = useState("");
   const [pseudonym, setPseudonym] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -32,6 +37,35 @@ function EventAssistantRoom() {
   const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
 
   const messageInputRef = useRef<HTMLInputElement>(null);
+  const mediaPlayerRef = useRef<HTMLAudioElement>(null);
+
+  // Flair animation for new EA messages
+  const flair = () => {
+    const flairElement = document.getElementById("message-flair");
+    if (flairElement) {
+      flairElement.style.maskImage = randomizedSvgShape();
+    }
+    animate(
+      "#message-flair",
+      {
+        scale: [0, 1.4 + Math.random() * 0.3],
+        opacity: [1, 0],
+        rotate: [
+          `${-15 + Math.random() * 10}deg`,
+          `${15 + Math.random() * 10}deg`,
+        ],
+        background: [
+          `radial-gradient(at ${1 + Math.random() * 150}% ${
+            35 + Math.random() * 20
+          }%, #6366F1, transparent)`,
+          `radial-gradient(at ${1 + Math.random() * 150}% ${
+            35 + Math.random() * 20
+          }%, #A78BFA, transparent)`,
+        ],
+      },
+      { duration: 1.4, ease: cubicBezier(0.075, 0.82, 0.165, 1.0) }
+    );
+  };
 
   useEffect(() => {
     if (socket || joining) return;
@@ -118,8 +152,21 @@ function EventAssistantRoom() {
               if (process.env.NODE_ENV !== "production")
                 console.log("New message:", data);
 
+              // Append new message to messages list
               setMessages((prev) => [...prev, data]);
 
+              // Play new message sound
+              if (
+                mediaPlayerRef.current &&
+                data.pseudonym !== pseudonym &&
+                messagesRef.current.length > 0
+              ) {
+                flair();
+                mediaPlayerRef.current.currentTime = 0;
+                mediaPlayerRef.current.play().catch((e) => {
+                  console.error("Error playing sound:", e);
+                });
+              }
               scroller.scrollTo("end", {
                 duration: 800,
                 delay: 0,
@@ -144,7 +191,7 @@ function EventAssistantRoom() {
         });
     }
     fetchConversationData();
-  }, [socket, router, userId, agentId]);
+  }, [socket, router, userId, agentId, pseudonym, messages]);
 
   async function sendMessage(message: string) {
     if (!Api.get().GetTokens() || !message) return;
@@ -165,6 +212,14 @@ function EventAssistantRoom() {
 
   return (
     <div className="h-screen flex items-start justify-center mt-12">
+      {/* Hidden media player for new message SFX */}
+      <audio
+        ref={mediaPlayerRef}
+        src="/new-msg.wav"
+        preload="auto"
+        autoPlay={false}
+        loop={false}
+      />
       {errorMessage ? (
         <div className="text-medium-slate-blue text-lg font-bold mx-9">
           {errorMessage}
@@ -250,19 +305,45 @@ function EventAssistantRoom() {
                             </>
                           )}
                         </p>
-                        <DirectMessage
-                          key={`msg-${i}`}
-                          text={message.body}
-                          date={new Date(message.createdAt!)}
-                          theme={
-                            message.pseudonym === "Event Assistant"
-                              ? "assistant"
-                              : "none"
-                          }
-                        />
+                        <AnimatePresence>
+                          <motion.div
+                            key={`msg-${i}`}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            <DirectMessage
+                              text={message.body}
+                              date={new Date(message.createdAt!)}
+                              theme={
+                                message.pseudonym === "Event Assistant"
+                                  ? "assistant"
+                                  : "none"
+                              }
+                            />
+                          </motion.div>
+                        </AnimatePresence>
                       </div>
                     </div>
                   ))}
+
+                  <motion.div
+                    id="message-flair-dad"
+                    className="relative h-56 w-1/2 blur-md"
+                  >
+                    <motion.div
+                      className="w-full h-full rounded-full bg-radial-[at_30%_45%] from-indigo-500 to-transparent"
+                      id="message-flair"
+                      style={{
+                        maskImage:
+                          'url(\'data:image/svg+xml,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cpath fill="black" d="M44.7,-76.4C58.8,-69.2,71.8,-59.1,79.6,-45.8C87.4,-32.6,90,-16.3,88.5,-0.9C87,14.6,81.4,29.2,73.1,42.8C64.8,56.4,53.8,69,39.8,76.8C25.8,84.6,8.8,87.6,-7.6,87.1C-24,86.6,-39.4,82.6,-52.8,74.4C-66.2,66.2,-77.6,53.8,-84.8,38.8C-92,23.8,-95,6.2,-92.4,-10.2C-89.8,-26.6,-81.6,-41.8,-69.8,-52.8C-58,-63.8,-42.6,-70.6,-27.4,-77.4C-12.2,-84.2,2.6,-91,18.8,-91.4C35,-91.8,30.6,-83.6,44.7,-76.4Z" transform="translate(100 100)" stroke-linejoin="round" stroke-linecap="round" /%3E%3C/svg%3E\')',
+                        maskSize: "contain",
+                        maskRepeat: "no-repeat",
+                        maskPosition: "center",
+                      }}
+                    />
+                  </motion.div>
                   {/* Scroll to bottom element */}
                   <Element name="end" />
                 </div>
@@ -317,6 +398,13 @@ function EventAssistantRoom() {
                               input: {
                                 endAdornment: (
                                   <InputAdornment position="end">
+                                    <IconButton
+                                      onClick={flair}
+                                      aria-label="add flair"
+                                      size="small"
+                                    >
+                                      ✨
+                                    </IconButton>
                                     <IconButton
                                       onClick={() =>
                                         sendMessage(

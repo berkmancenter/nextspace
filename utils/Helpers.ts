@@ -368,13 +368,50 @@ export const createConversationFromData = async (
   };
 };
 
+// Experimental blob shape randomization for flair effects
+function randomizeBlobShape(
+  baseShape: string,
+  variation: number = 0.3
+): string {
+  // Parse the path commands
+  const commands = baseShape.match(/[MLCZmlcz][^MLCZmlcz]*/g);
+  if (!commands) return baseShape;
+
+  const randomized = commands.map((cmd) => {
+    const letter = cmd[0];
+    const coords = cmd
+      .slice(1)
+      .split(",")
+      .map((n) => parseFloat(n.trim()));
+
+    // Apply random variation to each coordinate
+    const varied = coords.map((coord) => {
+      const change = coord * (Math.random() * variation * 2 - variation);
+      return (coord + change).toFixed(1);
+    });
+
+    return letter + varied.join(",");
+  });
+
+  return randomized.join("");
+}
+
+// Generates a randomized SVG shape as a data URL for use in CSS
+export const randomizedSvgShape = () => {
+  const svgShape =
+    "M41.3,-72.8C52.3,-64.7,59.3,-51.5,66.8,-38.2C74.3,-24.9,82.3,-11.5,83.8,2.5C85.3,16.5,80.3,31.1,71.8,43.5C63.3,55.9,51.3,66.1,37.8,72.4C24.3,78.7,9.3,81.1,-5.8,79.9C-20.9,78.7,-36.1,73.9,-49.1,66.3C-62.1,58.7,-72.9,48.3,-79.3,35.5C-85.7,22.7,-87.7,7.5,-85.2,-6.9C-82.7,-21.3,-75.7,-34.9,-66.3,-46.1C-56.9,-57.3,-45.1,-66.1,-32.5,-73.5C-19.9,-80.9,-5.7,-86.9,7.3,-97.7C20.3,-108.5,30.3,-80.9,41.3,-72.8Z";
+  // Anything above .3 variation looks too distorted
+  const shape = randomizeBlobShape(svgShape, 0.3);
+  const svg = `url(\'data:image/svg+xml,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cpath fill="black" d="${shape}" transform="translate(100 100)" /%3E%3C/svg%3E\')`;
+  return svg;
+};
+
 /** Check if the request has the authentication header set
  * @param headers - The request headers
  * @returns An object containing the isAuthenticated property
  */
 export const CheckAuthHeader = (headers: Record<string, string>) => {
-  const isAuthenticated =
-    headers && headers["x-is-authenticated"] === "true";
+  const isAuthenticated = headers && headers["x-is-authenticated"] === "true";
   return {
     props: {
       isAuthenticated,
