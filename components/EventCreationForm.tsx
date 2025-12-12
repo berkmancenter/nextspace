@@ -25,6 +25,7 @@ import { EventStatus } from "./";
 import { components } from "../types";
 import { Conversation } from "../types.internal";
 import { createConversationFromData, Api } from "../utils/Helpers";
+import { useField } from "@mui/x-date-pickers/internals";
 
 /**
  * EventCreationForm component
@@ -71,6 +72,13 @@ export const EventCreationForm: React.FC = ({}) => {
     null
   );
 
+  const [formGroupsErrors, setFormGroupsErrors] = useState({
+    platforms: false,
+    conversationType: false,
+  });
+  const [platformsPreviouslyChecked, setPlatformsPreviouslyChecked] =
+    useState(false);
+
   const formRef = useRef<HTMLFormElement>(null);
 
   const setFieldFocus = (fieldName: string) => {
@@ -85,6 +93,17 @@ export const EventCreationForm: React.FC = ({}) => {
       }
     }
   }, [conversationTypes, selectedConvType]);
+
+  useEffect(() => {
+    // If all platforms are deselected after one+ selection, error state should be shown
+    setFormGroupsErrors((prev) => ({
+      ...prev,
+      platforms: selectedPlatforms.length === 0 && platformsPreviouslyChecked,
+    }));
+    setPlatformsPreviouslyChecked(selectedPlatforms.length > 0);
+    //Exhaustive-deps disabled to avoid double-dip
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPlatforms]);
 
   useEffect(() => {
     async function fetchServerConfig() {
@@ -133,12 +152,16 @@ export const EventCreationForm: React.FC = ({}) => {
     // Check that at least one platform is selected
     if (selectedPlatforms.length === 0) {
       setFormError("At least one platform must be selected");
+      setFieldFocus("nextspace");
+      setFormGroupsErrors((prev) => ({ ...prev, platforms: true }));
       return false;
     }
 
     // Check that agent is selected
     if (!selectedConvType) {
       setFormError("At least one agent must be selected");
+      setFieldFocus("agent-option-0");
+      setFormGroupsErrors((prev) => ({ ...prev, conversationType: true }));
       return false;
     }
 
@@ -149,6 +172,8 @@ export const EventCreationForm: React.FC = ({}) => {
     }
 
     setFormError(null);
+    setFormGroupsErrors({ platforms: false, conversationType: false });
+
     return true;
   };
 
@@ -326,7 +351,9 @@ export const EventCreationForm: React.FC = ({}) => {
               margin="normal"
               id="platforms-select"
               sx={{
-                border: "1px solid rgba(0, 0, 0, 0.23)",
+                border: formGroupsErrors.platforms
+                  ? "2px solid red"
+                  : "1px solid rgba(0, 0, 0, 0.23)",
                 borderRadius: 1,
                 p: 2,
                 "&:focus-within": {
@@ -351,6 +378,7 @@ export const EventCreationForm: React.FC = ({}) => {
                     key={platform.name}
                     control={
                       <Checkbox
+                        name={platform.name.toLowerCase()}
                         checked={selectedPlatforms.indexOf(platform.name) > -1}
                         onChange={(e) => {
                           if (e.target.checked) {
@@ -381,7 +409,9 @@ export const EventCreationForm: React.FC = ({}) => {
               required
               margin="normal"
               sx={{
-                border: "1px solid rgba(0, 0, 0, 0.23)",
+                border: formGroupsErrors.conversationType
+                  ? "2px solid red"
+                  : "1px solid rgba(0, 0, 0, 0.23)",
                 borderRadius: 1,
                 p: 2,
                 "&:focus-within": {
@@ -405,6 +435,10 @@ export const EventCreationForm: React.FC = ({}) => {
                 name="selectedConvType"
                 onChange={(e) => {
                   setSelectedConvType(e.target.value);
+                  setFormGroupsErrors((prev) => ({
+                    ...prev,
+                    conversationType: false,
+                  }));
                 }}
                 sx={{ mt: -1 }}
               >
@@ -412,7 +446,7 @@ export const EventCreationForm: React.FC = ({}) => {
                   <div key={option.name}>
                     <FormControlLabel
                       value={option.name}
-                      control={<Radio required={index === 0} />} // ← Makes validation work
+                      control={<Radio name={`agent-option-${index}`} />} // ← Makes validation work
                       label={option.label}
                       sx={
                         index === 0
