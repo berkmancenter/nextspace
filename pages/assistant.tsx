@@ -333,7 +333,7 @@ function EventAssistantRoom() {
                     className="relative h-56 w-1/2 blur-md"
                   >
                     <motion.div
-                      className="w-full h-full rounded-full bg-radial-[at_30%_45%] from-indigo-500 to-transparent"
+                      className="w-full h-full opacity-0 bg-radial-[at_30%_45%] from-indigo-500 to-transparent"
                       id="message-flair"
                       style={{
                         maskImage:
