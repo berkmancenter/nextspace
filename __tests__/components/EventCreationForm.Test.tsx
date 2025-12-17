@@ -455,25 +455,6 @@ describe("EventCreationForm Component", () => {
     expect(screen.getByRole("button", { name: /back/i })).toBeDisabled();
   });
 
-  it("validates zoom meeting URL format", async () => {
-    const user = userEvent.setup();
-    await act(async () => {
-      render(<EventCreationForm />);
-    });
-
-    const urlInput = screen.getByLabelText(/Zoom Meeting URL/i);
-    await user.type(urlInput, "invalid-url");
-
-    // Try to proceed to next step
-    await user.click(screen.getByRole("button", { name: /next/i }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(/Invalid Zoom Meeting URL format/i, { exact: false })
-      ).toBeInTheDocument();
-    });
-  });
-
   it("allows custom zoom bot name configuration on Step 3", async () => {
     const user = userEvent.setup();
     await act(async () => {

@@ -33,6 +33,16 @@ export async function middleware(request: NextRequest) {
   } catch (e) {
     // jwtDecrypt will throw an error when the token is invalid
     console.error("Middleware auth error:", e);
+
+    // Don't redirect if already on signup or login page to avoid redirect loop
+    if (
+      request.nextUrl.pathname === "/signup" ||
+      request.nextUrl.pathname === "/login"
+    ) {
+      requestHeaders.set("x-is-authenticated", "false");
+      return NextResponse.next({ headers: requestHeaders });
+    }
+
     const url = request.nextUrl.clone();
     url.pathname = "/signup";
     return NextResponse.redirect(url);

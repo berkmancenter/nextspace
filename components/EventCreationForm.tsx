@@ -77,15 +77,6 @@ export const EventCreationForm: React.FC = ({}) => {
     useState<boolean>(false);
   const [zoomMeetingTime, setZoomMeetingTime] = useState<string>("");
 
-  // Zoom Meeting URL pattern from environment variable or fallback regex
-  const zoomMeetingUrlPattern = process.env.NEXT_PUBLIC_ZOOM_URL_PATTERN
-    ? new RegExp(process.env.NEXT_PUBLIC_ZOOM_URL_PATTERN)
-    : /https:\/\/[\w-]*\.?zoom.us\/.*/g;
-  const zoomUrlDomain = process.env.NEXT_PUBLIC_ZOOM_DOMAIN || "zoom.us";
-  const zoomUrlDomainError = `Invalid Zoom Meeting URL format ${
-    zoomUrlDomain ? `(must use ${zoomUrlDomain})` : ""
-  }.`;
-
   const [botName, setBotName] = useState<string | null>(null);
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -147,10 +138,6 @@ export const EventCreationForm: React.FC = ({}) => {
     // Check zoom fields
     if (!zoomMeetingUrl) {
       setFormError("Zoom Meeting URL is required");
-      return false;
-    }
-    if (!zoomMeetingUrl.match(zoomMeetingUrlPattern)) {
-      setFormError(zoomUrlDomainError);
       return false;
     }
 
@@ -416,19 +403,13 @@ export const EventCreationForm: React.FC = ({}) => {
                 onBlur={() =>
                   // Check format on unfocus
                   setZoomMeetingUrlHasError(
-                    !zoomMeetingUrl ||
-                      zoomMeetingUrl.length < 10 ||
-                      (zoomMeetingUrl.length > 0 &&
-                        !zoomMeetingUrl.match(zoomMeetingUrlPattern))
+                    !zoomMeetingUrl || zoomMeetingUrl.length < 10
                   )
                 }
                 error={zoomMeetingUrlHasError}
                 helperText={
                   zoomMeetingUrlHasError
-                    ? zoomMeetingUrl.length > 0 &&
-                      !zoomMeetingUrl.match(zoomMeetingUrlPattern)
-                      ? zoomUrlDomainError
-                      : "Enter the Zoom Meeting URL for transcription purposes."
+                    ? "Enter the Zoom Meeting URL for transcription purposes."
                     : null
                 }
                 variant="outlined"
