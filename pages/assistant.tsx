@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
 import { Box, IconButton, InputAdornment, TextField } from "@mui/material";
-import { Send } from "@mui/icons-material";
+import { Send, Close } from "@mui/icons-material";
 
 import { Element, scroller } from "react-scroll";
 
-import { DirectMessage } from "../components";
+import { DirectMessage, ControlledInputConfig } from "../components";
 import { Api, JoinSession, RetrieveData, SendData } from "../utils";
 import { components } from "../types";
 import { PseudonymousMessage } from "../types.internal";
@@ -30,6 +30,8 @@ function EventAssistantRoom() {
   const [userId, setUserId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
+  const [controlledMode, setControlledMode] =
+    useState<ControlledInputConfig | null>(null);
 
   const messageInputRef = useRef<HTMLInputElement>(null);
 
@@ -150,18 +152,62 @@ function EventAssistantRoom() {
     if (!Api.get().GetTokens() || !message) return;
     let channels = [{ name: `direct-${userId}-${agentId}` }];
 
+    // Prepend prefix if in controlled mode
+    const finalMessage = controlledMode
+      ? controlledMode.prefix + message
+      : message;
+
     setWaitingForResponse(true);
     setCurrentMessage("");
 
     await SendData("messages", {
-      body: message,
+      body: finalMessage,
       bodyType: "text",
       conversation: router.query.conversationId,
       channels,
     });
 
     messageInputRef.current!.value = "";
+
+    // Auto-exit controlled mode after sending
+    if (controlledMode) {
+      setControlledMode(null);
+    }
   }
+
+  const enterControlledMode = (config: ControlledInputConfig) => {
+    setControlledMode(config);
+    setCurrentMessage("");
+    if (messageInputRef.current) {
+      messageInputRef.current.value = "";
+      messageInputRef.current.focus();
+    }
+  };
+
+  const exitControlledMode = () => {
+    setControlledMode(null);
+    setCurrentMessage("");
+    if (messageInputRef.current) {
+      messageInputRef.current.value = "";
+    }
+  };
+
+  // Handle ESC key to exit controlled mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && controlledMode) {
+        exitControlledMode();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [controlledMode]);
+
+  const sendFeedbackRating = async (messageId: string, rating: number) => {
+    const feedbackText = `/ShareFeedback|Rating|${messageId}|${rating}`;
+    await sendMessage(feedbackText);
+  };
 
   return (
     <div className="h-screen flex items-start justify-center mt-12">
@@ -258,6 +304,9 @@ function EventAssistantRoom() {
                               ? "assistant"
                               : "none"
                           }
+                          messageId={message.id}
+                          onPopulateFeedbackText={enterControlledMode}
+                          onSendFeedbackRating={sendFeedbackRating}
                         />
                       </div>
                     </div>
@@ -271,8 +320,25 @@ function EventAssistantRoom() {
                       {/* Message Input */}
                       <Box display="flex" alignItems="center" padding="8px">
                         <div className="flex flex-col w-full">
-                          <div className="border-[1px] border-b-0 border-[#A5B4FC] rounded-t-lg p-2 font-bold text-sm uppercase">
-                            Writing as {pseudonym}
+                          <div className="border-[1px] border-b-0 border-[#A5B4FC] rounded-t-lg p-2 font-bold text-sm flex justify-between items-center">
+                            <span className="uppercase">
+                              Writing as {pseudonym}
+                              {controlledMode && (
+                                <span className="normal-case">
+                                  {" • "}
+                                  {controlledMode.icon} {controlledMode.label}
+                                </span>
+                              )}
+                            </span>
+                            {controlledMode && (
+                              <IconButton
+                                size="small"
+                                onClick={exitControlledMode}
+                                sx={{ padding: "4px" }}
+                              >
+                                <Close fontSize="small" />
+                              </IconButton>
+                            )}
                           </div>
                           <TextField
                             id="message-input"
