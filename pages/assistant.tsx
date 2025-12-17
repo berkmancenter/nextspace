@@ -157,7 +157,11 @@ function EventAssistantRoom() {
       ? controlledMode.prefix + message
       : message;
 
-    setWaitingForResponse(true);
+    // Only set waitingForResponse for regular messages, not controlled mode messages
+    // (controlled mode messages like feedback don't generate responses)
+    if (!controlledMode) {
+      setWaitingForResponse(true);
+    }
     setCurrentMessage("");
 
     await SendData("messages", {
@@ -166,8 +170,6 @@ function EventAssistantRoom() {
       conversation: router.query.conversationId,
       channels,
     });
-
-    messageInputRef.current!.value = "";
 
     // Auto-exit controlled mode after sending
     if (controlledMode) {
@@ -178,9 +180,6 @@ function EventAssistantRoom() {
   const enterControlledMode = (config: ControlledInputConfig) => {
     setControlledMode(config);
     setCurrentMessage("");
-    if (messageInputRef.current) {
-      messageInputRef.current.value = "";
-    }
     // Use setTimeout to ensure focus happens after any state updates
     setTimeout(() => {
       if (messageInputRef.current) {
@@ -192,9 +191,6 @@ function EventAssistantRoom() {
   const exitControlledMode = () => {
     setControlledMode(null);
     setCurrentMessage("");
-    if (messageInputRef.current) {
-      messageInputRef.current.value = "";
-    }
   };
 
   // Handle ESC key to exit controlled mode
@@ -286,7 +282,7 @@ function EventAssistantRoom() {
                                       <circle cx="20" cy="16" r="1" />
                                       <path
                                         d="M13 19 Q16 21 19 19"
-                                        stroke-linecap="round"
+                                        strokeLinecap="round"
                                         fill="none"
                                       />
                                       <line x1="8" y1="15" x2="4.5" y2="13" />
@@ -352,10 +348,7 @@ function EventAssistantRoom() {
                             placeholder="Write a Comment"
                             value={currentMessage}
                             onChange={(e) => {
-                              if (messageInputRef.current) {
-                                messageInputRef.current.value = e.target.value;
-                                setCurrentMessage(e.target.value);
-                              }
+                              setCurrentMessage(e.target.value);
                             }}
                             onKeyUp={(e) => {
                               if (
@@ -364,7 +357,7 @@ function EventAssistantRoom() {
                                 currentMessage.length > 0 &&
                                 !waitingForResponse
                               )
-                                sendMessage(messageInputRef.current!.value);
+                                sendMessage(currentMessage);
                             }}
                             style={{
                               flex: 1,
@@ -389,9 +382,7 @@ function EventAssistantRoom() {
                                   <InputAdornment position="end">
                                     <IconButton
                                       onClick={() =>
-                                        sendMessage(
-                                          messageInputRef.current!.value
-                                        )
+                                        sendMessage(currentMessage)
                                       }
                                       aria-label="send message"
                                       disabled={
