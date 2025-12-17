@@ -1,4 +1,4 @@
-import { FC, useState } from "react";
+import { FC, useState, useRef, useEffect, KeyboardEvent } from "react";
 import { Box, Button, Typography } from "@mui/material";
 import {
   ThumbDownOutlined,
@@ -6,6 +6,27 @@ import {
   Check,
 } from "@mui/icons-material";
 import { ControlledInputConfig } from "./DirectMessage";
+
+/**
+ * VisuallyHidden component for screen reader only content
+ */
+const VisuallyHidden: FC<{ children: React.ReactNode }> = ({ children }) => (
+  <span
+    style={{
+      position: "absolute",
+      width: "1px",
+      height: "1px",
+      padding: "0",
+      margin: "-1px",
+      overflow: "hidden",
+      clip: "rect(0, 0, 0, 0)",
+      whiteSpace: "nowrap",
+      border: "0",
+    }}
+  >
+    {children}
+  </span>
+);
 
 /**
  * Props for the MessageFeedback component
@@ -28,12 +49,56 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
   onSendFeedbackRating,
 }) => {
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
+  const [announcement, setAnnouncement] = useState<string>("");
+  const [focusedRating, setFocusedRating] = useState<number | null>(null);
+  const ratingButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const handleRatingClick = (rating: number) => {
     if (selectedRating !== null || !messageId || !onSendFeedbackRating) return;
     setSelectedRating(rating);
+    setAnnouncement(`Rating ${rating} of 5 selected`);
     onSendFeedbackRating(messageId, rating);
   };
+
+  const handleKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    rating: number
+  ) => {
+    if (selectedRating !== null) return;
+
+    let nextRating: number | null = null;
+
+    switch (event.key) {
+      case "ArrowLeft":
+      case "ArrowUp":
+        event.preventDefault();
+        nextRating = rating > 1 ? rating - 1 : 5;
+        break;
+      case "ArrowRight":
+      case "ArrowDown":
+        event.preventDefault();
+        nextRating = rating < 5 ? rating + 1 : 1;
+        break;
+      case " ":
+      case "Enter":
+        event.preventDefault();
+        handleRatingClick(rating);
+        return;
+    }
+
+    if (nextRating !== null) {
+      setFocusedRating(nextRating);
+      ratingButtonRefs.current[nextRating - 1]?.focus();
+    }
+  };
+
+  useEffect(() => {
+    // Clear announcement after it's been read
+    if (announcement) {
+      const timer = setTimeout(() => setAnnouncement(""), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [announcement]);
 
   const handleSayMoreClick = () => {
     if (!messageId || !onPopulateFeedbackText) return;
@@ -50,16 +115,26 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
 
   return (
     <Box display="flex" flexDirection="column" gap="0.5rem" marginTop="0.5rem">
+      {/* Live region for announcements */}
+      <div aria-live="polite" aria-atomic="true">
+        <VisuallyHidden>{announcement}</VisuallyHidden>
+      </div>
+
       {/* Header Row */}
       <Box display="flex" justifyContent="space-between" alignItems="center">
-        <Typography variant="body2" className="text-gray-500">
+        <Typography
+          variant="body2"
+          id="rating-group-label"
+          className="text-gray-600"
+        >
           How did the bot do?
         </Typography>
         <Button
           size="small"
-          endIcon={<AddCommentOutlined fontSize="small" />}
+          endIcon={<AddCommentOutlined fontSize="small" aria-hidden="true" />}
           onClick={handleSayMoreClick}
           className="text-medium-slate-blue"
+          aria-label="Provide additional feedback about this response"
           sx={{
             textTransform: "none",
             fontSize: "0.875rem",
@@ -72,39 +147,77 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
         </Button>
       </Box>
       {/* Rating Row */}
-      <Box display="flex" alignItems="center" gap="0.5rem">
-        <ThumbDownOutlined sx={{ color: "gray", fontSize: "1.25rem" }} />
+      <Box
+        display="flex"
+        alignItems="center"
+        gap="0.5rem"
+        role="radiogroup"
+        aria-labelledby="rating-group-label"
+      >
+        <ThumbDownOutlined
+          className="text-gray-600"
+          sx={{ fontSize: "1.25rem" }}
+          aria-hidden="true"
+        />
         {[1, 2, 3, 4, 5].map((rating) => (
           <Button
             key={rating}
+            ref={(el) => {
+              ratingButtonRefs.current[rating - 1] = el;
+            }}
             variant="outlined"
             size="small"
             onClick={() => handleRatingClick(rating)}
+            onKeyDown={(e) => handleKeyDown(e, rating)}
             disabled={selectedRating !== null}
+            role="radio"
+            aria-checked={selectedRating === rating}
+            aria-label={`Rate ${rating} out of 5`}
+            tabIndex={
+              selectedRating !== null
+                ? -1
+                : focusedRating === rating ||
+                  (focusedRating === null && rating === 1)
+                ? 0
+                : -1
+            }
+            className={
+              selectedRating === rating
+                ? "border-2 border-green-600 text-green-700 bg-green-100"
+                : "border-2 border-gray-300 text-gray-700 bg-white"
+            }
             sx={{
               minWidth: "36px",
               height: "36px",
-              borderWidth: "2px",
-              borderColor: selectedRating === rating ? "green" : "lightgray",
-              color: selectedRating === rating ? "green" : "gray",
-              backgroundColor:
-                selectedRating === rating ? "lightgreen" : "white",
               fontWeight: 600,
               "&:hover": {
-                borderColor: selectedRating === rating ? "green" : "gray",
+                borderColor:
+                  selectedRating === rating
+                    ? "rgb(22 163 74)"
+                    : "rgb(75 85 99)",
                 backgroundColor:
-                  selectedRating === rating ? "lightgreen" : "whitesmoke",
+                  selectedRating === rating
+                    ? "rgb(220 252 231)"
+                    : "rgb(243 244 246)",
                 borderWidth: "2px",
               },
+              "&:focus-visible": {
+                outline: "2px solid rgb(59 130 246)",
+                outlineOffset: "2px",
+              },
               "&.Mui-disabled": {
-                borderColor: "lightgray",
-                color: "lightgray",
+                borderColor: "rgb(209 213 219)",
+                color: "rgb(156 163 175)",
                 backgroundColor: "white",
                 borderWidth: "2px",
               },
             }}
           >
-            {selectedRating === rating ? <Check fontSize="small" /> : rating}
+            {selectedRating === rating ? (
+              <Check fontSize="small" aria-hidden="true" />
+            ) : (
+              rating
+            )}
           </Button>
         ))}
         <svg
@@ -113,11 +226,9 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
           viewBox="0 0 28 27"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+          role="img"
         >
-          <title id="svgTitle">Mind Blown</title>
-          <desc id="svgDesc">
-            A mind blown icon, suggestion a great interaction
-          </desc>
           <path
             d="M13.9907 20.1083V10.4903M13.9907 20.1083C13.9907 18.1767 15.5566 16.6108 17.4882 16.6108M13.9907 20.1083C13.9907 18.1767 12.4248 16.6108 10.4933 16.6108M13.9907 20.1083C13.9907 20.9826 14.11 21.3064 14.4279 21.857C15.273 23.3207 17.1446 23.8222 18.6083 22.9771C19.9505 22.2022 20.4836 20.5642 19.9113 19.1689C21.5202 18.8546 22.7343 17.4373 22.7343 15.7365C22.7343 13.8049 21.1685 12.239 19.2369 12.239L19.2369 10.4903C19.2369 9.04159 18.0625 7.86719 16.6138 7.86719C15.1651 7.86719 13.9907 9.04159 13.9907 10.4903M13.9907 20.1083C13.9907 20.9826 13.8714 21.3064 13.5535 21.857C12.7085 23.3207 10.8368 23.8222 9.37312 22.9771C8.03095 22.2022 7.49783 20.5642 8.07011 19.1689C6.46124 18.8546 5.2471 17.4373 5.2471 15.7365C5.2471 13.8049 6.81296 12.239 8.74455 12.239L8.74453 10.4903C8.74453 9.04159 9.91893 7.86719 11.3676 7.86719C12.8163 7.86719 13.9907 9.04159 13.9907 10.4903"
             stroke="black"
