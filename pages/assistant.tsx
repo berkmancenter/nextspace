@@ -180,8 +180,13 @@ function EventAssistantRoom() {
     setCurrentMessage("");
     if (messageInputRef.current) {
       messageInputRef.current.value = "";
-      messageInputRef.current.focus();
     }
+    // Use setTimeout to ensure focus happens after any state updates
+    setTimeout(() => {
+      if (messageInputRef.current) {
+        messageInputRef.current.focus();
+      }
+    }, 0);
   };
 
   const exitControlledMode = () => {
@@ -234,83 +239,83 @@ function EventAssistantRoom() {
                   className="overflow-auto flex flex-col grow items-center gap-8 mt-4 mb-32 xl:mb-20"
                   id="scroll-container"
                 >
-                  {messages.map((message, i) => (
-                    <div key={`msg-${i}`} className="w-full lg:w-3/4 px-2">
-                      <div className="flex flex-col lg:flex-row gap-x-5.5">
-                        <p className="flex flex-col min-w-24 items-center text-sm text-neutral-600 mb-1 lg:mb-0 lg:mt-2">
-                          {new Date(message.createdAt!).toLocaleTimeString(
-                            "en-US",
-                            {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }
-                          )}
-                          {message.pseudonym === "Event Assistant" && (
-                            <>
-                              <span className="hidden lg:inline-block h-full border-l-2 border-l-dark-blue opacity-50 border-dotted my-1"></span>
-                              {waitingForResponse &&
-                                i ===
-                                  messages.findLastIndex(
-                                    (msg) => msg.pseudonym === "Event Assistant"
-                                  ) && (
-                                  <svg
-                                    viewBox="0 0 32 32"
-                                    className="w-10 h-10 text-black dark:text-white mx-auto"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="0.7"
-                                  >
-                                    <circle
-                                      cx="16"
-                                      cy="5.5"
-                                      r="1"
-                                      className="animate-bounce"
-                                    />
-                                    <line x1="16" y1="6.5" x2="16" y2="10" />
-                                    <rect
-                                      x="8"
-                                      y="10"
-                                      width="16"
-                                      height="12"
-                                      rx="6"
-                                    />
-                                    <circle cx="12" cy="16" r="1" />
-                                    <circle cx="20" cy="16" r="1" />
-                                    <path
-                                      d="M13 19 Q16 21 19 19"
-                                      stroke-linecap="round"
+                  {messages.map((message, i) => {
+                    const isAssistant = message.pseudonym === "Event Assistant";
+                    return (
+                      <div key={`msg-${i}`} className="w-full lg:w-3/4 px-2">
+                        <div className="flex flex-col lg:flex-row gap-x-5.5">
+                          <p className="flex flex-col min-w-24 items-center text-sm text-neutral-600 mb-1 lg:mb-0 lg:mt-2">
+                            {new Date(message.createdAt!).toLocaleTimeString(
+                              "en-US",
+                              {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }
+                            )}
+                            {isAssistant && (
+                              <>
+                                <span className="hidden lg:inline-block h-full border-l-2 border-l-dark-blue opacity-50 border-dotted my-1"></span>
+                                {waitingForResponse &&
+                                  i ===
+                                    messages.findLastIndex(
+                                      (msg) =>
+                                        msg.pseudonym === "Event Assistant"
+                                    ) && (
+                                    <svg
+                                      viewBox="0 0 32 32"
+                                      className="w-10 h-10 text-black dark:text-white mx-auto"
                                       fill="none"
-                                    />
-                                    <line x1="8" y1="15" x2="4.5" y2="13" />
-                                    <line x1="24" y1="15" x2="27.5" y2="13" />
-                                    <rect
-                                      x="13"
-                                      y="22"
-                                      width="6"
-                                      height="5"
-                                      rx="2"
-                                    />
-                                  </svg>
-                                )}
-                            </>
-                          )}
-                        </p>
-                        <DirectMessage
-                          key={`msg-${i}`}
-                          text={message.body}
-                          date={new Date(message.createdAt!)}
-                          theme={
-                            message.pseudonym === "Event Assistant"
-                              ? "assistant"
-                              : "none"
-                          }
-                          messageId={message.id}
-                          onPopulateFeedbackText={enterControlledMode}
-                          onSendFeedbackRating={sendFeedbackRating}
-                        />
+                                      stroke="currentColor"
+                                      strokeWidth="0.7"
+                                    >
+                                      <circle
+                                        cx="16"
+                                        cy="5.5"
+                                        r="1"
+                                        className="animate-bounce"
+                                      />
+                                      <line x1="16" y1="6.5" x2="16" y2="10" />
+                                      <rect
+                                        x="8"
+                                        y="10"
+                                        width="16"
+                                        height="12"
+                                        rx="6"
+                                      />
+                                      <circle cx="12" cy="16" r="1" />
+                                      <circle cx="20" cy="16" r="1" />
+                                      <path
+                                        d="M13 19 Q16 21 19 19"
+                                        stroke-linecap="round"
+                                        fill="none"
+                                      />
+                                      <line x1="8" y1="15" x2="4.5" y2="13" />
+                                      <line x1="24" y1="15" x2="27.5" y2="13" />
+                                      <rect
+                                        x="13"
+                                        y="22"
+                                        width="6"
+                                        height="5"
+                                        rx="2"
+                                      />
+                                    </svg>
+                                  )}
+                              </>
+                            )}
+                          </p>
+                          <DirectMessage
+                            key={`msg-${i}`}
+                            text={message.body}
+                            date={new Date(message.createdAt!)}
+                            theme={isAssistant ? "assistant" : "none"}
+                            messageId={message.id}
+                            onPopulateFeedbackText={enterControlledMode}
+                            onSendFeedbackRating={sendFeedbackRating}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {/* Scroll to bottom element */}
                   <Element name="end" />
                 </div>
@@ -342,7 +347,7 @@ function EventAssistantRoom() {
                           </div>
                           <TextField
                             id="message-input"
-                            ref={messageInputRef}
+                            inputRef={messageInputRef}
                             type="text"
                             placeholder="Write a Comment"
                             value={currentMessage}

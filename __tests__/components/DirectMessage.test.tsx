@@ -80,4 +80,21 @@ describe("DirectMessage Component", () => {
     rerender(<DirectMessage text="Test" date={testDate} theme="backchannel" />);
     expect(document.querySelector(".bg-\\[\\#E0E7FF\\]")).toBeInTheDocument();
   });
+
+  it("displays feedback messages with special styling", () => {
+    const testDate = new Date();
+
+    render(
+      <DirectMessage
+        text="/ShareFeedback|Rating|msg-123|5"
+        date={testDate}
+        theme="assistant"
+      />
+    );
+
+    expect(screen.getByText("User feedback received.")).toBeInTheDocument();
+    expect(
+      document.querySelector(".bg-blue-50.border.border-blue-200")
+    ).toBeInTheDocument();
+  });
 });
