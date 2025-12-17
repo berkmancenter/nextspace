@@ -57,7 +57,7 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
         </Typography>
         <Button
           size="small"
-          startIcon={<AddCommentOutlined fontSize="small" />}
+          endIcon={<AddCommentOutlined fontSize="small" />}
           onClick={handleSayMoreClick}
           className="text-medium-slate-blue"
           sx={{
