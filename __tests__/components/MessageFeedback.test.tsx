@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { MessageFeedback } from "../../components/MessageFeedback";
 
 describe("MessageFeedback Component", () => {
-  it("renders all rating buttons", () => {
+  it("renders all feedback buttons", () => {
     const mockPopulateFeedback = jest.fn();
     const mockSendRating = jest.fn();
 
@@ -17,14 +17,18 @@ describe("MessageFeedback Component", () => {
 
     expect(screen.getByText("How did the bot do?")).toBeInTheDocument();
     expect(screen.getByText("Say more")).toBeInTheDocument();
-    expect(screen.getByText("1")).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByText("4")).toBeInTheDocument();
-    expect(screen.getByText("5")).toBeInTheDocument();
+    expect(
+      screen.getByRole("radio", { name: "Thumbs Down" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("radio", { name: "Thumbs Up" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("radio", { name: "Mind Blown!" })
+    ).toBeInTheDocument();
   });
 
-  it("calls onSendFeedbackRating when a rating button is clicked", () => {
+  it("calls onSendFeedbackRating when a feedback button is clicked", () => {
     const mockPopulateFeedback = jest.fn();
     const mockSendRating = jest.fn();
 
@@ -36,14 +40,14 @@ describe("MessageFeedback Component", () => {
       />
     );
 
-    const button3 = screen.getByText("3");
-    fireEvent.click(button3);
+    const thumbsUpButton = screen.getByRole("radio", { name: "Thumbs Up" });
+    fireEvent.click(thumbsUpButton);
 
-    expect(mockSendRating).toHaveBeenCalledWith("msg-123", 3);
+    expect(mockSendRating).toHaveBeenCalledWith("msg-123", "Thumbs Up");
     expect(mockSendRating).toHaveBeenCalledTimes(1);
   });
 
-  it("disables rating buttons after a rating is selected", () => {
+  it("disables feedback buttons after a feedback is selected", () => {
     const mockPopulateFeedback = jest.fn();
     const mockSendRating = jest.fn();
 
@@ -55,16 +59,16 @@ describe("MessageFeedback Component", () => {
       />
     );
 
-    const button3 = screen.getByText("3");
-    fireEvent.click(button3);
+    const thumbsUpButton = screen.getByRole("radio", { name: "Thumbs Up" });
+    fireEvent.click(thumbsUpButton);
 
     // Try clicking another button
-    const button5 = screen.getByText("5");
-    fireEvent.click(button5);
+    const thumbsDownButton = screen.getByRole("radio", { name: "Thumbs Down" });
+    fireEvent.click(thumbsDownButton);
 
     // Should only have been called once
     expect(mockSendRating).toHaveBeenCalledTimes(1);
-    expect(mockSendRating).toHaveBeenCalledWith("msg-123", 3);
+    expect(mockSendRating).toHaveBeenCalledWith("msg-123", "Thumbs Up");
   });
 
   it("calls onPopulateFeedbackText when Say more button is clicked", () => {
