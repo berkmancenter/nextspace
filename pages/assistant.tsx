@@ -209,7 +209,7 @@ function EventAssistantRoom() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [controlledMode]);
 
-  const sendFeedbackRating = async (messageId: string, rating: number) => {
+  const sendFeedbackRating = async (messageId: string, rating: string) => {
     const feedbackText = `/ShareFeedback|Rating|${messageId}|${rating}`;
     await sendMessage(feedbackText);
   };

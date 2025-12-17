@@ -22,7 +22,7 @@ export interface ControlledInputConfig {
  * @property {"none" | "assistant" | "backchannel"} [theme] - The theme of the message, "assistant" or "backchannel", defaults to "none".
  * @property {string} [messageId] - The ID of the message (for feedback).
  * @property {(config: ControlledInputConfig) => void} [onPopulateFeedbackText] - Callback to enter controlled input mode.
- * @property {(messageId: string, rating: number) => void} [onSendFeedbackRating] - Callback to send rating feedback.
+ * @property {(messageId: string, rating: string) => void} [onSendFeedbackRating] - Callback to send rating feedback.
  */
 interface DirectMessageProps {
   text: string;
@@ -30,7 +30,7 @@ interface DirectMessageProps {
   theme?: "none" | "assistant" | "backchannel";
   messageId?: string;
   onPopulateFeedbackText?: (config: ControlledInputConfig) => void;
-  onSendFeedbackRating?: (messageId: string, rating: number) => void;
+  onSendFeedbackRating?: (messageId: string, rating: string) => void;
 }
 
 /**
