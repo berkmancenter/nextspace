@@ -1,16 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import decryptCookie from "../../utils/Decrypt";
 import { RetrieveData, SendData } from "../../utils";
+import { withEnvValidation } from "../../utils/withEnvValidation";
 
 /**
  * API Route to handle requests with authentication
  * @param req - NextApiRequest object
  * @param res - NextApiResponse object
  */
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   let apiResponse;
   const token = req.cookies["nextspace-session"] || null;
 
@@ -54,3 +52,5 @@ export default async function handler(
 
   return res.status(200).json(apiResponse);
 }
+
+export default withEnvValidation(handler, ["SESSION_SECRET"]);

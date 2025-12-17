@@ -73,17 +73,32 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
 
 ### .env file
 
-Please see the `env.template` to see the needed parameters. Here is a breakdown of what each parameter does.
+Please see the `.env.template` file to see all available parameters. Copy it to `.env` and fill in the required values.
+
+**The application will fail to start if any required environment variables are missing**, with clear error messages indicating which variables need to be set.
+
+#### Required Environment Variables
+
+These variables **must** be set for the application to run:
 
 ```
-NEXT_PUBLIC_API_URL: the URL you are using to interact with the backend
-NEXT_PUBLIC_API_USER: the username that you have registered with the API; see "For first-time setup"
-NEXT_PUBLIC_API_PASSWORD: the password of the registered user
-NEXT_PUBLIC_SOCKET_URL: the URL to the socket.io instance you are interacting with, e.g. "ws://localhost:5555/?EIO=4&transport=websocket"
-NEXT_PUBLIC_DEFAULT_TOPIC_ID: the ID of the default topic that you are submitting new events to; used within the event creation form
-NEXT_PUBLIC_ZOOM_URL_PATTERN: optional - Zoom URL regex pattern to match against on event creation form, Defaults to "/https:\/\/[\w-]*\.?zoom.us\/.*/g". Must be string.
-NEXT_PUBLIC_ZOOM_DOMAIN: optional - Zoom domain for validation error messages. Defaults to zoom.us.
-SESSION_SECRET: crypto key used to encrypt session cookie. Please see at https://github.com/panva/jose/issues/210#jwe-alg.
+NEXT_PUBLIC_API_URL=<your-backend-url>
+  The URL you are using to interact with the backend API, e.g. http://localhost:3000/v1
+
+NEXT_PUBLIC_SOCKET_URL=<your-socket-url>
+  The URL to the socket.io instance, e.g. "ws://localhost:5555/?EIO=4&transport=websocket"
+
+NEXT_PUBLIC_DEFAULT_TOPIC_ID=<topic-id>
+  The ID of the default topic for submitting new events; used within the event creation form
+
+NEXT_PUBLIC_ABOUT_URL=<about-url>
+  The URL for the About page footer link
+
+SESSION_SECRET=<secret-key>
+  Crypto key used to encrypt session cookies with A128CBC-HS256 algorithm
+  Must be at least 32 characters (256 bits)
+  Generate securely: openssl rand -base64 32
+  See https://github.com/panva/jose/issues/210#jwe-alg
 ```
 
 ### Install and run
@@ -114,8 +129,15 @@ The above example generates types against LLM Engine running locally. You can al
 
 #### Run the development server:
 
+On default port 8080:
 ```bash
 npm run dev
+```
+
+OR, to run on a different port if needed
+
+```bash
+npm x next -- dev -p <PORT>
 ```
 
 #### View the app:
