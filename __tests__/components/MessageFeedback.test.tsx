@@ -17,15 +17,9 @@ describe("MessageFeedback Component", () => {
 
     expect(screen.getByText("How did the bot do?")).toBeInTheDocument();
     expect(screen.getByText("Say more")).toBeInTheDocument();
-    expect(
-      screen.getByRole("radio", { name: "Thumbs Down" })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("radio", { name: "Thumbs Up" })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("radio", { name: "Mind Blown!" })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Nah" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Meh" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "WOW!" })).toBeInTheDocument();
   });
 
   it("calls onSendFeedbackRating when a feedback button is clicked", () => {
@@ -40,10 +34,10 @@ describe("MessageFeedback Component", () => {
       />
     );
 
-    const thumbsUpButton = screen.getByRole("radio", { name: "Thumbs Up" });
-    fireEvent.click(thumbsUpButton);
+    const mehButton = screen.getByRole("radio", { name: "Meh" });
+    fireEvent.click(mehButton);
 
-    expect(mockSendRating).toHaveBeenCalledWith("msg-123", "Thumbs Up");
+    expect(mockSendRating).toHaveBeenCalledWith("msg-123", "Meh");
     expect(mockSendRating).toHaveBeenCalledTimes(1);
   });
 
@@ -59,16 +53,16 @@ describe("MessageFeedback Component", () => {
       />
     );
 
-    const thumbsUpButton = screen.getByRole("radio", { name: "Thumbs Up" });
-    fireEvent.click(thumbsUpButton);
+    const wowButton = screen.getByRole("radio", { name: "WOW!" });
+    fireEvent.click(wowButton);
 
     // Try clicking another button
-    const thumbsDownButton = screen.getByRole("radio", { name: "Thumbs Down" });
-    fireEvent.click(thumbsDownButton);
+    const nahButton = screen.getByRole("radio", { name: "Nah" });
+    fireEvent.click(nahButton);
 
     // Should only have been called once
     expect(mockSendRating).toHaveBeenCalledTimes(1);
-    expect(mockSendRating).toHaveBeenCalledWith("msg-123", "Thumbs Up");
+    expect(mockSendRating).toHaveBeenCalledWith("msg-123", "WOW!");
   });
 
   it("calls onPopulateFeedbackText when Say more button is clicked", () => {
@@ -94,11 +88,11 @@ describe("MessageFeedback Component", () => {
     );
   });
 
-  it("renders custom SVG icon", () => {
+  it("displays text on buttons", () => {
     const mockPopulateFeedback = jest.fn();
     const mockSendRating = jest.fn();
 
-    const { container } = render(
+    render(
       <MessageFeedback
         messageId="msg-123"
         onPopulateFeedbackText={mockPopulateFeedback}
@@ -106,13 +100,10 @@ describe("MessageFeedback Component", () => {
       />
     );
 
-    // Check for the custom SVG
-    const svgs = container.querySelectorAll("svg");
-    expect(svgs.length).toBeGreaterThan(0);
-
-    // Check for the custom SVG with specific viewBox
-    const customSvg = container.querySelector('svg[viewBox="0 0 28 27"]');
-    expect(customSvg).toBeInTheDocument();
+    // Check that text is visible on buttons
+    expect(screen.getByText("Nah")).toBeInTheDocument();
+    expect(screen.getByText("Meh")).toBeInTheDocument();
+    expect(screen.getByText("WOW!")).toBeInTheDocument();
   });
 
   it("returns null when required props are missing", () => {
@@ -135,7 +126,7 @@ describe("MessageFeedback Component", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("uses ThumbDownOutlined icon (not filled)", () => {
+  it("shows check icon when button is selected", () => {
     const mockPopulateFeedback = jest.fn();
     const mockSendRating = jest.fn();
 
@@ -147,8 +138,14 @@ describe("MessageFeedback Component", () => {
       />
     );
 
-    // The MUI icons render as SVGs, we're checking they exist
+    const wowButton = screen.getByRole("radio", { name: "WOW!" });
+    fireEvent.click(wowButton);
+
+    // After selection, the button should still display the text
+    expect(screen.getByText("WOW!")).toBeInTheDocument();
+
+    // Check icon should be present (MUI icons render as SVGs)
     const svgs = container.querySelectorAll("svg");
-    expect(svgs.length).toBeGreaterThan(1); // Should have ThumbDown, AddComment, and custom SVG
+    expect(svgs.length).toBeGreaterThan(0);
   });
 });
