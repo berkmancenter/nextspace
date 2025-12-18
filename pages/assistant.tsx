@@ -148,7 +148,10 @@ function EventAssistantRoom() {
     fetchConversationData();
   }, [socket, router, userId, agentId]);
 
-  async function sendMessage(message: string) {
+  async function sendMessage(
+    message: string,
+    shouldWaitForResponse: boolean = true
+  ) {
     if (!Api.get().GetTokens() || !message) return;
     let channels = [{ name: `direct-${userId}-${agentId}` }];
 
@@ -159,7 +162,7 @@ function EventAssistantRoom() {
 
     // Only set waitingForResponse for regular messages, not controlled mode messages
     // (controlled mode messages like feedback don't generate responses)
-    if (!controlledMode) {
+    if (shouldWaitForResponse && !controlledMode) {
       setWaitingForResponse(true);
     }
     setCurrentMessage("");
@@ -207,7 +210,7 @@ function EventAssistantRoom() {
 
   const sendFeedbackRating = async (messageId: string, rating: string) => {
     const feedbackText = `/ShareFeedback|Rating|${messageId}|${rating}`;
-    await sendMessage(feedbackText);
+    await sendMessage(feedbackText, false);
   };
 
   return (

@@ -1035,6 +1035,205 @@ describe("EventAssistantRoom", () => {
   });
 
   describe("Controlled Input Bug Fixes", () => {
+    it("does not wait for response after sending a rating", async () => {
+      const user = userEvent.setup();
+      (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
+        onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
+      });
+      (RetrieveData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-456", agentType: "eventAssistant" }],
+      });
+      (SendData as jest.Mock).mockResolvedValue({ success: true });
+
+      await act(async () => {
+        render(<EventAssistantRoom />);
+      });
+
+      // Simulate socket connection and message
+      await act(async () => {
+        const connectHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "connect"
+        )?.[1];
+        if (connectHandler) connectHandler();
+      });
+
+      await act(async () => {
+        const messageHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "message:new"
+        )?.[1];
+        if (messageHandler) {
+          messageHandler({
+            id: "msg-rating-test",
+            body: "How did I do?",
+            pseudonym: "Event Assistant",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      // Click rating button
+      const ratingButton = await screen.findByTestId("rating-button-3");
+      await user.click(ratingButton);
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith("messages", {
+          body: "/ShareFeedback|Rating|msg-rating-test|3",
+          bodyType: "text",
+          conversation: "test-conversation-id",
+          channels: [{ name: "direct-user-123-agent-456" }],
+        });
+      });
+
+      // Input should remain enabled - not waiting for response
+      const messageInput = screen.getByPlaceholderText("Write a Comment");
+      await user.type(messageInput, "Follow-up message");
+
+      const sendButton = screen.getByLabelText("send message");
+      // Button should be enabled immediately after rating (not waiting)
+      expect(sendButton).not.toBeDisabled();
+    });
+
+    it("does not wait for response after sending free-form text feedback", async () => {
+      const user = userEvent.setup();
+      (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
+        onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
+      });
+      (RetrieveData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-456", agentType: "eventAssistant" }],
+      });
+      (SendData as jest.Mock).mockResolvedValue({ success: true });
+
+      await act(async () => {
+        render(<EventAssistantRoom />);
+      });
+
+      // Simulate socket connection and message
+      await act(async () => {
+        const connectHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "connect"
+        )?.[1];
+        if (connectHandler) connectHandler();
+      });
+
+      await act(async () => {
+        const messageHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "message:new"
+        )?.[1];
+        if (messageHandler) {
+          messageHandler({
+            id: "msg-text-feedback",
+            body: "What do you think?",
+            pseudonym: "Event Assistant",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      // Enter controlled mode via Say more button
+      const sayMoreButton = await screen.findByTestId("say-more-button");
+      await user.click(sayMoreButton);
+
+      // Send text feedback
+      const messageInput = screen.getByPlaceholderText("Write a Comment");
+      await user.type(messageInput, "This was very helpful!");
+      await user.click(screen.getByLabelText("send message"));
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith("messages", {
+          body: "/ShareFeedback|Text|msg-text-feedback|This was very helpful!",
+          bodyType: "text",
+          conversation: "test-conversation-id",
+          channels: [{ name: "direct-user-123-agent-456" }],
+        });
+      });
+
+      // Input should be cleared and ready for immediate use
+      await waitFor(() => {
+        expect(messageInput).toHaveValue("");
+      });
+
+      // Should be able to type and send another message immediately
+      await user.type(messageInput, "Another message");
+      const sendButton = screen.getByLabelText("send message");
+      // Button should be enabled (not waiting for response)
+      expect(sendButton).not.toBeDisabled();
+    });
+
+    it("waits for response after regular message but not after feedback", async () => {
+      const user = userEvent.setup();
+      (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
+        onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
+      });
+      (RetrieveData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-456", agentType: "eventAssistant" }],
+      });
+      // Make SendData take time to complete
+      (SendData as jest.Mock).mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve({ success: true }), 50)
+          )
+      );
+
+      await act(async () => {
+        render(<EventAssistantRoom />);
+      });
+
+      // Simulate socket connection
+      await act(async () => {
+        const connectHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "connect"
+        )?.[1];
+        if (connectHandler) connectHandler();
+      });
+
+      const messageInput = screen.getByPlaceholderText("Write a Comment");
+      const sendButton = screen.getByLabelText("send message");
+
+      // Send a regular message
+      await user.type(messageInput, "Regular question");
+      await user.click(sendButton);
+
+      // Should be waiting for response - button disabled
+      await waitFor(() => {
+        expect(sendButton).toBeDisabled();
+      });
+
+      // Simulate bot response
+      await act(async () => {
+        const messageHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "message:new"
+        )?.[1];
+        if (messageHandler) {
+          messageHandler({
+            id: "msg-bot-response",
+            body: "Here's my answer",
+            pseudonym: "Event Assistant",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      // Now send a rating - should NOT wait
+      const ratingButton = await screen.findByTestId("rating-button-3");
+      await user.click(ratingButton);
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenLastCalledWith("messages", {
+          body: "/ShareFeedback|Rating|msg-bot-response|3",
+          bodyType: "text",
+          conversation: "test-conversation-id",
+          channels: [{ name: "direct-user-123-agent-456" }],
+        });
+      });
+
+      // Input should be enabled immediately after rating
+      await user.type(messageInput, "x");
+      await waitFor(() => {
+        expect(sendButton).not.toBeDisabled();
+      });
+    });
+
     it("allows sending multiple controlled mode messages in succession", async () => {
       const user = userEvent.setup();
       (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
