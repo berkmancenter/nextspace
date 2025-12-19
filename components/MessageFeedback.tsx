@@ -115,7 +115,7 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
   const handleSayMoreClick = () => {
     if (!messageId || !onPopulateFeedbackText) return;
     onPopulateFeedbackText({
-      prefix: `/ShareFeedback|Text|${messageId}|`,
+      prefix: `/feedback|Text|${messageId}|`,
       icon: <AddCommentOutlined fontSize="small" />,
       label: "Feedback Mode",
     });

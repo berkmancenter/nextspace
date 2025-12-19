@@ -73,7 +73,7 @@ jest.mock("../../components", () => ({
             data-testid="say-more-button"
             onClick={() =>
               onPopulateFeedbackText?.({
-                prefix: `/ShareFeedback|Text|${messageId}|`,
+                prefix: `/feedback|Text|${messageId}|`,
                 icon: null,
                 label: "Feedback Mode",
               })
@@ -816,7 +816,7 @@ describe("EventAssistantRoom", () => {
 
       await waitFor(() => {
         expect(SendData).toHaveBeenCalledWith("messages", {
-          body: "/ShareFeedback|Rating|msg-789|3",
+          body: "/feedback|Rating|msg-789|3",
           bodyType: "text",
           conversation: "test-conversation-id",
           channels: [{ name: "direct-user-123-agent-456" }],
@@ -921,7 +921,7 @@ describe("EventAssistantRoom", () => {
 
       await waitFor(() => {
         expect(SendData).toHaveBeenCalledWith("messages", {
-          body: "/ShareFeedback|Text|msg-999|Great response!",
+          body: "/feedback|Text|msg-999|Great response!",
           bodyType: "text",
           conversation: "test-conversation-id",
           channels: [{ name: "direct-user-123-agent-456" }],
@@ -1077,7 +1077,7 @@ describe("EventAssistantRoom", () => {
 
       await waitFor(() => {
         expect(SendData).toHaveBeenCalledWith("messages", {
-          body: "/ShareFeedback|Rating|msg-rating-test|3",
+          body: "/feedback|Rating|msg-rating-test|3",
           bodyType: "text",
           conversation: "test-conversation-id",
           channels: [{ name: "direct-user-123-agent-456" }],
@@ -1140,7 +1140,7 @@ describe("EventAssistantRoom", () => {
 
       await waitFor(() => {
         expect(SendData).toHaveBeenCalledWith("messages", {
-          body: "/ShareFeedback|Text|msg-text-feedback|This was very helpful!",
+          body: "/feedback|Text|msg-text-feedback|This was very helpful!",
           bodyType: "text",
           conversation: "test-conversation-id",
           channels: [{ name: "direct-user-123-agent-456" }],
@@ -1220,7 +1220,7 @@ describe("EventAssistantRoom", () => {
 
       await waitFor(() => {
         expect(SendData).toHaveBeenLastCalledWith("messages", {
-          body: "/ShareFeedback|Rating|msg-bot-response|3",
+          body: "/feedback|Rating|msg-bot-response|3",
           bodyType: "text",
           conversation: "test-conversation-id",
           channels: [{ name: "direct-user-123-agent-456" }],
@@ -1280,7 +1280,7 @@ describe("EventAssistantRoom", () => {
 
       await waitFor(() => {
         expect(SendData).toHaveBeenCalledWith("messages", {
-          body: "/ShareFeedback|Text|msg-first|First feedback",
+          body: "/feedback|Text|msg-first|First feedback",
           bodyType: "text",
           conversation: "test-conversation-id",
           channels: [{ name: "direct-user-123-agent-456" }],

@@ -82,7 +82,7 @@ describe("MessageFeedback Component", () => {
 
     expect(mockPopulateFeedback).toHaveBeenCalledWith(
       expect.objectContaining({
-        prefix: "/ShareFeedback|Text|msg-123|",
+        prefix: "/feedback|Text|msg-123|",
         label: "Feedback Mode",
       })
     );

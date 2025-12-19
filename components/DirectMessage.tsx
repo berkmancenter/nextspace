@@ -62,7 +62,7 @@ export const DirectMessage: FC<DirectMessageProps> = ({
   }, [isMessageSent]);
 
   // Replace feedback messages with a user-friendly display
-  const isFeedbackMessage = text.startsWith("/ShareFeedback");
+  const isFeedbackMessage = text.startsWith("/feedback");
   const displayText = isFeedbackMessage ? "User feedback received." : text;
 
   const messageContent = (

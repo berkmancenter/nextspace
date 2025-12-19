@@ -209,7 +209,7 @@ function EventAssistantRoom() {
   }, [controlledMode]);
 
   const sendFeedbackRating = async (messageId: string, rating: string) => {
-    const feedbackText = `/ShareFeedback|Rating|${messageId}|${rating}`;
+    const feedbackText = `/feedback|Rating|${messageId}|${rating}`;
     await sendMessage(feedbackText, false);
   };
 

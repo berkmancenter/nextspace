@@ -86,7 +86,7 @@ describe("DirectMessage Component", () => {
 
     render(
       <DirectMessage
-        text="/ShareFeedback|Rating|msg-123|5"
+        text="/feedback|Rating|msg-123|5"
         date={testDate}
         theme="assistant"
       />
