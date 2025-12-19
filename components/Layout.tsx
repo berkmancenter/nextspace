@@ -24,7 +24,7 @@ export const Layout = ({
   const currentUrl = router.isReady ? router.asPath : "";
 
   // Pages where footer should be hidden (full-screen chat interfaces)
-  const hideFooter = currentUrl.includes("/conversation");
+  const hideFooter = currentUrl.includes("conversation");
 
   return (
     <div
