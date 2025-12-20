@@ -1,5 +1,6 @@
 import { ParsedUrlQuery } from "querystring";
 import { RefreshToken, RetrieveData, Request } from "./";
+import { fetchWithAutoAuth } from "./AuthInterceptor";
 import { components } from "../types";
 import { Conversation, EventUrl, EventUrls } from "../types.internal";
 
@@ -144,6 +145,7 @@ export const GetChannelPasscode = (
 
 /**
  * Sends a POST request to the API
+ * Automatically handles 401 Unauthorized responses by attempting token refresh or redirecting to login.
  * @param urlSuffix - The endpoint suffix to send data to.
  * @param payload - The data payload to send in the request body.
  * @param accessToken - Optional access token to use for authorization.
@@ -155,61 +157,73 @@ export const SendData = async (
   payload: any,
   accessToken?: string,
   fetchOptions?: RequestInit
-) => {
+): Promise<any> => {
   const apiI = Api.get();
-  let API_TOKENS = apiI.GetTokens();
-  let options = fetchOptions || {
+  const API_TOKENS = apiI.GetTokens();
+
+  // Build request options
+  const options = fetchOptions || {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
   };
+
   // Ensure headers is a mutable object
   if (!options.headers) {
     options.headers = {};
   }
-  // Add Authorization header; use provided accessToken if available
+
+  // Add Authorization header
   (options.headers as Record<string, string>)["Authorization"] = accessToken
     ? `Bearer ${accessToken}`
     : `Bearer ${API_TOKENS.access}`;
 
+  // Create fetch function
+  const makeFetchCall = () =>
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/${urlSuffix}`, {
+      method: options.method,
+      headers: options.headers,
+      body: options.body,
+    });
+
   try {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/${urlSuffix}`,
-      {
-        method: options.method,
-        headers: options.headers,
-        body: options.body,
+    // Try the request with centralized 401 handling
+    const result = await fetchWithAutoAuth(makeFetchCall);
+
+    // If we got a 401 error and have a refresh token, try to refresh
+    if (result?.status === 401 && API_TOKENS.refresh) {
+      try {
+        console.log("Token expired, refreshing...");
+        const tokensResponse = await RefreshToken(API_TOKENS.refresh);
+        apiI.SetTokens(
+          tokensResponse.access.token,
+          tokensResponse.refresh.token
+        );
+
+        // Retry with new token
+        return await SendData(
+          urlSuffix,
+          payload,
+          tokensResponse.access.token,
+          fetchOptions
+        );
+      } catch (refreshError) {
+        // Refresh failed, the 401 handling already redirected
+        console.warn("Token refresh failed - Session expired");
+        return {
+          error: true,
+          status: 401,
+          message: "Unauthorized - Session expired",
+        };
       }
-    );
-
-    // If 401 Unauthorized, refresh the token
-    if (response.status === 401 && API_TOKENS.refresh) {
-      console.log("Token expired, refreshing...");
-      // Refresh the token
-      const tokensResponse = await RefreshToken(API_TOKENS.refresh);
-      apiI.SetTokens(tokensResponse.access.token, tokensResponse.refresh.token);
-
-      // Retry the request with the new token
-      SendData(urlSuffix, payload);
-      return null;
     }
 
-    // TODO: Handle other status codes as needed
-    if (!response.ok) {
-      console.error("Error:", response);
-      return {
-        error: true,
-        status: response.status,
-        message: response.statusText,
-      };
-    }
-
-    const data = await response.json();
-    return data;
+    return result;
   } catch (error) {
     console.error("There was a problem with the send operation:", error);
+    throw error;
   }
 };
 
@@ -373,8 +387,7 @@ export const createConversationFromData = async (
  * @returns An object containing the isAuthenticated property
  */
 export const CheckAuthHeader = (headers: Record<string, string>) => {
-  const isAuthenticated =
-    headers && headers["x-is-authenticated"] === "true";
+  const isAuthenticated = headers && headers["x-is-authenticated"] === "true";
   return {
     props: {
       isAuthenticated,

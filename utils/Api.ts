@@ -3,6 +3,8 @@
  * @file Helper methods for fetching data from the LLM Facilitator API
  */
 
+import { fetchWithAutoAuth } from "./AuthInterceptor";
+
 /**
  * Authenticate the user with the API.
  * @returns Promise with access and refresh tokens
@@ -80,6 +82,7 @@ export const RefreshToken = async (refreshToken: string) => {
 
 /**
  * Retrieve data from the API.
+ * Automatically handles 401 Unauthorized responses by redirecting to login.
  * @param urlSuffix - The endpoint suffix to retrieve data from.
  * @param token - Optional bearer token for authorization.
  * @param dataType - Optional data type to specify how to parse the response (e.g., "json", "text").
@@ -90,41 +93,19 @@ export const RetrieveData = async (
   token?: string,
   dataType?: string
 ) => {
-  const options = {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  };
-
-  try {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/${urlSuffix}`,
-      {
-        method: options.method,
-        headers: token ? options.headers : {},
-      }
-    );
-
-    if (!response.ok) {
-      console.error("Network response was not ok");
-      const errorData = await response.json();
-      return {
-        error: true,
-        message: errorData,
-      };
-    }
-    let data;
-    if (!dataType || dataType === "json") data = await response.json();
-    else if (dataType === "text") data = await response.text();
-    return data;
-  } catch (error) {
-    console.error("There was a problem with the fetch operation:", error);
-  }
+  return fetchWithAutoAuth(
+    () =>
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/${urlSuffix}`, {
+        method: "GET",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }),
+    { parseAs: dataType as "json" | "text" }
+  );
 };
 
 /**
  * Send data to the client API, so cookie can be decrypted and used for request auth.
+ * Automatically handles 401 Unauthorized responses by redirecting to login.
  * @param urlSuffix - The endpoint suffix to send data to.
  * @param payload? - The data payload to send.
  * @returns Promise<any>
@@ -133,40 +114,36 @@ export const Request = async (urlSuffix: string, payload?: any) => {
   const url = payload
     ? `/api/request`
     : `/api/request?apiEndpoint=${encodeURIComponent(urlSuffix)}`;
-  const response = await fetch(
-    url,
-    payload
-      ? {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            apiEndpoint: urlSuffix,
-            payload,
-          }),
-        }
-      : {
-          method: "GET",
-        }
+
+  const result = await fetchWithAutoAuth(() =>
+    fetch(
+      url,
+      payload
+        ? {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              apiEndpoint: urlSuffix,
+              payload,
+            }),
+          }
+        : {
+            method: "GET",
+          }
+    )
   );
-  if (!response) {
-    console.error("Network response was not ok", response);
+
+  // Handle case where fetch returns null/undefined
+  if (!result) {
     return {
       error: true,
       message: "No response received",
     };
   }
-  if (!response.ok) {
-    console.error("Network response was not ok");
-    const errorData = await response.json();
-    return {
-      error: true,
-      message: errorData,
-    };
-  }
-  const data = await response.json();
-  return data;
+
+  return result;
 };
 
 /**
