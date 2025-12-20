@@ -3,7 +3,101 @@
  */
 
 /**
+ * Shows an accessible toast notification for session expiration
+ * Uses theme colors and proper ARIA attributes for accessibility
+ */
+const showSessionExpiredToast = (): void => {
+  // Get theme colors dynamically
+  const getThemeColors = () => {
+    // Try to read from MUI theme CSS variables
+    const root = document.documentElement;
+    const computedStyle = getComputedStyle(root);
+
+    // Try MUI CSS variables first, fallback to standard MUI error colors
+    const errorColor =
+      computedStyle.getPropertyValue("--mui-palette-error-main")?.trim() ||
+      "#d32f2f";
+    const errorContrastText =
+      computedStyle
+        .getPropertyValue("--mui-palette-error-contrastText")
+        ?.trim() || "#ffffff";
+
+    return { errorColor, errorContrastText };
+  };
+
+  const { errorColor, errorContrastText } = getThemeColors();
+
+  const toast = document.createElement("div");
+
+  // ARIA attributes for screen reader accessibility
+  toast.setAttribute("role", "alert");
+  toast.setAttribute("aria-live", "assertive");
+  toast.setAttribute("aria-atomic", "true");
+  toast.setAttribute("id", "session-expired-toast");
+
+  toast.innerHTML = `
+    <div style="
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: ${errorColor};
+      color: ${errorContrastText};
+      padding: 16px 24px;
+      border-radius: 4px;
+      box-shadow: 0px 3px 5px -1px rgba(0,0,0,0.2),
+                  0px 6px 10px 0px rgba(0,0,0,0.14),
+                  0px 1px 18px 0px rgba(0,0,0,0.12);
+      z-index: 9999;
+      font-family: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 1.43;
+      letter-spacing: 0.01071em;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: slideIn 0.3s ease-out;
+      max-width: 90%;
+      box-sizing: border-box;
+    ">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="flex-shrink: 0;">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+      </svg>
+      <span>Your session has expired. Redirecting to login...</span>
+    </div>
+    <style>
+      @keyframes slideIn {
+        from {
+          transform: translate(-50%, 100px);
+          opacity: 0;
+        }
+        to {
+          transform: translate(-50%, 0);
+          opacity: 1;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #session-expired-toast * {
+          animation: none !important;
+        }
+      }
+    </style>
+  `;
+
+  document.body.appendChild(toast);
+
+  // Auto-remove after redirect
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.remove();
+    }
+  }, 3000);
+};
+
+/**
  * Handles 401 Unauthorized responses by clearing the session and redirecting to login
+ * Shows an accessible notification before redirecting
  * @param redirectUrl - Optional URL to redirect to after clearing session (defaults to /login)
  */
 export const handle401Response = (redirectUrl: string = "/login"): void => {
@@ -13,10 +107,15 @@ export const handle401Response = (redirectUrl: string = "/login"): void => {
       "nextspace-session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
   }
 
-  // Clear any in-memory tokens
+  // Clear any in-memory tokens and show notification
   if (typeof window !== "undefined") {
-    // Redirect to login page
-    window.location.href = redirectUrl;
+    // Show notification to user
+    showSessionExpiredToast();
+
+    // Redirect after 2 seconds to give user time to read the message
+    setTimeout(() => {
+      window.location.href = redirectUrl;
+    }, 2000);
   }
 };
 
