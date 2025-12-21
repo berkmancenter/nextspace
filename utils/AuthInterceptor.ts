@@ -298,10 +298,17 @@ export const authenticatedFetch = async (
       }
     }
 
+    // Only include credentials for internal API routes to avoid CORS issues
+    // External API calls don't need cookies
+    const isInternalRoute =
+      typeof input === "string" && input.startsWith("/api");
+    const shouldIncludeCredentials =
+      init?.credentials || (isInternalRoute ? "include" : "omit");
+
     // Make the fetch request
     const response = await fetch(input, {
       ...init,
-      credentials: init?.credentials || "include",
+      credentials: shouldIncludeCredentials,
     });
 
     // Handle 401 Unauthorized
