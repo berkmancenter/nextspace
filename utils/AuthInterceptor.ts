@@ -1,19 +1,37 @@
 /**
- * @file Client-side authentication interceptor to handle 401 responses
+ * @file Client-side authentication interceptor for Next.js
+ * Handles session expiration, token refresh, and 401 responses
+ * Following Next.js best practices for authentication
  */
+
+/**
+ * Token expiry information stored in memory
+ */
+interface TokenInfo {
+  expiresAt: number | null;
+  refreshToken: string | null;
+}
+
+let tokenInfo: TokenInfo = {
+  expiresAt: null,
+  refreshToken: null,
+};
 
 /**
  * Shows an accessible toast notification for session expiration
  * Uses theme colors and proper ARIA attributes for accessibility
  */
 const showSessionExpiredToast = (): void => {
+  // Prevent duplicate toasts
+  if (document.getElementById("session-expired-toast")) {
+    return;
+  }
+
   // Get theme colors dynamically
   const getThemeColors = () => {
-    // Try to read from MUI theme CSS variables
     const root = document.documentElement;
     const computedStyle = getComputedStyle(root);
 
-    // Try MUI CSS variables first, fallback to standard MUI error colors
     const errorColor =
       computedStyle.getPropertyValue("--mui-palette-error-main")?.trim() ||
       "#d32f2f";
@@ -96,26 +114,107 @@ const showSessionExpiredToast = (): void => {
 };
 
 /**
- * Handles 401 Unauthorized responses by clearing the session and redirecting to login
- * Shows an accessible notification before redirecting
- * @param redirectUrl - Optional URL to redirect to after clearing session (defaults to /login)
+ * Clears the session using server-side API route (best practice for Next.js)
+ * This ensures httpOnly cookies are properly cleared
+ * @param redirectUrl - Optional URL to redirect to after clearing session
  */
-export const handle401Response = (redirectUrl: string = "/login"): void => {
-  // Clear the session cookie
-  if (typeof document !== "undefined") {
-    document.cookie =
-      "nextspace-session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+export const clearSession = async (
+  redirectUrl: string = "/login"
+): Promise<void> => {
+  try {
+    // Call server-side logout API to clear httpOnly cookies properly
+    await fetch("/api/logout", {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch (error) {
+    console.error("Error clearing session:", error);
   }
 
-  // Clear any in-memory tokens and show notification
+  // Clear in-memory token info
+  tokenInfo = {
+    expiresAt: null,
+    refreshToken: null,
+  };
+
+  // Show notification and redirect
   if (typeof window !== "undefined") {
-    // Show notification to user
     showSessionExpiredToast();
 
-    // Redirect after 2 seconds to give user time to read the message
     setTimeout(() => {
       window.location.href = redirectUrl;
     }, 2000);
+  }
+};
+
+/**
+ * Set token information for proactive refresh
+ * @param expiresIn - Seconds until token expires
+ * @param refreshToken - Refresh token for obtaining new access token
+ */
+export const setTokenInfo = (expiresIn: number, refreshToken: string): void => {
+  tokenInfo = {
+    expiresAt: Date.now() + expiresIn * 1000,
+    refreshToken,
+  };
+};
+
+/**
+ * Check if token is expired or about to expire
+ * @param bufferSeconds - Number of seconds before expiry to consider token expired (default: 60)
+ * @returns true if token is expired or will expire within buffer time
+ */
+export const isTokenExpired = (bufferSeconds: number = 60): boolean => {
+  if (!tokenInfo.expiresAt) {
+    return false; // No token info, let server handle it
+  }
+
+  const bufferMs = bufferSeconds * 1000;
+  return Date.now() >= tokenInfo.expiresAt - bufferMs;
+};
+
+/**
+ * Attempts to refresh the access token proactively
+ * @returns true if refresh was successful, false otherwise
+ */
+export const refreshAccessToken = async (): Promise<boolean> => {
+  if (!tokenInfo.refreshToken) {
+    console.warn("No refresh token available");
+    return false;
+  }
+
+  try {
+    const response = await fetch("/api/session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "refresh",
+        refreshToken: tokenInfo.refreshToken,
+      }),
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      console.error("Token refresh failed:", response.status);
+      return false;
+    }
+
+    const data = await response.json();
+
+    // Update token info with new expiry
+    if (data.tokens?.access?.expires) {
+      const expiresIn = Math.floor(
+        (new Date(data.tokens.access.expires).getTime() - Date.now()) / 1000
+      );
+      setTokenInfo(expiresIn, data.tokens.refresh.token);
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error refreshing token:", error);
+    return false;
   }
 };
 
@@ -125,7 +224,7 @@ export const handle401Response = (redirectUrl: string = "/login"): void => {
  * @returns true if the response indicates a 401 error
  */
 export const is401Response = (response: any): boolean => {
-  // Check Response object (only if Response is defined in environment)
+  // Check Response object
   if (typeof Response !== "undefined" && response instanceof Response) {
     return response.status === 401;
   }
@@ -145,28 +244,67 @@ export const is401Response = (response: any): boolean => {
 };
 
 /**
- * Wraps a fetch call with 401 handling
- * @param fetchPromise - The fetch promise to wrap
- * @param options - Options for handling the 401
- * @returns The fetch response or throws if 401 and auto-redirect is enabled
+ * Unified authenticated fetch wrapper for Next.js
+ * Handles token refresh, 401 responses, and response parsing
+ * This is the primary function to use for all authenticated API calls
+ *
+ * @param input - Fetch input (URL or Request)
+ * @param init - Fetch options
+ * @param options - Additional options for auth handling
+ * @returns Parsed response data
+ *
+ * @example
+ * // Simple GET request
+ * const data = await authenticatedFetch('/api/users');
+ *
+ * @example
+ * // POST with body
+ * const result = await authenticatedFetch('/api/users', {
+ *   method: 'POST',
+ *   body: JSON.stringify({ name: 'John' })
+ * });
+ *
+ * @example
+ * // Custom error handling
+ * const data = await authenticatedFetch('/api/data', {}, {
+ *   onUnauthorized: () => console.log('Session expired'),
+ *   autoRefresh: false
+ * });
  */
-export const fetchWith401Handler = async <T = any>(
-  fetchPromise: Promise<Response>,
-  options: {
-    autoRedirect?: boolean;
-    redirectUrl?: string;
+export const authenticatedFetch = async (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  options?: {
+    parseAs?: "json" | "text" | "blob";
+    autoRefresh?: boolean;
     onUnauthorized?: () => void;
-  } = {}
-): Promise<Response> => {
+    skipParsing?: boolean;
+  }
+): Promise<any> => {
   const {
-    autoRedirect = true,
-    redirectUrl = "/login",
+    parseAs = "json",
+    autoRefresh = true,
     onUnauthorized,
-  } = options;
+    skipParsing = false,
+  } = options || {};
 
   try {
-    const response = await fetchPromise;
+    // Proactive token refresh if token is about to expire
+    if (autoRefresh && isTokenExpired()) {
+      console.log("Token about to expire, refreshing proactively...");
+      const refreshed = await refreshAccessToken();
+      if (!refreshed) {
+        console.warn("Token refresh failed, continuing with existing token");
+      }
+    }
 
+    // Make the fetch request
+    const response = await fetch(input, {
+      ...init,
+      credentials: init?.credentials || "include",
+    });
+
+    // Handle 401 Unauthorized
     if (response.status === 401) {
       console.warn("401 Unauthorized response detected");
 
@@ -175,152 +313,104 @@ export const fetchWith401Handler = async <T = any>(
         onUnauthorized();
       }
 
-      // Handle redirect if enabled
-      if (autoRedirect) {
-        handle401Response(redirectUrl);
+      // Try to refresh token once if auto-refresh is enabled
+      if (autoRefresh) {
+        const refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Retry the request with new token
+          const retryResponse = await fetch(input, {
+            ...init,
+            credentials: init?.credentials || "include",
+          });
+
+          if (retryResponse.ok) {
+            return skipParsing
+              ? retryResponse
+              : await parseResponse(retryResponse, parseAs);
+          }
+        }
       }
+
+      // If refresh failed or not enabled, clear session and redirect
+      await clearSession();
+      return null;
     }
 
-    return response;
-  } catch (error) {
-    throw error;
-  }
-};
-
-/**
- * Wraps an API call result with 401 handling
- * @param apiCall - The API call function to wrap
- * @param options - Options for handling the 401
- * @returns The API response data or handles 401 appropriately
- */
-export const apiCallWith401Handler = async <T = any>(
-  apiCall: () => Promise<T>,
-  options: {
-    autoRedirect?: boolean;
-    redirectUrl?: string;
-    onUnauthorized?: () => void;
-  } = {}
-): Promise<T | null> => {
-  const {
-    autoRedirect = true,
-    redirectUrl = "/login",
-    onUnauthorized,
-  } = options;
-
-  try {
-    const response = await apiCall();
-
-    // Check if response indicates 401
-    if (is401Response(response)) {
-      console.warn("401 Unauthorized response detected in API call");
-
-      // Call custom handler if provided
-      if (onUnauthorized) {
-        onUnauthorized();
-      }
-
-      // Handle redirect if enabled
-      if (autoRedirect) {
-        handle401Response(redirectUrl);
-        return null;
-      }
-    }
-
-    return response;
-  } catch (error) {
-    throw error;
-  }
-};
-
-/**
- * Global fetch wrapper that automatically handles 401 responses
- * Can be used to replace the global fetch function if needed
- * @param input - Fetch input (URL or Request)
- * @param init - Fetch options
- * @returns Promise with fetch Response
- */
-export const fetchWithAuth = async (
-  input: RequestInfo | URL,
-  init?: RequestInit
-): Promise<Response> => {
-  const response = await fetch(input, init);
-
-  if (response.status === 401) {
-    console.warn("401 Unauthorized - Session expired");
-    handle401Response();
-  }
-
-  return response;
-};
-
-/**
- * Centralized fetch wrapper with complete 401 handling and response parsing
- * Handles all three layers of 401 detection in one place
- * @param fetchCall - Function that returns a fetch promise
- * @param options - Options for parsing and error handling
- * @returns Parsed response data or error object
- */
-export const fetchWithAutoAuth = async (
-  fetchCall: () => Promise<Response>,
-  options?: {
-    parseAs?: "json" | "text";
-    skipParsing?: boolean;
-  }
-): Promise<any> => {
-  try {
-    const response = await fetchCall();
-
-    // Handle non-OK responses
+    // Handle other non-OK responses
     if (!response.ok) {
-      // Layer 1: Check response status for 401
-      if (response.status === 401) {
-        console.warn("401 Unauthorized - Session expired");
-        handle401Response();
-        return {
-          error: true,
-          status: 401,
-          message: "Unauthorized",
-        };
-      }
+      const errorData = await response.json().catch(() => ({
+        message: response.statusText,
+      }));
 
-      // Parse error response
-      console.error("Network response was not ok");
-      const errorData = await response.json();
-
-      // Layer 2: Check if error data indicates 401
-      if (is401Response(errorData)) {
-        console.warn("401 Unauthorized detected in error response");
-        handle401Response();
-      }
+      console.error(`HTTP ${response.status}:`, errorData);
 
       return {
         error: true,
-        message: errorData,
+        status: response.status,
+        message: errorData.message || errorData,
       };
     }
 
-    // Skip parsing if requested (for cases where caller wants raw response)
-    if (options?.skipParsing) {
+    // Parse successful response
+    if (skipParsing) {
       return response;
     }
 
-    // Parse successful response
-    let data;
-    if (options?.parseAs === "text") {
-      data = await response.text();
-    } else {
-      data = await response.json();
-    }
+    const data = await parseResponse(response, parseAs);
 
-    // Layer 3: Check if successful response contains 401 error
+    // Check if successful response contains 401 error (edge case)
     if (is401Response(data)) {
-      console.warn("401 Unauthorized detected in response data");
-      handle401Response();
+      console.warn("401 error detected in response data");
+      await clearSession();
+      return null;
     }
 
     return data;
   } catch (error) {
-    console.error("There was a problem with the fetch operation:", error);
+    console.error("Fetch error:", error);
     throw error;
+  }
+};
+
+/**
+ * Helper function to parse response based on specified type
+ */
+async function parseResponse(
+  response: Response,
+  parseAs: "json" | "text" | "blob"
+): Promise<any> {
+  switch (parseAs) {
+    case "text":
+      return await response.text();
+    case "blob":
+      return await response.blob();
+    case "json":
+    default:
+      return await response.json();
+  }
+}
+
+/**
+ * Initialize auth state from server
+ * Call this on app load to sync token expiry info
+ */
+export const initAuthState = async (): Promise<void> => {
+  try {
+    const response = await fetch("/api/session", {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.tokens?.access?.expires && data.tokens?.refresh?.token) {
+        const expiresIn = Math.floor(
+          (new Date(data.tokens.access.expires).getTime() - Date.now()) / 1000
+        );
+        setTokenInfo(expiresIn, data.tokens.refresh.token);
+      }
+    }
+  } catch (error) {
+    console.error("Error initializing auth state:", error);
   }
 };

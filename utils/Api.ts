@@ -1,9 +1,9 @@
 /**
- *
  * @file Helper methods for fetching data from the LLM Facilitator API
+ * Updated to use authenticatedFetch for better Next.js integration
  */
 
-import { fetchWithAutoAuth } from "./AuthInterceptor";
+import { authenticatedFetch } from "./AuthInterceptor";
 
 /**
  * Authenticate the user with the API.
@@ -82,7 +82,7 @@ export const RefreshToken = async (refreshToken: string) => {
 
 /**
  * Retrieve data from the API.
- * Automatically handles 401 Unauthorized responses by redirecting to login.
+ * Automatically handles 401 Unauthorized responses and token refresh.
  * @param urlSuffix - The endpoint suffix to retrieve data from.
  * @param token - Optional bearer token for authorization.
  * @param dataType - Optional data type to specify how to parse the response (e.g., "json", "text").
@@ -93,19 +93,19 @@ export const RetrieveData = async (
   token?: string,
   dataType?: string
 ) => {
-  return fetchWithAutoAuth(
-    () =>
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/${urlSuffix}`, {
-        method: "GET",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      }),
+  return authenticatedFetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/${urlSuffix}`,
+    {
+      method: "GET",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    },
     { parseAs: dataType as "json" | "text" }
   );
 };
 
 /**
  * Send data to the client API, so cookie can be decrypted and used for request auth.
- * Automatically handles 401 Unauthorized responses by redirecting to login.
+ * Automatically handles 401 Unauthorized responses and token refresh.
  * @param urlSuffix - The endpoint suffix to send data to.
  * @param payload? - The data payload to send.
  * @returns Promise<any>
@@ -115,24 +115,22 @@ export const Request = async (urlSuffix: string, payload?: any) => {
     ? `/api/request`
     : `/api/request?apiEndpoint=${encodeURIComponent(urlSuffix)}`;
 
-  const result = await fetchWithAutoAuth(() =>
-    fetch(
-      url,
-      payload
-        ? {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              apiEndpoint: urlSuffix,
-              payload,
-            }),
-          }
-        : {
-            method: "GET",
-          }
-    )
+  const result = await authenticatedFetch(
+    url,
+    payload
+      ? {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            apiEndpoint: urlSuffix,
+            payload,
+          }),
+        }
+      : {
+          method: "GET",
+        }
   );
 
   // Handle case where fetch returns null/undefined

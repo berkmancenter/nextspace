@@ -3,13 +3,13 @@
  */
 
 import { RetrieveData, Request } from "../../utils/Api";
-import { fetchWithAutoAuth } from "../../utils/AuthInterceptor";
+import { authenticatedFetch } from "../../utils/AuthInterceptor";
 
-// Mock fetchWithAutoAuth
+// Mock authenticatedFetch
 jest.mock("../../utils/AuthInterceptor");
 
-const mockedFetchWithAutoAuth = fetchWithAutoAuth as jest.MockedFunction<
-  typeof fetchWithAutoAuth
+const mockedAuthenticatedFetch = authenticatedFetch as jest.MockedFunction<
+  typeof authenticatedFetch
 >;
 
 describe("Api Functions Integration", () => {
@@ -20,46 +20,59 @@ describe("Api Functions Integration", () => {
   describe("RetrieveData", () => {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://api.test";
 
-    it("calls fetchWithAutoAuth with correct parameters", async () => {
+    it("calls authenticatedFetch with correct parameters", async () => {
       const mockData = { id: 1, name: "Test" };
-      mockedFetchWithAutoAuth.mockResolvedValue(mockData);
+      mockedAuthenticatedFetch.mockResolvedValue(mockData);
 
       const result = await RetrieveData("test/endpoint", "test-token");
 
-      expect(mockedFetchWithAutoAuth).toHaveBeenCalledTimes(1);
+      expect(mockedAuthenticatedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedAuthenticatedFetch).toHaveBeenCalledWith(
+        `${API_URL}/test/endpoint`,
+        {
+          method: "GET",
+          headers: { Authorization: "Bearer test-token" },
+        },
+        { parseAs: undefined }
+      );
       expect(result).toEqual(mockData);
-
-      // Verify the fetch call was configured correctly
-      const fetchCall = mockedFetchWithAutoAuth.mock.calls[0][0];
-      expect(fetchCall).toBeDefined();
     });
 
     it("works without token", async () => {
       const mockData = { public: true };
-      mockedFetchWithAutoAuth.mockResolvedValue(mockData);
+      mockedAuthenticatedFetch.mockResolvedValue(mockData);
 
       const result = await RetrieveData("public/endpoint");
 
-      expect(mockedFetchWithAutoAuth).toHaveBeenCalledTimes(1);
+      expect(mockedAuthenticatedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedAuthenticatedFetch).toHaveBeenCalledWith(
+        expect.stringContaining("public/endpoint"),
+        {
+          method: "GET",
+          headers: {},
+        },
+        { parseAs: undefined }
+      );
       expect(result).toEqual(mockData);
     });
 
     it("supports text data type", async () => {
       const mockText = "Plain text response";
-      mockedFetchWithAutoAuth.mockResolvedValue(mockText);
+      mockedAuthenticatedFetch.mockResolvedValue(mockText);
 
       const result = await RetrieveData("test/endpoint", "test-token", "text");
 
       expect(result).toBe(mockText);
-      expect(mockedFetchWithAutoAuth).toHaveBeenCalledWith(
-        expect.any(Function),
+      expect(mockedAuthenticatedFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Object),
         { parseAs: "text" }
       );
     });
 
-    it("handles errors from fetchWithAutoAuth", async () => {
+    it("handles errors from authenticatedFetch", async () => {
       const error = new Error("Network error");
-      mockedFetchWithAutoAuth.mockRejectedValue(error);
+      mockedAuthenticatedFetch.mockRejectedValue(error);
 
       await expect(RetrieveData("test/endpoint", "test-token")).rejects.toThrow(
         "Network error"
@@ -68,29 +81,43 @@ describe("Api Functions Integration", () => {
   });
 
   describe("Request", () => {
-    it("calls fetchWithAutoAuth for GET requests", async () => {
+    it("calls authenticatedFetch for GET requests", async () => {
       const mockData = { success: true };
-      mockedFetchWithAutoAuth.mockResolvedValue(mockData);
+      mockedAuthenticatedFetch.mockResolvedValue(mockData);
 
       const result = await Request("test/endpoint");
 
-      expect(mockedFetchWithAutoAuth).toHaveBeenCalledTimes(1);
+      expect(mockedAuthenticatedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedAuthenticatedFetch).toHaveBeenCalledWith(
+        "/api/request?apiEndpoint=test%2Fendpoint",
+        { method: "GET" }
+      );
       expect(result).toEqual(mockData);
     });
 
-    it("calls fetchWithAutoAuth for POST requests", async () => {
+    it("calls authenticatedFetch for POST requests", async () => {
       const mockData = { success: true };
       const payload = { data: "test" };
-      mockedFetchWithAutoAuth.mockResolvedValue(mockData);
+      mockedAuthenticatedFetch.mockResolvedValue(mockData);
 
       const result = await Request("test/endpoint", payload);
 
-      expect(mockedFetchWithAutoAuth).toHaveBeenCalledTimes(1);
+      expect(mockedAuthenticatedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedAuthenticatedFetch).toHaveBeenCalledWith("/api/request", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          apiEndpoint: "test/endpoint",
+          payload,
+        }),
+      });
       expect(result).toEqual(mockData);
     });
 
     it("handles null/undefined responses", async () => {
-      mockedFetchWithAutoAuth.mockResolvedValue(null);
+      mockedAuthenticatedFetch.mockResolvedValue(null);
 
       const result = await Request("test/endpoint");
 
@@ -98,6 +125,19 @@ describe("Api Functions Integration", () => {
         error: true,
         message: "No response received",
       });
+    });
+
+    it("handles error responses", async () => {
+      const errorResponse = {
+        error: true,
+        status: 500,
+        message: "Server error",
+      };
+      mockedAuthenticatedFetch.mockResolvedValue(errorResponse);
+
+      const result = await Request("test/endpoint");
+
+      expect(result).toEqual(errorResponse);
     });
   });
 });

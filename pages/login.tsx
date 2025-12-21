@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { Api, Authenticate } from "../utils";
+import { setTokenInfo } from "../utils/AuthInterceptor";
 
 /**
  * Login Page
@@ -90,6 +91,15 @@ export default function LoginPage() {
           refreshToken: response.refresh.token,
         }),
       });
+
+      // Set token info for proactive refresh
+      if (response.access?.expires && response.refresh?.token) {
+        const expiresIn = Math.floor(
+          (new Date(response.access.expires).getTime() - Date.now()) / 1000
+        );
+        setTokenInfo(expiresIn, response.refresh.token);
+      }
+
       setFormSuccess(true);
       // Redirect to events page after successful login
       router.push("/admin/events");

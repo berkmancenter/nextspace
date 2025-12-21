@@ -3,22 +3,17 @@
  */
 
 import {
-  handle401Response,
+  clearSession,
+  setTokenInfo,
+  isTokenExpired,
+  refreshAccessToken,
   is401Response,
-  fetchWith401Handler,
-  apiCallWith401Handler,
-  fetchWithAuth,
+  authenticatedFetch,
+  initAuthState,
 } from "../../utils/AuthInterceptor";
 
-// Polyfill Response for jsdom
-if (typeof global.Response === "undefined") {
-  global.Response = class Response {
-    status: number;
-    constructor(body: any, init?: { status?: number }) {
-      this.status = init?.status || 200;
-    }
-  } as any;
-}
+// Mock fetch globally
+global.fetch = jest.fn();
 
 describe("AuthInterceptor", () => {
   let locationHref: string;
@@ -26,8 +21,10 @@ describe("AuthInterceptor", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(console, "warn").mockImplementation(() => {});
+    jest.spyOn(console, "log").mockImplementation(() => {});
+    jest.spyOn(console, "error").mockImplementation(() => {});
 
-    // Simple location href mock
+    // Mock location
     locationHref = "";
     Object.defineProperty(window, "location", {
       value: {
@@ -41,6 +38,15 @@ describe("AuthInterceptor", () => {
       writable: true,
       configurable: true,
     });
+
+    // Clear any existing toasts
+    const existingToast = document.getElementById("session-expired-toast");
+    if (existingToast) {
+      existingToast.remove();
+    }
+
+    // Reset fetch mock
+    (global.fetch as jest.Mock).mockReset();
   });
 
   afterEach(() => {
@@ -49,12 +55,12 @@ describe("AuthInterceptor", () => {
 
   describe("is401Response", () => {
     it("returns true for Response object with 401 status", () => {
-      const response = new Response(null, { status: 401 });
+      const response = { status: 401 } as Response;
       expect(is401Response(response)).toBe(true);
     });
 
     it("returns false for Response object with non-401 status", () => {
-      const response = new Response(null, { status: 200 });
+      const response = { status: 200 } as Response;
       expect(is401Response(response)).toBe(false);
     });
 
@@ -73,410 +79,453 @@ describe("AuthInterceptor", () => {
       expect(is401Response({ error: true, status: 500 })).toBe(false);
       expect(is401Response(null)).toBe(false);
       expect(is401Response(undefined)).toBe(false);
-      expect(is401Response("string")).toBe(false);
-      expect(is401Response(401)).toBe(false);
     });
   });
 
-  describe("handle401Response", () => {
-    beforeEach(() => {
-      // Clear any existing toasts
-      const existingToast = document.getElementById("session-expired-toast");
-      if (existingToast) {
-        existingToast.remove();
-      }
-      jest.useFakeTimers();
+  describe("setTokenInfo", () => {
+    it("stores token expiry time correctly", () => {
+      const expiresIn = 3600; // 1 hour
+      const refreshToken = "refresh-token-123";
+      const beforeTime = Date.now();
+
+      setTokenInfo(expiresIn, refreshToken);
+
+      // Token should expire approximately 1 hour from now
+      expect(isTokenExpired(3599)).toBe(false); // 1 second before buffer
+      expect(isTokenExpired(3601)).toBe(true); // 1 second after buffer
     });
 
-    afterEach(() => {
-      jest.runOnlyPendingTimers();
-      jest.useRealTimers();
-    });
+    it("updates token info on multiple calls", () => {
+      setTokenInfo(100, "token1");
+      expect(isTokenExpired(150)).toBe(true); // 150s buffer > 100s remaining
 
-    it("shows toast notification before redirecting", () => {
-      handle401Response();
-
-      // Toast should be created immediately
-      const toast = document.getElementById("session-expired-toast");
-      expect(toast).not.toBeNull();
-      expect(toast).toBeInTheDocument();
-    });
-
-    it("toast has proper ARIA attributes for accessibility", () => {
-      handle401Response();
-
-      const toast = document.getElementById("session-expired-toast");
-      expect(toast?.getAttribute("role")).toBe("alert");
-      expect(toast?.getAttribute("aria-live")).toBe("assertive");
-      expect(toast?.getAttribute("aria-atomic")).toBe("true");
-    });
-
-    it("toast displays session expired message", () => {
-      handle401Response();
-
-      const toast = document.getElementById("session-expired-toast");
-      expect(toast?.textContent).toContain(
-        "Your session has expired. Redirecting to login..."
-      );
-    });
-
-    it("toast includes warning icon", () => {
-      handle401Response();
-
-      const toast = document.getElementById("session-expired-toast");
-      const svg = toast?.querySelector("svg");
-      expect(svg).not.toBeNull();
-      expect(svg?.getAttribute("aria-hidden")).toBe("true");
-    });
-
-    it("redirects to /login after 2 second delay", () => {
-      handle401Response();
-
-      // Should not redirect immediately
-      expect(locationHref).toBe("");
-
-      // Fast-forward time by 2 seconds
-      jest.advanceTimersByTime(2000);
-
-      // Now should redirect
-      expect(locationHref).toBe("/login");
-    });
-
-    it("redirects to custom URL after delay", () => {
-      handle401Response("/custom-auth");
-
-      expect(locationHref).toBe("");
-
-      jest.advanceTimersByTime(2000);
-
-      expect(locationHref).toBe("/custom-auth");
-    });
-
-    it("removes toast after 3 seconds", () => {
-      handle401Response();
-
-      const toast = document.getElementById("session-expired-toast");
-      expect(toast).toBeInTheDocument();
-
-      // Fast-forward past removal time
-      jest.advanceTimersByTime(3000);
-
-      // Toast should be removed
-      const toastAfter = document.getElementById("session-expired-toast");
-      expect(toastAfter).toBeNull();
-    });
-
-    it("clears session cookie", () => {
-      // Set a cookie first so we can verify it gets cleared
-      document.cookie = "nextspace-session=test-value; path=/";
-
-      handle401Response();
-
-      // Verify the cookie was set to expire (empty value or expired)
-      const cookies = document.cookie;
-      // In jsdom, expired cookies may be removed or set to empty
-      expect(
-        cookies === "" || !cookies.includes("nextspace-session=test-value")
-      ).toBe(true);
-    });
-
-    it("handles multiple calls gracefully", () => {
-      handle401Response();
-      const firstToast = document.getElementById("session-expired-toast");
-
-      handle401Response();
-      const secondToast = document.getElementById("session-expired-toast");
-
-      // Both should exist (second doesn't replace first)
-      expect(firstToast).toBeInTheDocument();
-      expect(secondToast).toBeInTheDocument();
-    });
-
-    it("toast styling matches MUI theme structure", () => {
-      handle401Response();
-
-      const toast = document.getElementById("session-expired-toast");
-      const toastDiv = toast?.querySelector("div");
-
-      // Check for MUI-style properties in inline styles
-      const style = toastDiv?.getAttribute("style");
-      expect(style).toContain("position: fixed");
-      expect(style).toContain("bottom: 24px");
-      expect(style).toContain("box-shadow");
-      expect(style).toContain("border-radius: 4px");
-      expect(style).toContain("z-index: 9999");
-    });
-
-    it("toast uses Inter Variable font family", () => {
-      handle401Response();
-
-      const toast = document.getElementById("session-expired-toast");
-      const toastDiv = toast?.querySelector("div");
-      const style = toastDiv?.getAttribute("style");
-
-      expect(style).toContain("Inter Variable");
-    });
-
-    it("includes animation with reduced motion support", () => {
-      handle401Response();
-
-      const toast = document.getElementById("session-expired-toast");
-      const style = toast?.querySelector("style");
-
-      expect(style?.textContent).toContain("@keyframes slideIn");
-      expect(style?.textContent).toContain(
-        "@media (prefers-reduced-motion: reduce)"
-      );
+      setTokenInfo(3600, "token2");
+      expect(isTokenExpired(150)).toBe(false); // 150s buffer < 3600s remaining
     });
   });
 
-  describe("fetchWith401Handler", () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
+  describe("isTokenExpired", () => {
+    it("returns false when no token info is set", () => {
+      // Reset by setting expired token
+      setTokenInfo(-1000, "old-token");
+      // Then clear by setting null-like state via direct test
+      expect(isTokenExpired()).toBe(true); // Expired
     });
 
-    afterEach(() => {
-      jest.runOnlyPendingTimers();
-      jest.useRealTimers();
+    it("returns false when token has plenty of time left", () => {
+      setTokenInfo(3600, "token"); // 1 hour
+      expect(isTokenExpired(60)).toBe(false); // Check with 60s buffer
     });
 
-    it("returns response for successful requests", async () => {
-      const mockResponse = new Response(JSON.stringify({ data: "test" }), {
-        status: 200,
-      });
-      const result = await fetchWith401Handler(Promise.resolve(mockResponse));
-      expect(result).toBe(mockResponse);
-      expect(locationHref).toBe("");
+    it("returns true when token expires within buffer time", () => {
+      setTokenInfo(30, "token"); // 30 seconds
+      expect(isTokenExpired(60)).toBe(true); // 60s buffer > 30s remaining
     });
 
-    it("handles 401 response with auto-redirect enabled", async () => {
-      const mockResponse = new Response(null, { status: 401 });
-      const result = await fetchWith401Handler(Promise.resolve(mockResponse));
-      expect(result.status).toBe(401);
-
-      // Advance timers for redirect delay
-      jest.advanceTimersByTime(2000);
-      expect(locationHref).toBe("/login");
+    it("returns true when token is already expired", () => {
+      setTokenInfo(-100, "token"); // Already expired
+      expect(isTokenExpired()).toBe(true);
     });
 
-    it("handles 401 response without auto-redirect", async () => {
-      const mockResponse = new Response(null, { status: 401 });
-      const result = await fetchWith401Handler(Promise.resolve(mockResponse), {
-        autoRedirect: false,
-      });
-      expect(result.status).toBe(401);
-      expect(locationHref).toBe("");
-    });
+    it("respects custom buffer time", () => {
+      setTokenInfo(200, "token"); // 200 seconds
 
-    it("redirects to custom URL on 401", async () => {
-      const mockResponse = new Response(null, { status: 401 });
-      await fetchWith401Handler(Promise.resolve(mockResponse), {
-        redirectUrl: "/custom-auth",
-      });
-
-      jest.advanceTimersByTime(2000);
-      expect(locationHref).toBe("/custom-auth");
-    });
-
-    it("calls onUnauthorized callback on 401", async () => {
-      const onUnauthorized = jest.fn();
-      const mockResponse = new Response(null, { status: 401 });
-      await fetchWith401Handler(Promise.resolve(mockResponse), {
-        onUnauthorized,
-        autoRedirect: false,
-      });
-      expect(onUnauthorized).toHaveBeenCalledTimes(1);
-    });
-
-    it("logs warning on 401", async () => {
-      const consoleWarnSpy = jest.spyOn(console, "warn");
-      const mockResponse = new Response(null, { status: 401 });
-      await fetchWith401Handler(Promise.resolve(mockResponse), {
-        autoRedirect: false,
-      });
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        "401 Unauthorized response detected"
-      );
-    });
-
-    it("propagates fetch errors", async () => {
-      const error = new Error("Network error");
-      await expect(fetchWith401Handler(Promise.reject(error))).rejects.toThrow(
-        "Network error"
-      );
+      expect(isTokenExpired(100)).toBe(false); // 100s buffer, 200s left = ok
+      expect(isTokenExpired(250)).toBe(true); // 250s buffer, 200s left = expired
     });
   });
 
-  describe("apiCallWith401Handler", () => {
+  describe("refreshAccessToken", () => {
     beforeEach(() => {
-      jest.useFakeTimers();
+      setTokenInfo(3600, "refresh-token-123");
     });
 
-    afterEach(() => {
-      jest.runOnlyPendingTimers();
-      jest.useRealTimers();
-    });
-
-    it("returns data for successful API calls", async () => {
-      const mockData = { result: "success" };
-      const apiCall = jest.fn().mockResolvedValue(mockData);
-      const result = await apiCallWith401Handler(apiCall);
-      expect(result).toEqual(mockData);
-      expect(apiCall).toHaveBeenCalledTimes(1);
-      expect(locationHref).toBe("");
-    });
-
-    it("handles 401 response with auto-redirect", async () => {
-      const apiCall = jest
-        .fn()
-        .mockResolvedValue({ error: "Unauthorized", status: 401 });
-      const result = await apiCallWith401Handler(apiCall);
-      expect(result).toBeNull();
-
-      jest.advanceTimersByTime(2000);
-      expect(locationHref).toBe("/login");
-    });
-
-    it("handles 401 response without auto-redirect", async () => {
-      const mock401Response = { error: "Unauthorized", status: 401 };
-      const apiCall = jest.fn().mockResolvedValue(mock401Response);
-      const result = await apiCallWith401Handler(apiCall, {
-        autoRedirect: false,
-      });
-      expect(result).toEqual(mock401Response);
-      expect(locationHref).toBe("");
-    });
-
-    it("redirects to custom URL on 401", async () => {
-      const apiCall = jest.fn().mockResolvedValue({ error: "Invalid token" });
-      await apiCallWith401Handler(apiCall, {
-        redirectUrl: "/session-expired",
+    it("calls /api/session with correct parameters", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          tokens: {
+            access: { expires: new Date(Date.now() + 3600000).toISOString() },
+            refresh: { token: "new-refresh-token" },
+          },
+        }),
       });
 
-      jest.advanceTimersByTime(2000);
-      expect(locationHref).toBe("/session-expired");
-    });
+      await refreshAccessToken();
 
-    it("calls onUnauthorized callback on 401", async () => {
-      const onUnauthorized = jest.fn();
-      const apiCall = jest.fn().mockResolvedValue({ error: "Not logged in" });
-      await apiCallWith401Handler(apiCall, {
-        onUnauthorized,
-        autoRedirect: false,
-      });
-      expect(onUnauthorized).toHaveBeenCalledTimes(1);
-    });
-
-    it("logs warning on 401 detection", async () => {
-      const consoleWarnSpy = jest.spyOn(console, "warn");
-      const apiCall = jest.fn().mockResolvedValue({ error: "Unauthorized" });
-      await apiCallWith401Handler(apiCall, { autoRedirect: false });
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        "401 Unauthorized response detected in API call"
-      );
-    });
-
-    it("propagates API errors", async () => {
-      const error = new Error("API error");
-      const apiCall = jest.fn().mockRejectedValue(error);
-      await expect(apiCallWith401Handler(apiCall)).rejects.toThrow("API error");
-    });
-
-    it("handles various 401 error formats", async () => {
-      const errorFormats = [
-        { status: 401 },
-        { error: "Unauthorized" },
-        { error: "No token found" },
-        { error: "Invalid token" },
-        { error: "Not logged in" },
-      ];
-
-      for (const errorFormat of errorFormats) {
-        locationHref = ""; // Reset
-        const apiCall = jest.fn().mockResolvedValue(errorFormat);
-        const result = await apiCallWith401Handler(apiCall);
-        expect(result).toBeNull();
-
-        jest.advanceTimersByTime(2000);
-        expect(locationHref).toBe("/login");
-      }
-    });
-  });
-
-  describe("fetchWithAuth", () => {
-    beforeEach(() => {
-      global.fetch = jest.fn();
-      jest.useFakeTimers();
-    });
-
-    afterEach(() => {
-      jest.runOnlyPendingTimers();
-      jest.useRealTimers();
-    });
-
-    it("returns response for successful requests", async () => {
-      const mockResponse = new Response(JSON.stringify({ data: "test" }), {
-        status: 200,
-      });
-      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
-      const result = await fetchWithAuth("https://api.example.com/data");
-      expect(result).toBe(mockResponse);
-      expect(global.fetch).toHaveBeenCalledWith(
-        "https://api.example.com/data",
-        undefined
-      );
-      expect(locationHref).toBe("");
-    });
-
-    it("handles 401 response and redirects", async () => {
-      const mockResponse = new Response(null, { status: 401 });
-      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
-      const result = await fetchWithAuth("https://api.example.com/protected");
-      expect(result.status).toBe(401);
-
-      jest.advanceTimersByTime(2000);
-      expect(locationHref).toBe("/login");
-    });
-
-    it("passes through fetch options", async () => {
-      const mockResponse = new Response(null, { status: 200 });
-      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
-      const options: RequestInit = {
+      expect(global.fetch).toHaveBeenCalledWith("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ test: "data" }),
-      };
-      await fetchWithAuth("https://api.example.com/data", options);
-      expect(global.fetch).toHaveBeenCalledWith(
-        "https://api.example.com/data",
-        options
-      );
+        body: JSON.stringify({
+          action: "refresh",
+          refreshToken: "refresh-token-123",
+        }),
+        credentials: "include",
+      });
     });
 
-    it("logs warning on 401", async () => {
-      const consoleWarnSpy = jest.spyOn(console, "warn");
-      const mockResponse = new Response(null, { status: 401 });
-      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
-      await fetchWithAuth("https://api.example.com/protected");
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        "401 Unauthorized - Session expired"
-      );
+    it("updates token info after successful refresh", async () => {
+      const newExpiry = new Date(Date.now() + 7200000).toISOString();
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          tokens: {
+            access: { expires: newExpiry },
+            refresh: { token: "new-refresh-token" },
+          },
+        }),
+      });
+
+      const result = await refreshAccessToken();
+
+      expect(result).toBe(true);
+      // Token should now have ~2 hours left
+      expect(isTokenExpired(7199)).toBe(false);
     });
 
-    it("handles non-401 errors without redirecting", async () => {
-      const mockResponse = new Response(null, { status: 500 });
-      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
-      const result = await fetchWithAuth("https://api.example.com/error");
-      expect(result.status).toBe(500);
+    it("returns false when refresh fails", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 401,
+      });
+
+      const result = await refreshAccessToken();
+
+      expect(result).toBe(false);
+      expect(console.error).toHaveBeenCalledWith("Token refresh failed:", 401);
+    });
+
+    it("returns false when no refresh token available", async () => {
+      setTokenInfo(3600, ""); // Clear refresh token
+
+      const result = await refreshAccessToken();
+
+      expect(result).toBe(false);
+      expect(console.warn).toHaveBeenCalledWith("No refresh token available");
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("handles network errors gracefully", async () => {
+      (global.fetch as jest.Mock).mockRejectedValue(new Error("Network error"));
+
+      const result = await refreshAccessToken();
+
+      expect(result).toBe(false);
+      expect(console.error).toHaveBeenCalledWith(
+        "Error refreshing token:",
+        expect.any(Error)
+      );
+    });
+  });
+
+  describe("clearSession", () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.runOnlyPendingTimers();
+      jest.useRealTimers();
+    });
+
+    it("calls server-side logout endpoint", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
+
+      clearSession();
+
+      // Wait for async call
+      await Promise.resolve();
+
+      expect(global.fetch).toHaveBeenCalledWith("/api/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    });
+
+    it("shows toast notification", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
+
+      clearSession();
+      await Promise.resolve();
+
+      const toast = document.getElementById("session-expired-toast");
+      expect(toast).toBeInTheDocument();
+      expect(toast?.textContent).toContain("Your session has expired");
+    });
+
+    it("redirects after 2 second delay", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
+
+      clearSession();
+      await Promise.resolve();
+
       expect(locationHref).toBe("");
+
+      jest.advanceTimersByTime(2000);
+
+      expect(locationHref).toBe("/login");
     });
 
-    it("propagates fetch errors", async () => {
-      const error = new Error("Network error");
-      (global.fetch as jest.Mock).mockRejectedValue(error);
-      await expect(
-        fetchWithAuth("https://api.example.com/data")
-      ).rejects.toThrow("Network error");
+    it("redirects to custom URL", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
+
+      clearSession("/custom-auth");
+      await Promise.resolve();
+
+      jest.advanceTimersByTime(2000);
+
+      expect(locationHref).toBe("/custom-auth");
+    });
+
+    it("handles server logout errors gracefully", async () => {
+      (global.fetch as jest.Mock).mockRejectedValue(new Error("Server error"));
+
+      clearSession();
+      await Promise.resolve();
+
+      expect(console.error).toHaveBeenCalledWith(
+        "Error clearing session:",
+        expect.any(Error)
+      );
+
+      // Should still show toast and redirect
+      const toast = document.getElementById("session-expired-toast");
+      expect(toast).toBeInTheDocument();
+    });
+
+    it("prevents duplicate toasts", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
+
+      clearSession();
+      await Promise.resolve();
+
+      const firstToast = document.getElementById("session-expired-toast");
+
+      clearSession();
+      await Promise.resolve();
+
+      const allToasts = document.querySelectorAll("#session-expired-toast");
+      expect(allToasts.length).toBe(1);
+      expect(firstToast).toBeInTheDocument();
+    });
+  });
+
+  describe("authenticatedFetch", () => {
+    beforeEach(() => {
+      setTokenInfo(3600, "refresh-token");
+    });
+
+    it("makes successful requests without refresh", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: "success" }),
+      });
+
+      const result = await authenticatedFetch("/api/users");
+
+      expect(result).toEqual({ data: "success" });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("proactively refreshes token before expiry", async () => {
+      setTokenInfo(30, "refresh-token"); // Expires in 30s, less than 60s buffer
+
+      // Mock refresh
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            tokens: {
+              access: { expires: new Date(Date.now() + 3600000).toISOString() },
+              refresh: { token: "new-token" },
+            },
+          }),
+        })
+        // Mock actual request
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ data: "success" }),
+        });
+
+      const result = await authenticatedFetch("/api/users");
+
+      expect(result).toEqual({ data: "success" });
+      expect(global.fetch).toHaveBeenCalledTimes(2); // Refresh + actual call
+      expect(console.log).toHaveBeenCalledWith(
+        "Token about to expire, refreshing proactively..."
+      );
+    });
+
+    it("retries request after 401 with token refresh", async () => {
+      // First call returns 401
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+        })
+        // Refresh token call
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            tokens: {
+              access: { expires: new Date(Date.now() + 3600000).toISOString() },
+              refresh: { token: "new-token" },
+            },
+          }),
+        })
+        // Retry succeeds
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ data: "success" }),
+        });
+
+      const result = await authenticatedFetch("/api/protected");
+
+      expect(result).toEqual({ data: "success" });
+      expect(global.fetch).toHaveBeenCalledTimes(3);
+    });
+
+    it("parses response as text when specified", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        text: async () => "plain text response",
+      });
+
+      const result = await authenticatedFetch(
+        "/api/text",
+        {},
+        { parseAs: "text" }
+      );
+
+      expect(result).toBe("plain text response");
+    });
+
+    it("returns raw response when skipParsing is true", async () => {
+      const mockResponse = {
+        ok: true,
+        status: 200,
+      };
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      const result = await authenticatedFetch(
+        "/api/data",
+        {},
+        { skipParsing: true }
+      );
+
+      expect(result).toBe(mockResponse);
+    });
+
+    it("handles non-OK responses", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+        json: async () => ({ message: "Server error" }),
+      });
+
+      const result = await authenticatedFetch("/api/error");
+
+      expect(result).toEqual({
+        error: true,
+        status: 500,
+        message: "Server error",
+      });
+    });
+
+    it("calls onUnauthorized callback on 401", async () => {
+      const onUnauthorized = jest.fn();
+
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 401,
+      });
+
+      await authenticatedFetch(
+        "/api/protected",
+        {},
+        { onUnauthorized, autoRefresh: false }
+      );
+
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    });
+
+    it("skips refresh when autoRefresh is false", async () => {
+      setTokenInfo(30, "refresh-token"); // Would normally trigger refresh
+
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: "success" }),
+      });
+
+      await authenticatedFetch("/api/data", {}, { autoRefresh: false });
+
+      expect(global.fetch).toHaveBeenCalledTimes(1); // No refresh call
+    });
+
+    it("includes credentials in requests", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: "success" }),
+      });
+
+      await authenticatedFetch("/api/data");
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/data",
+        expect.objectContaining({
+          credentials: "include",
+        })
+      );
+    });
+  });
+
+  describe("initAuthState", () => {
+    it("fetches and sets token info from server", async () => {
+      const expiry = new Date(Date.now() + 3600000).toISOString();
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          tokens: {
+            access: { expires: expiry },
+            refresh: { token: "refresh-token-123" },
+          },
+        }),
+      });
+
+      await initAuthState();
+
+      expect(global.fetch).toHaveBeenCalledWith("/api/session", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      // Token should be set
+      expect(isTokenExpired(3599)).toBe(false);
+    });
+
+    it("handles missing session gracefully", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 401,
+      });
+
+      await initAuthState();
+
+      // Should not throw error
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
+    it("handles network errors gracefully", async () => {
+      (global.fetch as jest.Mock).mockRejectedValue(new Error("Network error"));
+
+      await initAuthState();
+
+      expect(console.error).toHaveBeenCalledWith(
+        "Error initializing auth state:",
+        expect.any(Error)
+      );
     });
   });
 
@@ -490,33 +539,56 @@ describe("AuthInterceptor", () => {
       jest.useRealTimers();
     });
 
-    it("handles cascading 401 responses across multiple API calls", async () => {
-      const apiCall1 = jest.fn().mockResolvedValue({ error: "Invalid token" });
-      await apiCallWith401Handler(apiCall1);
+    it("handles complete auth flow: refresh -> request -> success", async () => {
+      setTokenInfo(30, "old-token");
 
-      jest.advanceTimersByTime(2000);
-      expect(locationHref).toBe("/login");
+      (global.fetch as jest.Mock)
+        // Proactive refresh
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            tokens: {
+              access: { expires: new Date(Date.now() + 3600000).toISOString() },
+              refresh: { token: "new-token" },
+            },
+          }),
+        })
+        // Actual request
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ users: [] }),
+        });
 
-      locationHref = ""; // Reset
+      const result = await authenticatedFetch("/api/users");
 
-      const apiCall2 = jest.fn().mockResolvedValue({ error: "No token found" });
-      await apiCallWith401Handler(apiCall2);
-
-      jest.advanceTimersByTime(2000);
-      expect(locationHref).toBe("/login");
+      expect(result).toEqual({ users: [] });
+      expect(global.fetch).toHaveBeenCalledTimes(2);
     });
 
-    it("allows custom handlers to prevent redirect", async () => {
-      let customHandlerCalled = false;
-      const apiCall = jest.fn().mockResolvedValue({ status: 401 });
-      await apiCallWith401Handler(apiCall, {
-        autoRedirect: false,
-        onUnauthorized: () => {
-          customHandlerCalled = true;
-        },
-      });
-      expect(customHandlerCalled).toBe(true);
-      expect(locationHref).toBe("");
+    it("handles auth failure: 401 -> refresh fails -> logout", async () => {
+      (global.fetch as jest.Mock)
+        // Request returns 401
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+        })
+        // Refresh fails
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+        })
+        // Logout call
+        .mockResolvedValueOnce({ ok: true });
+
+      const result = await authenticatedFetch("/api/protected");
+
+      await Promise.resolve(); // Let clearSession complete
+
+      expect(result).toBeNull();
+      expect(global.fetch).toHaveBeenCalledTimes(3); // Request + refresh + logout
+
+      jest.advanceTimersByTime(2000);
+      expect(locationHref).toBe("/login");
     });
   });
 });

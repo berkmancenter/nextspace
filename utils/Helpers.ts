@@ -1,6 +1,6 @@
 import { ParsedUrlQuery } from "querystring";
 import { RefreshToken, RetrieveData, Request } from "./";
-import { fetchWithAutoAuth } from "./AuthInterceptor";
+import { authenticatedFetch } from "./AuthInterceptor";
 import { components } from "../types";
 import { Conversation, EventUrl, EventUrls } from "../types.internal";
 
@@ -145,7 +145,7 @@ export const GetChannelPasscode = (
 
 /**
  * Sends a POST request to the API
- * Automatically handles 401 Unauthorized responses by attempting token refresh or redirecting to login.
+ * Automatically handles 401 Unauthorized responses and token refresh.
  * @param urlSuffix - The endpoint suffix to send data to.
  * @param payload - The data payload to send in the request body.
  * @param accessToken - Optional access token to use for authorization.
@@ -180,45 +180,16 @@ export const SendData = async (
     ? `Bearer ${accessToken}`
     : `Bearer ${API_TOKENS.access}`;
 
-  // Create fetch function
-  const makeFetchCall = () =>
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/${urlSuffix}`, {
-      method: options.method,
-      headers: options.headers,
-      body: options.body,
-    });
-
   try {
-    // Try the request with centralized 401 handling
-    const result = await fetchWithAutoAuth(makeFetchCall);
-
-    // If we got a 401 error and have a refresh token, try to refresh
-    if (result?.status === 401 && API_TOKENS.refresh) {
-      try {
-        console.log("Token expired, refreshing...");
-        const tokensResponse = await RefreshToken(API_TOKENS.refresh);
-        apiI.SetTokens(
-          tokensResponse.access.token,
-          tokensResponse.refresh.token
-        );
-
-        // Retry with new token
-        return await SendData(
-          urlSuffix,
-          payload,
-          tokensResponse.access.token,
-          fetchOptions
-        );
-      } catch (refreshError) {
-        // Refresh failed, the 401 handling already redirected
-        console.warn("Token refresh failed - Session expired");
-        return {
-          error: true,
-          status: 401,
-          message: "Unauthorized - Session expired",
-        };
+    // Use authenticatedFetch for centralized auth handling
+    const result = await authenticatedFetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/${urlSuffix}`,
+      {
+        method: options.method,
+        headers: options.headers,
+        body: options.body,
       }
-    }
+    );
 
     return result;
   } catch (error) {

@@ -3,18 +3,13 @@
  */
 
 import { SendData, Api } from "../../utils/Helpers";
-import { RefreshToken } from "../../utils/Api";
-import { fetchWithAutoAuth } from "../../utils/AuthInterceptor";
+import { authenticatedFetch } from "../../utils/AuthInterceptor";
 
 // Mock dependencies
-jest.mock("../../utils/Api", () => ({
-  RefreshToken: jest.fn(),
-}));
-
 jest.mock("../../utils/AuthInterceptor");
 
-const mockedFetchWithAutoAuth = fetchWithAutoAuth as jest.MockedFunction<
-  typeof fetchWithAutoAuth
+const mockedAuthenticatedFetch = authenticatedFetch as jest.MockedFunction<
+  typeof authenticatedFetch
 >;
 
 describe("SendData Integration", () => {
@@ -37,99 +32,46 @@ describe("SendData Integration", () => {
     apiInstance.SetTokens("", "");
   });
 
-  it("calls fetchWithAutoAuth with correct parameters", async () => {
+  it("calls authenticatedFetch with correct parameters", async () => {
     const mockResponse = { success: true, id: 123 };
-    mockedFetchWithAutoAuth.mockResolvedValue(mockResponse);
+    mockedAuthenticatedFetch.mockResolvedValue(mockResponse);
 
     const result = await SendData("messages", { body: "Test message" });
 
-    expect(mockedFetchWithAutoAuth).toHaveBeenCalledTimes(1);
+    expect(mockedAuthenticatedFetch).toHaveBeenCalledTimes(1);
+    expect(mockedAuthenticatedFetch).toHaveBeenCalledWith(
+      `${process.env.NEXT_PUBLIC_API_URL}/messages`,
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+          Authorization: "Bearer access-token",
+        }),
+        body: JSON.stringify({ body: "Test message" }),
+      })
+    );
     expect(result).toEqual(mockResponse);
-    expect(RefreshToken).not.toHaveBeenCalled();
   });
 
   it("uses provided access token", async () => {
     const mockResponse = { success: true };
-    mockedFetchWithAutoAuth.mockResolvedValue(mockResponse);
+    mockedAuthenticatedFetch.mockResolvedValue(mockResponse);
 
     await SendData("messages", { body: "Test" }, "custom-token");
 
-    expect(mockedFetchWithAutoAuth).toHaveBeenCalledTimes(1);
-    // The custom token is passed in the fetch headers
-    const fetchCall = mockedFetchWithAutoAuth.mock.calls[0][0];
-    expect(fetchCall).toBeDefined();
-  });
-
-  it("attempts token refresh on 401 when refresh token available", async () => {
-    const newTokens = {
-      access: { token: "new-access-token" },
-      refresh: { token: "new-refresh-token" },
-    };
-    const finalResponse = { success: true, retried: true };
-
-    // First call returns 401
-    mockedFetchWithAutoAuth
-      .mockResolvedValueOnce({
-        error: true,
-        status: 401,
-        message: "Unauthorized",
+    expect(mockedAuthenticatedFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer custom-token",
+        }),
       })
-      // Second call (after refresh) succeeds
-      .mockResolvedValueOnce(finalResponse);
-
-    (RefreshToken as jest.Mock).mockResolvedValue(newTokens);
-
-    const result = await SendData("messages", { body: "Test" });
-
-    expect(RefreshToken).toHaveBeenCalledWith("refresh-token");
-    expect(mockedFetchWithAutoAuth).toHaveBeenCalledTimes(2);
-    expect(result).toEqual(finalResponse);
-  });
-
-  it("handles refresh failure gracefully", async () => {
-    mockedFetchWithAutoAuth.mockResolvedValue({
-      error: true,
-      status: 401,
-      message: "Unauthorized",
-    });
-
-    (RefreshToken as jest.Mock).mockRejectedValue(
-      new Error("Refresh token expired")
     );
-
-    const result = await SendData("messages", { body: "Test" });
-
-    expect(RefreshToken).toHaveBeenCalled();
-    expect(result).toEqual({
-      error: true,
-      status: 401,
-      message: "Unauthorized - Session expired",
-    });
-  });
-
-  it("handles 401 when no refresh token available", async () => {
-    // Clear refresh token
-    apiInstance.SetTokens("access-token", "");
-
-    mockedFetchWithAutoAuth.mockResolvedValue({
-      error: true,
-      status: 401,
-      message: "Unauthorized",
-    });
-
-    const result = await SendData("messages", { body: "Test" });
-
-    expect(RefreshToken).not.toHaveBeenCalled();
-    expect(result).toEqual({
-      error: true,
-      status: 401,
-      message: "Unauthorized",
-    });
   });
 
   it("handles successful responses", async () => {
     const mockData = { id: 1, message: "Created" };
-    mockedFetchWithAutoAuth.mockResolvedValue(mockData);
+    mockedAuthenticatedFetch.mockResolvedValue(mockData);
 
     const result = await SendData("messages", { body: "Test" });
 
@@ -138,7 +80,7 @@ describe("SendData Integration", () => {
 
   it("handles network errors", async () => {
     const networkError = new Error("Network failure");
-    mockedFetchWithAutoAuth.mockRejectedValue(networkError);
+    mockedAuthenticatedFetch.mockRejectedValue(networkError);
 
     await expect(SendData("messages", { body: "Test" })).rejects.toThrow(
       "Network failure"
@@ -150,40 +92,73 @@ describe("SendData Integration", () => {
     );
   });
 
-  it("updates API tokens after successful refresh", async () => {
-    const newTokens = {
-      access: { token: "new-access" },
-      refresh: { token: "new-refresh" },
-    };
-
-    mockedFetchWithAutoAuth
-      .mockResolvedValueOnce({ error: true, status: 401 })
-      .mockResolvedValueOnce({ success: true });
-
-    (RefreshToken as jest.Mock).mockResolvedValue(newTokens);
+  it("uses default API tokens when no custom token provided", async () => {
+    const mockResponse = { success: true };
+    mockedAuthenticatedFetch.mockResolvedValue(mockResponse);
 
     await SendData("messages", { body: "Test" });
 
-    const tokens = apiInstance.GetTokens();
-    expect(tokens.access).toBe("new-access");
-    expect(tokens.refresh).toBe("new-refresh");
+    expect(mockedAuthenticatedFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer access-token",
+        }),
+      })
+    );
   });
 
-  it("logs appropriate messages during token refresh", async () => {
-    const consoleSpy = jest.spyOn(console, "log");
-    const newTokens = {
-      access: { token: "new-token" },
-      refresh: { token: "new-refresh" },
+  it("includes request body in POST request", async () => {
+    const mockResponse = { success: true };
+    const payload = { message: "Hello", user: "John" };
+    mockedAuthenticatedFetch.mockResolvedValue(mockResponse);
+
+    await SendData("messages", payload);
+
+    expect(mockedAuthenticatedFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+  });
+
+  it("respects custom fetch options when provided", async () => {
+    const mockResponse = { success: true };
+    const customOptions = {
+      method: "PUT",
+      headers: {
+        "X-Custom-Header": "value",
+      },
+      body: JSON.stringify({ test: "data" }),
     };
+    mockedAuthenticatedFetch.mockResolvedValue(mockResponse);
 
-    mockedFetchWithAutoAuth
-      .mockResolvedValueOnce({ error: true, status: 401 })
-      .mockResolvedValueOnce({ success: true });
+    await SendData("messages", { body: "Test" }, undefined, customOptions);
 
-    (RefreshToken as jest.Mock).mockResolvedValue(newTokens);
+    expect(mockedAuthenticatedFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        method: "PUT",
+        headers: expect.objectContaining({
+          "X-Custom-Header": "value",
+          Authorization: "Bearer access-token",
+        }),
+      })
+    );
+  });
 
-    await SendData("messages", { body: "Test" });
+  it("handles error responses from authenticatedFetch", async () => {
+    const errorResponse = {
+      error: true,
+      status: 500,
+      message: "Server error",
+    };
+    mockedAuthenticatedFetch.mockResolvedValue(errorResponse);
 
-    expect(consoleSpy).toHaveBeenCalledWith("Token expired, refreshing...");
+    const result = await SendData("messages", { body: "Test" });
+
+    expect(result).toEqual(errorResponse);
   });
 });
