@@ -324,21 +324,40 @@ export const authenticatedFetch = async (
       if (autoRefresh) {
         const refreshed = await refreshAccessToken();
         if (refreshed) {
-          // Retry the request with new token
+          console.log("Token refreshed successfully, retrying request...");
+          // Retry the request with new token - use same credentials logic as initial request
           const retryResponse = await fetch(input, {
             ...init,
-            credentials: init?.credentials || "include",
+            credentials: shouldIncludeCredentials,
           });
 
           if (retryResponse.ok) {
             return skipParsing
               ? retryResponse
               : await parseResponse(retryResponse, parseAs);
+          } else if (retryResponse.status === 401) {
+            // Still 401 after refresh - session is definitely invalid
+            console.warn(
+              "Still unauthorized after token refresh, clearing session"
+            );
+            await clearSession();
+            return null;
           }
+        } else {
+          // Refresh failed - clear session and redirect
+          console.warn("Token refresh failed, clearing session");
+          await clearSession();
+          return null;
         }
+      } else {
+        // Auto-refresh disabled - clear session and redirect
+        console.warn("Auto-refresh disabled, clearing session");
+        await clearSession();
+        return null;
       }
 
-      // If refresh failed or not enabled, clear session and redirect
+      // Fallback - should not reach here, but ensure session is cleared
+      console.warn("Unexpected 401 flow, clearing session");
       await clearSession();
       return null;
     }
