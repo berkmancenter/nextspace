@@ -8,6 +8,19 @@ import {
   ThemeProvider,
 } from "@mui/material";
 import { Layout } from "../components";
+import { validateEnv } from "../utils/validateEnv";
+
+// Validate environment variables on app initialization
+if (typeof window === "undefined") {
+  try {
+    validateEnv();
+  } catch (error) {
+    console.error(
+      error instanceof Error ? error.message : "Environment validation failed"
+    );
+    throw error;
+  }
+}
 
 export default function App({ Component, pageProps }: AppProps) {
   const theme = createTheme({

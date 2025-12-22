@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
 import { Box, IconButton, InputAdornment, TextField } from "@mui/material";
-import { Send } from "@mui/icons-material";
+import { Send, Close } from "@mui/icons-material";
 
 import { Element, scroller } from "react-scroll";
 
-import { DirectMessage } from "../components";
+import { DirectMessage, ControlledInputConfig } from "../components";
 import { Api, JoinSession, RetrieveData, SendData } from "../utils";
 import { components } from "../types";
 import { PseudonymousMessage } from "../types.internal";
@@ -30,6 +30,8 @@ function EventAssistantRoom() {
   const [userId, setUserId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
+  const [controlledMode, setControlledMode] =
+    useState<ControlledInputConfig | null>(null);
 
   const messageInputRef = useRef<HTMLInputElement>(null);
 
@@ -146,22 +148,70 @@ function EventAssistantRoom() {
     fetchConversationData();
   }, [socket, router, userId, agentId]);
 
-  async function sendMessage(message: string) {
+  async function sendMessage(
+    message: string,
+    shouldWaitForResponse: boolean = true
+  ) {
     if (!Api.get().GetTokens() || !message) return;
     let channels = [{ name: `direct-${userId}-${agentId}` }];
 
-    setWaitingForResponse(true);
+    // Prepend prefix if in controlled mode
+    const finalMessage = controlledMode
+      ? controlledMode.prefix + message
+      : message;
+
+    // Only set waitingForResponse for regular messages, not controlled mode messages
+    // (controlled mode messages like feedback don't generate responses)
+    if (shouldWaitForResponse && !controlledMode) {
+      setWaitingForResponse(true);
+    }
     setCurrentMessage("");
 
     await SendData("messages", {
-      body: message,
+      body: finalMessage,
       bodyType: "text",
       conversation: router.query.conversationId,
       channels,
     });
 
-    messageInputRef.current!.value = "";
+    // Auto-exit controlled mode after sending
+    if (controlledMode) {
+      setControlledMode(null);
+    }
   }
+
+  const enterControlledMode = (config: ControlledInputConfig) => {
+    setControlledMode(config);
+    setCurrentMessage("");
+    // Use setTimeout to ensure focus happens after any state updates
+    setTimeout(() => {
+      if (messageInputRef.current) {
+        messageInputRef.current.focus();
+      }
+    }, 0);
+  };
+
+  const exitControlledMode = () => {
+    setControlledMode(null);
+    setCurrentMessage("");
+  };
+
+  // Handle ESC key to exit controlled mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && controlledMode) {
+        exitControlledMode();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [controlledMode]);
+
+  const sendFeedbackRating = async (messageId: string, rating: string) => {
+    const feedbackText = `/feedback|Rating|${messageId}|${rating}`;
+    await sendMessage(feedbackText, false);
+  };
 
   return (
     <div className="h-screen flex items-start justify-center mt-12">
@@ -189,80 +239,83 @@ function EventAssistantRoom() {
                   id="scroll-container"
                   aria-live="assertive"
                 >
-                  {messages.map((message, i) => (
-                    <div key={`msg-${i}`} className="w-full lg:w-3/4 px-2">
-                      <div className="flex flex-col lg:flex-row gap-x-5.5">
-                        <p className="flex flex-col min-w-24 items-center text-sm text-neutral-600 mb-1 lg:mb-0 lg:mt-2">
-                          {new Date(message.createdAt!).toLocaleTimeString(
-                            "en-US",
-                            {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }
-                          )}
-                          {message.pseudonym === "Event Assistant" && (
-                            <>
-                              <span className="hidden lg:inline-block h-full border-l-2 border-l-dark-blue opacity-50 border-dotted my-1"></span>
-                              {waitingForResponse &&
-                                i ===
-                                  messages.findLastIndex(
-                                    (msg) => msg.pseudonym === "Event Assistant"
-                                  ) && (
-                                  <svg
-                                    viewBox="0 0 32 32"
-                                    className="w-10 h-10 text-black dark:text-white mx-auto"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="0.7"
-                                  >
-                                    <circle
-                                      cx="16"
-                                      cy="5.5"
-                                      r="1"
-                                      className="animate-bounce"
-                                    />
-                                    <line x1="16" y1="6.5" x2="16" y2="10" />
-                                    <rect
-                                      x="8"
-                                      y="10"
-                                      width="16"
-                                      height="12"
-                                      rx="6"
-                                    />
-                                    <circle cx="12" cy="16" r="1" />
-                                    <circle cx="20" cy="16" r="1" />
-                                    <path
-                                      d="M13 19 Q16 21 19 19"
-                                      stroke-linecap="round"
+                  {messages.map((message, i) => {
+                    const isAssistant = message.pseudonym === "Event Assistant";
+                    return (
+                      <div key={`msg-${i}`} className="w-full lg:w-3/4 px-2">
+                        <div className="flex flex-col lg:flex-row gap-x-5.5">
+                          <p className="flex flex-col min-w-24 items-center text-sm text-neutral-600 mb-1 lg:mb-0 lg:mt-2">
+                            {new Date(message.createdAt!).toLocaleTimeString(
+                              "en-US",
+                              {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }
+                            )}
+                            {isAssistant && (
+                              <>
+                                <span className="hidden lg:inline-block h-full border-l-2 border-l-dark-blue opacity-50 border-dotted my-1"></span>
+                                {waitingForResponse &&
+                                  i ===
+                                    messages.findLastIndex(
+                                      (msg) =>
+                                        msg.pseudonym === "Event Assistant"
+                                    ) && (
+                                    <svg
+                                      viewBox="0 0 32 32"
+                                      className="w-10 h-10 text-black dark:text-white mx-auto"
                                       fill="none"
-                                    />
-                                    <line x1="8" y1="15" x2="4.5" y2="13" />
-                                    <line x1="24" y1="15" x2="27.5" y2="13" />
-                                    <rect
-                                      x="13"
-                                      y="22"
-                                      width="6"
-                                      height="5"
-                                      rx="2"
-                                    />
-                                  </svg>
-                                )}
-                            </>
-                          )}
-                        </p>
-                        <DirectMessage
-                          key={`msg-${i}`}
-                          text={message.body}
-                          date={new Date(message.createdAt!)}
-                          theme={
-                            message.pseudonym === "Event Assistant"
-                              ? "assistant"
-                              : "none"
-                          }
-                        />
+                                      stroke="currentColor"
+                                      strokeWidth="0.7"
+                                    >
+                                      <circle
+                                        cx="16"
+                                        cy="5.5"
+                                        r="1"
+                                        className="animate-bounce"
+                                      />
+                                      <line x1="16" y1="6.5" x2="16" y2="10" />
+                                      <rect
+                                        x="8"
+                                        y="10"
+                                        width="16"
+                                        height="12"
+                                        rx="6"
+                                      />
+                                      <circle cx="12" cy="16" r="1" />
+                                      <circle cx="20" cy="16" r="1" />
+                                      <path
+                                        d="M13 19 Q16 21 19 19"
+                                        strokeLinecap="round"
+                                        fill="none"
+                                      />
+                                      <line x1="8" y1="15" x2="4.5" y2="13" />
+                                      <line x1="24" y1="15" x2="27.5" y2="13" />
+                                      <rect
+                                        x="13"
+                                        y="22"
+                                        width="6"
+                                        height="5"
+                                        rx="2"
+                                      />
+                                    </svg>
+                                  )}
+                              </>
+                            )}
+                          </p>
+                          <DirectMessage
+                            key={`msg-${i}`}
+                            text={message.body}
+                            date={new Date(message.createdAt!)}
+                            theme={isAssistant ? "assistant" : "none"}
+                            messageId={message.id}
+                            onPopulateFeedbackText={enterControlledMode}
+                            onSendFeedbackRating={sendFeedbackRating}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {/* Scroll to bottom element */}
                   <Element name="end" />
                 </div>
@@ -272,20 +325,34 @@ function EventAssistantRoom() {
                       {/* Message Input */}
                       <Box display="flex" alignItems="center" padding="8px">
                         <div className="flex flex-col w-full">
-                          <div className="border-[1px] border-b-0 border-[#A5B4FC] rounded-t-lg p-2 font-bold text-sm uppercase">
-                            Writing as {pseudonym}
+                          <div className="border-[1px] border-b-0 border-[#A5B4FC] rounded-t-lg p-2 font-bold text-sm flex justify-between items-center">
+                            <span className="uppercase">
+                              Writing as {pseudonym}
+                              {controlledMode && (
+                                <span className="normal-case">
+                                  {" • "}
+                                  {controlledMode.icon} {controlledMode.label}
+                                </span>
+                              )}
+                            </span>
+                            {controlledMode && (
+                              <IconButton
+                                size="small"
+                                onClick={exitControlledMode}
+                                sx={{ padding: "4px" }}
+                              >
+                                <Close fontSize="small" />
+                              </IconButton>
+                            )}
                           </div>
                           <TextField
                             id="message-input"
-                            ref={messageInputRef}
+                            inputRef={messageInputRef}
                             type="text"
                             placeholder="Write a Comment"
                             value={currentMessage}
                             onChange={(e) => {
-                              if (messageInputRef.current) {
-                                messageInputRef.current.value = e.target.value;
-                                setCurrentMessage(e.target.value);
-                              }
+                              setCurrentMessage(e.target.value);
                             }}
                             onKeyUp={(e) => {
                               if (
@@ -294,7 +361,7 @@ function EventAssistantRoom() {
                                 currentMessage.length > 0 &&
                                 !waitingForResponse
                               )
-                                sendMessage(messageInputRef.current!.value);
+                                sendMessage(currentMessage);
                             }}
                             style={{
                               flex: 1,
@@ -319,9 +386,7 @@ function EventAssistantRoom() {
                                   <InputAdornment position="end">
                                     <IconButton
                                       onClick={() =>
-                                        sendMessage(
-                                          messageInputRef.current!.value
-                                        )
+                                        sendMessage(currentMessage)
                                       }
                                       aria-label="send message"
                                       disabled={

@@ -6,5 +6,7 @@ export { Header } from "./Header";
 export { Layout } from "./Layout";
 export { Logo } from "./Logo";
 export { DirectMessage } from "./DirectMessage";
+export type { ControlledInputConfig } from "./DirectMessage";
+export { MessageFeedback } from "./MessageFeedback";
 export { Transcript } from "./Transcript";
 export { AgentConfigForm } from "./AgentConfigForm";
