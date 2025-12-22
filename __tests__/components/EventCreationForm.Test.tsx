@@ -731,10 +731,6 @@ describe("EventCreationForm Component", () => {
       render(<EventCreationForm />);
     });
 
-    await waitFor(() => {
-      expect(screen.getByText("Nextspace")).toBeInTheDocument();
-    });
-
     // Fill in event name we will then clear and zoom URL
     await fillEventDetails(
       "Scheduled Event To Clear",
@@ -744,10 +740,7 @@ describe("EventCreationForm Component", () => {
     const nameInput = screen.getByLabelText(/Event Name/i);
     await user.clear(nameInput);
 
-    const submitButton = screen.getByRole("button", {
-      name: /create conversation/i,
-    });
-    await user.click(submitButton);
+    await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => {
       expect(screen.getByText("Event Name is required")).toBeInTheDocument();
@@ -761,10 +754,6 @@ describe("EventCreationForm Component", () => {
       render(<EventCreationForm />);
     });
 
-    await waitFor(() => {
-      expect(screen.getByText("Nextspace")).toBeInTheDocument();
-    });
-
     // Fill in event and zoom URL we will then clear
     await fillEventDetails(
       "Scheduled Event",
@@ -774,10 +763,7 @@ describe("EventCreationForm Component", () => {
     const urlInput = screen.getByLabelText(/Zoom Meeting URL/i);
     await user.clear(urlInput);
 
-    const submitButton = screen.getByRole("button", {
-      name: /create conversation/i,
-    });
-    await user.click(submitButton);
+    await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => {
       expect(
@@ -793,59 +779,18 @@ describe("EventCreationForm Component", () => {
       render(<EventCreationForm />);
     });
 
-    await waitFor(() => {
-      expect(screen.getByText("Nextspace")).toBeInTheDocument();
-    });
-
     await fillEventDetails(
       "Test Event",
       "https://huitstage.zoom.us/j/1234567890"
     );
 
-    const backChannelRadio = screen.getByRole("radio", {
-      name: /back channel/i,
-    });
-    await user.click(backChannelRadio);
-
-    const submitButton = screen.getByRole("button", {
-      name: /create conversation/i,
-    });
-    await user.click(submitButton);
+    // Navigate to Step 3 without selecting platform
+    await user.click(screen.getByRole("button", { name: /next/i }));
+    await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => {
       expect(
         screen.getByText("At least one platform must be selected")
-      ).toBeInTheDocument();
-    });
-  });
-
-  it("displays error when no agent is selected", async () => {
-    const user = userEvent.setup();
-
-    await act(async () => {
-      render(<EventCreationForm />);
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText("Nextspace")).toBeInTheDocument();
-    });
-
-    await fillEventDetails(
-      "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
-    );
-
-    const zoomCheckbox = screen.getByRole("checkbox", { name: /zoom/i });
-    await user.click(zoomCheckbox);
-
-    const submitButton = screen.getByRole("button", {
-      name: /create conversation/i,
-    });
-    await user.click(submitButton);
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("At least one agent must be selected")
       ).toBeInTheDocument();
     });
   });
@@ -857,24 +802,14 @@ describe("EventCreationForm Component", () => {
       render(<EventCreationForm />);
     });
 
-    await waitFor(() => {
-      expect(screen.getByText("Nextspace")).toBeInTheDocument();
-    });
-
     await fillEventDetails(
       "Test Event",
       "https://huitstage.zoom.us/j/1234567890"
     );
 
-    const backChannelRadio = screen.getByRole("radio", {
-      name: /back channel/i,
-    });
-    await user.click(backChannelRadio);
-
-    const submitButton = screen.getByRole("button", {
-      name: /create conversation/i,
-    });
-    await user.click(submitButton);
+    // Navigate to Step 3 without selecting platform
+    await user.click(screen.getByRole("button", { name: /next/i }));
+    await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => {
       expect(
@@ -885,51 +820,11 @@ describe("EventCreationForm Component", () => {
     const zoomCheckbox = screen.getByRole("checkbox", { name: /zoom/i });
     await user.click(zoomCheckbox);
 
+    await user.click(screen.getByRole("button", { name: /next/i }));
+
     await waitFor(() => {
       expect(
         screen.queryByText("At least one platform must be selected")
-      ).not.toBeInTheDocument();
-    });
-  });
-
-  it("clears agent error when agent is selected", async () => {
-    const user = userEvent.setup();
-
-    await act(async () => {
-      render(<EventCreationForm />);
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText("Nextspace")).toBeInTheDocument();
-    });
-
-    await fillEventDetails(
-      "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
-    );
-
-    const zoomCheckbox = screen.getByRole("checkbox", { name: /zoom/i });
-    await user.click(zoomCheckbox);
-
-    const submitButton = screen.getByRole("button", {
-      name: /create conversation/i,
-    });
-    await user.click(submitButton);
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("At least one agent must be selected")
-      ).toBeInTheDocument();
-    });
-
-    const backChannelRadio = screen.getByRole("radio", {
-      name: /back channel/i,
-    });
-    await user.click(backChannelRadio);
-
-    await waitFor(() => {
-      expect(
-        screen.queryByText("At least one agent must be selected")
       ).not.toBeInTheDocument();
     });
   });
@@ -941,14 +836,12 @@ describe("EventCreationForm Component", () => {
       render(<EventCreationForm />);
     });
 
-    await waitFor(() => {
-      expect(screen.getByText("Nextspace")).toBeInTheDocument();
-    });
-
     await fillEventDetails(
       "Test Event",
       "https://huitstage.zoom.us/j/1234567890"
     );
+
+    await user.click(screen.getByRole("button", { name: /next/i }));
 
     const backChannelRadio = screen.getByRole("radio", {
       name: /back channel/i,
@@ -956,13 +849,11 @@ describe("EventCreationForm Component", () => {
     await user.click(backChannelRadio);
 
     const zoomCheckbox = screen.getByRole("checkbox", { name: /zoom/i });
-    await user.click(zoomCheckbox);
-    await user.click(zoomCheckbox);
 
-    const submitButton = screen.getByRole("button", {
-      name: /create conversation/i,
-    });
-    await user.click(submitButton);
+    await user.click(zoomCheckbox);
+    await user.click(zoomCheckbox); // Unselect
+
+    await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => {
       expect(
