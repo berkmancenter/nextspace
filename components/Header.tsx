@@ -78,28 +78,24 @@ export const Header = ({
     return Object.keys(currentPages).map((pageName) => {
       const isExternalLink = currentPages[pageName].url.startsWith("http");
       return (
-        <Link
+        <Button
+          component="a"
           href={currentPages[pageName].url}
           key={pageName}
           target={isExternalLink ? "_blank" : undefined}
           rel={isExternalLink ? "noopener noreferrer" : undefined}
+          sx={{
+            textTransform: "capitalize",
+            "&:hover": { color: "#4845d2" },
+            fontSize: "1rem",
+            color:
+              router.asPath === currentPages[pageName].url ? "#4845d2" : "grey",
+            backgroundColor: "transparent",
+          }}
+          startIcon={currentPages[pageName].icon}
         >
-          <Button
-            sx={{
-              textTransform: "capitalize",
-              "&:hover": { color: "#4845d2" },
-              fontSize: "1rem",
-              color:
-                router.asPath === currentPages[pageName].url
-                  ? "#4845d2"
-                  : "grey",
-              backgroundColor: "transparent",
-            }}
-            startIcon={currentPages[pageName].icon}
-          >
-            {pageName}
-          </Button>
-        </Link>
+          {pageName}
+        </Button>
       );
     });
   };
@@ -130,7 +126,7 @@ export const Header = ({
             </List>
           </Drawer>
         </div>
-        <Box className="hidden lg:flex flex-row justify-end grow-1 space-x-6">
+        <Box className="hidden lg:flex flex-row justify-end grow-1 gap-x-6">
           {NavItems()}
         </Box>
       </Toolbar>

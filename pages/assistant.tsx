@@ -237,6 +237,7 @@ function EventAssistantRoom() {
                 <div
                   className="overflow-auto flex flex-col grow items-center gap-8 mt-4 mb-32 xl:mb-20"
                   id="scroll-container"
+                  aria-live="assertive"
                 >
                   {messages.map((message, i) => {
                     const isAssistant = message.pseudonym === "Event Assistant";
