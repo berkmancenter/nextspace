@@ -1,6 +1,7 @@
 import "../globals.css";
 import type { AppProps } from "next/app";
 import Head from "next/head";
+import { useEffect } from "react";
 import { AppCacheProvider } from "@mui/material-nextjs/v15-pagesRouter";
 import {
   createTheme,
@@ -9,6 +10,7 @@ import {
 } from "@mui/material";
 import { Layout } from "../components";
 import { validateEnv } from "../utils/validateEnv";
+import { initAuthState } from "../utils/AuthInterceptor";
 
 // Validate environment variables on app initialization
 if (typeof window === "undefined") {
@@ -28,6 +30,11 @@ export default function App({ Component, pageProps }: AppProps) {
       fontFamily: ["Inter Variable", "sans-serif"].join(","),
     },
   });
+
+  // Initialize auth state from server on app load
+  useEffect(() => {
+    initAuthState();
+  }, []);
 
   return (
     <AppCacheProvider>
