@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/berkmancenter/nextspace/compare/v1.3.0...v1.4.0) (2025-12-23)
+
+
+### Features
+
+* merge ([78f4d2a](https://github.com/berkmancenter/nextspace/commit/78f4d2a3b1c7068a85d52625242b972167e0eca9))
+
 ## [1.3.0](https://github.com/berkmancenter/nextspace/compare/v1.2.1...v1.3.0) (2025-12-19)
 
 
