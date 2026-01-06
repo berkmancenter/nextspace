@@ -323,6 +323,12 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
         url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}`,
       };
       participant.push(eventAssistantUrl);
+    } else if (convType.name === "eventAssistantPlus") {
+      const eventAssistantPlusUrl = {
+        label: "Event Assistant Plus",
+        url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}`,
+      };
+      participant.push(eventAssistantPlusUrl);
     }
   }
 
@@ -373,8 +379,7 @@ export const createConversationFromData = async (
  * @returns An object containing the isAuthenticated property
  */
 export const CheckAuthHeader = (headers: Record<string, string>) => {
-  const isAuthenticated =
-    headers && headers["x-is-authenticated"] === "true";
+  const isAuthenticated = headers && headers["x-is-authenticated"] === "true";
   return {
     props: {
       isAuthenticated,

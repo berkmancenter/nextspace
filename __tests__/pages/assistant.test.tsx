@@ -50,41 +50,68 @@ jest.mock("../../utils", () => ({
   SendData: jest.fn(),
 }));
 
-// Mock DirectMessage component (includes MessageFeedback internally)
-jest.mock("../../components", () => ({
-  DirectMessage: ({
-    text,
-    theme,
-    messageId,
+// Mock message components
+jest.mock("../../components/messages", () => ({
+  AssistantMessage: ({
+    message,
     onPopulateFeedbackText,
     onSendFeedbackRating,
-  }: any) => (
-    <div data-testid="direct-message" data-theme={theme}>
-      {text}
-      {theme === "assistant" && messageId && (
-        <div data-testid="message-feedback" data-message-id={messageId}>
-          <button
-            data-testid="rating-button-3"
-            onClick={() => onSendFeedbackRating?.(messageId, 3)}
-          >
-            3
-          </button>
-          <button
-            data-testid="say-more-button"
-            onClick={() =>
-              onPopulateFeedbackText?.({
-                prefix: `/feedback|Text|${messageId}|`,
-                icon: null,
-                label: "Feedback Mode",
-              })
-            }
-          >
-            Say more
-          </button>
-        </div>
-      )}
-    </div>
-  ),
+    messageType,
+  }: any) => {
+    const messageText =
+      typeof message.body === "string"
+        ? message.body
+        : message.body?.text || "";
+
+    return (
+      <div data-testid="assistant-message">
+        {messageText}
+        {message.id && !messageType && (
+          <div data-testid="message-feedback" data-message-id={message.id}>
+            <button
+              data-testid="rating-button-3"
+              onClick={() => onSendFeedbackRating?.(message.id, 3)}
+            >
+              3
+            </button>
+            <button
+              data-testid="say-more-button"
+              onClick={() =>
+                onPopulateFeedbackText?.({
+                  prefix: `/feedback|Text|${message.id}|`,
+                  icon: null,
+                  label: "Feedback Mode",
+                })
+              }
+            >
+              Say more
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  },
+  SubmittedMessage: ({ message }: any) => {
+    const messageText =
+      typeof message.body === "string"
+        ? message.body
+        : message.body?.text || "";
+    return <div data-testid="submitted-message">{messageText}</div>;
+  },
+  ModeratorSubmittedMessage: ({ message }: any) => {
+    const messageText =
+      typeof message.body === "string"
+        ? message.body
+        : message.body?.text || "";
+    return <div data-testid="moderator-submitted-message">{messageText}</div>;
+  },
+  UserMessage: ({ message }: any) => {
+    const messageText =
+      typeof message.body === "string"
+        ? message.body
+        : message.body?.text || "";
+    return <div data-testid="user-message">{messageText}</div>;
+  },
 }));
 
 // Mock CheckAuthHeader
@@ -587,8 +614,9 @@ describe("EventAssistantRoom", () => {
 
     await waitFor(() => {
       const assistantMessage = screen.getByText("Assistant response");
+      // Should render as AssistantMessage component
       expect(
-        assistantMessage.closest('[data-theme="assistant"]')
+        assistantMessage.closest('[data-testid="assistant-message"]')
       ).toBeInTheDocument();
     });
   });
@@ -626,7 +654,10 @@ describe("EventAssistantRoom", () => {
 
     await waitFor(() => {
       const userMessage = screen.getByText("User message");
-      expect(userMessage.closest('[data-theme="none"]')).toBeInTheDocument();
+      // Should render as UserMessage component
+      expect(
+        userMessage.closest('[data-testid="user-message"]')
+      ).toBeInTheDocument();
     });
   });
 
@@ -720,10 +751,10 @@ describe("EventAssistantRoom", () => {
       });
 
       await waitFor(() => {
-        const directMessage = screen.getByTestId("direct-message");
-        expect(directMessage).toHaveAttribute("data-theme", "assistant");
-        // MessageFeedback should be inside DirectMessage
-        const feedbackInside = directMessage.querySelector(
+        const assistantMessage = screen.getByTestId("assistant-message");
+        expect(assistantMessage).toBeInTheDocument();
+        // MessageFeedback should be inside AssistantMessage
+        const feedbackInside = assistantMessage.querySelector(
           '[data-testid="message-feedback"]'
         );
         expect(feedbackInside).toBeInTheDocument();
@@ -1684,6 +1715,357 @@ describe("EventAssistantRoom", () => {
       // Should be able to type again immediately
       await user.type(messageInput, "Next message");
       expect(messageInput).toHaveValue("Next message");
+    });
+  });
+
+  describe("Message Filtering and Submitted ID", () => {
+    it("filters out messages with parentMessage from rendering", async () => {
+      (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
+        onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
+      });
+      (RetrieveData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-456", agentType: "eventAssistant" }],
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom />);
+      });
+
+      // Simulate socket connection
+      await act(async () => {
+        const connectHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "connect"
+        )?.[1];
+        if (connectHandler) connectHandler();
+      });
+
+      // Add a regular message (should be displayed)
+      await act(async () => {
+        const messageHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "message:new"
+        )?.[1];
+        if (messageHandler) {
+          messageHandler({
+            id: "msg-regular",
+            body: "Regular message",
+            pseudonym: "Event Assistant",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      // Add a message with parentMessage (should NOT be displayed)
+      await act(async () => {
+        const messageHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "message:new"
+        )?.[1];
+        if (messageHandler) {
+          messageHandler({
+            id: "msg-with-parent",
+            body: "Child message",
+            pseudonym: "test-pseudonym",
+            createdAt: new Date().toISOString(),
+            parentMessage: "msg-regular",
+          });
+        }
+      });
+
+      // Regular message should be visible
+      await waitFor(() => {
+        expect(screen.getByText("Regular message")).toBeInTheDocument();
+      });
+
+      // Message with parentMessage should NOT be visible
+      expect(screen.queryByText("Child message")).not.toBeInTheDocument();
+    });
+
+    it("recognizes Event Assistant Plus messages", async () => {
+      (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
+        onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
+      });
+      (RetrieveData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-456", agentType: "eventAssistantPlus" }],
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom />);
+      });
+
+      // Simulate socket connection
+      await act(async () => {
+        const connectHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "connect"
+        )?.[1];
+        if (connectHandler) connectHandler();
+      });
+
+      // Add Event Assistant Plus message
+      await act(async () => {
+        const messageHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "message:new"
+        )?.[1];
+        if (messageHandler) {
+          messageHandler({
+            id: "msg-plus",
+            body: "Message from Plus",
+            pseudonym: "Event Assistant Plus",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Message from Plus")).toBeInTheDocument();
+      });
+
+      // Should render as AssistantMessage
+      const messageElement = screen
+        .getByText("Message from Plus")
+        .closest('[data-testid="assistant-message"]');
+      expect(messageElement).toBeInTheDocument();
+    });
+
+    it("finds and applies submitted theme to referenced message", async () => {
+      (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
+        onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
+      });
+      (RetrieveData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-456", agentType: "eventAssistant" }],
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom />);
+      });
+
+      // Simulate socket connection
+      await act(async () => {
+        const connectHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "connect"
+        )?.[1];
+        if (connectHandler) connectHandler();
+      });
+
+      // Add a user question that will be referenced
+      await act(async () => {
+        const messageHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "message:new"
+        )?.[1];
+        if (messageHandler) {
+          messageHandler({
+            id: "msg-question",
+            body: "User question text",
+            pseudonym: "test-pseudonym",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      // Add a moderator_submitted message that references the question
+      await act(async () => {
+        const messageHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "message:new"
+        )?.[1];
+        if (messageHandler) {
+          messageHandler({
+            id: "msg-confirmation",
+            body: {
+              text: "Your question has been submitted",
+              type: "moderator_submitted",
+              message: "msg-question",
+            },
+            pseudonym: "Event Assistant",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("User question text")).toBeInTheDocument();
+        expect(
+          screen.getByText("Your question has been submitted")
+        ).toBeInTheDocument();
+      });
+
+      // The referenced message should render as SubmittedMessage
+      const questionElement = screen
+        .getByText("User question text")
+        .closest('[data-testid="submitted-message"]');
+      expect(questionElement).toBeInTheDocument();
+    });
+
+    it("handles multiple moderator_submitted messages correctly", async () => {
+      (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
+        onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
+      });
+      (RetrieveData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-456", agentType: "eventAssistant" }],
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom />);
+      });
+
+      // Simulate socket connection
+      await act(async () => {
+        const connectHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "connect"
+        )?.[1];
+        if (connectHandler) connectHandler();
+      });
+
+      // Add first question
+      await act(async () => {
+        const messageHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "message:new"
+        )?.[1];
+        if (messageHandler) {
+          messageHandler({
+            id: "msg-q1",
+            body: "First question",
+            pseudonym: "test-pseudonym",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      // Add second question
+      await act(async () => {
+        const messageHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "message:new"
+        )?.[1];
+        if (messageHandler) {
+          messageHandler({
+            id: "msg-q2",
+            body: "Second question",
+            pseudonym: "test-pseudonym",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      // Add first confirmation
+      await act(async () => {
+        const messageHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "message:new"
+        )?.[1];
+        if (messageHandler) {
+          messageHandler({
+            id: "msg-conf1",
+            body: {
+              text: "First submitted",
+              type: "moderator_submitted",
+              message: "msg-q1",
+            },
+            pseudonym: "Event Assistant",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      // Add second confirmation
+      await act(async () => {
+        const messageHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "message:new"
+        )?.[1];
+        if (messageHandler) {
+          messageHandler({
+            id: "msg-conf2",
+            body: {
+              text: "Second submitted",
+              type: "moderator_submitted",
+              message: "msg-q2",
+            },
+            pseudonym: "Event Assistant",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("First question")).toBeInTheDocument();
+        expect(screen.getByText("Second question")).toBeInTheDocument();
+        expect(screen.getByText("First submitted")).toBeInTheDocument();
+        expect(screen.getByText("Second submitted")).toBeInTheDocument();
+      });
+
+      // BOTH referenced messages should render as SubmittedMessage
+      const firstQuestion = screen
+        .getByText("First question")
+        .closest('[data-testid="submitted-message"]');
+      const secondQuestion = screen
+        .getByText("Second question")
+        .closest('[data-testid="submitted-message"]');
+
+      expect(firstQuestion).toBeInTheDocument();
+      expect(secondQuestion).toBeInTheDocument();
+    });
+
+    it("does not add messages with parentMessage to state", async () => {
+      (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
+        onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
+      });
+      (RetrieveData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-456", agentType: "eventAssistant" }],
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom />);
+      });
+
+      // Simulate socket connection
+      await act(async () => {
+        const connectHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "connect"
+        )?.[1];
+        if (connectHandler) connectHandler();
+      });
+
+      // Add regular message
+      await act(async () => {
+        const messageHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "message:new"
+        )?.[1];
+        if (messageHandler) {
+          messageHandler({
+            id: "msg-1",
+            body: "Message one",
+            pseudonym: "test-pseudonym",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      // Add message with parentMessage
+      await act(async () => {
+        const messageHandler = mockSocket.on.mock.calls.find(
+          (call) => call[0] === "message:new"
+        )?.[1];
+        if (messageHandler) {
+          messageHandler({
+            id: "msg-2",
+            body: "Message two with parent",
+            pseudonym: "test-pseudonym",
+            createdAt: new Date().toISOString(),
+            parentMessage: "msg-1",
+          });
+        }
+      });
+
+      // Only the first message should be rendered
+      await waitFor(() => {
+        expect(screen.getByText("Message one")).toBeInTheDocument();
+      });
+
+      // Second message should not exist at all
+      expect(
+        screen.queryByText("Message two with parent")
+      ).not.toBeInTheDocument();
+
+      // Verify only one message component was rendered (could be user or assistant message)
+      const userMessages = screen.queryAllByTestId("user-message");
+      const assistantMessages = screen.queryAllByTestId("assistant-message");
+      const totalMessages = userMessages.length + assistantMessages.length;
+      expect(totalMessages).toBe(1);
     });
   });
 });
