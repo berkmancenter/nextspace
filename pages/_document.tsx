@@ -11,6 +11,19 @@ export default function Document(props: DocumentHeadTagsProps) {
       <Head>
         <DocumentHeadTags {...props} />
         <link rel="icon" href="/favicon.ico" sizes="any" />
+        {/* Matomo Tag Manager */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              var _mtm = window._mtm = window._mtm || [];
+              _mtm.push({'mtm.startTime': (new Date().getTime()), 'event': 'mtm.Start'});
+              (function() {
+                var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
+                g.async=true; g.src='https://stats.berkman.harvard.edu/js/container_D4LXpjpN.js'; s.parentNode.insertBefore(g,s);
+              })();
+            `,
+          }}
+        />
       </Head>
       <body>
         <Main />
