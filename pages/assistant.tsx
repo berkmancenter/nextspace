@@ -12,10 +12,11 @@ import {
   ModeratorSubmittedMessage,
   UserMessage,
 } from "../components/messages";
+import { SlashCommandMenu, SlashCommand } from "../components/SlashCommandMenu";
 import { Api, JoinSession, RetrieveData, SendData } from "../utils";
 import { components } from "../types";
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
-import { CheckAuthHeader } from "../utils/Helpers";
+import { CheckAuthHeader, createConversationFromData } from "../utils/Helpers";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -68,11 +69,36 @@ function EventAssistantRoom() {
   const [pseudonym, setPseudonym] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
+  const [conversationType, setConversationType] = useState<string | null>(null);
   const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
   const [controlledMode, setControlledMode] =
     useState<ControlledInputConfig | null>(null);
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [slashCommandIndex, setSlashCommandIndex] = useState(0);
+  const [filteredCommands, setFilteredCommands] = useState<SlashCommand[]>([]);
 
   const messageInputRef = useRef<HTMLInputElement>(null);
+  const enterUsedForCommandRef = useRef(false);
+
+  // Available slash commands
+  // Commands can optionally specify which conversation types they're available for
+  const allSlashCommands: SlashCommand[] = [
+    {
+      command: "mod",
+      description: "Submit a question to the moderator",
+      value: "/mod ",
+      conversationTypes: ["eventAssistantPlus"],
+    },
+  ];
+
+  // Filter commands based on current conversation type
+  const slashCommands = allSlashCommands.filter((cmd) => {
+    // If command has no conversationTypes restriction, it's available for all
+    if (!cmd.conversationTypes || cmd.conversationTypes.length === 0) {
+      return true;
+    }
+    return conversationType && cmd.conversationTypes.includes(conversationType);
+  });
 
   useEffect(() => {
     if (socket || joining) return;
@@ -120,62 +146,69 @@ function EventAssistantRoom() {
         `conversations/${router.query.conversationId}`,
         Api.get().GetTokens().access!
       )
-        .then(async (conversation: any) => {
-          if (!conversation) {
+        .then(async (conversationData: any) => {
+          if (!conversationData) {
             setErrorMessage("Conversation not found.");
             return;
           }
-          if ("error" in conversation) {
+          if ("error" in conversationData) {
             setErrorMessage(
-              conversation.message?.message || "Error retrieving conversation."
+              conversationData.message?.message ||
+                "Error retrieving conversation."
             );
             return;
           }
-          // Check if the event has an event assistant agent
-          // TODO: This should really be a property of the conversation, not inferred from agents
-          const eventAsstAgent = conversation.agents.find(
-            (agent: components["schemas"]["Agent"]) =>
-              agent.agentType === "eventAssistant" ||
-              agent.agentType === "eventAssistantPlus"
-          );
-          if (eventAsstAgent) setAgentId(eventAsstAgent.id);
-          else {
-            setErrorMessage(
-              "This conversation does not have an event assistant agent."
+
+          createConversationFromData(conversationData).then((conversation) => {
+            setConversationType(conversation.type.name);
+
+            // Check if the event has an event assistant agent
+            // TODO: This should really be a property of the conversation, not inferred from agents
+            const eventAsstAgent = conversation.agents.find(
+              (agent: components["schemas"]["Agent"]) =>
+                agent.agentType === "eventAssistant" ||
+                agent.agentType === "eventAssistantPlus"
             );
-            return;
-          }
-          if (!socket || !socket.auth) {
-            return;
-          }
+            if (eventAsstAgent) {
+              setAgentId(eventAsstAgent.id!);
+            } else {
+              setErrorMessage(
+                "This conversation does not have an event assistant agent."
+              );
+              return;
+            }
+            if (!socket || !socket.auth) {
+              return;
+            }
 
-          if (!socket.hasListeners("message:new"))
-            socket.on("message:new", (data) => {
-              if (process.env.NODE_ENV !== "production")
-                console.log("New message:", data);
-              if (!data.parentMessage) {
-                setMessages((prev) => [...prev, data]);
-                scroller.scrollTo("end", {
-                  duration: 800,
-                  delay: 0,
-                  offset: 200,
-                  smooth: "easeInOutQuart",
-                  containerId: "scroll-container",
-                });
-              }
-              if (
-                data.pseudonym === "Event Assistant" ||
-                data.pseudonym === "Event Assistant Plus"
-              )
-                setWaitingForResponse(false);
-            });
+            if (!socket.hasListeners("message:new"))
+              socket.on("message:new", (data) => {
+                if (process.env.NODE_ENV !== "production")
+                  console.log("New message:", data);
+                if (!data.parentMessage) {
+                  setMessages((prev) => [...prev, data]);
+                  scroller.scrollTo("end", {
+                    duration: 800,
+                    delay: 0,
+                    offset: 200,
+                    smooth: "easeInOutQuart",
+                    containerId: "scroll-container",
+                  });
+                }
+                if (
+                  data.pseudonym === "Event Assistant" ||
+                  data.pseudonym === "Event Assistant Plus"
+                )
+                  setWaitingForResponse(false);
+              });
 
-          if (agentId && userId)
-            socket.emit("conversation:join", {
-              conversationId: router.query.conversationId,
-              token: Api.get().GetTokens().access,
-              channel: { name: `direct-${userId}-${agentId}` },
-            });
+            if (agentId && userId)
+              socket.emit("conversation:join", {
+                conversationId: router.query.conversationId,
+                token: Api.get().GetTokens().access,
+                channel: { name: `direct-${userId}-${agentId}` },
+              });
+          });
         })
         .catch((error) => {
           console.error("Error fetching conversation data:", error);
@@ -235,17 +268,83 @@ function EventAssistantRoom() {
     setCurrentMessage("");
   };
 
+  const handleSlashCommandSelect = (command: SlashCommand) => {
+    const value = command.value || `/${command.command} `;
+    setCurrentMessage(value);
+    setShowSlashMenu(false);
+    setSlashCommandIndex(0);
+    // Focus back on input and set cursor to end
+    setTimeout(() => {
+      if (messageInputRef.current) {
+        messageInputRef.current.focus();
+        // Set cursor position to the end of the text
+        messageInputRef.current.setSelectionRange(value.length, value.length);
+      }
+    }, 0);
+  };
+
+  const handleMessageChange = (value: string) => {
+    setCurrentMessage(value);
+
+    // Show slash menu if message starts with "/" and has no space yet
+    if (value.startsWith("/") && !value.includes(" ")) {
+      // Extract the command part (without the leading slash)
+      const commandQuery = value.slice(1).toLowerCase();
+
+      // Filter commands that start with the typed query
+      const filtered = slashCommands.filter((cmd) =>
+        cmd.command.toLowerCase().startsWith(commandQuery)
+      );
+
+      setFilteredCommands(filtered);
+
+      // Only show menu if there are matching commands
+      if (filtered.length > 0) {
+        setShowSlashMenu(true);
+        // Reset selected index, but make sure it's within bounds
+        setSlashCommandIndex(0);
+      } else {
+        setShowSlashMenu(false);
+      }
+    } else {
+      setShowSlashMenu(false);
+      setFilteredCommands([]);
+    }
+  };
+
   // Handle ESC key to exit controlled mode
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && controlledMode) {
         exitControlledMode();
       }
+      if (e.key === "Escape" && showSlashMenu) {
+        setShowSlashMenu(false);
+        setSlashCommandIndex(0);
+      }
+      // Handle arrow keys for slash menu navigation
+      if (showSlashMenu && filteredCommands.length > 0) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setSlashCommandIndex((prev) =>
+            prev < filteredCommands.length - 1 ? prev + 1 : 0
+          );
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setSlashCommandIndex((prev) =>
+            prev > 0 ? prev - 1 : filteredCommands.length - 1
+          );
+        } else if (e.key === "Enter" && showSlashMenu) {
+          e.preventDefault();
+          enterUsedForCommandRef.current = true;
+          handleSlashCommandSelect(filteredCommands[slashCommandIndex]);
+        }
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [controlledMode]);
+  }, [controlledMode, showSlashMenu, slashCommandIndex, filteredCommands]);
 
   const sendFeedbackRating = async (messageId: string, rating: string) => {
     const feedbackText = `/feedback|Rating|${messageId}|${rating}`;
@@ -485,14 +584,24 @@ function EventAssistantRoom() {
                             placeholder="Write a Comment"
                             value={currentMessage}
                             onChange={(e) => {
-                              setCurrentMessage(e.target.value);
+                              handleMessageChange(e.target.value);
                             }}
                             onKeyUp={(e) => {
+                              // Check if Enter was used to select a command
+                              if (
+                                e.key === "Enter" &&
+                                enterUsedForCommandRef.current
+                              ) {
+                                enterUsedForCommandRef.current = false;
+                                return; // Don't send message
+                              }
+
                               if (
                                 e.key === "Enter" &&
                                 !!currentMessage &&
                                 currentMessage.length > 0 &&
-                                !waitingForResponse
+                                !waitingForResponse &&
+                                !showSlashMenu
                               )
                                 sendMessage(currentMessage);
                             }}
@@ -547,6 +656,14 @@ function EventAssistantRoom() {
                                 ),
                               },
                             }}
+                          />
+                          {/* Slash Command Menu */}
+                          <SlashCommandMenu
+                            commands={filteredCommands}
+                            selectedIndex={slashCommandIndex}
+                            onSelect={handleSlashCommandSelect}
+                            anchorEl={messageInputRef.current}
+                            open={showSlashMenu}
                           />
                         </div>
                       </Box>
