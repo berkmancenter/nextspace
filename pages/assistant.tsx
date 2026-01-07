@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
-import { Box, IconButton, InputAdornment, TextField } from "@mui/material";
-import { Send, Close } from "@mui/icons-material";
+import { Box } from "@mui/material";
 
 import { Element, scroller } from "react-scroll";
 
@@ -12,7 +11,8 @@ import {
   ModeratorSubmittedMessage,
   UserMessage,
 } from "../components/messages";
-import { SlashCommandMenu, SlashCommand } from "../components/SlashCommandMenu";
+import { MessageInput } from "../components/MessageInput";
+import { SlashCommand } from "../components/SlashCommandMenu";
 import { Api, JoinSession, RetrieveData, SendData } from "../utils";
 import { components } from "../types";
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
@@ -65,7 +65,6 @@ function EventAssistantRoom() {
   const [waitingForResponse, setWaitingForResponse] = useState(false);
 
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
-  const [currentMessage, setCurrentMessage] = useState("");
   const [pseudonym, setPseudonym] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
@@ -73,12 +72,6 @@ function EventAssistantRoom() {
   const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
   const [controlledMode, setControlledMode] =
     useState<ControlledInputConfig | null>(null);
-  const [showSlashMenu, setShowSlashMenu] = useState(false);
-  const [slashCommandIndex, setSlashCommandIndex] = useState(0);
-  const [filteredCommands, setFilteredCommands] = useState<SlashCommand[]>([]);
-
-  const messageInputRef = useRef<HTMLInputElement>(null);
-  const enterUsedForCommandRef = useRef(false);
 
   // Available slash commands
   // Commands can optionally specify which conversation types they're available for
@@ -236,7 +229,6 @@ function EventAssistantRoom() {
     if (shouldWaitForResponse && !controlledMode) {
       setWaitingForResponse(true);
     }
-    setCurrentMessage("");
 
     await SendData("messages", {
       body: finalMessage,
@@ -254,62 +246,10 @@ function EventAssistantRoom() {
 
   const enterControlledMode = (config: ControlledInputConfig) => {
     setControlledMode(config);
-    setCurrentMessage("");
-    // Use setTimeout to ensure focus happens after any state updates
-    setTimeout(() => {
-      if (messageInputRef.current) {
-        messageInputRef.current.focus();
-      }
-    }, 0);
   };
 
   const exitControlledMode = () => {
     setControlledMode(null);
-    setCurrentMessage("");
-  };
-
-  const handleSlashCommandSelect = (command: SlashCommand) => {
-    const value = command.value || `/${command.command} `;
-    setCurrentMessage(value);
-    setShowSlashMenu(false);
-    setSlashCommandIndex(0);
-    // Focus back on input and set cursor to end
-    setTimeout(() => {
-      if (messageInputRef.current) {
-        messageInputRef.current.focus();
-        // Set cursor position to the end of the text
-        messageInputRef.current.setSelectionRange(value.length, value.length);
-      }
-    }, 0);
-  };
-
-  const handleMessageChange = (value: string) => {
-    setCurrentMessage(value);
-
-    // Show slash menu if message starts with "/" and has no space yet
-    if (value.startsWith("/") && !value.includes(" ")) {
-      // Extract the command part (without the leading slash)
-      const commandQuery = value.slice(1).toLowerCase();
-
-      // Filter commands that start with the typed query
-      const filtered = slashCommands.filter((cmd) =>
-        cmd.command.toLowerCase().startsWith(commandQuery)
-      );
-
-      setFilteredCommands(filtered);
-
-      // Only show menu if there are matching commands
-      if (filtered.length > 0) {
-        setShowSlashMenu(true);
-        // Reset selected index, but make sure it's within bounds
-        setSlashCommandIndex(0);
-      } else {
-        setShowSlashMenu(false);
-      }
-    } else {
-      setShowSlashMenu(false);
-      setFilteredCommands([]);
-    }
   };
 
   // Handle ESC key to exit controlled mode
@@ -318,33 +258,11 @@ function EventAssistantRoom() {
       if (e.key === "Escape" && controlledMode) {
         exitControlledMode();
       }
-      if (e.key === "Escape" && showSlashMenu) {
-        setShowSlashMenu(false);
-        setSlashCommandIndex(0);
-      }
-      // Handle arrow keys for slash menu navigation
-      if (showSlashMenu && filteredCommands.length > 0) {
-        if (e.key === "ArrowDown") {
-          e.preventDefault();
-          setSlashCommandIndex((prev) =>
-            prev < filteredCommands.length - 1 ? prev + 1 : 0
-          );
-        } else if (e.key === "ArrowUp") {
-          e.preventDefault();
-          setSlashCommandIndex((prev) =>
-            prev > 0 ? prev - 1 : filteredCommands.length - 1
-          );
-        } else if (e.key === "Enter" && showSlashMenu) {
-          e.preventDefault();
-          enterUsedForCommandRef.current = true;
-          handleSlashCommandSelect(filteredCommands[slashCommandIndex]);
-        }
-      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [controlledMode, showSlashMenu, slashCommandIndex, filteredCommands]);
+  }, [controlledMode]);
 
   const sendFeedbackRating = async (messageId: string, rating: string) => {
     const feedbackText = `/feedback|Rating|${messageId}|${rating}`;
@@ -551,125 +469,14 @@ function EventAssistantRoom() {
                   {/* Scroll to bottom element */}
                   <Element name="end" />
                 </div>
-                {pseudonym && (
-                  <div className="flex justify-center fixed bottom-0 left-0 right-0 bg-white">
-                    <div className="w-11/12 lg:w-1/2">
-                      {/* Message Input */}
-                      <Box display="flex" alignItems="center" padding="8px">
-                        <div className="flex flex-col w-full">
-                          <div className="border-[1px] border-b-0 border-[#A5B4FC] rounded-t-lg p-2 font-bold text-sm flex justify-between items-center">
-                            <span className="uppercase">
-                              Writing as {pseudonym}
-                              {controlledMode && (
-                                <span className="normal-case">
-                                  {" • "}
-                                  {controlledMode.icon} {controlledMode.label}
-                                </span>
-                              )}
-                            </span>
-                            {controlledMode && (
-                              <IconButton
-                                size="small"
-                                onClick={exitControlledMode}
-                                sx={{ padding: "4px" }}
-                              >
-                                <Close fontSize="small" />
-                              </IconButton>
-                            )}
-                          </div>
-                          <TextField
-                            id="message-input"
-                            inputRef={messageInputRef}
-                            type="text"
-                            placeholder="Write a Comment"
-                            value={currentMessage}
-                            onChange={(e) => {
-                              handleMessageChange(e.target.value);
-                            }}
-                            onKeyUp={(e) => {
-                              // Check if Enter was used to select a command
-                              if (
-                                e.key === "Enter" &&
-                                enterUsedForCommandRef.current
-                              ) {
-                                enterUsedForCommandRef.current = false;
-                                return; // Don't send message
-                              }
-
-                              if (
-                                e.key === "Enter" &&
-                                !!currentMessage &&
-                                currentMessage.length > 0 &&
-                                !waitingForResponse &&
-                                !showSlashMenu
-                              )
-                                sendMessage(currentMessage);
-                            }}
-                            style={{
-                              flex: 1,
-                            }}
-                            sx={{
-                              // Root class for the input field
-                              "& .MuiOutlinedInput-root": {
-                                // Class for the border around the input field
-                                "& .MuiOutlinedInput-notchedOutline": {
-                                  borderColor: "#A5B4FC",
-                                  borderWidth: "1px",
-                                  borderBottomLeftRadius: "8px",
-                                  borderBottomRightRadius: "8px",
-                                  borderTopLeftRadius: 0,
-                                  borderTopRightRadius: 0,
-                                },
-                              },
-                            }}
-                            slotProps={{
-                              input: {
-                                endAdornment: (
-                                  <InputAdornment position="end">
-                                    <IconButton
-                                      onClick={() =>
-                                        sendMessage(currentMessage)
-                                      }
-                                      aria-label="send message"
-                                      disabled={
-                                        !currentMessage ||
-                                        currentMessage.length < 1 ||
-                                        waitingForResponse
-                                      }
-                                    >
-                                      <Send
-                                        sx={{
-                                          opacity:
-                                            !currentMessage ||
-                                            currentMessage.length < 1
-                                              ? 0.5
-                                              : 1,
-                                          color: "white",
-                                          backgroundColor: "#2f69c4",
-                                          borderRadius: "50%",
-                                          padding: "4px",
-                                          transform: "rotate(-45deg)",
-                                        }}
-                                      />
-                                    </IconButton>
-                                  </InputAdornment>
-                                ),
-                              },
-                            }}
-                          />
-                          {/* Slash Command Menu */}
-                          <SlashCommandMenu
-                            commands={filteredCommands}
-                            selectedIndex={slashCommandIndex}
-                            onSelect={handleSlashCommandSelect}
-                            anchorEl={messageInputRef.current}
-                            open={showSlashMenu}
-                          />
-                        </div>
-                      </Box>
-                    </div>
-                  </div>
-                )}
+                <MessageInput
+                  pseudonym={pseudonym}
+                  onSendMessage={sendMessage}
+                  waitingForResponse={waitingForResponse}
+                  controlledMode={controlledMode}
+                  onExitControlledMode={exitControlledMode}
+                  slashCommands={slashCommands}
+                />
               </Box>
             ) : (
               <svg
