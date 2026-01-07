@@ -26,7 +26,7 @@ describe("_document.tsx Matomo Tag Manager", () => {
   it("includes correct Matomo container URL", () => {
     // Verify the script contains the correct container URL
     expect(documentSource).toContain(
-      "https://stats.berkman.harvard.edu/js/container_D4LXpjpN.js"
+      "https://stats.berkman.harvard.edu/js/container_YvNDfYrC.js"
     );
   });
 
