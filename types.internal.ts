@@ -28,7 +28,7 @@ export interface EventUrls {
 }
 
 export type Conversation = components["schemas"]["Conversation"] & {
-  types: components["schemas"]["ConversationType"][];
+  type: components["schemas"]["ConversationType"];
   eventUrls: EventUrls;
   platformTypes?: components["schemas"]["PlatformConfig"][];
 };
