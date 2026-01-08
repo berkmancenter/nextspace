@@ -30,14 +30,6 @@ jest.mock("socket.io-client", () => ({
   io: jest.fn(() => mockSocket),
 }));
 
-// Mock react-scroll
-jest.mock("react-scroll", () => ({
-  Element: ({ children }: any) => <div>{children}</div>,
-  scroller: {
-    scrollTo: jest.fn(),
-  },
-}));
-
 // Mock utils
 jest.mock("../../utils", () => ({
   Api: {
@@ -103,6 +95,9 @@ describe("EventAssistantRoom", () => {
     mockSocket.hasListeners.mockReturnValue(false);
     mockRouter.query = { conversationId: "test-conversation-id" };
     mockRouter.isReady = true;
+
+    // Mock scrollIntoView
+    Element.prototype.scrollIntoView = jest.fn();
   });
 
   it("renders loading state initially", async () => {

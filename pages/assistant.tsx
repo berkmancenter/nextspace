@@ -4,8 +4,6 @@ import { io } from "socket.io-client";
 import { Box, IconButton, InputAdornment, TextField } from "@mui/material";
 import { Send, Close } from "@mui/icons-material";
 
-import { Element, scroller } from "react-scroll";
-
 import { DirectMessage, ControlledInputConfig } from "../components";
 import { Api, JoinSession, RetrieveData, SendData } from "../utils";
 import { components } from "../types";
@@ -34,6 +32,22 @@ function EventAssistantRoom() {
     useState<ControlledInputConfig | null>(null);
 
   const messageInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to bottom when new messages arrive
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  // Auto-scroll when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [messages]);
 
   useEffect(() => {
     if (socket || joining) return;
@@ -122,13 +136,6 @@ function EventAssistantRoom() {
 
               setMessages((prev) => [...prev, data]);
 
-              scroller.scrollTo("end", {
-                duration: 800,
-                delay: 0,
-                offset: 200,
-                smooth: "easeInOutQuart",
-                containerId: "scroll-container",
-              });
               if (data.pseudonym === "Event Assistant")
                 setWaitingForResponse(false);
             });
@@ -214,7 +221,7 @@ function EventAssistantRoom() {
   };
 
   return (
-    <div className="h-screen flex items-start justify-center mt-12">
+    <div className="flex items-start justify-center pt-12">
       {errorMessage ? (
         <div className="text-medium-slate-blue text-lg font-bold mx-9">
           {errorMessage}
@@ -227,15 +234,10 @@ function EventAssistantRoom() {
 
           {
             isConnected ? (
-              <Box
-                display="flex"
-                flexDirection="column"
-                height="100vh"
-                overflow="hidden"
-              >
+              <Box display="flex" flexDirection="column">
                 {/* Conversation View */}
                 <div
-                  className="overflow-auto flex flex-col grow items-center gap-8 mt-4 mb-32 xl:mb-20"
+                  className="flex flex-col items-center gap-8 mt-4 mb-24"
                   id="scroll-container"
                   aria-live="assertive"
                 >
@@ -316,8 +318,8 @@ function EventAssistantRoom() {
                       </div>
                     );
                   })}
-                  {/* Scroll to bottom element */}
-                  <Element name="end" />
+                  {/* Scroll target - adds minimal space to ensure content is visible above fixed input */}
+                  <div ref={messagesEndRef} className="h-8" />
                 </div>
                 {pseudonym && (
                   <div className="flex justify-center fixed bottom-0 left-0 right-0 bg-white">
