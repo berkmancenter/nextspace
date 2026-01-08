@@ -6,12 +6,34 @@
  */
 
 /**
+ * Normalizes IP address (handles IPv6 localhost)
+ * @param ip - IP address string (IPv4 or IPv6)
+ * @returns Normalized IPv4 address
+ */
+function normalizeIp(ip: string): string {
+  // Convert IPv6 localhost to IPv4
+  if (ip === "::1" || ip === "::ffff:127.0.0.1") {
+    return "127.0.0.1";
+  }
+
+  // Remove IPv6 prefix if present
+  if (ip.startsWith("::ffff:")) {
+    return ip.substring(7);
+  }
+
+  return ip;
+}
+
+/**
  * Converts an IP address string to a 32-bit integer
  * @param ip - IP address string (e.g., "192.168.1.1")
  * @returns 32-bit integer representation
  */
 function ipToInt(ip: string): number {
-  const parts = ip.split(".").map(Number);
+  // Normalize first to handle IPv6
+  const normalizedIp = normalizeIp(ip);
+
+  const parts = normalizedIp.split(".").map(Number);
   if (parts.length !== 4 || parts.some((p) => isNaN(p) || p < 0 || p > 255)) {
     throw new Error(`Invalid IP address: ${ip}`);
   }
@@ -116,8 +138,8 @@ export function getClientIp(
   }
 
   if (remoteAddress) {
-    // Remove IPv6 prefix if present (::ffff:192.168.1.1 -> 192.168.1.1)
-    return remoteAddress.replace("::ffff:", "");
+    // Normalize to handle IPv6 addresses
+    return normalizeIp(remoteAddress);
   }
 
   return null;

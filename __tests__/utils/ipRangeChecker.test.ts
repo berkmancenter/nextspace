@@ -1,6 +1,40 @@
 import { isIpInRanges, getClientIp } from "../../utils/ipRangeChecker";
 
 describe("ipRangeChecker", () => {
+  describe("IPv6 normalization", () => {
+    it("normalizes IPv6 localhost (::1) to IPv4", () => {
+      // Using getClientIp to test the normalization indirectly
+      const result = getClientIp({}, "::1");
+      expect(result).toBe("127.0.0.1");
+    });
+
+    it("normalizes IPv6-mapped IPv4 localhost", () => {
+      const result = getClientIp({}, "::ffff:127.0.0.1");
+      expect(result).toBe("127.0.0.1");
+    });
+
+    it("normalizes IPv6-mapped IPv4 addresses", () => {
+      const result = getClientIp({}, "::ffff:192.168.1.100");
+      expect(result).toBe("192.168.1.100");
+    });
+
+    it("handles regular IPv4 addresses unchanged", () => {
+      const result = getClientIp({}, "192.168.1.50");
+      expect(result).toBe("192.168.1.50");
+    });
+
+    it("works with IPv6 localhost in CIDR matching", () => {
+      // ::1 should be normalized to 127.0.0.1 and match localhost range
+      const result = isIpInRanges("::1", "127.0.0.0/8");
+      expect(result).toBe(true);
+    });
+
+    it("works with IPv6-mapped addresses in CIDR matching", () => {
+      const result = isIpInRanges("::ffff:192.168.1.100", "192.168.1.0/24");
+      expect(result).toBe(true);
+    });
+  });
+
   describe("isIpInRanges", () => {
     describe("CIDR notation matching", () => {
       it("matches IP within /24 range", () => {
