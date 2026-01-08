@@ -492,6 +492,7 @@ describe("EventCreationForm Component", () => {
       channels: [],
       agents: [],
       adapters: [],
+      conversationType: "eventAssistant",
     };
     (Request as jest.Mock).mockResolvedValue(mockConversationData);
 
@@ -550,6 +551,7 @@ describe("EventCreationForm Component", () => {
       channels: [],
       agents: [],
       adapters: [],
+      conversationType: "eventAssistant",
     };
     (Request as jest.Mock).mockResolvedValue(mockConversationData);
 
@@ -612,6 +614,7 @@ describe("EventCreationForm Component", () => {
       channels: [],
       agents: [],
       adapters: [],
+      conversationType: "eventAssistant",
     };
     (Request as jest.Mock).mockResolvedValue(mockConversationData);
 
@@ -664,6 +667,7 @@ describe("EventCreationForm Component", () => {
       channels: [],
       agents: [],
       adapters: [],
+      conversationType: "eventAssistant",
     };
     (Request as jest.Mock).mockResolvedValue(mockConversationData);
 
@@ -926,6 +930,7 @@ describe("EventCreationForm Component", () => {
       channels: [],
       agents: [],
       adapters: [],
+      conversationType: "eventAssistant",
     };
     (Request as jest.Mock).mockResolvedValue(mockConversationData);
 
