@@ -88,7 +88,7 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
       }, heartbeatInterval);
     }
 
-    const handleVisibilityChange = () => {
+    function handleVisibilityChange() {
       const isVisible = document.visibilityState === "visible";
       isPageVisible.current = isVisible;
       trackVisibilityChange(isVisible);
@@ -102,7 +102,7 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
       else if (isVisible && enableHeartbeat && !heartbeatIntervalRef.current) {
         startHeartbeat();
       }
-    };
+    }
 
     // Start heartbeat if enabled
     if (enableHeartbeat) {
@@ -154,12 +154,12 @@ export function useSessionTracking() {
     }
 
     // Track session end on beforeunload
-    const handleBeforeUnload = () => {
+    function handleBeforeUnload() {
       const duration = Math.floor(
         (Date.now() - sessionStartTime.current) / 1000
       );
       trackSessionEnd(duration);
-    };
+    }
 
     window.addEventListener("beforeunload", handleBeforeUnload);
 
