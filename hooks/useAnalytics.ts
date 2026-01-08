@@ -7,6 +7,7 @@ import {
   trackSessionStart,
   trackSessionEnd,
   setCustomDimension,
+  trackUserLocation,
 } from "../utils/analytics";
 
 interface UseAnalyticsOptions {
@@ -132,6 +133,7 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
 export function useSessionTracking() {
   const sessionStartTime = useRef<number>(Date.now());
   const hasTrackedStart = useRef<boolean>(false);
+  const hasTrackedLocation = useRef<boolean>(false);
 
   useEffect(() => {
     // Track session start only once
@@ -143,6 +145,12 @@ export function useSessionTracking() {
         viewport: `${window.innerWidth}x${window.innerHeight}`,
       });
       hasTrackedStart.current = true;
+
+      // Detect and track user location (local vs remote)
+      if (!hasTrackedLocation.current) {
+        detectUserLocation();
+        hasTrackedLocation.current = true;
+      }
     }
 
     // Track session end on beforeunload
@@ -159,4 +167,37 @@ export function useSessionTracking() {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
+}
+
+/**
+ * Detects user location (local vs remote) and tracks it
+ * Uses the /api/check-location endpoint
+ */
+async function detectUserLocation() {
+  try {
+    // Get current URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const locationParam = urlParams.get("location");
+
+    // Build query string
+    const queryString = locationParam ? `?location=${locationParam}` : "";
+
+    // Call location detection API
+    const response = await fetch(`/api/check-location${queryString}`);
+
+    if (!response.ok) {
+      throw new Error(`Location API returned ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Track the location
+    trackUserLocation(data.location, data.method);
+  } catch (error) {
+    // On error, default to remote (privacy-preserving)
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[Analytics] Location detection failed:", error);
+    }
+    trackUserLocation("remote", "default");
+  }
 }

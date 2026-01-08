@@ -129,6 +129,7 @@ trackEvent(category, action, name?, value?)
 2. **page_type** (Action scope) - home, assistant, moderator, backchannel
 3. **session_duration** (Visit scope) - Total duration in seconds
 4. **page_duration** (Action scope) - Time on page in seconds
+5. **user_location** (Visit scope) - "local" (at venue) or "remote"
 
 ## Next Steps
 
@@ -182,10 +183,56 @@ The implementation:
 - **Matomo Docs**: https://matomo.org/docs/
 - **MTM Best Practices**: https://matomo.org/docs/tag-manager/
 
-## Future Enhancements (Not Implemented)
+## Location Detection (Local vs Remote)
 
-These were discussed but saved for future work:
-- In-room vs remote user detection
+The application includes privacy-preserving location detection to determine if users are accessing from the venue (local) or remotely.
+
+### How It Works
+
+**Detection Priority:**
+1. **URL Parameter** - Manual override via `?location=local` in URL
+2. **IP Range Matching** - Automatic detection based on configured IP ranges
+3. **Default to Remote** - Privacy-preserving default if no match
+
+### Configuration
+
+Set the `LOCAL_IP_RANGES` environment variable with comma-separated CIDR ranges:
+
+```bash
+LOCAL_IP_RANGES=10.0.0.0/8,192.168.1.0/24,172.16.50.0/24
+```
+
+### Privacy Guarantees
+
+- ✅ Only boolean result ("local" or "remote") sent to Matomo
+- ✅ No IP addresses logged or stored
+- ✅ No IP addresses sent to analytics
+- ✅ Defaults to "remote" on error (privacy-preserving)
+
+### Implementation Files
+
+- `pages/api/check-location.ts` - API endpoint for detection
+- `utils/ipRangeChecker.ts` - IP range matching utility
+- `hooks/useAnalytics.ts` - Frontend integration
+- `utils/analytics.ts` - `trackUserLocation()` function
+
+### Usage Examples
+
+**Venue WiFi:**
+```bash
+# Configure venue IP ranges
+LOCAL_IP_RANGES=192.168.1.0/24,10.20.0.0/16
+```
+
+**Manual Override:**
+```
+# Add to event links for guaranteed local detection
+https://yourapp.com/backchannel?conversationId=123&location=local
+```
+
+## Future Enhancements (Not Yet Implemented)
+
+These were discussed but not yet implemented:
 - Advanced device fingerprinting
 - Detailed viewport/orientation tracking
 - Mouse/touch heatmaps

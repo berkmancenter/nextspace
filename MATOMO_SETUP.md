@@ -44,6 +44,11 @@ These dimensions are specific to individual actions/page views:
    - **Scope**: Action
    - **Description**: Time spent on a specific page in seconds
 
+5. **User Location** (Index: 5)
+   - **Name**: `user_location`
+   - **Scope**: Visit
+   - **Description**: Whether user is accessing from local venue or remotely (values: "local" or "remote")
+
 ## Setting Up Custom Dimensions in Matomo
 
 1. Log in to your Matomo instance

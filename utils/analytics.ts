@@ -240,3 +240,25 @@ export function trackFeatureUsage(
 ): void {
   trackEvent("feature", action, feature, durationSeconds);
 }
+
+/**
+ * Tracks user location (local vs remote)
+ * @param location - User location type ('local' or 'remote')
+ * @param method - Detection method used ('ip', 'url', or 'default')
+ */
+export function trackUserLocation(
+  location: "local" | "remote",
+  method: "ip" | "url" | "default"
+): void {
+  // Track as custom dimension (index 5 for user_location)
+  setCustomDimension(5, "user_location", location, "visit");
+
+  // Also track as an event for analytics
+  trackEvent("session", "location_detected", location, undefined);
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log(
+      `[Analytics] User location: ${location} (detected via ${method})`
+    );
+  }
+}
