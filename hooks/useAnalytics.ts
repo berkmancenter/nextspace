@@ -31,7 +31,7 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
     pageName,
     pageType,
     enableHeartbeat = true,
-    heartbeatInterval = 20000, // 20 seconds default
+    heartbeatInterval = 60000, // 60 seconds default
   } = options;
 
   const router = useRouter();
@@ -53,7 +53,7 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
 
     // Set page type custom dimension
     if (pageType) {
-      setCustomDimension(2, "page_type", pageType, "action");
+      setCustomDimension(3, "page_type", pageType, "action");
     }
 
     // Reset entry time

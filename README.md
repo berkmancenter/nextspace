@@ -205,8 +205,13 @@ Nextspace includes built-in open source **Matomo Tag Manager** integration for c
 
 The implementation is privacy-friendly (pseudonymized IDs, no message content tracking) and gracefully degrades if Matomo isn't installed—the site continues to function normally with a development warning.
 
-📖 **Setup Guide**: See [MATOMO_SETUP.md](./MATOMO_SETUP.md) for configuration instructions
-📊 **Implementation Details**: See [ANALYTICS_IMPLEMENTATION.md](./ANALYTICS_IMPLEMENTATION.md) for technical documentation
+### Documentation
+
+⚠️ **IMPORTANT**: Analytics requires both code AND Matomo Tag Manager configuration to function.
+
+- 📖 **[MTM_CONFIGURATION.md](./MTM_CONFIGURATION.md)** - **START HERE** - Step-by-step MTM Tag Manager setup (required for analytics to work)
+- 📊 **[MATOMO_SETUP.md](./MATOMO_SETUP.md)** - Custom dimensions configuration in Matomo
+- 💻 **[ANALYTICS_IMPLEMENTATION.md](./ANALYTICS_IMPLEMENTATION.md)** - Technical implementation details and code reference
 
 ## License
 

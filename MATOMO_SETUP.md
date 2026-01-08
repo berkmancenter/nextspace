@@ -25,15 +25,15 @@ These dimensions persist for the entire user session:
    - **Scope**: Visit
    - **Description**: ISO timestamp when the session started
 
-2. **Page Type** (Index: 2)
-   - **Name**: `page_type`
+2. **User Location** (Index: 2)
+   - **Name**: `user_location`
    - **Scope**: Visit
-   - **Description**: Type of page (home, assistant, moderator, backchannel)
+   - **Description**: Whether user is accessing from local venue or remotely (values: "local" or "remote")
 
-3. **Session Duration** (Index: 3)
-   - **Name**: `session_duration`
-   - **Scope**: Visit
-   - **Description**: Total session duration in seconds
+3. **Page Type** (Index: 3)
+   - **Name**: `page_type`
+   - **Scope**: Action
+   - **Description**: Type of page (home, assistant, moderator, backchannel)
 
 ### Action-Scoped Dimensions
 
@@ -44,10 +44,10 @@ These dimensions are specific to individual actions/page views:
    - **Scope**: Action
    - **Description**: Time spent on a specific page in seconds
 
-5. **User Location** (Index: 5)
-   - **Name**: `user_location`
+5. **Session Duration** (Index: 5)
+   - **Name**: `session_duration`
    - **Scope**: Visit
-   - **Description**: Whether user is accessing from local venue or remotely (values: "local" or "remote")
+   - **Description**: Total session duration in seconds
 
 ## Setting Up Custom Dimensions in Matomo
 

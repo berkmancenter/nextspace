@@ -190,7 +190,7 @@ export function trackSessionEnd(durationSeconds: number): void {
   trackEvent("session", "end", undefined, durationSeconds);
 
   setCustomDimension(
-    3,
+    5,
     "session_duration",
     durationSeconds.toString(),
     "visit"
@@ -250,8 +250,8 @@ export function trackUserLocation(
   location: "local" | "remote",
   method: "ip" | "url" | "default"
 ): void {
-  // Track as custom dimension (index 5 for user_location)
-  setCustomDimension(5, "user_location", location, "visit");
+  // Track as custom dimension (index 2 for user_location)
+  setCustomDimension(2, "user_location", location, "visit");
 
   // Also track as an event for analytics
   trackEvent("session", "location_detected", location, undefined);

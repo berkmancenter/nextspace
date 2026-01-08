@@ -126,10 +126,10 @@ trackEvent(category, action, name?, value?)
 ## Custom Dimensions
 
 1. **session_start_time** (Visit scope) - ISO timestamp
-2. **page_type** (Action scope) - home, assistant, moderator, backchannel
-3. **session_duration** (Visit scope) - Total duration in seconds
+2. **user_location** (Visit scope) - "local" (at venue) or "remote"
+3. **page_type** (Action scope) - home, assistant, moderator, backchannel
 4. **page_duration** (Action scope) - Time on page in seconds
-5. **user_location** (Visit scope) - "local" (at venue) or "remote"
+5. **session_duration** (Visit scope) - Total duration in seconds
 
 ## Next Steps
 
