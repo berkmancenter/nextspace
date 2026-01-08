@@ -11,6 +11,12 @@ import { Api, JoinSession, RetrieveData, SendData } from "../utils";
 import { components } from "../types";
 import { PseudonymousMessage } from "../types.internal";
 import { CheckAuthHeader } from "../utils/Helpers";
+import { useAnalytics } from "../hooks/useAnalytics";
+import {
+  trackEvent,
+  trackConnectionStatus,
+  setUserId,
+} from "../utils/analytics";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -18,6 +24,9 @@ export const getServerSideProps = async (context: { req: any }) => {
 
 function EventAssistantRoom() {
   const router = useRouter();
+
+  // Initialize page-level analytics
+  useAnalytics({ pageType: "assistant" });
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -27,7 +36,7 @@ function EventAssistantRoom() {
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
   const [currentMessage, setCurrentMessage] = useState("");
   const [pseudonym, setPseudonym] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [userId, setUserIdState] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
   const [controlledMode, setControlledMode] =
@@ -41,7 +50,9 @@ function EventAssistantRoom() {
     JoinSession(
       (result) => {
         setPseudonym(result.pseudonym);
-        setUserId(result.userId);
+        setUserIdState(result.userId);
+        // Track user ID (pseudonym)
+        setUserId(result.pseudonym);
         let socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
           auth: { token: Api.get().GetTokens().access },
         });
@@ -59,9 +70,16 @@ function EventAssistantRoom() {
     if (!socket) return;
     socket.on("error", (error: string) => {
       console.error("Socket error:", error);
+      trackConnectionStatus("error");
     });
-    socket.on("connect", () => setIsConnected(true));
-    socket.on("disconnect", () => setIsConnected(false));
+    socket.on("connect", () => {
+      setIsConnected(true);
+      trackConnectionStatus("connected");
+    });
+    socket.on("disconnect", () => {
+      setIsConnected(false);
+      trackConnectionStatus("disconnected");
+    });
 
     return () => {
       socket.off("connect", () => setIsConnected(true));
@@ -159,6 +177,13 @@ function EventAssistantRoom() {
     const finalMessage = controlledMode
       ? controlledMode.prefix + message
       : message;
+
+    // Track message send
+    if (controlledMode) {
+      trackEvent("interaction", "feedback_sent", controlledMode.label);
+    } else {
+      trackEvent("interaction", "message_sent", "assistant_question");
+    }
 
     // Only set waitingForResponse for regular messages, not controlled mode messages
     // (controlled mode messages like feedback don't generate responses)
