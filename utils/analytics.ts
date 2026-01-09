@@ -17,6 +17,14 @@ declare global {
 let hasWarnedAboutMissingMatomo = false;
 
 /**
+ * Checks if analytics is enabled via environment variable
+ * @returns true if analytics is enabled (default), false if explicitly disabled
+ */
+function isAnalyticsEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_ENABLE_ANALYTICS !== "false";
+}
+
+/**
  * Checks if Matomo Tag Manager is actually loaded
  * @returns true if Matomo appears to be loaded, false otherwise
  */
@@ -39,6 +47,17 @@ function isMatomoLoaded(): boolean {
  */
 function ensureMTM(): void {
   if (typeof window === "undefined") return;
+
+  // Check if analytics is disabled
+  if (!isAnalyticsEnabled()) {
+    if (process.env.NODE_ENV !== "production" && !hasWarnedAboutMissingMatomo) {
+      console.log(
+        "[Analytics] Analytics is disabled via NEXT_PUBLIC_ENABLE_ANALYTICS environment variable. No tracking will occur."
+      );
+      hasWarnedAboutMissingMatomo = true;
+    }
+    return;
+  }
 
   // Initialize data layer if it doesn't exist
   if (!window._mtm) {

@@ -203,15 +203,24 @@ Nextspace includes built-in open source **Matomo Tag Manager** integration for c
 - Connection status monitoring
 - Mobile vs desktop usage
 
-The implementation is privacy-friendly (pseudonymized IDs, no message content tracking) and gracefully degrades if Matomo isn't installed—the site continues to function normally with a development warning.
+The implementation is privacy-friendly (pseudonymized IDs, no message content tracking) and can be easily disabled via environment variable. Analytics gracefully degrades if Matomo isn't configured—the site continues to function normally.
 
 ### Documentation
 
-⚠️ **IMPORTANT**: Analytics requires both code AND Matomo Tag Manager configuration to function.
+- 📖 **[ANALYTICS_SETUP.md](./ANALYTICS_SETUP.md)** - Complete setup guide for Matomo and MTM configuration
+- 💻 **[ANALYTICS_REFERENCE.md](./ANALYTICS_REFERENCE.md)** - Technical implementation details and developer reference
 
-- 📖 **[MTM_CONFIGURATION.md](./MTM_CONFIGURATION.md)** - **START HERE** - Step-by-step MTM Tag Manager setup (required for analytics to work)
-- 📊 **[MATOMO_SETUP.md](./MATOMO_SETUP.md)** - Custom dimensions configuration in Matomo
-- 💻 **[ANALYTICS_IMPLEMENTATION.md](./ANALYTICS_IMPLEMENTATION.md)** - Technical implementation details and code reference
+### Quick Start
+
+**To disable analytics:**
+```bash
+NEXT_PUBLIC_ENABLE_ANALYTICS=false
+```
+
+**To enable analytics** (requires Matomo Tag Manager setup):
+```bash
+NEXT_PUBLIC_ENABLE_ANALYTICS=true  # or omit (enabled by default)
+```
 
 ## License
 

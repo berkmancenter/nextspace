@@ -59,7 +59,7 @@ describe("_document.tsx Matomo Tag Manager", () => {
 
   it("includes comment markers for the Matomo script", () => {
     // Verify the script has proper comment markers
-    expect(documentSource).toContain("/* Matomo Tag Manager */");
+    expect(documentSource).toContain("{/* Matomo Tag Manager");
     expect(documentSource).toContain("Matomo Tag Manager");
   });
 
