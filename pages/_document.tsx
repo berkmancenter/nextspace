@@ -8,14 +8,15 @@ import {
 export default function Document(props: DocumentHeadTagsProps) {
   // Check if analytics is enabled (defaults to true if not set)
   const analyticsEnabled = process.env.NEXT_PUBLIC_ENABLE_ANALYTICS !== "false";
+  const matomoUrl = process.env.NEXT_PUBLIC_MATOMO_URL;
 
   return (
     <Html lang="en">
       <Head>
         <DocumentHeadTags {...props} />
         <link rel="icon" href="/favicon.ico" sizes="any" />
-        {/* Matomo Tag Manager - Only load if analytics is enabled */}
-        {analyticsEnabled && (
+        {/* Matomo Tag Manager - Only load if analytics is enabled and URL is configured */}
+        {analyticsEnabled && matomoUrl && (
           <script
             dangerouslySetInnerHTML={{
               __html: `
@@ -23,7 +24,7 @@ export default function Document(props: DocumentHeadTagsProps) {
               _mtm.push({'mtm.startTime': (new Date().getTime()), 'event': 'mtm.Start'});
               (function() {
                 var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
-                g.async=true; g.src='https://stats.berkman.harvard.edu/js/container_YvNDfYrC.js'; s.parentNode.insertBefore(g,s);
+                g.async=true; g.src='${matomoUrl}'; s.parentNode.insertBefore(g,s);
               })();
             `,
             }}

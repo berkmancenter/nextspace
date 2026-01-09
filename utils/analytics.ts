@@ -25,6 +25,17 @@ function isAnalyticsEnabled(): boolean {
 }
 
 /**
+ * Checks if Matomo URL is configured
+ * @returns true if URL is set, false otherwise
+ */
+function isMatomoUrlConfigured(): boolean {
+  return (
+    typeof process.env.NEXT_PUBLIC_MATOMO_URL === "string" &&
+    process.env.NEXT_PUBLIC_MATOMO_URL.length > 0
+  );
+}
+
+/**
  * Checks if Matomo Tag Manager is actually loaded
  * @returns true if Matomo appears to be loaded, false otherwise
  */
@@ -55,6 +66,18 @@ function ensureMTM(): void {
         "[Analytics] Analytics is disabled via NEXT_PUBLIC_ENABLE_ANALYTICS environment variable. No tracking will occur."
       );
       hasWarnedAboutMissingMatomo = true;
+    }
+    return;
+  }
+
+  // Check if Matomo URL is not configured
+  if (!isMatomoUrlConfigured()) {
+    if (!hasWarnedAboutMissingMatomo) {
+      hasWarnedAboutMissingMatomo = true;
+      console.warn(
+        "[Analytics] Warning: Analytics is enabled but NEXT_PUBLIC_MATOMO_URL environment variable is not set. " +
+          "No tracking will occur. Please configure NEXT_PUBLIC_MATOMO_URL in your environment variables."
+      );
     }
     return;
   }
@@ -90,6 +113,11 @@ export function trackPageView(
 ): void {
   ensureMTM();
 
+  // Return early if window._mtm was not initialized (analytics disabled or URL missing)
+  if (typeof window === "undefined" || !window._mtm) {
+    return;
+  }
+
   const data: Record<string, any> = {
     event: "mtm.PageView",
     pageName,
@@ -117,6 +145,11 @@ export function trackEvent(
   value?: number
 ): void {
   ensureMTM();
+
+  // Return early if window._mtm was not initialized (analytics disabled or URL missing)
+  if (typeof window === "undefined" || !window._mtm) {
+    return;
+  }
 
   const data: Record<string, any> = {
     event: "customEvent",
@@ -149,6 +182,11 @@ export function setCustomDimension(
 ): void {
   ensureMTM();
 
+  // Return early if window._mtm was not initialized (analytics disabled or URL missing)
+  if (typeof window === "undefined" || !window._mtm) {
+    return;
+  }
+
   window._mtm.push({
     event: "customDimension",
     dimensionId: index,
@@ -168,6 +206,11 @@ export function setCustomDimension(
  */
 export function setUserId(userId: string): void {
   ensureMTM();
+
+  // Return early if window._mtm was not initialized (analytics disabled or URL missing)
+  if (typeof window === "undefined" || !window._mtm) {
+    return;
+  }
 
   window._mtm.push({
     event: "setUserId",
@@ -190,7 +233,7 @@ export function trackSessionStart(metadata?: Record<string, any>): void {
 
   setCustomDimension(1, "session_start_time", timestamp, "visit");
 
-  if (metadata) {
+  if (metadata && typeof window !== "undefined" && window._mtm) {
     Object.entries(metadata).forEach(([key, value]) => {
       window._mtm.push({ [key]: value });
     });

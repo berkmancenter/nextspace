@@ -23,11 +23,14 @@ describe("_document.tsx Matomo Tag Manager", () => {
     expect(documentSource).toContain("mtm.Start");
   });
 
-  it("includes correct Matomo container URL", () => {
-    // Verify the script contains the correct container URL
-    expect(documentSource).toContain(
-      "https://stats.berkman.harvard.edu/js/container_YvNDfYrC.js"
-    );
+  it("uses environment variable for Matomo URL", () => {
+    // Verify the script uses NEXT_PUBLIC_MATOMO_URL environment variable
+    expect(documentSource).toContain("NEXT_PUBLIC_MATOMO_URL");
+  });
+
+  it("conditionally renders script only when analytics enabled and URL is configured", () => {
+    // Verify the script checks for both analyticsEnabled and matomoUrl
+    expect(documentSource).toContain("analyticsEnabled && matomoUrl");
   });
 
   it("loads Matomo script asynchronously", () => {
