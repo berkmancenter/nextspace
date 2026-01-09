@@ -197,5 +197,76 @@ describe("Analytics Utility", () => {
       });
       expect((global.window as any)._mtm[1].eventName).toBeUndefined();
     });
+
+    it("should track message_sent with 'message' for typed messages", async () => {
+      const { trackConversationEvent } = await import("../../utils/analytics");
+
+      trackConversationEvent(
+        "conv-789",
+        "assistant",
+        "message_sent",
+        "message"
+      );
+
+      expect((global.window as any)._mtm.length).toBe(2);
+      expect((global.window as any)._mtm[1]).toMatchObject({
+        event: "customEvent",
+        eventCategory: "assistant",
+        eventAction: "message_sent",
+        eventName: "message",
+      });
+    });
+
+    it("should track message_sent with 'reaction' for prompt selections", async () => {
+      const { trackConversationEvent } = await import("../../utils/analytics");
+
+      trackConversationEvent(
+        "conv-789",
+        "assistant",
+        "message_sent",
+        "reaction"
+      );
+
+      expect((global.window as any)._mtm.length).toBe(2);
+      expect((global.window as any)._mtm[1]).toMatchObject({
+        event: "customEvent",
+        eventCategory: "assistant",
+        eventAction: "message_sent",
+        eventName: "reaction",
+      });
+    });
+
+    it("should track rating_submitted separately from message_sent", async () => {
+      const { trackConversationEvent } = await import("../../utils/analytics");
+
+      trackConversationEvent("conv-101", "assistant", "rating_submitted", "5");
+
+      expect((global.window as any)._mtm.length).toBe(2);
+      expect((global.window as any)._mtm[1]).toMatchObject({
+        event: "customEvent",
+        eventCategory: "assistant",
+        eventAction: "rating_submitted",
+        eventName: "5",
+      });
+    });
+
+    it("should track feedback_sent separately from message_sent", async () => {
+      const { trackConversationEvent } = await import("../../utils/analytics");
+
+      trackConversationEvent(
+        "conv-102",
+        "assistant",
+        "feedback_sent",
+        "helpful"
+      );
+
+      expect((global.window as any)._mtm.length).toBe(2);
+      expect((global.window as any)._mtm[1]).toMatchObject({
+        event: "customEvent",
+        eventCategory: "assistant",
+        eventAction: "feedback_sent",
+        eventName: "helpful",
+      });
+    });
   });
 });

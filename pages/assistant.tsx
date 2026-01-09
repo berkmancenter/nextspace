@@ -240,7 +240,9 @@ function EventAssistantRoom() {
   async function sendMessage(
     message: string,
     shouldWaitForResponse: boolean = true,
-    parentMessageId?: string
+    parentMessageId?: string,
+    skipTracking: boolean = false,
+    messageSource: "message" | "reaction" = "message"
   ) {
     if (!Api.get().GetTokens() || !message) return;
     let channels = [{ name: `direct-${userId}-${agentId}` }];
@@ -250,22 +252,24 @@ function EventAssistantRoom() {
       ? controlledMode.prefix + message
       : message;
 
-    // Track message send
-    const conversationId = router.query.conversationId as string;
-    if (controlledMode) {
-      trackConversationEvent(
-        conversationId,
-        "assistant",
-        "feedback_sent",
-        controlledMode.label
-      );
-    } else {
-      trackConversationEvent(
-        conversationId,
-        "assistant",
-        "message_sent",
-        "question"
-      );
+    // Track message send (only if not skipping tracking)
+    if (!skipTracking) {
+      const conversationId = router.query.conversationId as string;
+      if (controlledMode) {
+        trackConversationEvent(
+          conversationId,
+          "assistant",
+          "feedback_sent",
+          controlledMode.label
+        );
+      } else {
+        trackConversationEvent(
+          conversationId,
+          "assistant",
+          "message_sent",
+          messageSource
+        );
+      }
     }
 
     // Only set waitingForResponse for regular messages, not controlled mode messages
@@ -317,14 +321,14 @@ function EventAssistantRoom() {
       rating
     );
     const feedbackText = `/feedback|Rating|${messageId}|${rating}`;
-    await sendMessage(feedbackText, false);
+    await sendMessage(feedbackText, false, undefined, true);
   };
 
   const handlePromptSelect = async (
     value: string,
     parentMessageId?: string
   ) => {
-    await sendMessage(value, true, parentMessageId);
+    await sendMessage(value, true, parentMessageId, false, "reaction");
   };
 
   return (
