@@ -16,7 +16,6 @@ describe("MessageFeedback Component", () => {
     );
 
     expect(screen.getByText("How did the bot do?")).toBeInTheDocument();
-    expect(screen.getByText("Say more")).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "No" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Meh" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "OK" })).toBeInTheDocument();
@@ -66,7 +65,7 @@ describe("MessageFeedback Component", () => {
     expect(mockSendRating).toHaveBeenCalledWith("msg-123", "WOW!");
   });
 
-  it("calls onPopulateFeedbackText when Say more button is clicked", () => {
+  it("does not show 'Say more' message before rating selection", () => {
     const mockPopulateFeedback = jest.fn();
     const mockSendRating = jest.fn();
 
@@ -78,8 +77,56 @@ describe("MessageFeedback Component", () => {
       />
     );
 
-    const sayMoreButton = screen.getByText("Say more");
-    fireEvent.click(sayMoreButton);
+    expect(screen.queryByText("Event Assistant")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Thank you for your input!")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Would you like to share more?")
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows 'Say more' message after rating selection", () => {
+    const mockPopulateFeedback = jest.fn();
+    const mockSendRating = jest.fn();
+
+    render(
+      <MessageFeedback
+        messageId="msg-123"
+        onPopulateFeedbackText={mockPopulateFeedback}
+        onSendFeedbackRating={mockSendRating}
+      />
+    );
+
+    const mehButton = screen.getByRole("radio", { name: "Meh" });
+    fireEvent.click(mehButton);
+
+    expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+    expect(screen.getByText("Thank you for your input!")).toBeInTheDocument();
+    expect(
+      screen.getByText("Would you like to share more?")
+    ).toBeInTheDocument();
+  });
+
+  it("calls onPopulateFeedbackText when 'Would you like to share more?' link is clicked", () => {
+    const mockPopulateFeedback = jest.fn();
+    const mockSendRating = jest.fn();
+
+    render(
+      <MessageFeedback
+        messageId="msg-123"
+        onPopulateFeedbackText={mockPopulateFeedback}
+        onSendFeedbackRating={mockSendRating}
+      />
+    );
+
+    // First select a rating to show the message
+    const mehButton = screen.getByRole("radio", { name: "Meh" });
+    fireEvent.click(mehButton);
+
+    // Then click the "Would you like to share more?" link
+    const shareMoreLink = screen.getByText("Would you like to share more?");
+    fireEvent.click(shareMoreLink);
 
     expect(mockPopulateFeedback).toHaveBeenCalledWith(
       expect.objectContaining({

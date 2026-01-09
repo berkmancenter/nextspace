@@ -1,6 +1,6 @@
 import { FC, useState, useRef, useEffect, KeyboardEvent } from "react";
-import { Box, Button, Typography, alpha } from "@mui/material";
-import { AddCommentOutlined, Check } from "@mui/icons-material";
+import { Box, Button, Typography, Link, alpha } from "@mui/material";
+import { Check, AddCommentOutlined } from "@mui/icons-material";
 import { ControlledInputConfig } from "../types.internal";
 
 /**
@@ -143,23 +143,6 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
         >
           How did the bot do?
         </Typography>
-        <Button
-          size="small"
-          endIcon={<AddCommentOutlined fontSize="small" aria-hidden="true" />}
-          onClick={handleSayMoreClick}
-          className="text-medium-slate-blue"
-          aria-label="Provide additional feedback about this response"
-          sx={{
-            textTransform: "none",
-            fontSize: "0.875rem",
-            "&:hover": {
-              backgroundColor: (theme) =>
-                alpha(theme.palette.primary.main, 0.04),
-            },
-          }}
-        >
-          Say more
-        </Button>
       </Box>
       {/* Feedback Buttons Row */}
       <Box
@@ -234,6 +217,32 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
           </Button>
         ))}
       </Box>
+
+      {/* Conditional "Say More" Message - shown after rating selection */}
+      {selectedFeedback !== null && (
+        <Box className="bg-light-gray rounded-2xl p-3" marginTop="1rem">
+          <p className="py-3 text-xs text-dark-blue font-bold uppercase">
+            Event Assistant
+          </p>
+          <Typography variant="body1">
+            Thank you for your input!{" "}
+            <Link
+              component="button"
+              onClick={handleSayMoreClick}
+              className="text-medium-slate-blue"
+              sx={{
+                cursor: "pointer",
+                textDecoration: "underline",
+                "&:hover": {
+                  textDecoration: "none",
+                },
+              }}
+            >
+              Would you like to share more?
+            </Link>
+          </Typography>
+        </Box>
+      )}
     </Box>
   );
 };
