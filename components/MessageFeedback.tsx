@@ -7,8 +7,9 @@ import { ControlledInputConfig } from "../types.internal";
  * Rating button labels - modify these to change the button text
  */
 const RATING_LABELS = {
-  NEGATIVE: "Nah",
-  NEUTRAL: "Meh",
+  NEGATIVE: "No",
+  NEUTRAL_LOW: "Meh",
+  NEUTRAL_HIGH: "OK",
   POSITIVE: "WOW!",
 } as const;
 
@@ -60,7 +61,8 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
 
   const feedbackOptions = [
     { text: RATING_LABELS.NEGATIVE, label: RATING_LABELS.NEGATIVE },
-    { text: RATING_LABELS.NEUTRAL, label: RATING_LABELS.NEUTRAL },
+    { text: RATING_LABELS.NEUTRAL_LOW, label: RATING_LABELS.NEUTRAL_LOW },
+    { text: RATING_LABELS.NEUTRAL_HIGH, label: RATING_LABELS.NEUTRAL_HIGH },
     { text: RATING_LABELS.POSITIVE, label: RATING_LABELS.POSITIVE },
   ];
 

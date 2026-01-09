@@ -17,8 +17,9 @@ describe("MessageFeedback Component", () => {
 
     expect(screen.getByText("How did the bot do?")).toBeInTheDocument();
     expect(screen.getByText("Say more")).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Nah" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "No" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Meh" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "OK" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "WOW!" })).toBeInTheDocument();
   });
 
@@ -57,8 +58,8 @@ describe("MessageFeedback Component", () => {
     fireEvent.click(wowButton);
 
     // Try clicking another button
-    const nahButton = screen.getByRole("radio", { name: "Nah" });
-    fireEvent.click(nahButton);
+    const noButton = screen.getByRole("radio", { name: "No" });
+    fireEvent.click(noButton);
 
     // Should only have been called once
     expect(mockSendRating).toHaveBeenCalledTimes(1);
@@ -101,8 +102,9 @@ describe("MessageFeedback Component", () => {
     );
 
     // Check that text is visible on buttons
-    expect(screen.getByText("Nah")).toBeInTheDocument();
+    expect(screen.getByText("No")).toBeInTheDocument();
     expect(screen.getByText("Meh")).toBeInTheDocument();
+    expect(screen.getByText("OK")).toBeInTheDocument();
     expect(screen.getByText("WOW!")).toBeInTheDocument();
   });
 
