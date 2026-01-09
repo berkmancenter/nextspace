@@ -99,7 +99,6 @@ trackSessionEnd(durationSeconds: number): void
 #### Specialized Tracking
 
 ```typescript
-trackHeartbeat(): void
 trackVisibilityChange(visible: boolean): void
 trackConnectionStatus(status: 'connected' | 'disconnected' | 'error'): void
 trackFeatureUsage(feature: string, action: 'open' | 'close' | 'use', durationSeconds?: number): void
@@ -201,7 +200,7 @@ setUserId(pseudonym.value);
 - Session start timestamp (ISO format)
 - Session end timestamp
 - Total session duration (seconds)
-- Active time via heartbeat (60s intervals)
+- Active time via Matomo's built-in heartbeat timer (configured in MTM)
 - Page visibility changes
 
 **Use Cases:**
@@ -256,7 +255,7 @@ setUserId(pseudonym.value);
 | Category | Actions | Purpose |
 |----------|---------|---------|
 | `session` | start, end, location_detected | Session lifecycle |
-| `engagement` | heartbeat, visibility_change, welcome_dismissed | Active time |
+| `engagement` | visibility_change, welcome_dismissed | User engagement |
 | `interaction` | message_sent, feedback_sent, quick_response_sent, custom_message_sent, metrics_clicked | User actions |
 | `feature` | open, close, use | Feature usage |
 | `system` | connection_status | Technical health |

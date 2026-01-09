@@ -264,14 +264,6 @@ export function trackSessionEnd(durationSeconds: number): void {
 }
 
 /**
- * Tracks heartbeat to measure active time
- * Used to send periodic signals while user is actively using the app
- */
-export function trackHeartbeat(): void {
-  trackEvent("engagement", "heartbeat");
-}
-
-/**
  * Tracks page visibility change
  * @param visible - Whether the page is visible
  */

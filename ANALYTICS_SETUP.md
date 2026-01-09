@@ -173,7 +173,10 @@ Custom Dimension 5: {{dimensionValue}}
 - Type: `Custom Event`
 - Event Name: `mtm.PageView`
 
-**Save the tag**
+**Optional - Enable Heartbeat Timer:**
+
+To track active time more accurately, you can enable Matomo's built-in heartbeat timer in your Tag Manager container configuration.
+
 
 #### Tag 2: Matomo Analytics - Events
 
@@ -364,7 +367,7 @@ The application tracks these event categories:
 
 ### Engagement Events
 - **Category:** `engagement`
-- **Actions:** `heartbeat`, `visibility_change`, `welcome_dismissed`
+- **Actions:** `visibility_change`, `welcome_dismissed`
 
 ### Interaction Events
 - **Category:** `interaction`
