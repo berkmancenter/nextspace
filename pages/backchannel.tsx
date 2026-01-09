@@ -20,8 +20,8 @@ import {
   SendData,
 } from "../utils";
 
-import { DirectMessage } from "../components";
 import { components } from "../types";
+import { BackchannelMessage } from "../components/messages/BackchannelMessage";
 import { useAnalytics } from "../hooks/useAnalytics";
 import {
   trackEvent,
@@ -44,9 +44,9 @@ function BackchannelRoom() {
     null
   );
 
-  const [messages, setMessages] = useState<
-    (components["schemas"]["Message"] & { date: Date })[]
-  >([]);
+  const [messages, setMessages] = useState<components["schemas"]["Message"][]>(
+    []
+  );
   const [currentMessage, setCurrentMessage] = useState("");
   const [pseudonym, setPseudonym] = useState<string | null>(null);
   const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
@@ -164,7 +164,6 @@ function BackchannelRoom() {
           ...prev,
           {
             ...message[0],
-            date: new Date(),
           },
         ]);
         setCurrentMessage("");
@@ -299,11 +298,9 @@ function BackchannelRoom() {
                   id="scroll-container"
                 >
                   {messages.map((message, i) => (
-                    <DirectMessage
+                    <BackchannelMessage
                       key={`msg-${i}`}
-                      text={(message.body as any).text}
-                      date={message.date}
-                      theme="backchannel"
+                      message={{ ...message, body: (message.body as any).text }}
                     />
                   ))}
                   <div className="mt-20 w-full block" />
