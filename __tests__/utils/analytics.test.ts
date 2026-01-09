@@ -137,4 +137,65 @@ describe("Analytics Utility", () => {
       );
     });
   });
+
+  describe("trackConversationEvent", () => {
+    beforeEach(() => {
+      process.env.NEXT_PUBLIC_ENABLE_ANALYTICS = "true";
+      process.env.NEXT_PUBLIC_MATOMO_URL = "https://example.com/matomo.js";
+      // Mock window object for browser environment
+      global.window = {
+        _mtm: [],
+        _paq: [],
+      } as any;
+    });
+
+    afterEach(() => {
+      delete (global as any).window;
+    });
+
+    it("should set conversation_id dimension and track event", async () => {
+      const { trackConversationEvent } = await import("../../utils/analytics");
+
+      trackConversationEvent(
+        "conv-123",
+        "assistant",
+        "message_sent",
+        "question"
+      );
+
+      // Check that window._mtm received two pushes: dimension + event
+      expect((global.window as any)._mtm.length).toBe(2);
+
+      // First push should be the dimension
+      expect((global.window as any)._mtm[0]).toMatchObject({
+        event: "customDimension",
+        dimensionId: 6,
+        dimensionName: "conversation_id",
+        dimensionValue: "conv-123",
+        dimensionScope: "action",
+      });
+
+      // Second push should be the event
+      expect((global.window as any)._mtm[1]).toMatchObject({
+        event: "customEvent",
+        eventCategory: "assistant",
+        eventAction: "message_sent",
+        eventName: "question",
+      });
+    });
+
+    it("should work without optional name parameter", async () => {
+      const { trackConversationEvent } = await import("../../utils/analytics");
+
+      trackConversationEvent("conv-456", "moderator", "metrics_clicked");
+
+      expect((global.window as any)._mtm.length).toBe(2);
+      expect((global.window as any)._mtm[1]).toMatchObject({
+        event: "customEvent",
+        eventCategory: "moderator",
+        eventAction: "metrics_clicked",
+      });
+      expect((global.window as any)._mtm[1].eventName).toBeUndefined();
+    });
+  });
 });

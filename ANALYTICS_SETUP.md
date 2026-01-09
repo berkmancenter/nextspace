@@ -59,7 +59,7 @@ Before starting, ensure you have:
 
 ### 1.1: Create Custom Dimensions
 
-You need to configure 5 custom dimensions in your Matomo instance:
+You need to configure 3 custom dimensions in your Matomo instance:
 
 **Access Custom Dimensions:**
 1. Log into Matomo
@@ -68,32 +68,24 @@ You need to configure 5 custom dimensions in your Matomo instance:
 
 **Create these dimensions:**
 
-#### Dimension 1: session_start_time
-- **Name:** `session_start_time`
-- **Scope:** Visit
-- **Description:** ISO timestamp when the session started
-
 #### Dimension 2: user_location
 - **Name:** `user_location`
 - **Scope:** Visit
 - **Description:** Whether user is accessing from local venue or remotely (values: "local" or "remote")
-
-#### Dimension 3: page_type
-- **Name:** `page_type`
-- **Scope:** Action
-- **Description:** Type of page (home, assistant, moderator, backchannel)
 
 #### Dimension 4: page_duration
 - **Name:** `page_duration`
 - **Scope:** Action
 - **Description:** Time spent on a specific page in seconds
 
-#### Dimension 5: session_duration
-- **Name:** `session_duration`
-- **Scope:** Visit
-- **Description:** Total session duration in seconds
+#### Dimension 6: conversation_id
+- **Name:** `conversation_id`
+- **Scope:** Action
+- **Description:** The UUID of the conversation for tracking conversation-specific events
 
-**Note:** The auto-assigned index numbers should be 1-5. If they differ, you'll need to adjust the code in `utils/analytics.ts`.
+**Note:** The dimension index numbers should be 2, 4, and 6. If they differ, you'll need to adjust the code in `utils/analytics.ts`.
+
+**Historical Note:** Dimensions 1, 3, and 5 were previously used but are no longer actively tracked. They cannot be deleted from Matomo but will not receive new data.
 
 ---
 

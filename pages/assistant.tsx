@@ -18,6 +18,7 @@ import { CheckAuthHeader, createConversationFromData } from "../utils/Helpers";
 import { useAnalytics } from "../hooks/useAnalytics";
 import {
   trackEvent,
+  trackConversationEvent,
   trackConnectionStatus,
   setUserId,
 } from "../utils/analytics";
@@ -250,10 +251,21 @@ function EventAssistantRoom() {
       : message;
 
     // Track message send
+    const conversationId = router.query.conversationId as string;
     if (controlledMode) {
-      trackEvent("interaction", "feedback_sent", controlledMode.label);
+      trackConversationEvent(
+        conversationId,
+        "assistant",
+        "feedback_sent",
+        controlledMode.label
+      );
     } else {
-      trackEvent("interaction", "message_sent", "assistant_question");
+      trackConversationEvent(
+        conversationId,
+        "assistant",
+        "message_sent",
+        "question"
+      );
     }
 
     // Only set waitingForResponse for regular messages, not controlled mode messages
@@ -297,6 +309,13 @@ function EventAssistantRoom() {
   }, [controlledMode]);
 
   const sendFeedbackRating = async (messageId: string, rating: string) => {
+    const conversationId = router.query.conversationId as string;
+    trackConversationEvent(
+      conversationId,
+      "assistant",
+      "rating_submitted",
+      rating
+    );
     const feedbackText = `/feedback|Rating|${messageId}|${rating}`;
     await sendMessage(feedbackText, false);
   };

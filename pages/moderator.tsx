@@ -28,6 +28,7 @@ import { CheckAuthHeader, DefaultEase } from "../utils/Helpers";
 import { useAnalytics } from "../hooks/useAnalytics";
 import {
   trackEvent,
+  trackConversationEvent,
   trackConnectionStatus,
   trackFeatureUsage,
 } from "../utils/analytics";
@@ -460,8 +461,11 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
                       key={index}
                       onClick={() => {
                         // Track metrics click-through
-                        trackEvent(
-                          "interaction",
+                        const conversationId = router.query
+                          .conversationId as string;
+                        trackConversationEvent(
+                          conversationId,
+                          "moderator",
                           "metrics_clicked",
                           "jump_to_transcript"
                         );

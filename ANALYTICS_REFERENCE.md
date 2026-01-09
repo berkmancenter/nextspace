@@ -72,6 +72,25 @@ trackEvent(
 - Name: optional additional context
 - Value: optional numeric value
 
+#### Conversation Event Tracking
+
+```typescript
+trackConversationEvent(
+  conversationId: string,
+  category: string,
+  action: string,
+  name?: string,
+  value?: number
+): void
+```
+- Convenience wrapper for tracking conversation-related events
+- Automatically sets conversation_id as custom dimension (index 6)
+- Category: typically the page/role context (assistant, moderator, backchannel)
+- Action: specific action taken
+- Name: optional additional context
+- Value: optional numeric value
+- **Recommended for all conversation-specific tracking**
+
 #### Custom Dimensions
 
 ```typescript
@@ -149,45 +168,48 @@ useAnalytics('home');
 
 #### Assistant Page (pages/assistant.tsx)
 ```typescript
-useAnalytics('assistant');
+useAnalytics({ pageType: 'assistant' });
 
-// Track message sends
-trackEvent('interaction', 'message_sent', 'assistant_question');
+// Track message sends with conversation context
+trackConversationEvent(conversationId, 'assistant', 'message_sent', 'question');
 
 // Track feedback
-trackEvent('interaction', 'feedback_sent', feedbackType, rating);
+trackConversationEvent(conversationId, 'assistant', 'feedback_sent', feedbackLabel);
 
-// Track user ID
-setUserId(pseudonym.value);
+// Track ratings
+trackConversationEvent(conversationId, 'assistant', 'rating_submitted', rating);
+
+// Track user ID (pseudonym)
+setUserId(pseudonym);
 ```
 
 #### Moderator Page (pages/moderator.tsx)
 ```typescript
-useAnalytics('moderator');
+useAnalytics({ pageType: 'moderator' });
 
 // Track transcript toggle
 trackFeatureUsage('transcript', 'open');
 trackFeatureUsage('transcript', 'close', durationSeconds);
 
-// Track metrics clicks
-trackEvent('interaction', 'metrics_clicked');
+// Track metrics clicks with conversation context
+trackConversationEvent(conversationId, 'moderator', 'metrics_clicked', 'jump_to_transcript');
 ```
 
 #### Backchannel Page (pages/backchannel.tsx)
 ```typescript
-useAnalytics('backchannel');
+useAnalytics({ pageType: 'backchannel' });
 
 // Track welcome dismissal
-trackEvent('engagement', 'welcome_dismissed');
+trackConversationEvent(conversationId, 'backchannel', 'welcome_dismissed');
 
 // Track quick responses
-trackEvent('interaction', 'quick_response_sent', buttonLabel);
+trackConversationEvent(conversationId, 'backchannel', 'quick_response_sent', buttonLabel);
 
 // Track custom messages
-trackEvent('interaction', 'custom_message_sent');
+trackConversationEvent(conversationId, 'backchannel', 'custom_message_sent');
 
-// Track user ID
-setUserId(pseudonym.value);
+// Track user ID (pseudonym)
+setUserId(pseudonym);
 ```
 
 ---
@@ -197,27 +219,25 @@ setUserId(pseudonym.value);
 ### Session Metrics
 
 **What's Tracked:**
-- Session start timestamp (ISO format)
-- Session end timestamp
-- Total session duration (seconds)
+- Session start/end events
 - Active time via Matomo's built-in heartbeat timer (configured in MTM)
 - Page visibility changes
+- User location (local vs remote)
 
 **Use Cases:**
 - Average session length
 - Active vs idle time
 - Session frequency patterns
 - Time-of-day usage
+- Venue attendance tracking
 
 **Custom Dimensions Used:**
-- Index 1: `session_start_time` (Visit scope)
-- Index 5: `session_duration` (Visit scope)
+- Dimension 2: `user_location` (Visit scope) - "local" or "remote"
 
 ### Page Metrics
 
 **What's Tracked:**
-- Page views with page name
-- Page type (home, assistant, moderator, backchannel)
+- Page views with page name and path
 - Time spent per page
 - Navigation patterns
 
@@ -228,35 +248,56 @@ setUserId(pseudonym.value);
 - Page engagement
 
 **Custom Dimensions Used:**
-- Index 3: `page_type` (Action scope)
-- Index 4: `page_duration` (Action scope)
+- Dimension 4: `page_duration` (Action scope) - Time in seconds
+
+### Conversation Metrics
+
+**What's Tracked:**
+- All user interactions within conversations
+- Message sending patterns
+- Feedback submission
+- Feature usage within conversations
+
+**Use Cases:**
+- Conversation-level engagement analysis
+- Per-conversation user behavior
+- A/B testing within specific conversations
+- Conversation outcome tracking
+
+**Custom Dimensions Used:**
+- Dimension 6: `conversation_id` (Action scope) - Conversation UUID
 
 ### User Behavior
 
 **What's Tracked:**
-- User location (local venue vs remote)
+- User pseudonym (via Matomo User ID)
 - Device information (user agent, screen, viewport)
-- Feature usage (transcript toggle, message sending)
-- Interaction patterns
+- Feature usage patterns
+- Interaction sequences
 
 **Use Cases:**
-- Local vs remote user comparison
+- User journey mapping across sessions
 - Device type distribution (mobile vs desktop)
 - Feature adoption rates
-- User journey mapping
-
-**Custom Dimensions Used:**
-- Index 2: `user_location` (Visit scope)
+- User retention analysis
 
 ### Interaction Events
+
+**Event Taxonomy:**
+- **Category**: Page/role context (assistant, moderator, backchannel) or high-level type (session, engagement, feature, system)
+- **Action**: Specific action taken (message_sent, feedback_sent, metrics_clicked, etc.)
+- **Name**: Optional contextual detail (question, rating value, button label, etc.)
+- **Value**: Optional numeric value (duration, count, etc.)
 
 **Categories Tracked:**
 
 | Category | Actions | Purpose |
 |----------|---------|---------|
+| `assistant` | message_sent, feedback_sent, rating_submitted | Assistant page interactions |
+| `moderator` | metrics_clicked | Moderator page interactions |
+| `backchannel` | welcome_dismissed, quick_response_sent, custom_message_sent | Backchannel interactions |
 | `session` | start, end, location_detected | Session lifecycle |
-| `engagement` | visibility_change, welcome_dismissed | User engagement |
-| `interaction` | message_sent, feedback_sent, quick_response_sent, custom_message_sent, metrics_clicked | User actions |
+| `engagement` | visibility_change | User engagement |
 | `feature` | open, close, use | Feature usage |
 | `system` | connection_status | Technical health |
 

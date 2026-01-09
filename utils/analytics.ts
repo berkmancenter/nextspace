@@ -168,6 +168,29 @@ export function trackEvent(
 }
 
 /**
+ * Tracks a conversation-related event with automatic conversation ID tracking
+ * This is a convenience wrapper that automatically sets the conversation_id dimension
+ * @param conversationId - The conversation UUID
+ * @param category - Event category (typically the page/role: 'assistant', 'moderator', 'backchannel')
+ * @param action - Event action (e.g., 'message_sent', 'feedback_submitted')
+ * @param name - Optional event name for additional context
+ * @param value - Optional numeric value
+ */
+export function trackConversationEvent(
+  conversationId: string,
+  category: string,
+  action: string,
+  name?: string,
+  value?: number
+): void {
+  // Automatically set conversation ID as a custom dimension
+  setCustomDimension(6, "conversation_id", conversationId, "action");
+
+  // Track the event
+  trackEvent(category, action, name, value);
+}
+
+/**
  * Sets a custom dimension
  * @param index - Dimension index (1-5 for visit scope, 1-20 for action scope)
  * @param name - Dimension name
@@ -227,11 +250,7 @@ export function setUserId(userId: string): void {
  * @param metadata - Additional session metadata
  */
 export function trackSessionStart(metadata?: Record<string, any>): void {
-  const timestamp = new Date().toISOString();
-
   trackEvent("session", "start", undefined, undefined);
-
-  setCustomDimension(1, "session_start_time", timestamp, "visit");
 
   if (metadata && typeof window !== "undefined" && window._mtm) {
     Object.entries(metadata).forEach(([key, value]) => {
@@ -240,7 +259,7 @@ export function trackSessionStart(metadata?: Record<string, any>): void {
   }
 
   if (process.env.NODE_ENV !== "production") {
-    console.log("[Analytics] Session started:", timestamp, metadata);
+    console.log("[Analytics] Session started:", metadata);
   }
 }
 
@@ -250,13 +269,6 @@ export function trackSessionStart(metadata?: Record<string, any>): void {
  */
 export function trackSessionEnd(durationSeconds: number): void {
   trackEvent("session", "end", undefined, durationSeconds);
-
-  setCustomDimension(
-    5,
-    "session_duration",
-    durationSeconds.toString(),
-    "visit"
-  );
 
   if (process.env.NODE_ENV !== "production") {
     console.log("[Analytics] Session ended:", durationSeconds, "seconds");

@@ -25,6 +25,7 @@ import { BackchannelMessage } from "../components/messages/BackchannelMessage";
 import { useAnalytics } from "../hooks/useAnalytics";
 import {
   trackEvent,
+  trackConversationEvent,
   trackConnectionStatus,
   setUserId,
 } from "../utils/analytics";
@@ -144,10 +145,20 @@ function BackchannelRoom() {
       });
 
     // Track message send
+    const conversationId = router.query.conversationId as string;
     if (preset) {
-      trackEvent("interaction", "quick_response_sent", message);
+      trackConversationEvent(
+        conversationId,
+        "backchannel",
+        "quick_response_sent",
+        message
+      );
     } else {
-      trackEvent("interaction", "custom_message_sent");
+      trackConversationEvent(
+        conversationId,
+        "backchannel",
+        "custom_message_sent"
+      );
     }
 
     SendData("messages", {
@@ -243,7 +254,14 @@ function BackchannelRoom() {
                 color="primary"
                 onClick={() => {
                   setShowWelcome(false);
-                  trackEvent("engagement", "welcome_dismissed", "backchannel");
+                  const conversationId = router.query.conversationId as string;
+                  if (conversationId) {
+                    trackConversationEvent(
+                      conversationId,
+                      "backchannel",
+                      "welcome_dismissed"
+                    );
+                  }
                 }}
                 sx={{ marginTop: "1rem", maxWidth: "10rem" }}
               >

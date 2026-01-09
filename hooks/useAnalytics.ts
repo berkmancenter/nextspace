@@ -43,11 +43,6 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
       }),
     });
 
-    // Set page type custom dimension
-    if (pageType) {
-      setCustomDimension(3, "page_type", pageType, "action");
-    }
-
     // Reset entry time
     pageEntryTime.current = Date.now();
 
@@ -58,13 +53,7 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
         setCustomDimension(4, "page_duration", duration.toString(), "action");
       }
     };
-  }, [
-    pageName,
-    pageType,
-    router.pathname,
-    router.asPath,
-    router.query.conversationId,
-  ]);
+  }, [pageName, router.pathname, router.asPath, router.query.conversationId]);
 
   // Page visibility tracking
   useEffect(() => {
@@ -161,3 +150,4 @@ async function detectUserLocation() {
     trackUserLocation("remote", "default");
   }
 }
+// Track the location
