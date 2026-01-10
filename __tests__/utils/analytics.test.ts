@@ -268,5 +268,38 @@ describe("Analytics Utility", () => {
         eventName: "helpful",
       });
     });
+
+    it("should track command_sent for slash commands", async () => {
+      const { trackConversationEvent } = await import("../../utils/analytics");
+
+      trackConversationEvent("conv-103", "assistant", "command_sent", "mod");
+
+      expect((global.window as any)._mtm.length).toBe(2);
+      expect((global.window as any)._mtm[1]).toMatchObject({
+        event: "customEvent",
+        eventCategory: "assistant",
+        eventAction: "command_sent",
+        eventName: "mod",
+      });
+    });
+
+    it("should track command_sent for system commands", async () => {
+      const { trackConversationEvent } = await import("../../utils/analytics");
+
+      trackConversationEvent(
+        "conv-104",
+        "assistant",
+        "command_sent",
+        "feedback"
+      );
+
+      expect((global.window as any)._mtm.length).toBe(2);
+      expect((global.window as any)._mtm[1]).toMatchObject({
+        event: "customEvent",
+        eventCategory: "assistant",
+        eventAction: "command_sent",
+        eventName: "feedback",
+      });
+    });
   });
 });

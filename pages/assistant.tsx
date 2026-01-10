@@ -255,7 +255,17 @@ function EventAssistantRoom() {
     // Track message send (only if not skipping tracking)
     if (!skipTracking) {
       const conversationId = router.query.conversationId as string;
-      if (controlledMode) {
+
+      // Check if message is a slash command
+      if (message.startsWith("/")) {
+        const commandName = message.split(" ")[0].substring(1).split("|")[0];
+        trackConversationEvent(
+          conversationId,
+          "assistant",
+          "command_sent",
+          commandName
+        );
+      } else if (controlledMode) {
         trackConversationEvent(
           conversationId,
           "assistant",
