@@ -105,10 +105,9 @@ const EventCard = ({ event }: { event: Conversation }) => {
         <Divider className="my-3" />
 
         {/* Agent info */}
-        {event.types && event.types.length > 0 && (
+        {event.type && (
           <div className="text-sm text-gray-700">
-            <span className="font-medium">Agents:</span>{" "}
-            {event.types.map((type) => type.label).join(", ")}
+            <span className="font-medium">Agent:</span> {event.type.label}
           </div>
         )}
         {event.eventUrls.zoom && (

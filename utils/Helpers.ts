@@ -236,28 +236,28 @@ export const JoinSession = async (
 export const DefaultEase = " ease-[cubic-bezier(0.075, 0.820, 0.165, 1.000)]";
 
 /**
- * Returns the conversation types for a particular conversation. Will use the conversationType property if set,
+ * Returns the conversation type for a particular conversation. Will use the conversationType property if set,
  * othwerwise maps agents to conversation type for legacy conversations (e.g. multiple agents combined into a single type)
  * @param conversation
- * @returns ConversationType[] the types for the conversation
+ * @returns ConversationType the type for the conversation
  */
-async function getTypesForConversation(
+async function getTypeForConversation(
   conversation: components["schemas"]["Conversation"],
   conversationTypes: components["schemas"]["ConversationType"][]
-): Promise<components["schemas"]["ConversationType"][]> {
+): Promise<components["schemas"]["ConversationType"]> {
   if (conversation.conversationType) {
     const type = conversationTypes.find(
       (type) => type.name === conversation.conversationType
     );
-    if (type) return [type];
+    if (type) return type;
   }
   const agentNames = conversation.agents.map((agent) => agent.agentType);
   // Bit of a hack to support legacy conversations without a type. Takes advantage of the fact that
   // backChannel and eventAssistant conversation types match their agent names
   // (both backChannelInsights and backChannelMetrics contain 'backChannel', the type name)
-  return conversationTypes.filter((convType) =>
+  return conversationTypes.find((convType) =>
     agentNames.some((agentName) => agentName.includes(convType.name))
-  );
+  )!;
 }
 
 function generateEventUrls(conversationData: Conversation): EventUrls {
@@ -272,43 +272,49 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
     ? { label: "Zoom", url: zoomAdapter.config?.meetingUrl as string }
     : undefined;
 
-  for (const convType of conversationData.types) {
-    if (convType.name === "backChannel") {
-      const modPasscode = conversationData.channels.find(
-        (channel) => channel.name === "moderator"
-      )?.passcode;
+  const convType = conversationData.type;
 
-      const participantPasscode = conversationData.channels.find(
-        (channel) => channel.name === "participant"
-      )?.passcode;
+  if (convType.name === "backChannel") {
+    const modPasscode = conversationData.channels.find(
+      (channel) => channel.name === "moderator"
+    )?.passcode;
 
-      const transcriptPasscode = conversationData.channels.find(
-        (channel) => channel.name === "transcript"
-      )?.passcode;
-      const hasTranscript = Boolean(transcriptPasscode);
-      if (modPasscode) {
-        moderator.push({
-          label: "Back Channel",
-          url: `${urlPrefix}/moderator/?conversationId=${
-            conversationData.id
-          }&channel=moderator,${modPasscode}${
-            hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
-          }`,
-        });
-      }
-      if (participantPasscode) {
-        participant.push({
-          label: "Back Channel",
-          url: `${urlPrefix}/backchannel/?conversationId=${conversationData.id}&channel=participant,${participantPasscode}`,
-        });
-      }
-    } else if (convType.name === "eventAssistant") {
-      const eventAssistantUrl = {
-        label: "Event Assistant",
-        url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}`,
-      };
-      participant.push(eventAssistantUrl);
+    const participantPasscode = conversationData.channels.find(
+      (channel) => channel.name === "participant"
+    )?.passcode;
+
+    const transcriptPasscode = conversationData.channels.find(
+      (channel) => channel.name === "transcript"
+    )?.passcode;
+    const hasTranscript = Boolean(transcriptPasscode);
+    if (modPasscode) {
+      moderator.push({
+        label: "Back Channel",
+        url: `${urlPrefix}/moderator/?conversationId=${
+          conversationData.id
+        }&channel=moderator,${modPasscode}${
+          hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
+        }`,
+      });
     }
+    if (participantPasscode) {
+      participant.push({
+        label: "Back Channel",
+        url: `${urlPrefix}/backchannel/?conversationId=${conversationData.id}&channel=participant,${participantPasscode}`,
+      });
+    }
+  } else if (convType.name === "eventAssistant") {
+    const eventAssistantUrl = {
+      label: "Event Assistant",
+      url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}`,
+    };
+    participant.push(eventAssistantUrl);
+  } else if (convType.name === "eventAssistantPlus") {
+    const eventAssistantPlusUrl = {
+      label: "Event Assistant Plus",
+      url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}`,
+    };
+    participant.push(eventAssistantPlusUrl);
   }
 
   return {
@@ -337,15 +343,15 @@ export const createConversationFromData = async (
 ): Promise<Conversation> => {
   const { conversationTypes, availablePlatforms } = await Api.get().GetConfig();
 
-  const types = await getTypesForConversation(data, conversationTypes);
+  const type = await getTypeForConversation(data, conversationTypes);
   const eventUrls = generateEventUrls({
     ...data,
-    types,
+    type,
   } as Conversation);
 
   return {
     ...data,
-    types,
+    type,
     eventUrls,
     platformTypes: availablePlatforms.filter((platform) =>
       data.platforms?.some((p) => p === platform.name)

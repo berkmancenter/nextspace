@@ -31,6 +31,7 @@ import { EventStatus } from "./";
 import { components } from "../types";
 import { Conversation } from "../types.internal";
 import { createConversationFromData, Api } from "../utils/Helpers";
+import { useField } from "@mui/x-date-pickers/internals";
 
 const steps = [
   "Event Details",
@@ -84,6 +85,13 @@ export const EventCreationForm: React.FC = ({}) => {
     null
   );
 
+  const [formGroupsErrors, setFormGroupsErrors] = useState({
+    platforms: false,
+    conversationType: false,
+  });
+  const [platformsPreviouslyChecked, setPlatformsPreviouslyChecked] =
+    useState(false);
+
   // Moderators and Speakers state
   const [moderators, setModerators] = useState<
     Array<{ name: string; bio: string }>
@@ -95,6 +103,10 @@ export const EventCreationForm: React.FC = ({}) => {
 
   const formRef = useRef<HTMLFormElement>(null);
 
+  const setFieldFocus = (fieldName: string) => {
+    (formRef.current?.elements.namedItem(fieldName) as HTMLElement)?.focus();
+  };
+
   useEffect(() => {
     if (selectedConvType) {
       const type = conversationTypes?.find((a) => a.name === selectedConvType);
@@ -102,7 +114,18 @@ export const EventCreationForm: React.FC = ({}) => {
         setBotName(type.label || type.name);
       }
     }
-  }, [selectedConvType]);
+  }, [conversationTypes, selectedConvType]);
+
+  useEffect(() => {
+    // If all platforms are deselected after one+ selection, error state should be shown
+    setFormGroupsErrors((prev) => ({
+      ...prev,
+      platforms: selectedPlatforms.length === 0 && platformsPreviouslyChecked,
+    }));
+    setPlatformsPreviouslyChecked(selectedPlatforms.length > 0);
+    //Exhaustive-deps disabled to avoid double-dip
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPlatforms]);
 
   useEffect(() => {
     async function fetchServerConfig() {
@@ -132,12 +155,14 @@ export const EventCreationForm: React.FC = ({}) => {
     // Check that required fields are present
     if (!eventName || eventName.trim() === "") {
       setFormError("Event Name is required");
+      setFieldFocus("name");
       return false;
     }
 
     // Check zoom fields
     if (!zoomMeetingUrl) {
       setFormError("Zoom Meeting URL is required");
+      setFieldFocus("zoomMeetingUrl");
       return false;
     }
 
@@ -149,15 +174,29 @@ export const EventCreationForm: React.FC = ({}) => {
     // Check that at least one platform is selected
     if (selectedPlatforms.length === 0) {
       setFormError("At least one platform must be selected");
+      setFieldFocus("nextspace");
+      setFormGroupsErrors((prev) => ({ ...prev, platforms: true }));
       return false;
     }
 
     // Check that agent is selected
     if (!selectedConvType) {
       setFormError("At least one agent must be selected");
+      setFieldFocus("agent-option-0");
+      setFormGroupsErrors((prev) => ({ ...prev, conversationType: true }));
       return false;
     }
 
+    // Check form validity using HTML validation
+    if (!formRef.current?.checkValidity()) {
+      setFormError("Please fill out all required fields.");
+      return false;
+    }
+
+    setFormError(null);
+    setFormGroupsErrors({ platforms: false, conversationType: false });
+
+    return true;
     setFormError(null);
     return true;
   };
@@ -366,17 +405,26 @@ export const EventCreationForm: React.FC = ({}) => {
                 name="name"
                 label="Event Name"
                 id="thread-name"
-                helperText="Enter a name for your event."
                 fullWidth
                 variant="outlined"
                 margin="normal"
                 required
                 value={eventName}
                 onChange={(e) => setEventName(e.target.value)}
-                error={eventNameHasError}
-                onBlur={() =>
-                  setEventNameHasError(!eventName || eventName.trim() === "")
+                helperText={
+                  eventNameHasError ? "Enter a name for your event." : null
                 }
+                onBlur={() =>
+                  setEventNameHasError(
+                    !formRef.current?.elements.namedItem("name") ||
+                      !(
+                        formRef.current.elements.namedItem(
+                          "name"
+                        ) as HTMLInputElement
+                      ).value
+                  )
+                }
+                error={eventNameHasError}
               />
 
               <TextField
@@ -451,7 +499,9 @@ export const EventCreationForm: React.FC = ({}) => {
                 fullWidth
                 margin="normal"
                 sx={{
-                  border: "1px solid rgba(0, 0, 0, 0.23)",
+                  border: formGroupsErrors.platforms
+                    ? "2px solid red"
+                    : "1px solid rgba(0, 0, 0, 0.23)",
                   borderRadius: 1,
                   p: 2,
                   "&:focus-within": {
@@ -476,6 +526,7 @@ export const EventCreationForm: React.FC = ({}) => {
                       key={platform.name}
                       control={
                         <Checkbox
+                          name={platform.name.toLowerCase()}
                           checked={
                             selectedPlatforms.indexOf(platform.name) > -1
                           }
@@ -508,7 +559,9 @@ export const EventCreationForm: React.FC = ({}) => {
                 required
                 margin="normal"
                 sx={{
-                  border: "1px solid rgba(0, 0, 0, 0.23)",
+                  border: formGroupsErrors.conversationType
+                    ? "2px solid red"
+                    : "1px solid rgba(0, 0, 0, 0.23)",
                   borderRadius: 1,
                   p: 2,
                   "&:focus-within": {
@@ -532,6 +585,10 @@ export const EventCreationForm: React.FC = ({}) => {
                   name="selectedConvType"
                   onChange={(e) => {
                     setSelectedConvType(e.target.value);
+                    setFormGroupsErrors((prev) => ({
+                      ...prev,
+                      conversationType: false,
+                    }));
                   }}
                   sx={{ mt: -1 }}
                 >
@@ -539,7 +596,7 @@ export const EventCreationForm: React.FC = ({}) => {
                     <div key={option.name}>
                       <FormControlLabel
                         value={option.name}
-                        control={<Radio required={index === 0} />}
+                        control={<Radio name={`agent-option-${index}`} />}
                         label={option.label}
                         sx={
                           index === 0

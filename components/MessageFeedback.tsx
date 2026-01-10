@@ -1,7 +1,7 @@
 import { FC, useState, useRef, useEffect, KeyboardEvent } from "react";
 import { Box, Button, Typography, alpha } from "@mui/material";
 import { AddCommentOutlined, Check } from "@mui/icons-material";
-import { ControlledInputConfig } from "./DirectMessage";
+import { ControlledInputConfig } from "../types.internal";
 
 /**
  * Rating button labels - modify these to change the button text

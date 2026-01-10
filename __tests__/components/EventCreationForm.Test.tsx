@@ -492,6 +492,7 @@ describe("EventCreationForm Component", () => {
       channels: [],
       agents: [],
       adapters: [],
+      conversationType: "eventAssistant",
     };
     (Request as jest.Mock).mockResolvedValue(mockConversationData);
 
@@ -550,6 +551,7 @@ describe("EventCreationForm Component", () => {
       channels: [],
       agents: [],
       adapters: [],
+      conversationType: "eventAssistant",
     };
     (Request as jest.Mock).mockResolvedValue(mockConversationData);
 
@@ -612,6 +614,7 @@ describe("EventCreationForm Component", () => {
       channels: [],
       agents: [],
       adapters: [],
+      conversationType: "eventAssistant",
     };
     (Request as jest.Mock).mockResolvedValue(mockConversationData);
 
@@ -664,6 +667,7 @@ describe("EventCreationForm Component", () => {
       channels: [],
       agents: [],
       adapters: [],
+      conversationType: "eventAssistant",
     };
     (Request as jest.Mock).mockResolvedValue(mockConversationData);
 
@@ -723,6 +727,145 @@ describe("EventCreationForm Component", () => {
         })
       );
     });
+  });
+
+  it("displays error message when event name is left empty", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<EventCreationForm />);
+    });
+
+    // Fill in event name we will then clear and zoom URL
+    await fillEventDetails(
+      "Scheduled Event To Clear",
+      "https://huitstage.zoom.us/j/1111111111"
+    );
+
+    const nameInput = screen.getByLabelText(/Event Name/i);
+    await user.clear(nameInput);
+
+    await user.click(screen.getByRole("button", { name: /next/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Event Name is required")).toBeInTheDocument();
+    });
+  });
+
+  it("displays error message when zoom URL is left empty", async () => {
+    const user = userEvent.setup();
+
+    await act(async () => {
+      render(<EventCreationForm />);
+    });
+
+    // Fill in event and zoom URL we will then clear
+    await fillEventDetails(
+      "Scheduled Event",
+      "https://huitstage.zoom.us/j/1111111111"
+    );
+
+    const urlInput = screen.getByLabelText(/Zoom Meeting URL/i);
+    await user.clear(urlInput);
+
+    await user.click(screen.getByRole("button", { name: /next/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Zoom Meeting URL is required")
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("displays error when no platform is selected", async () => {
+    const user = userEvent.setup();
+
+    await act(async () => {
+      render(<EventCreationForm />);
+    });
+
+    await fillEventDetails(
+      "Test Event",
+      "https://huitstage.zoom.us/j/1234567890"
+    );
+
+    // Navigate to Step 3 without selecting platform
+    await user.click(screen.getByRole("button", { name: /next/i }));
+    await user.click(screen.getByRole("button", { name: /next/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("At least one platform must be selected")
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("clears platform error when platform is selected", async () => {
+    const user = userEvent.setup();
+
+    await act(async () => {
+      render(<EventCreationForm />);
+    });
+
+    await fillEventDetails(
+      "Test Event",
+      "https://huitstage.zoom.us/j/1234567890"
+    );
+
+    // Navigate to Step 3 without selecting platform
+    await user.click(screen.getByRole("button", { name: /next/i }));
+    await user.click(screen.getByRole("button", { name: /next/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("At least one platform must be selected")
+      ).toBeInTheDocument();
+    });
+
+    const zoomCheckbox = screen.getByRole("checkbox", { name: /zoom/i });
+    await user.click(zoomCheckbox);
+
+    await user.click(screen.getByRole("button", { name: /next/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText("At least one platform must be selected")
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("does not submit when platform is unselected after being selected", async () => {
+    const user = userEvent.setup();
+
+    await act(async () => {
+      render(<EventCreationForm />);
+    });
+
+    await fillEventDetails(
+      "Test Event",
+      "https://huitstage.zoom.us/j/1234567890"
+    );
+
+    await user.click(screen.getByRole("button", { name: /next/i }));
+
+    const backChannelRadio = screen.getByRole("radio", {
+      name: /back channel/i,
+    });
+    await user.click(backChannelRadio);
+
+    const zoomCheckbox = screen.getByRole("checkbox", { name: /zoom/i });
+
+    await user.click(zoomCheckbox);
+    await user.click(zoomCheckbox); // Unselect
+
+    await user.click(screen.getByRole("button", { name: /next/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("At least one platform must be selected")
+      ).toBeInTheDocument();
+    });
+
+    expect(Request).not.toHaveBeenCalled();
   });
 
   it("displays error message when form submission fails", async () => {
@@ -787,6 +930,7 @@ describe("EventCreationForm Component", () => {
       channels: [],
       agents: [],
       adapters: [],
+      conversationType: "eventAssistant",
     };
     (Request as jest.Mock).mockResolvedValue(mockConversationData);
 
