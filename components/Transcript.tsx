@@ -22,6 +22,11 @@ export function Transcript(props: {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [focusedMessageIds, setFocusedMessageIds] = useState<string[]>([]);
   const topRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const preserveScrollRef = useRef<{
+    scrollHeight: number;
+    scrollTop: number;
+  } | null>(null);
   const transcriptOpenTimeRef = useRef<number>(0);
 
   const handleToggle = () => {
@@ -95,6 +100,21 @@ export function Transcript(props: {
       block: "start",
     });
   };
+
+  // Preserve scroll position when new messages arrive
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (container && preserveScrollRef.current) {
+      const { scrollHeight: oldScrollHeight, scrollTop: oldScrollTop } =
+        preserveScrollRef.current;
+      const newScrollHeight = container.scrollHeight;
+      const heightDifference = newScrollHeight - oldScrollHeight;
+
+      // Adjust scroll to maintain visual position
+      container.scrollTop = oldScrollTop - heightDifference;
+      preserveScrollRef.current = null; // Reset
+    }
+  }, [messages]);
 
   // Fetch initial messages
   useEffect(() => {
@@ -171,6 +191,21 @@ export function Transcript(props: {
       console.log("New transcript message:", data);
 
       if (data.channels && data.channels.includes("transcript")) {
+        // Capture scroll state before adding message
+        const container = messagesContainerRef.current;
+        if (container) {
+          const wasAtBottom = Math.abs(container.scrollTop) < 5;
+          if (!wasAtBottom) {
+            // Save scroll state to restore after render
+            preserveScrollRef.current = {
+              scrollHeight: container.scrollHeight,
+              scrollTop: container.scrollTop,
+            };
+          } else {
+            preserveScrollRef.current = null;
+          }
+        }
+
         setMessages((prev) => [data, ...prev]);
       }
     };
