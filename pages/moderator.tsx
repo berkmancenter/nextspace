@@ -25,6 +25,13 @@ import {
 
 import { Transcript } from "../components/";
 import { CheckAuthHeader, DefaultEase } from "../utils/Helpers";
+import { useAnalytics } from "../hooks/useAnalytics";
+import {
+  trackEvent,
+  trackConversationEvent,
+  trackConnectionStatus,
+  trackFeatureUsage,
+} from "../utils/analytics";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -32,6 +39,9 @@ export const getServerSideProps = async (context: { req: any }) => {
 
 function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
   const router = useRouter();
+
+  // Initialize page-level analytics
+  useAnalytics({ pageType: "moderator" });
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -47,6 +57,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
 
   const scrollViewRef = useRef<HTMLDivElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
+  const transcriptOpenTimeRef = useRef<number>(0);
 
   /**
    * Filters transcript elements based on a given timespan
@@ -143,9 +154,16 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
     if (!socket) return;
     socket.on("error", (error: string) => {
       console.error("Socket error:", error);
+      trackConnectionStatus("error");
     });
-    socket.on("connect", () => setIsConnected(true));
-    socket.on("disconnect", () => setIsConnected(false));
+    socket.on("connect", () => {
+      setIsConnected(true);
+      trackConnectionStatus("connected");
+    });
+    socket.on("disconnect", () => {
+      setIsConnected(false);
+      trackConnectionStatus("disconnected");
+    });
 
     return () => {
       socket.off("connect", () => setIsConnected(true));
@@ -311,7 +329,21 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
           {transcriptEnabled && (
             <button
               className={`fixed bottom-4 left-4 w-20 h-20 z-50 cursor-pointer rounded-full shadow-2xl transition-all duration-300 ease-in-out hover:scale-110 hover:shadow-medium-slate-blue/50 ${DefaultEase}`}
-              onClick={() => setIsTranscriptOpen(!isTranscriptOpen)}
+              onClick={() => {
+                const newState = !isTranscriptOpen;
+                if (newState) {
+                  // Opening transcript
+                  transcriptOpenTimeRef.current = Date.now();
+                  trackFeatureUsage("transcript", "open");
+                } else {
+                  // Closing transcript - calculate duration
+                  const duration = Math.floor(
+                    (Date.now() - transcriptOpenTimeRef.current) / 1000
+                  );
+                  trackFeatureUsage("transcript", "close", duration);
+                }
+                setIsTranscriptOpen(newState);
+              }}
               aria-label={`${
                 isTranscriptOpen ? "Close" : "Open"
               } transcript view`}
@@ -428,6 +460,16 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
                       }`}
                       key={index}
                       onClick={() => {
+                        // Track metrics click-through
+                        const conversationId = router.query
+                          .conversationId as string;
+                        trackConversationEvent(
+                          conversationId,
+                          "moderator",
+                          "metrics_clicked",
+                          "jump_to_transcript"
+                        );
+
                         // Scroll to the message first appearing in the transcript matching the timespan
                         const matchingMsgs = filterElementsByTimespan(
                           new Date(message.body.timestamp.start),

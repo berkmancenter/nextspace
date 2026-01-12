@@ -194,6 +194,34 @@ The transcript channel password is provided only if you are utilizing one of the
 
 This repo automatically has changes deployed to Vercel via the Vercel for GitHub [app](https://github.com/apps/vercel). Changes merged to the `main` branch will be deployed to production, while any feature branch will automatically be deployed to a preview URL. If you have forked this repo and want to deploy changes without usage of this app, you can do so via [the CLI](https://vercel.com/docs/cli).
 
+## Analytics Integration
+
+Nextspace includes built-in open source **Matomo Tag Manager** integration for comprehensive analytics tracking:
+- Session duration and active time measurement
+- Page navigation and engagement tracking
+- User behavior patterns and feature usage
+- Connection status monitoring
+- Mobile vs desktop usage
+
+The implementation is privacy-friendly (pseudonymized IDs, no message content tracking) and can be easily disabled via environment variable. Analytics gracefully degrades if Matomo isn't configured—the site continues to function normally.
+
+### Documentation
+
+- 📖 **[ANALYTICS_SETUP.md](./ANALYTICS_SETUP.md)** - Complete setup guide for Matomo and MTM configuration
+- 💻 **[ANALYTICS_REFERENCE.md](./ANALYTICS_REFERENCE.md)** - Technical implementation details and developer reference
+
+### Quick Start
+
+**To disable analytics:**
+```bash
+NEXT_PUBLIC_ENABLE_ANALYTICS=false
+```
+
+**To enable analytics** (requires Matomo Tag Manager setup):
+```bash
+NEXT_PUBLIC_ENABLE_ANALYTICS=true  # or omit (enabled by default)
+```
+
 ## License
 
 Nextspace is [AGPL 3.0 licensed](./LICENSE).

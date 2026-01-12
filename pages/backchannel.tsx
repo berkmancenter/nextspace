@@ -22,9 +22,19 @@ import {
 
 import { components } from "../types";
 import { BackchannelMessage } from "../components/messages/BackchannelMessage";
+import { useAnalytics } from "../hooks/useAnalytics";
+import {
+  trackEvent,
+  trackConversationEvent,
+  trackConnectionStatus,
+  setUserId,
+} from "../utils/analytics";
 
 function BackchannelRoom() {
   const router = useRouter();
+
+  // Initialize page-level analytics
+  useAnalytics({ pageType: "backchannel" });
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(true);
@@ -50,6 +60,8 @@ function BackchannelRoom() {
     JoinSession(
       (result) => {
         setPseudonym(result.pseudonym);
+        // Track user ID (pseudonym)
+        setUserId(result.pseudonym);
         let socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
           auth: { token: Api.get().GetTokens().access },
         });
@@ -67,9 +79,16 @@ function BackchannelRoom() {
     if (!socket) return;
     socket.on("error", (error: string) => {
       console.error("Socket error:", error);
+      trackConnectionStatus("error");
     });
-    socket.on("connect", () => setIsConnected(true));
-    socket.on("disconnect", () => setIsConnected(false));
+    socket.on("connect", () => {
+      setIsConnected(true);
+      trackConnectionStatus("connected");
+    });
+    socket.on("disconnect", () => {
+      setIsConnected(false);
+      trackConnectionStatus("disconnected");
+    });
 
     return () => {
       socket.off("connect", () => setIsConnected(true));
@@ -124,6 +143,23 @@ function BackchannelRoom() {
         name: "transcript",
         passcode: transcriptPasscode,
       });
+
+    // Track message send
+    const conversationId = router.query.conversationId as string;
+    if (preset) {
+      trackConversationEvent(
+        conversationId,
+        "backchannel",
+        "quick_response_sent",
+        message
+      );
+    } else {
+      trackConversationEvent(
+        conversationId,
+        "backchannel",
+        "custom_message_sent"
+      );
+    }
 
     SendData("messages", {
       body: {
@@ -216,7 +252,17 @@ function BackchannelRoom() {
               <Button
                 variant="contained"
                 color="primary"
-                onClick={() => setShowWelcome(false)}
+                onClick={() => {
+                  setShowWelcome(false);
+                  const conversationId = router.query.conversationId as string;
+                  if (conversationId) {
+                    trackConversationEvent(
+                      conversationId,
+                      "backchannel",
+                      "welcome_dismissed"
+                    );
+                  }
+                }}
                 sx={{ marginTop: "1rem", maxWidth: "10rem" }}
               >
                 Got it!

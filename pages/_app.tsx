@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 import { Layout } from "../components";
 import { validateEnv } from "../utils/validateEnv";
+import { useSessionTracking } from "../hooks/useAnalytics";
 
 // Validate environment variables on app initialization
 if (typeof window === "undefined") {
@@ -23,6 +24,9 @@ if (typeof window === "undefined") {
 }
 
 export default function App({ Component, pageProps }: AppProps) {
+  // Track session-level analytics
+  useSessionTracking();
+
   const theme = createTheme({
     typography: {
       fontFamily: ["Inter Variable", "sans-serif"].join(","),
