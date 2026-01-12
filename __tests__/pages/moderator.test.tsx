@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { act } from "react";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
@@ -141,17 +141,5 @@ describe("ModeratorScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("API error")).toBeInTheDocument();
     });
-  });
-
-  it("scrolls to top when arrow button is clicked", async () => {
-    await act(async () => {
-      render(<ModeratorScreen isAuthenticated />);
-    });
-
-    fireEvent.click(screen.getByLabelText("go to top"));
-
-    expect(
-      require("react-scroll").animateScroll.scrollToTop
-    ).toHaveBeenCalled();
   });
 });

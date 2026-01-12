@@ -68,13 +68,6 @@ export interface HeaderProps extends BaseComponentProps {
  */
 export type PseudonymousMessage = components["schemas"]["Message"] & {
   body: any;
-  // TODO: it would be great for the Message base schema to include channels
-  channels: string[];
-  pseudonym:
-    | "Back Channel Insights Agent"
-    | "Back Channel Metrics Agent"
-    | "Event Assistant"
-    | "Event Assistant Plus";
 };
 
 /**

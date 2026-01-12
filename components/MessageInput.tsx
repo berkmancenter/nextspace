@@ -167,8 +167,8 @@ export const MessageInput: FC<MessageInputProps> = ({
   }
 
   return (
-    <div className="flex justify-center fixed bottom-0 left-0 right-0 bg-white">
-      <div className="w-11/12 lg:w-1/2">
+    <div className="flex bg-white pl-8">
+      <div className="w-full max-w-4xl">
         <Box display="flex" alignItems="center" padding="8px">
           <div className="flex flex-col w-full">
             <div className="border-[1px] border-b-0 border-[#A5B4FC] rounded-t-lg p-2 font-bold text-sm flex justify-between items-center">

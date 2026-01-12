@@ -49,33 +49,90 @@ describe("Transcript", () => {
   const setupUser = () => userEvent.setup();
 
   const toggleTranscript = async (user: ReturnType<typeof setupUser>) => {
-    await user.click(screen.getByRole("button", { name: /transcript view/i }));
+    // Find the toggle button - it changes aria-label based on state
+    const toggle = screen.getByRole("button", {
+      name: /transcript/i,
+    });
+    await user.click(toggle);
   };
 
-  it("toggles transcript open and closed via aria-label", async () => {
+  it("starts collapsed and can be toggled open and closed", async () => {
     const user = setupUser();
     render(<Transcript {...baseProps} />);
 
+    // Should start collapsed with "Open transcript" button
     const toggle = screen.getByRole("button", {
-      name: /open transcript view/i,
+      name: /Open transcript/i,
     });
+    expect(toggle).toBeInTheDocument();
 
+    // Should show vertical text when collapsed
+    expect(screen.getByText("LIVE TRANSCRIPT")).toBeInTheDocument();
+
+    // Open the transcript
     await user.click(toggle);
 
     await waitFor(() => {
-      expect(toggle).toHaveAttribute("aria-label", "Close transcript view");
+      expect(
+        screen.getByRole("button", {
+          name: /Close transcript/i,
+        })
+      ).toBeInTheDocument();
+      // Should show horizontal header when open
+      expect(screen.getByText("LIVE TRANSCRIPT")).toBeInTheDocument();
     });
 
-    await user.click(toggle);
+    // Close it again
+    const closeButton = screen.getByRole("button", {
+      name: /Close transcript/i,
+    });
+    await user.click(closeButton);
 
     await waitFor(() => {
-      expect(toggle).toHaveAttribute("aria-label", "Open transcript view");
+      expect(
+        screen.getByRole("button", {
+          name: /Open transcript/i,
+        })
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("displays vertical text when collapsed", () => {
+    render(<Transcript {...baseProps} />);
+
+    // Should show vertical "LIVE TRANSCRIPT" text when collapsed
+    expect(screen.getByText("LIVE TRANSCRIPT")).toBeInTheDocument();
+
+    // Should have the open button
+    expect(
+      screen.getByRole("button", { name: /Open transcript/i })
+    ).toBeInTheDocument();
+  });
+
+  it("changes width when toggled", async () => {
+    const user = setupUser();
+    const { container } = render(<Transcript {...baseProps} />);
+
+    const transcriptContainer = container.firstChild as HTMLElement;
+
+    // Should start with collapsed width (w-16 = 64px)
+    expect(transcriptContainer).toHaveClass("w-16");
+
+    // Open transcript
+    await toggleTranscript(user);
+
+    await waitFor(() => {
+      // Should expand to full width (w-[33vw])
+      expect(transcriptContainer).toHaveClass("w-[33vw]");
     });
   });
 
   it("renders transcript messages when opened", async () => {
     const user = setupUser();
     render(<Transcript {...baseProps} />);
+
+    // Should start collapsed, messages not visible
+    expect(screen.queryByText("Hello world")).not.toBeInTheDocument();
 
     await toggleTranscript(user);
 
@@ -99,13 +156,16 @@ describe("Transcript", () => {
     // Should auto-open when focusTimeRange is provided
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /close transcript view/i })
+        screen.getByRole("button", { name: /Close transcript/i })
       ).toBeInTheDocument();
     });
 
-    // Should apply focus styles
+    // Should apply focus styles with purple highlight
     await waitFor(() => {
-      expect(document.querySelector(".bg-amber-100")).toBeTruthy();
+      const highlightedElement = document.getElementById(
+        "transcript-message-m1"
+      );
+      expect(highlightedElement?.className).toContain("bg-[#4A0979]");
     });
   });
 
@@ -120,7 +180,7 @@ describe("Transcript", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /close transcript view/i })
+        screen.getByRole("button", { name: /Close transcript/i })
       ).toBeInTheDocument();
     });
 
@@ -136,7 +196,10 @@ describe("Transcript", () => {
     );
 
     await waitFor(() => {
-      expect(document.querySelector(".bg-amber-100")).toBeTruthy();
+      const highlightedElement = document.getElementById(
+        "transcript-message-m1"
+      );
+      expect(highlightedElement?.className).toContain("bg-[#4A0979]");
     });
   });
 
@@ -155,7 +218,10 @@ describe("Transcript", () => {
 
     // Should auto-open with focus
     await waitFor(() => {
-      expect(document.querySelector(".bg-amber-100")).toBeTruthy();
+      const highlightedElement = document.getElementById(
+        "transcript-message-m1"
+      );
+      expect(highlightedElement?.className).toContain("bg-[#4A0979]");
     });
 
     // Manually close via toggle
@@ -163,7 +229,7 @@ describe("Transcript", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /open transcript view/i })
+        screen.getByRole("button", { name: /Open transcript/i })
       ).toBeInTheDocument();
     });
 
@@ -171,7 +237,10 @@ describe("Transcript", () => {
     await toggleTranscript(user);
 
     await waitFor(() => {
-      expect(document.querySelector(".bg-amber-100")).toBeTruthy();
+      const highlightedElement = document.getElementById(
+        "transcript-message-m1"
+      );
+      expect(highlightedElement?.className).toContain("bg-[#4A0979]");
     });
   });
 
@@ -188,14 +257,20 @@ describe("Transcript", () => {
 
     // Should auto-open with focus
     await waitFor(() => {
-      expect(document.querySelector(".bg-amber-100")).toBeTruthy();
+      const highlightedElement = document.getElementById(
+        "transcript-message-m1"
+      );
+      expect(highlightedElement?.className).toContain("bg-[#4A0979]");
     });
 
     // Remove focusTimeRange
     rerender(<Transcript {...baseProps} />);
 
     await waitFor(() => {
-      expect(document.querySelector(".bg-amber-100")).toBeFalsy();
+      const highlightedElement = document.getElementById(
+        "transcript-message-m1"
+      );
+      expect(highlightedElement?.className).not.toContain("bg-[#4A0979]");
     });
   });
 
@@ -213,7 +288,7 @@ describe("Transcript", () => {
     // Should auto-open and focus m1
     await waitFor(() => {
       expect(document.querySelector("#transcript-message-m1")).toHaveClass(
-        "bg-amber-100"
+        "bg-[#4A0979]"
       );
     });
 
@@ -230,10 +305,10 @@ describe("Transcript", () => {
 
     await waitFor(() => {
       expect(document.querySelector("#transcript-message-m2")).toHaveClass(
-        "bg-amber-100"
+        "bg-[#4A0979]"
       );
       expect(document.querySelector("#transcript-message-m1")).not.toHaveClass(
-        "bg-amber-100"
+        "bg-[#4A0979]"
       );
     });
   });
@@ -259,14 +334,17 @@ describe("Transcript", () => {
     // Should auto-open
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /close transcript view/i })
+        screen.getByRole("button", { name: /Close transcript/i })
       ).toBeInTheDocument();
     });
 
     // Focus should apply once messages load
     await waitFor(
       () => {
-        expect(document.querySelector(".bg-amber-100")).toBeTruthy();
+        const highlightedElement = document.getElementById(
+          "transcript-message-m1"
+        );
+        expect(highlightedElement?.className).toContain("bg-[#4A0979]");
       },
       { timeout: 300 }
     );
@@ -335,9 +413,11 @@ describe("Transcript", () => {
       on: jest.fn(),
       off: jest.fn(),
       listenerCount: jest.fn().mockReturnValue(0),
+      auth: { token: "mock-token" },
+      hasListeners: jest.fn(() => false),
     };
 
-    rerender(<Transcript {...baseProps} socket={newMockSocket} />);
+    rerender(<Transcript {...baseProps} socket={newMockSocket as any} />);
 
     // Old socket should have cleanup called
     expect(mockSocket.off).toHaveBeenCalledWith("message:new", firstHandler);
@@ -365,7 +445,7 @@ describe("Transcript", () => {
     // Should auto-open
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /close transcript view/i })
+        screen.getByRole("button", { name: /Close transcript/i })
       ).toBeInTheDocument();
     });
 
@@ -374,7 +454,7 @@ describe("Transcript", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /open transcript view/i })
+        screen.getByRole("button", { name: /Open transcript/i })
       ).toBeInTheDocument();
     });
 
@@ -395,7 +475,7 @@ describe("Transcript", () => {
 
     // Transcript should still be closed
     expect(
-      screen.getByRole("button", { name: /open transcript view/i })
+      screen.getByRole("button", { name: /Open transcript/i })
     ).toBeInTheDocument();
   });
 });

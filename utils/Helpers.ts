@@ -289,47 +289,62 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
 
   const convType = conversationData.type;
 
-  if (convType.name === "backChannel") {
-    const modPasscode = conversationData.channels.find(
-      (channel) => channel.name === "moderator"
-    )?.passcode;
+  const transcriptPasscode = conversationData.channels.find(
+    (channel) => channel.name === "transcript"
+  )?.passcode;
+  const hasTranscript = Boolean(transcriptPasscode);
 
+  const modPasscode = conversationData.channels.find(
+    (channel) => channel.name === "moderator"
+  )?.passcode;
+
+  const modUrl = modPasscode
+    ? `${urlPrefix}/moderator/?conversationId=${
+        conversationData.id
+      }&channel=moderator,${modPasscode}${
+        hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
+      }`
+    : "";
+
+  if (convType.name === "backChannel") {
     const participantPasscode = conversationData.channels.find(
       (channel) => channel.name === "participant"
     )?.passcode;
 
-    const transcriptPasscode = conversationData.channels.find(
-      (channel) => channel.name === "transcript"
-    )?.passcode;
-    const hasTranscript = Boolean(transcriptPasscode);
-    if (modPasscode) {
-      moderator.push({
-        label: "Back Channel",
-        url: `${urlPrefix}/moderator/?conversationId=${
-          conversationData.id
-        }&channel=moderator,${modPasscode}${
-          hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
-        }`,
-      });
-    }
     if (participantPasscode) {
       participant.push({
         label: "Back Channel",
         url: `${urlPrefix}/backchannel/?conversationId=${conversationData.id}&channel=participant,${participantPasscode}`,
       });
     }
+    if (modPasscode) {
+      moderator.push({
+        label: "Back Channel",
+        url: modUrl,
+      });
+    }
   } else if (convType.name === "eventAssistant") {
     const eventAssistantUrl = {
       label: "Event Assistant",
-      url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}`,
+      url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
+        hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
+      }`,
     };
     participant.push(eventAssistantUrl);
   } else if (convType.name === "eventAssistantPlus") {
     const eventAssistantPlusUrl = {
       label: "Event Assistant Plus",
-      url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}`,
+      url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
+        hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
+      }`,
     };
     participant.push(eventAssistantPlusUrl);
+    if (modPasscode) {
+      moderator.push({
+        label: "Event Assistant Plus",
+        url: modUrl,
+      });
+    }
   }
 
   return {

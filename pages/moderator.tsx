@@ -1,13 +1,8 @@
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
-import { IconButton, Tooltip } from "@mui/material";
+import { Tooltip } from "@mui/material";
 import { io } from "socket.io-client";
-import {
-  ArrowUpwardOutlined,
-  CloudOffOutlined,
-  CloudOutlined,
-} from "@mui/icons-material";
-import { animateScroll as scroll } from "react-scroll";
+import { CloudOffOutlined, CloudOutlined } from "@mui/icons-material";
 import {
   PseudonymousMessage,
   ModeratorInsightsMessage,
@@ -123,7 +118,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
     if (!router.isReady || !socket || !apiAccessToken) return;
     const messageHandler = (data: PseudonymousMessage) => {
       console.log("New message:", data);
-      if (data.channels[0] === "moderator") {
+      if (data.channels![0] === "moderator") {
         setMessages((prevMessages) => [...prevMessages, data]);
         scrollViewRef.current?.scrollTo({
           top: scrollViewRef.current.scrollHeight,
@@ -178,7 +173,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
         setMessages(
           (conversationMessagesResponse as PseudonymousMessage[]).filter(
             (message) =>
-              message.channels[0] === "moderator" &&
+              message.channels![0] === "moderator" &&
               (message.body.hasOwnProperty("insights") ||
                 message.body.hasOwnProperty("metrics"))
           )
@@ -256,14 +251,96 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
   const transcriptEnabled = !!transcriptPasscode;
 
   return (
-    <div className="flex items-start justify-center mt-12">
+    <div className="flex h-[calc(100vh-96px)] overflow-hidden">
       {errorMessage ? (
-        <div className="text-medium-slate-blue text-lg font-bold">
+        <div className="text-medium-slate-blue text-lg font-bold mx-9">
           {errorMessage}
         </div>
       ) : (
         <>
-          {/* Transcript view - only render if enabled */}
+          {/* Main moderator content on the left */}
+          <div className="flex-1 flex flex-col relative overflow-hidden">
+            {/*  Insights/analytics view */}
+            <div className="h-full overflow-y-auto px-8 pt-12" id="scroll-view">
+              <div
+                className="max-w-2.5"
+                aria-label={`Connection status is ${
+                  isConnected ? "connected" : "disconnected"
+                }`}
+              >
+                {isConnected ? (
+                  <Tooltip
+                    title={`Conversation ID: ${process.env.NEXT_PUBLIC_LLM_FCLTR_CONVERSATION_ID}`}
+                  >
+                    <CloudOutlined sx={{ color: "green" }} />
+                  </Tooltip>
+                ) : (
+                  <Tooltip
+                    title={`Conversation ID: ${process.env.NEXT_PUBLIC_LLM_FCLTR_CONVERSATION_ID}`}
+                  >
+                    <CloudOffOutlined sx={{ color: "red" }} />
+                  </Tooltip>
+                )}
+              </div>
+              <div ref={scrollViewRef} className="mt-4 max-w-full">
+                <h2 className="text-2xl font-bold mb-4 ml-2">
+                  Hi Mod! This is the very beginning of the&nbsp;
+                  <span className="text-medium-slate-blue">#ASML</span>&nbsp;
+                  event.
+                </h2>
+                <div aria-live="polite">
+                  {messages.length > 0 ? (
+                    messages.map((message: ModeratorMetricsMessage, index) => (
+                      <div
+                        className={`flex flex-col lg:flex-row justify-start mb-4 p-3 ${
+                          transcriptEnabled &&
+                          "cursor-pointer hover:bg-yellow-50"
+                        }`}
+                        key={index}
+                        onClick={() => {
+                          // Track metrics click-through
+                          const conversationId = router.query
+                            .conversationId as string;
+                          trackConversationEvent(
+                            conversationId,
+                            "moderator",
+                            "metrics_clicked",
+                            "jump_to_transcript"
+                          );
+
+                          // Set the time range for the transcript to focus on
+                          setMessageFocusTimeRange({
+                            start: new Date(message.body.timestamp.start),
+                            end: new Date(message.body.timestamp.end),
+                          });
+                        }}
+                      >
+                        <span className="text-neutral-900 text-xs font-normal min-w-40">
+                          {typeof message.body === "object" &&
+                            "timestamp" in message.body && (
+                              <>
+                                {`${new Date(
+                                  message.body.timestamp.start
+                                ).toLocaleTimeString()} -`}
+                                <br />
+                                {`${new Date(
+                                  message.body.timestamp.end
+                                ).toLocaleTimeString()}`}
+                              </>
+                            )}
+                        </span>
+                        <div>{renderMessageBody(message)}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <p>No messages yet.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Transcript view on the right - only render if enabled */}
           {transcriptEnabled && (
             <Transcript
               focusTimeRange={messageFocusTimeRange}
@@ -273,106 +350,6 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
               apiAccessToken={apiAccessToken!}
             />
           )}
-
-          {/*  Insights/analytics view */}
-          <div className="w-11/12 lg:w-2/3" id="scroll-view">
-            <div
-              className="max-w-2.5"
-              aria-label={`Connection status is ${
-                isConnected ? "connected" : "disconnected"
-              }`}
-            >
-              {isConnected ? (
-                <Tooltip
-                  title={`Conversation ID: ${process.env.NEXT_PUBLIC_LLM_FCLTR_CONVERSATION_ID}`}
-                >
-                  <CloudOutlined sx={{ color: "green" }} />
-                </Tooltip>
-              ) : (
-                <Tooltip
-                  title={`Conversation ID: ${process.env.NEXT_PUBLIC_LLM_FCLTR_CONVERSATION_ID}`}
-                >
-                  <CloudOffOutlined sx={{ color: "red" }} />
-                </Tooltip>
-              )}
-            </div>
-            <div ref={scrollViewRef} className="mt-4 p-2.5 max-w-full">
-              <h2 className="text-2xl font-bold mb-4 ml-2">
-                Hi Mod! This is the very beginning of the&nbsp;
-                <span className="text-medium-slate-blue">#ASML</span>&nbsp;
-                event.
-              </h2>
-              <div aria-live="polite">
-                {messages.length > 0 ? (
-                  messages.map((message: ModeratorMetricsMessage, index) => (
-                    <div
-                      className={`flex flex-col lg:flex-row justify-start mb-4 p-3 ${
-                        transcriptEnabled && "cursor-pointer hover:bg-yellow-50"
-                      }`}
-                      key={index}
-                      onClick={() => {
-                        // Track metrics click-through
-                        const conversationId = router.query
-                          .conversationId as string;
-                        trackConversationEvent(
-                          conversationId,
-                          "moderator",
-                          "metrics_clicked",
-                          "jump_to_transcript"
-                        );
-
-                        // Set the time range for the transcript to focus on
-                        setMessageFocusTimeRange({
-                          start: new Date(message.body.timestamp.start),
-                          end: new Date(message.body.timestamp.end),
-                        });
-                      }}
-                    >
-                      <span className="text-neutral-900 text-xs font-normal min-w-40">
-                        {typeof message.body === "object" &&
-                          "timestamp" in message.body && (
-                            <>
-                              {`${new Date(
-                                message.body.timestamp.start
-                              ).toLocaleTimeString()} -`}
-                              <br />
-                              {`${new Date(
-                                message.body.timestamp.end
-                              ).toLocaleTimeString()}`}
-                            </>
-                          )}
-                      </span>
-                      <div>{renderMessageBody(message)}</div>
-                    </div>
-                  ))
-                ) : (
-                  <p>No messages yet.</p>
-                )}
-              </div>
-            </div>
-            <div className="fixed bottom-4 right-10">
-              <IconButton
-                aria-label="go to top"
-                sx={{
-                  " &:hover": {
-                    backgroundColor: "#0B6BCB",
-                    color: "#fff",
-                    scale: 1.1,
-                  },
-                  backgroundColor: "#fff",
-                  color: "#0B6BCB",
-                  borderRadius: "6px",
-                  border: "2px solid #97C3F0",
-                  boxShadow: "0px 4px 4px 0px #00000040",
-                }}
-                onClick={() => {
-                  scroll.scrollToTop();
-                }}
-              >
-                <ArrowUpwardOutlined fontSize="large" />
-              </IconButton>
-            </div>
-          </div>
         </>
       )}
     </div>
