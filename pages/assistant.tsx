@@ -119,46 +119,53 @@ function EventAssistantRoom() {
 
   useEffect(() => {
     if (socket || joining) return;
+
+    let socketLocal: ReturnType<typeof io> | null = null;
+
     setJoining(true);
+
     JoinSession(
       (result) => {
         setPseudonym(result.pseudonym);
         setUserIdState(result.userId);
         // Track user ID (pseudonym)
         setUserId(result.pseudonym);
-        let socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
+
+        socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
           auth: { token: Api.get().GetTokens().access },
         });
-        // Set the socket instance in state
+
+        // Set up all listeners immediately
+        socketLocal.on("error", (error: string) => {
+          console.error("Socket error:", error);
+          trackConnectionStatus("error");
+        });
+
+        socketLocal.on("connect", () => {
+          trackConnectionStatus("connected");
+          setIsConnected(true);
+        });
+        socketLocal.on("disconnect", () => {
+          setIsConnected(false);
+          trackConnectionStatus("disconnected");
+        });
         setSocket(socketLocal);
         setJoining(false);
       },
       (error) => {
         setErrorMessage(error);
+        setJoining(false);
       }
     );
-  }, [socket, joining]);
-
-  useEffect(() => {
-    if (!socket) return;
-    socket.on("error", (error: string) => {
-      console.error("Socket error:", error);
-      trackConnectionStatus("error");
-    });
-    socket.on("connect", () => {
-      setIsConnected(true);
-      trackConnectionStatus("connected");
-    });
-    socket.on("disconnect", () => {
-      setIsConnected(false);
-      trackConnectionStatus("disconnected");
-    });
 
     return () => {
-      socket.off("connect", () => setIsConnected(true));
-      socket.off("disconnect", () => setIsConnected(false));
+      if (socketLocal) {
+        socketLocal.off("connect");
+        socketLocal.off("disconnect");
+        socketLocal.off("error");
+      }
     };
-  }, [socket]);
+  }, [socket, joining]);
 
   useEffect(() => {
     if (!Api.get().GetTokens().access || !router.isReady) return;
