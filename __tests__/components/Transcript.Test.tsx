@@ -67,7 +67,7 @@ describe("Transcript", () => {
     expect(toggle).toBeInTheDocument();
 
     // Should show vertical text when collapsed
-    expect(screen.getByText("LIVE TRANSCRIPT")).toBeInTheDocument();
+    expect(screen.getAllByText("LIVE TRANSCRIPT").length).toBeGreaterThan(0);
 
     // Open the transcript
     await user.click(toggle);
@@ -79,7 +79,7 @@ describe("Transcript", () => {
         })
       ).toBeInTheDocument();
       // Should show horizontal header when open
-      expect(screen.getByText("LIVE TRANSCRIPT")).toBeInTheDocument();
+      expect(screen.getAllByText("LIVE TRANSCRIPT").length).toBeGreaterThan(0);
     });
 
     // Close it again
@@ -101,7 +101,7 @@ describe("Transcript", () => {
     render(<Transcript {...baseProps} />);
 
     // Should show vertical "LIVE TRANSCRIPT" text when collapsed
-    expect(screen.getByText("LIVE TRANSCRIPT")).toBeInTheDocument();
+    expect(screen.getAllByText("LIVE TRANSCRIPT").length).toBeGreaterThan(0);
 
     // Should have the open button
     expect(
@@ -116,14 +116,14 @@ describe("Transcript", () => {
     const transcriptContainer = container.firstChild as HTMLElement;
 
     // Should start with collapsed width (w-16 = 64px)
-    expect(transcriptContainer).toHaveClass("w-16");
+    expect(transcriptContainer).toHaveClass("lg:w-16");
 
     // Open transcript
     await toggleTranscript(user);
 
     await waitFor(() => {
       // Should expand to full width (w-[33vw])
-      expect(transcriptContainer).toHaveClass("w-[33vw]");
+      expect(transcriptContainer).toHaveClass("lg:w-[33vw]");
     });
   });
 

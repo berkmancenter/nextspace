@@ -316,15 +316,27 @@ function EventAssistantRoom() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-96px)] overflow-hidden">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-96px)] overflow-hidden">
       {errorMessage ? (
         <div className="text-medium-slate-blue text-lg font-bold mx-9">
           {errorMessage}
         </div>
       ) : (
         <>
-          {/* Main assistant chat view on the left */}
-          <div className="flex-1 flex flex-col relative overflow-hidden">
+          {/* Transcript view on top for mobile, right side for desktop - only render if enabled */}
+          {transcriptPasscode && (
+            <div className="lg:order-2">
+              <Transcript
+                socket={socket}
+                conversationId={router.query.conversationId as string}
+                transcriptPasscode={transcriptPasscode}
+                apiAccessToken={Api.get().GetTokens().access!}
+              />
+            </div>
+          )}
+
+          {/* Main assistant chat view below transcript on mobile, left side on desktop */}
+          <div className="flex-1 flex flex-col relative overflow-hidden lg:order-1">
             {isConnected ? (
               <AssistantChat
                 messages={messages}
@@ -365,16 +377,6 @@ function EventAssistantRoom() {
               </svg>
             )}
           </div>
-
-          {/* Transcript view on the right - only render if enabled */}
-          {transcriptPasscode && (
-            <Transcript
-              socket={socket}
-              conversationId={router.query.conversationId as string}
-              transcriptPasscode={transcriptPasscode}
-              apiAccessToken={Api.get().GetTokens().access!}
-            />
-          )}
         </>
       )}
     </div>

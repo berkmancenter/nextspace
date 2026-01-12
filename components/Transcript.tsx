@@ -189,12 +189,14 @@ export function Transcript(props: {
 
   return (
     <div
-      className={`h-full bg-[#200434] text-white transition-all duration-300 ease-in-out flex flex-col ${
-        isOpen ? "w-[33vw]" : "w-16"
+      className={`bg-[#200434] text-white transition-all duration-300 ease-in-out flex flex-col ${
+        isOpen
+          ? "h-[40vh] lg:h-full lg:w-[33vw]"
+          : "flex-shrink-0 lg:h-full lg:w-16"
       }`}
     >
       {/* Header with toggle */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-[#200434] relative before:absolute before:inset-0 before:bg-white/20 before:pointer-events-none">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-[#200434] relative before:absolute before:inset-0 before:bg-white/20 before:pointer-events-none flex-shrink-0">
         {isOpen ? (
           <>
             <h2 className="text-xl font-semibold tracking-wide">
@@ -205,23 +207,30 @@ export function Transcript(props: {
               className="text-white hover:bg-white/10 rounded p-1 transition-colors"
               aria-label="Close transcript"
             >
-              <ChevronRight />
+              <ChevronRight className="transition-transform -rotate-90 lg:rotate-0" />
             </button>
           </>
         ) : (
-          <button
-            onClick={handleToggle}
-            className="text-white hover:bg-white/10 rounded p-1 transition-colors mx-auto"
-            aria-label="Open transcript"
-          >
-            <ChevronLeft />
-          </button>
+          <>
+            <div className="flex-1 flex items-center justify-center lg:hidden">
+              <div className="text-xs font-semibold tracking-widest">
+                LIVE TRANSCRIPT
+              </div>
+            </div>
+            <button
+              onClick={handleToggle}
+              className="text-white hover:bg-white/10 rounded p-1 transition-colors mx-auto"
+              aria-label="Open transcript"
+            >
+              <ChevronLeft className="transition-transform rotate-90 lg:rotate-0" />
+            </button>
+          </>
         )}
       </div>
 
-      {/* Vertical text when collapsed */}
+      {/* Vertical text when collapsed (desktop only) */}
       {!isOpen && (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="hidden lg:flex flex-1 items-center justify-center">
           <div className="transform -rotate-90 whitespace-nowrap text-xs font-semibold tracking-widest">
             LIVE TRANSCRIPT
           </div>
@@ -230,16 +239,17 @@ export function Transcript(props: {
 
       {/* Messages */}
       {isOpen && (
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col-reverse">
+        <div
+          ref={messagesContainerRef}
+          className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col-reverse min-h-0 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[#2D0A4E] [&::-webkit-scrollbar-thumb]:bg-[#6B21A8] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-[#7C3AED]"
+        >
           <div ref={topRef} />
           {messages.map((message, i) => (
             <div
               id={`transcript-message-${message.id}`}
               key={`message-${i}`}
               className={`mb-4 ${
-                focusedMessageIds.includes(message.id!)
-                  ? "bg-[#4A0979] border-l-4 border-[#6B21A8] rounded pl-2 py-2"
-                  : ""
+                focusedMessageIds.includes(message.id!) ? "bg-[#4A0979]" : ""
               }`}
             >
               <div className="text-gray-300 text-sm mb-1">

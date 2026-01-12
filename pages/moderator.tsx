@@ -251,15 +251,28 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
   const transcriptEnabled = !!transcriptPasscode;
 
   return (
-    <div className="flex h-[calc(100vh-96px)] overflow-hidden">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-96px)] overflow-hidden">
       {errorMessage ? (
         <div className="text-medium-slate-blue text-lg font-bold mx-9">
           {errorMessage}
         </div>
       ) : (
         <>
-          {/* Main moderator content on the left */}
-          <div className="flex-1 flex flex-col relative overflow-hidden">
+          {/* Transcript view on top for mobile, right side for desktop - only render if enabled */}
+          {transcriptEnabled && (
+            <div className="lg:order-2">
+              <Transcript
+                focusTimeRange={messageFocusTimeRange}
+                socket={socket}
+                conversationId={router.query.conversationId as string}
+                transcriptPasscode={transcriptPasscode}
+                apiAccessToken={apiAccessToken!}
+              />
+            </div>
+          )}
+
+          {/* Main moderator content below transcript on mobile, left side on desktop */}
+          <div className="flex-1 flex flex-col relative overflow-hidden lg:order-1">
             {/*  Insights/analytics view */}
             <div className="h-full overflow-y-auto px-8 pt-12" id="scroll-view">
               <div
@@ -339,17 +352,6 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
               </div>
             </div>
           </div>
-
-          {/* Transcript view on the right - only render if enabled */}
-          {transcriptEnabled && (
-            <Transcript
-              focusTimeRange={messageFocusTimeRange}
-              socket={socket}
-              conversationId={router.query.conversationId as string}
-              transcriptPasscode={transcriptPasscode}
-              apiAccessToken={apiAccessToken!}
-            />
-          )}
         </>
       )}
     </div>
