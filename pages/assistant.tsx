@@ -15,6 +15,13 @@ import { Api, JoinSession, RetrieveData, SendData } from "../utils";
 import { components } from "../types";
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
 import { CheckAuthHeader, createConversationFromData } from "../utils/Helpers";
+import { useAnalytics } from "../hooks/useAnalytics";
+import {
+  trackEvent,
+  trackConversationEvent,
+  trackConnectionStatus,
+  setUserId,
+} from "../utils/analytics";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -57,6 +64,9 @@ const parseMessageBody = (body: string | object): ParsedMessageBody => {
 function EventAssistantRoom() {
   const router = useRouter();
 
+  // Initialize page-level analytics
+  useAnalytics({ pageType: "assistant" });
+
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -64,7 +74,7 @@ function EventAssistantRoom() {
 
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
   const [pseudonym, setPseudonym] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [userId, setUserIdState] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [conversationType, setConversationType] = useState<string | null>(null);
   const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
@@ -113,7 +123,9 @@ function EventAssistantRoom() {
     JoinSession(
       (result) => {
         setPseudonym(result.pseudonym);
-        setUserId(result.userId);
+        setUserIdState(result.userId);
+        // Track user ID (pseudonym)
+        setUserId(result.pseudonym);
         let socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
           auth: { token: Api.get().GetTokens().access },
         });
@@ -131,9 +143,16 @@ function EventAssistantRoom() {
     if (!socket) return;
     socket.on("error", (error: string) => {
       console.error("Socket error:", error);
+      trackConnectionStatus("error");
     });
-    socket.on("connect", () => setIsConnected(true));
-    socket.on("disconnect", () => setIsConnected(false));
+    socket.on("connect", () => {
+      setIsConnected(true);
+      trackConnectionStatus("connected");
+    });
+    socket.on("disconnect", () => {
+      setIsConnected(false);
+      trackConnectionStatus("disconnected");
+    });
 
     return () => {
       socket.off("connect", () => setIsConnected(true));
@@ -221,7 +240,9 @@ function EventAssistantRoom() {
   async function sendMessage(
     message: string,
     shouldWaitForResponse: boolean = true,
-    parentMessageId?: string
+    parentMessageId?: string,
+    skipTracking: boolean = false,
+    messageSource: "message" | "reaction" = "message"
   ) {
     if (!Api.get().GetTokens() || !message) return;
     let channels = [{ name: `direct-${userId}-${agentId}` }];
@@ -230,6 +251,36 @@ function EventAssistantRoom() {
     const finalMessage = controlledMode
       ? controlledMode.prefix + message
       : message;
+
+    // Track message send (only if not skipping tracking)
+    if (!skipTracking) {
+      const conversationId = router.query.conversationId as string;
+
+      // Check if message is a slash command
+      if (message.startsWith("/")) {
+        const commandName = message.split(" ")[0].substring(1).split("|")[0];
+        trackConversationEvent(
+          conversationId,
+          "assistant",
+          "command_sent",
+          commandName
+        );
+      } else if (controlledMode) {
+        trackConversationEvent(
+          conversationId,
+          "assistant",
+          "feedback_sent",
+          controlledMode.label
+        );
+      } else {
+        trackConversationEvent(
+          conversationId,
+          "assistant",
+          "message_sent",
+          messageSource
+        );
+      }
+    }
 
     // Only set waitingForResponse for regular messages, not controlled mode messages
     // (controlled mode messages like feedback don't generate responses)
@@ -272,15 +323,22 @@ function EventAssistantRoom() {
   }, [controlledMode]);
 
   const sendFeedbackRating = async (messageId: string, rating: string) => {
+    const conversationId = router.query.conversationId as string;
+    trackConversationEvent(
+      conversationId,
+      "assistant",
+      "rating_submitted",
+      rating
+    );
     const feedbackText = `/feedback|Rating|${messageId}|${rating}`;
-    await sendMessage(feedbackText, false);
+    await sendMessage(feedbackText, false, undefined, true);
   };
 
   const handlePromptSelect = async (
     value: string,
     parentMessageId?: string
   ) => {
-    await sendMessage(value, true, parentMessageId);
+    await sendMessage(value, true, parentMessageId, false, "reaction");
   };
 
   return (

@@ -149,10 +149,16 @@ export const MessageInput: FC<MessageInputProps> = ({
     onExitControlledMode,
   ]);
 
-  // Clear input when controlled mode is entered
+  // Clear input and focus when controlled mode is entered
   useEffect(() => {
     if (controlledMode) {
       setCurrentMessage("");
+      // Focus the input field
+      setTimeout(() => {
+        if (messageInputRef.current) {
+          messageInputRef.current.focus();
+        }
+      }, 0);
     }
   }, [controlledMode]);
 
