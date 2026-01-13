@@ -69,13 +69,14 @@ export const AssistantChat: FC<AssistantChatProps> = ({
   sendFeedbackRating,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom when new messages arrive
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop =
+        messagesContainerRef.current.scrollHeight;
+    }
   };
 
   // Auto-scroll when messages change
@@ -99,7 +100,10 @@ export const AssistantChat: FC<AssistantChatProps> = ({
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
       {/* Scrollable messages area */}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-8 pt-12">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-8 pt-12"
+      >
         <div
           className="flex flex-col items-start gap-8 pb-4"
           aria-live="assertive"

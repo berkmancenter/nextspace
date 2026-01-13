@@ -104,10 +104,6 @@ describe("AssistantChat", () => {
     sendFeedbackRating: mockSendFeedbackRating,
   };
 
-  beforeAll(() => {
-    Element.prototype.scrollIntoView = jest.fn();
-  });
-
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -393,10 +389,25 @@ describe("AssistantChat", () => {
   });
 
   it("scrolls to bottom when new messages arrive", async () => {
-    const scrollIntoViewMock = jest.fn();
-    Element.prototype.scrollIntoView = scrollIntoViewMock;
+    const { rerender, container } = render(
+      <AssistantChat {...baseProps} messages={[]} />
+    );
 
-    const { rerender } = render(<AssistantChat {...baseProps} messages={[]} />);
+    // Get the scrollable messages container
+    const messagesContainer = container.querySelector(".overflow-y-auto");
+
+    // Mock scrollTop and scrollHeight
+    Object.defineProperty(messagesContainer, "scrollHeight", {
+      configurable: true,
+      value: 1000,
+    });
+
+    const scrollTopSpy = jest.fn();
+    Object.defineProperty(messagesContainer, "scrollTop", {
+      configurable: true,
+      set: scrollTopSpy,
+      get: () => 0,
+    });
 
     const newMessages = [
       {
@@ -418,7 +429,7 @@ describe("AssistantChat", () => {
     rerender(<AssistantChat {...baseProps} messages={newMessages} />);
 
     await waitFor(() => {
-      expect(scrollIntoViewMock).toHaveBeenCalled();
+      expect(scrollTopSpy).toHaveBeenCalledWith(1000);
     });
   });
 
