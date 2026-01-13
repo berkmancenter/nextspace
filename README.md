@@ -10,7 +10,11 @@ This view displays what an event moderator uses when assessing insights and metr
 
 ### Backchannel (participant)
 
-This view displays what an event participant uses to send in questions and feedback during an event. The nomenclature for this channel being utilized is currently a "backchannel". The `BackchannelRoom` function initially attempts to register a new pseudonym for the session and sets local API tokens, if successful. It then joins the socket.io instance and the relevant conversation. The `SendData` utility function is used here to send messages from the user to the API.
+This view displays what an event participant uses to send in questions and feedback during an event that uses only the Back Channel agent. The nomenclature for this channel being utilized is currently a "backchannel". The `BackchannelRoom` function initially attempts to register a new pseudonym for the session and sets local API tokens, if successful. It then joins the socket.io instance and the relevant conversation. The `SendData` utility function is used here to send messages from the user to the API.
+
+### Assistant (participant)
+
+This view is for event participants to interact with Event Assistant or Event Assistant Plus. It provides an interface to send and receive direct messages with the agent, and with Event Assistant Plus, to send messages to the moderator. If the event has enabled it and it is provided in the URL as a parameter, a transcript view is also visible.
 
 ## Getting Started
 
@@ -55,6 +59,8 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
     Render the moderator view; see "App views overview".
   - **backchannel.tsx**
     Render the backchannel (participant) view; see "App views overview".
+  - **assistant.tsx**
+    Render the assistant (participant) view; see "App views overview".
   - **signup.tsx**
     Allows users to create an account with username, email, and password.
 
@@ -130,6 +136,7 @@ The above example generates types against LLM Engine running locally. You can al
 #### Run the development server:
 
 On default port 8080:
+
 ```bash
 npm run dev
 ```
@@ -197,6 +204,7 @@ This repo automatically has changes deployed to Vercel via the Vercel for GitHub
 ## Analytics Integration
 
 Nextspace includes built-in open source **Matomo Tag Manager** integration for comprehensive analytics tracking:
+
 - Session duration and active time measurement
 - Page navigation and engagement tracking
 - User behavior patterns and feature usage
@@ -213,11 +221,13 @@ The implementation is privacy-friendly (pseudonymized IDs, no message content tr
 ### Quick Start
 
 **To disable analytics:**
+
 ```bash
 NEXT_PUBLIC_ENABLE_ANALYTICS=false
 ```
 
 **To enable analytics** (requires Matomo Tag Manager setup):
+
 ```bash
 NEXT_PUBLIC_ENABLE_ANALYTICS=true  # or omit (enabled by default)
 ```

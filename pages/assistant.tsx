@@ -1,64 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
-import { Box } from "@mui/material";
 
-import {
-  AssistantMessage,
-  SubmittedMessage,
-  ModeratorSubmittedMessage,
-  UserMessage,
-} from "../components/messages";
-import { MessageInput } from "../components/MessageInput";
+import { AssistantChat } from "../components/AssistantChat";
 import { SlashCommand } from "../components/SlashCommandMenu";
-import { Api, JoinSession, RetrieveData, SendData } from "../utils";
+import {
+  Api,
+  JoinSession,
+  RetrieveData,
+  SendData,
+  GetChannelPasscode,
+} from "../utils";
 import { components } from "../types";
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
 import { CheckAuthHeader, createConversationFromData } from "../utils/Helpers";
 import { useAnalytics } from "../hooks/useAnalytics";
 import {
-  trackEvent,
   trackConversationEvent,
   trackConnectionStatus,
   setUserId,
 } from "../utils/analytics";
+import { Transcript } from "../components/";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
-};
-
-/**
- * Parsed message body structure
- * @property {string} text - The actual text content of the message
- * @property {string} [type] - Optional type for styling (e.g., "moderator_submitted")
- * @property {string} [message] - Optional message ID reference
- */
-interface ParsedMessageBody {
-  text: string;
-  type?: string;
-  message?: string;
-}
-
-/**
- * Parse the message body to extract text content and metadata
- * Handles both string and object formats
- */
-const parseMessageBody = (body: string | object): ParsedMessageBody => {
-  // Handle object input
-  if (body && typeof body === "object") {
-    const obj = body as Record<string, any>;
-
-    return {
-      text: obj.text?.toString() || "",
-      type: obj.type?.toString(),
-      message: obj.message?.toString(),
-    };
-  }
-
-  // Handle string input
-  return {
-    text: typeof body === "string" ? body : String(body),
-  };
 };
 
 function EventAssistantRoom() {
@@ -80,6 +45,7 @@ function EventAssistantRoom() {
   const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
   const [controlledMode, setControlledMode] =
     useState<ControlledInputConfig | null>(null);
+  const [transcriptPasscode, setTranscriptPasscode] = useState<string>("");
 
   // Available slash commands
   // Commands can optionally specify which conversation types they're available for
@@ -100,22 +66,6 @@ function EventAssistantRoom() {
     }
     return conversationType && cmd.conversationTypes.includes(conversationType);
   });
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Scroll to bottom when new messages arrive
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  };
-
-  // Auto-scroll when messages change
-  useEffect(() => {
-    if (messages.length > 0) {
-      scrollToBottom();
-    }
-  }, [messages]);
 
   useEffect(() => {
     if (socket || joining) return;
@@ -148,6 +98,22 @@ function EventAssistantRoom() {
         socketLocal.on("disconnect", () => {
           setIsConnected(false);
           trackConnectionStatus("disconnected");
+        });
+        socketLocal.on("message:new", (data) => {
+          if (process.env.NODE_ENV !== "production")
+            console.log("New message:", data);
+
+          if (
+            !data.parentMessage &&
+            (!data.channels || !data.channels.includes("transcript"))
+          ) {
+            setMessages((prev) => [...prev, data]);
+          }
+          if (
+            data.pseudonym === "Event Assistant" ||
+            data.pseudonym === "Event Assistant Plus"
+          )
+            setWaitingForResponse(false);
         });
         setSocket(socketLocal);
         setJoining(false);
@@ -195,6 +161,19 @@ function EventAssistantRoom() {
           createConversationFromData(conversationData).then((conversation) => {
             setConversationType(conversation.type.name);
 
+            // Get transcript passcode if channel query param exists
+            if (router.query.channel) {
+              const transcriptPasscodeParam = GetChannelPasscode(
+                "transcript",
+                router.query,
+                setErrorMessage
+              );
+
+              if (transcriptPasscodeParam) {
+                setTranscriptPasscode(transcriptPasscodeParam);
+              }
+            }
+
             // Check if the event has an event assistant agent
             // TODO: This should really be a property of the conversation, not inferred from agents
             const eventAsstAgent = conversation.agents.find(
@@ -214,26 +193,14 @@ function EventAssistantRoom() {
               return;
             }
 
-            if (!socket.hasListeners("message:new"))
-              socket.on("message:new", (data) => {
-                if (process.env.NODE_ENV !== "production")
-                  console.log("New message:", data);
-                if (!data.parentMessage) {
-                  setMessages((prev) => [...prev, data]);
-                }
-                if (
-                  data.pseudonym === "Event Assistant" ||
-                  data.pseudonym === "Event Assistant Plus"
-                )
-                  setWaitingForResponse(false);
-              });
-
-            if (agentId && userId)
+            if (agentId && userId) {
+              console.log("Joining conversation");
               socket.emit("conversation:join", {
                 conversationId: router.query.conversationId,
                 token: Api.get().GetTokens().access,
                 channel: { name: `direct-${userId}-${agentId}` },
               });
+            }
           });
         })
         .catch((error) => {
@@ -349,202 +316,40 @@ function EventAssistantRoom() {
   };
 
   return (
-    <div className="flex items-start justify-center pt-12">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-96px)] overflow-hidden">
       {errorMessage ? (
         <div className="text-medium-slate-blue text-lg font-bold mx-9">
           {errorMessage}
         </div>
       ) : (
-        <div className="w-11/12 lg:w-2/3">
-          <h2 className="text-3xl font-bold mb-4 w-full text-center">
-            Ask the Event Assistant
-          </h2>
+        <>
+          {/* Transcript view on top for mobile, right side for desktop - only render if enabled */}
+          {transcriptPasscode && (
+            <div className="lg:order-2">
+              <Transcript
+                socket={socket}
+                conversationId={router.query.conversationId as string}
+                transcriptPasscode={transcriptPasscode}
+                apiAccessToken={Api.get().GetTokens().access!}
+              />
+            </div>
+          )}
 
-          {
-            isConnected ? (
-              <Box display="flex" flexDirection="column">
-                {/* Conversation View */}
-                <div
-                  className="flex flex-col items-center gap-8 mt-4 mb-24"
-                  id="scroll-container"
-                  aria-live="assertive"
-                >
-                  {(() => {
-                    // Collect all message IDs referenced by moderator_submitted messages
-                    const submittedIds = messages
-                      .filter((msg) => {
-                        if (typeof msg.body === "object" && msg.body !== null) {
-                          const bodyObj = msg.body as Record<string, any>;
-                          return (
-                            bodyObj.type === "moderator_submitted" &&
-                            bodyObj.message
-                          );
-                        }
-                        return false;
-                      })
-                      .map((msg) => (msg.body as any).message);
-
-                    return messages
-                      .filter((message) => !message.parentMessage) // for now, assume anything with a parent message was selected via prompt option and should not be displayed again
-                      .map((message, i) => {
-                        const isAssistant =
-                          message.pseudonym === "Event Assistant" ||
-                          message.pseudonym === "Event Assistant Plus";
-                        return (
-                          <div
-                            key={`msg-${i}`}
-                            className="w-full lg:w-3/4 px-2"
-                          >
-                            <div className="flex flex-col lg:flex-row gap-x-5.5">
-                              <p className="flex flex-col min-w-24 items-center text-sm text-neutral-600 mb-1 lg:mb-0 lg:mt-2">
-                                {new Date(
-                                  message.createdAt!
-                                ).toLocaleTimeString("en-US", {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
-                                {isAssistant && (
-                                  <>
-                                    <span className="hidden lg:inline-block h-full border-l-2 border-l-dark-blue opacity-50 border-dotted my-1"></span>
-                                    {waitingForResponse &&
-                                      i ===
-                                        messages.findLastIndex(
-                                          (msg) =>
-                                            msg.pseudonym ===
-                                              "Event Assistant" ||
-                                            msg.pseudonym ===
-                                              "Event Assistant Plus"
-                                        ) && (
-                                        <svg
-                                          viewBox="0 0 32 32"
-                                          className="w-10 h-10 text-black dark:text-white mx-auto"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          strokeWidth="0.7"
-                                        >
-                                          <circle
-                                            cx="16"
-                                            cy="5.5"
-                                            r="1"
-                                            className="animate-bounce"
-                                          />
-                                          <line
-                                            x1="16"
-                                            y1="6.5"
-                                            x2="16"
-                                            y2="10"
-                                          />
-                                          <rect
-                                            x="8"
-                                            y="10"
-                                            width="16"
-                                            height="12"
-                                            rx="6"
-                                          />
-                                          <circle cx="12" cy="16" r="1" />
-                                          <circle cx="20" cy="16" r="1" />
-                                          <path
-                                            d="M13 19 Q16 21 19 19"
-                                            strokeLinecap="round"
-                                            fill="none"
-                                          />
-                                          <line
-                                            x1="8"
-                                            y1="15"
-                                            x2="4.5"
-                                            y2="13"
-                                          />
-                                          <line
-                                            x1="24"
-                                            y1="15"
-                                            x2="27.5"
-                                            y2="13"
-                                          />
-                                          <rect
-                                            x="13"
-                                            y="22"
-                                            width="6"
-                                            height="5"
-                                            rx="2"
-                                          />
-                                        </svg>
-                                      )}
-                                  </>
-                                )}
-                              </p>
-
-                              {(() => {
-                                // Determine message type and render appropriate component
-                                const parsed = parseMessageBody(message.body);
-                                const messageType = parsed.type;
-
-                                // Check if this is a moderator_submitted type message
-                                if (messageType === "moderator_submitted") {
-                                  return (
-                                    <ModeratorSubmittedMessage
-                                      key={`msg-${i}`}
-                                      message={{
-                                        ...message,
-                                        body: parsed.text,
-                                      }}
-                                    />
-                                  );
-                                }
-
-                                // Check if this message was submitted (referenced by moderator_submitted)
-                                if (submittedIds.includes(message.id)) {
-                                  return (
-                                    <SubmittedMessage
-                                      key={`msg-${i}`}
-                                      message={message}
-                                    />
-                                  );
-                                }
-
-                                // Render assistant message
-                                if (isAssistant) {
-                                  return (
-                                    <AssistantMessage
-                                      key={`msg-${i}`}
-                                      message={{
-                                        ...message,
-                                        body: parsed.text,
-                                      }}
-                                      onPromptSelect={handlePromptSelect}
-                                      onPopulateFeedbackText={
-                                        enterControlledMode
-                                      }
-                                      onSendFeedbackRating={sendFeedbackRating}
-                                      messageType={parsed.type}
-                                    />
-                                  );
-                                }
-
-                                // Default to user message
-                                return (
-                                  <UserMessage
-                                    key={`msg-${i}`}
-                                    message={message}
-                                  />
-                                );
-                              })()}
-                            </div>
-                          </div>
-                        );
-                      });
-                  })()}
-                  {/* Scroll target - adds minimal space to ensure content is visible above fixed input */}
-                  <div ref={messagesEndRef} className="h-8" />
-                </div>
-                <MessageInput
-                  pseudonym={pseudonym}
-                  onSendMessage={sendMessage}
-                  waitingForResponse={waitingForResponse}
-                  controlledMode={controlledMode}
-                  onExitControlledMode={exitControlledMode}
-                  slashCommands={slashCommands}
-                />
-              </Box>
+          {/* Main assistant chat view below transcript on mobile, left side on desktop */}
+          <div className="flex-1 flex flex-col relative overflow-hidden lg:order-1">
+            {isConnected ? (
+              <AssistantChat
+                messages={messages}
+                pseudonym={pseudonym}
+                waitingForResponse={waitingForResponse}
+                controlledMode={controlledMode}
+                slashCommands={slashCommands}
+                onSendMessage={sendMessage}
+                onExitControlledMode={exitControlledMode}
+                onPromptSelect={handlePromptSelect}
+                enterControlledMode={enterControlledMode}
+                sendFeedbackRating={sendFeedbackRating}
+              />
             ) : (
               <svg
                 className="mx-auto w-12 h-5"
@@ -570,9 +375,9 @@ function EventAssistantRoom() {
                   r="4"
                 />
               </svg>
-            ) /* Loading indicator */
-          }
-        </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

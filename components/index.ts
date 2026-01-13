@@ -7,5 +7,6 @@ export { Layout } from "./Layout";
 export { Logo } from "./Logo";
 export { MessageFeedback } from "./MessageFeedback";
 export { MessageInput } from "./MessageInput";
+export { AssistantChat } from "./AssistantChat";
 export { Transcript } from "./Transcript";
 export { AgentConfigForm } from "./AgentConfigForm";
