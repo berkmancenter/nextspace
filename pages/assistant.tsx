@@ -99,6 +99,22 @@ function EventAssistantRoom() {
           setIsConnected(false);
           trackConnectionStatus("disconnected");
         });
+        socketLocal.on("message:new", (data) => {
+          if (process.env.NODE_ENV !== "production")
+            console.log("New message:", data);
+
+          if (
+            !data.parentMessage &&
+            (!data.channels || !data.channels.includes("transcript"))
+          ) {
+            setMessages((prev) => [...prev, data]);
+          }
+          if (
+            data.pseudonym === "Event Assistant" ||
+            data.pseudonym === "Event Assistant Plus"
+          )
+            setWaitingForResponse(false);
+        });
         setSocket(socketLocal);
         setJoining(false);
       },
@@ -177,30 +193,14 @@ function EventAssistantRoom() {
               return;
             }
 
-            if (!socket.hasListeners("message:new"))
-              socket.on("message:new", (data) => {
-                if (process.env.NODE_ENV !== "production")
-                  console.log("New message:", data);
-
-                if (
-                  !data.parentMessage &&
-                  (!data.channels || !data.channels.includes("transcript"))
-                ) {
-                  setMessages((prev) => [...prev, data]);
-                }
-                if (
-                  data.pseudonym === "Event Assistant" ||
-                  data.pseudonym === "Event Assistant Plus"
-                )
-                  setWaitingForResponse(false);
-              });
-
-            if (agentId && userId)
+            if (agentId && userId) {
+              console.log("Joining conversation");
               socket.emit("conversation:join", {
                 conversationId: router.query.conversationId,
                 token: Api.get().GetTokens().access,
                 channel: { name: `direct-${userId}-${agentId}` },
               });
+            }
           });
         })
         .catch((error) => {
