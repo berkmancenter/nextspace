@@ -43,16 +43,6 @@ export function Transcript(props: {
       trackFeatureUsage("transcript", "close", duration);
     }
     setIsOpen(newOpenState);
-
-    // Scroll to bottom when manually opening
-    if (newOpenState) {
-      // Closing transcript - calculate duration
-      const duration = Math.floor(
-        (Date.now() - transcriptOpenTimeRef.current) / 1000
-      );
-      trackFeatureUsage("transcript", "close", duration);
-      scrollToBottom();
-    }
   };
 
   const applyFocusAndScroll = (
@@ -188,9 +178,8 @@ export function Transcript(props: {
     }
 
     const messageHandler = (data: PseudonymousMessage) => {
-      console.log("New transcript message:", data);
-
       if (data.channels && data.channels.includes("transcript")) {
+        console.log("New transcript message:", data);
         // Capture scroll state before adding message
         const container = messagesContainerRef.current;
         if (container) {
