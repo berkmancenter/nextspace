@@ -158,7 +158,10 @@ describe("/api/check-location", () => {
           "x-real-ip": "192.168.1.100",
         },
       });
-      req.socket.remoteAddress = "192.168.1.100";
+      Object.defineProperty(req.socket, "remoteAddress", {
+        value: "192.168.1.100",
+        writable: true,
+      });
 
       handler(req, res);
 
