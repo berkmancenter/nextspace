@@ -242,7 +242,7 @@ export function Transcript(props: {
               className="text-white hover:bg-white/10 rounded p-1 transition-colors"
               aria-label="Close transcript"
             >
-              <ChevronRight className="transition-transform -rotate-90 lg:rotate-0" />
+              <ChevronRight className="transition-transform -rotate-270 lg:rotate-0" />
             </button>
           </>
         ) : (
@@ -257,7 +257,7 @@ export function Transcript(props: {
               className="text-white hover:bg-white/10 rounded p-1 transition-colors mx-auto"
               aria-label="Open transcript"
             >
-              <ChevronLeft className="transition-transform rotate-90 lg:rotate-0" />
+              <ChevronLeft className="transition-transform rotate-270 lg:rotate-0" />
             </button>
           </>
         )}
