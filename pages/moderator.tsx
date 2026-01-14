@@ -21,10 +21,8 @@ import { Transcript } from "../components/";
 import { CheckAuthHeader } from "../utils/Helpers";
 import { useAnalytics } from "../hooks/useAnalytics";
 import {
-  trackEvent,
   trackConversationEvent,
   trackConnectionStatus,
-  trackFeatureUsage,
 } from "../utils/analytics";
 
 export const getServerSideProps = async (context: { req: any }) => {
@@ -52,70 +50,73 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
 
   const scrollViewRef = useRef<HTMLDivElement>(null);
 
-  /**
-   * Authenticates the user and retrieves an API token.
-   * @returns The API token as a string.
-   */
-  const join = async () => {
+  useEffect(() => {
+    if (socket || joining) return;
+
+    let socketLocal: ReturnType<typeof io> | null = null;
+
     setJoining(true);
     JoinSession(
       () => {
         const token = Api.get().GetTokens().access;
-        let socketLocal;
         try {
           // Initialize the socket connection
           socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
             auth: { token },
           });
+
+          // Attach all listeners immediately
           socketLocal.on("connect_error", (err: any) => {
             console.error("Socket connection error:", err);
             setErrorMessage("Failed to connect to the socket server.");
           });
+
+          socketLocal.on("error", (error: string) => {
+            console.error("Socket error:", error);
+            trackConnectionStatus("error");
+          });
+
+          socketLocal.on("connect", () => {
+            setIsConnected(true);
+            trackConnectionStatus("connected");
+          });
+
+          socketLocal.on("disconnect", () => {
+            setIsConnected(false);
+            trackConnectionStatus("disconnected");
+          });
         } catch (error) {
           console.error("Error initializing socket:", error);
           setErrorMessage("Failed to connect to the socket server.");
+          setJoining(false);
           return;
         }
-        // Set the socket instance in state
+
         setSocket(socketLocal);
         setJoining(false);
       },
       (error) => {
         setErrorMessage(error);
+        setJoining(false);
       }
     );
-  };
 
-  useEffect(() => {
-    if (socket || joining) return;
-    join();
-  });
-
-  useEffect(() => {
-    if (!socket) return;
-    socket.on("error", (error: string) => {
-      console.error("Socket error:", error);
-      trackConnectionStatus("error");
-    });
-    socket.on("connect", () => {
-      setIsConnected(true);
-      trackConnectionStatus("connected");
-    });
-    socket.on("disconnect", () => {
-      setIsConnected(false);
-      trackConnectionStatus("disconnected");
-    });
-
+    // Cleanup
     return () => {
-      socket.off("connect", () => setIsConnected(true));
-      socket.off("disconnect", () => setIsConnected(false));
+      if (socketLocal) {
+        socketLocal.off("connect");
+        socketLocal.off("disconnect");
+        socketLocal.off("error");
+        socketLocal.off("connect_error");
+      }
     };
-  }, [socket]);
+  }, [socket, joining]);
 
   const apiAccessToken = Api.get().GetTokens().access;
 
   useEffect(() => {
     if (!router.isReady || !socket || !apiAccessToken) return;
+
     const messageHandler = (data: PseudonymousMessage) => {
       console.log("New message:", data);
       if (data.channels![0] === "moderator") {
@@ -126,6 +127,9 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
         });
       }
     };
+
+    // Attach listener immediately, before async fetch
+    socket.on("message:new", messageHandler);
 
     async function fetchConversationData() {
       if (!router.isReady || !apiAccessToken) return;
@@ -191,11 +195,11 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
       } catch (error) {
         console.error("Error sending conversation:join message:", error);
       }
-      socket.on("message:new", messageHandler);
     }
 
     fetchConversationData();
-    // return cleanup function
+
+    // Cleanup
     return () => {
       socket?.off("message:new", messageHandler);
     };
