@@ -304,18 +304,32 @@ describe("EventAssistantRoom", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByPlaceholderText("Write a Comment")
+          screen.getByPlaceholderText("Enter your message here")
         ).toBeInTheDocument();
       });
 
+      // Wait for all promises to resolve (conversation data loading)
+      await act(async () => {
+        await Promise.resolve(); // Let RetrieveData promise resolve
+        await Promise.resolve(); // Let createConversationFromData promise resolve
+      });
+
+      // Allow React to process state updates
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
       const user = userEvent.setup();
-      const input = screen.getByPlaceholderText("Write a Comment");
+      const input = screen.getByPlaceholderText("Enter your message here");
 
       await user.type(input, "/");
 
-      await waitFor(() => {
-        expect(screen.getByText("/mod")).toBeInTheDocument();
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByText("/mod")).toBeInTheDocument();
+        },
+        { timeout: 3000 }
+      );
     });
 
     it("does not show /mod command for Event Assistant (non-Plus)", async () => {
@@ -343,12 +357,12 @@ describe("EventAssistantRoom", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByPlaceholderText("Write a Comment")
+          screen.getByPlaceholderText("Enter your message here")
         ).toBeInTheDocument();
       });
 
       const user = userEvent.setup();
-      const input = screen.getByPlaceholderText("Write a Comment");
+      const input = screen.getByPlaceholderText("Enter your message here");
 
       await user.type(input, "/");
 

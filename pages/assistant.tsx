@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
 
-import { AssistantChat } from "../components/AssistantChat";
-import { SlashCommand } from "../components/SlashCommandMenu";
+import { AssistantChatPanel } from "../components/AssistantChatPanel";
+import { GroupChatPanel } from "../components/GroupChatPanel";
+import { SlashCommand } from "../components/enhancers/slashCommandEnhancer";
 import {
   Api,
   JoinSession,
@@ -37,7 +38,11 @@ function EventAssistantRoom() {
   const [joining, setJoining] = useState(false);
   const [waitingForResponse, setWaitingForResponse] = useState(false);
 
-  const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
+  const [activeTab, setActiveTab] = useState<"assistant" | "chat">("assistant");
+  const [assistantMessages, setAssistantMessages] = useState<
+    PseudonymousMessage[]
+  >([]);
+  const [chatMessages, setChatMessages] = useState<PseudonymousMessage[]>([]);
   const [pseudonym, setPseudonym] = useState<string | null>(null);
   const [userId, setUserIdState] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
@@ -46,6 +51,9 @@ function EventAssistantRoom() {
   const [controlledMode, setControlledMode] =
     useState<ControlledInputConfig | null>(null);
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>("");
+  const [chatPasscode, setChatPasscode] = useState<string>("");
+  const [assistantInputValue, setAssistantInputValue] = useState<string>("");
+  const [chatInputValue, setChatInputValue] = useState<string>("");
 
   // Available slash commands
   // Commands can optionally specify which conversation types they're available for
@@ -103,11 +111,16 @@ function EventAssistantRoom() {
           if (process.env.NODE_ENV !== "production")
             console.log("New message:", data);
 
-          if (
-            !data.parentMessage &&
-            (!data.channels || !data.channels.includes("transcript"))
-          ) {
-            setMessages((prev) => [...prev, data]);
+          if (!data.parentMessage) {
+            // Route messages to appropriate array based on channel
+            if (data.channels && data.channels.includes("chat")) {
+              setChatMessages((prev) => [...prev, data]);
+            } else if (
+              !data.channels ||
+              !data.channels.includes("transcript")
+            ) {
+              setAssistantMessages((prev) => [...prev, data]);
+            }
           }
           if (
             data.pseudonym === "Event Assistant" ||
@@ -161,7 +174,7 @@ function EventAssistantRoom() {
           createConversationFromData(conversationData).then((conversation) => {
             setConversationType(conversation.type.name);
 
-            // Get transcript passcode if channel query param exists
+            // Get transcript and chat passcodes if channel query param exists
             if (router.query.channel) {
               const transcriptPasscodeParam = GetChannelPasscode(
                 "transcript",
@@ -171,6 +184,16 @@ function EventAssistantRoom() {
 
               if (transcriptPasscodeParam) {
                 setTranscriptPasscode(transcriptPasscodeParam);
+              }
+
+              const chatPasscodeParam = GetChannelPasscode(
+                "chat",
+                router.query,
+                setErrorMessage
+              );
+
+              if (chatPasscodeParam) {
+                setChatPasscode(chatPasscodeParam);
               }
             }
 
@@ -195,6 +218,7 @@ function EventAssistantRoom() {
 
             if (agentId && userId) {
               console.log("Joining conversation");
+              // Join the direct channel for assistant
               socket.emit("conversation:join", {
                 conversationId: router.query.conversationId,
                 token: Api.get().GetTokens().access,
@@ -211,6 +235,33 @@ function EventAssistantRoom() {
     fetchConversationData();
   }, [socket, router, userId, agentId]);
 
+  // Join chat channel and load initial messages when chatPasscode becomes available
+  useEffect(() => {
+    if (!socket || !chatPasscode || !router.query.conversationId) return;
+
+    socket.emit("conversation:join", {
+      conversationId: router.query.conversationId,
+      token: Api.get().GetTokens().access,
+      channel: { name: "chat", passcode: chatPasscode },
+    });
+    const fetchInitialMessages = async () => {
+      try {
+        const chatMessages = await RetrieveData(
+          `messages/${router.query.conversationId}?channel=chat,${chatPasscode}`,
+          Api.get().GetTokens().access!
+        );
+
+        if (Array.isArray(chatMessages)) {
+          setChatMessages(chatMessages);
+        }
+      } catch (error) {
+        console.error("Error fetching initial chat messages:", error);
+      }
+    };
+
+    fetchInitialMessages();
+  }, [socket, chatPasscode, router.query.conversationId]);
+
   async function sendMessage(
     message: string,
     shouldWaitForResponse: boolean = true,
@@ -219,7 +270,12 @@ function EventAssistantRoom() {
     messageSource: "message" | "reaction" = "message"
   ) {
     if (!Api.get().GetTokens() || !message) return;
-    let channels = [{ name: `direct-${userId}-${agentId}` }];
+
+    // Use different channel based on active tab
+    let channels =
+      activeTab === "chat"
+        ? [{ name: "chat", passcode: chatPasscode }]
+        : [{ name: `direct-${userId}-${agentId}` }];
 
     // Prepend prefix if in controlled mode
     const finalMessage = controlledMode
@@ -256,9 +312,9 @@ function EventAssistantRoom() {
       }
     }
 
-    // Only set waitingForResponse for regular messages, not controlled mode messages
-    // (controlled mode messages like feedback don't generate responses)
-    if (shouldWaitForResponse && !controlledMode) {
+    // Only set waitingForResponse for assistant mode regular messages, not controlled mode messages
+    // (controlled mode messages like feedback don't generate responses, and chat mode has no assistant)
+    if (shouldWaitForResponse && !controlledMode && activeTab === "assistant") {
       setWaitingForResponse(true);
     }
 
@@ -337,19 +393,67 @@ function EventAssistantRoom() {
 
           {/* Main assistant chat view below transcript on mobile, left side on desktop */}
           <div className="flex-1 flex flex-col relative overflow-hidden lg:order-1">
+            {/* Tab navigation - only show if chat passcode is available */}
+            {chatPasscode && (
+              <div className="flex border-b border-gray-300 px-8 pt-6 gap-8">
+                <button
+                  onClick={() => setActiveTab("assistant")}
+                  className={`pb-3 text-sm font-bold uppercase border-b-4 transition-colors ${
+                    activeTab === "assistant"
+                      ? "text-gray-800"
+                      : "border-transparent text-gray-400 hover:text-gray-600"
+                  }`}
+                  style={
+                    activeTab === "assistant"
+                      ? { borderBottomColor: "#200434" }
+                      : undefined
+                  }
+                >
+                  Event Assistant
+                </button>
+                <button
+                  onClick={() => setActiveTab("chat")}
+                  className={`pb-3 text-sm font-bold uppercase border-b-4 transition-colors ${
+                    activeTab === "chat"
+                      ? "text-gray-800"
+                      : "border-transparent text-gray-400 hover:text-gray-600"
+                  }`}
+                  style={
+                    activeTab === "chat"
+                      ? { borderBottomColor: "#200434" }
+                      : undefined
+                  }
+                >
+                  Chat
+                </button>
+              </div>
+            )}
+
             {isConnected ? (
-              <AssistantChat
-                messages={messages}
-                pseudonym={pseudonym}
-                waitingForResponse={waitingForResponse}
-                controlledMode={controlledMode}
-                slashCommands={slashCommands}
-                onSendMessage={sendMessage}
-                onExitControlledMode={exitControlledMode}
-                onPromptSelect={handlePromptSelect}
-                enterControlledMode={enterControlledMode}
-                sendFeedbackRating={sendFeedbackRating}
-              />
+              activeTab === "chat" ? (
+                <GroupChatPanel
+                  messages={chatMessages}
+                  pseudonym={pseudonym}
+                  inputValue={chatInputValue}
+                  onInputChange={setChatInputValue}
+                  onSendMessage={sendMessage}
+                />
+              ) : (
+                <AssistantChatPanel
+                  messages={assistantMessages}
+                  pseudonym={pseudonym}
+                  waitingForResponse={waitingForResponse}
+                  controlledMode={controlledMode}
+                  slashCommands={slashCommands}
+                  inputValue={assistantInputValue}
+                  onInputChange={setAssistantInputValue}
+                  onSendMessage={sendMessage}
+                  onExitControlledMode={exitControlledMode}
+                  onPromptSelect={handlePromptSelect}
+                  enterControlledMode={enterControlledMode}
+                  sendFeedbackRating={sendFeedbackRating}
+                />
+              )
             ) : (
               <svg
                 className="mx-auto w-12 h-5"

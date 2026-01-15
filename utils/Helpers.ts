@@ -294,6 +294,11 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
   )?.passcode;
   const hasTranscript = Boolean(transcriptPasscode);
 
+  const chatPasscode = conversationData.channels.find(
+    (channel) => channel.name === "chat"
+  )?.passcode;
+  const hasChat = Boolean(chatPasscode);
+
   const modPasscode = conversationData.channels.find(
     (channel) => channel.name === "moderator"
   )?.passcode;
@@ -328,7 +333,7 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
       label: "Event Assistant",
       url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
         hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
-      }`,
+      }${hasChat ? `&channel=chat,${chatPasscode}` : ""}`,
     };
     participant.push(eventAssistantUrl);
   } else if (convType.name === "eventAssistantPlus") {
@@ -336,7 +341,7 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
       label: "Event Assistant Plus",
       url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
         hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
-      }`,
+      }${hasChat ? `&channel=chat,${chatPasscode}` : ""}`,
     };
     participant.push(eventAssistantPlusUrl);
     if (modPasscode) {

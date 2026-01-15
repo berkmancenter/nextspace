@@ -5,81 +5,122 @@ import {
   KeyboardEvent,
   ChangeEvent,
   useEffect,
+  useCallback,
 } from "react";
 import { Box, IconButton, InputAdornment, TextField } from "@mui/material";
 import { Send, Close } from "@mui/icons-material";
 import { ControlledInputConfig } from "../types.internal";
-import { SlashCommandMenu, SlashCommand } from "./SlashCommandMenu";
+import { ActiveEnhancerState, InputEnhancer } from "../types/inputEnhancer";
+import { GenericEnhancerMenu } from "./GenericEnhancerMenu";
+import { getAvatarStyle } from "../utils/avatarUtils";
 
 interface MessageInputProps {
   pseudonym: string | null;
+  enhancers: InputEnhancer<any>[];
   onSendMessage: (message: string) => void;
   waitingForResponse: boolean;
   controlledMode: ControlledInputConfig | null;
   onExitControlledMode: () => void;
-  slashCommands: SlashCommand[];
+  inputValue?: string;
+  onInputChange?: (value: string) => void;
 }
 
 export const MessageInput: FC<MessageInputProps> = ({
   pseudonym,
+  enhancers,
   onSendMessage,
   waitingForResponse,
   controlledMode,
   onExitControlledMode,
-  slashCommands,
+  inputValue,
+  onInputChange,
 }) => {
-  const [currentMessage, setCurrentMessage] = useState("");
-  const [showSlashMenu, setShowSlashMenu] = useState(false);
-  const [slashCommandIndex, setSlashCommandIndex] = useState(0);
-  const [filteredCommands, setFilteredCommands] = useState<SlashCommand[]>([]);
+  const [internalValue, setInternalValue] = useState("");
+  const isControlled = inputValue !== undefined && onInputChange !== undefined;
+  const currentMessage = isControlled ? inputValue : internalValue;
+  const setCurrentMessage = isControlled ? onInputChange : setInternalValue;
+
+  const [activeEnhancer, setActiveEnhancer] =
+    useState<ActiveEnhancerState<any> | null>(null);
 
   const messageInputRef = useRef<HTMLInputElement>(null);
   const enterUsedForCommandRef = useRef(false);
 
+  // Close menu when enhancers change
+  useEffect(() => {
+    setActiveEnhancer(null);
+  }, [enhancers]);
+
+  /** Detect triggers for the current value */
+  const detectTriggersForValue = useCallback(
+    (value: string) => {
+      const cursor = messageInputRef.current?.selectionStart ?? value.length;
+
+      // Check each enhancer for a trigger match
+      for (const enhancer of enhancers) {
+        const trigger = enhancer.detectTrigger(value, cursor);
+
+        if (trigger) {
+          const items = enhancer.getItems(trigger.query);
+
+          if (items.length > 0) {
+            setActiveEnhancer({
+              enhancer,
+              items,
+              selectedIndex: 0,
+              trigger,
+            });
+            return; // Stop at first match
+          }
+        }
+      }
+
+      // No triggers matched
+      setActiveEnhancer(null);
+    },
+    [enhancers]
+  );
+
+  /** Handle input changes */
   const handleMessageChange = (value: string) => {
     setCurrentMessage(value);
-
-    // Show slash menu if message starts with "/" and has no space yet
-    if (value.startsWith("/") && !value.includes(" ")) {
-      // Extract the command part (without the leading slash)
-      const commandQuery = value.slice(1).toLowerCase();
-
-      // Filter commands that start with the typed query
-      const filtered = slashCommands.filter((cmd) =>
-        cmd.command.toLowerCase().startsWith(commandQuery)
-      );
-
-      setFilteredCommands(filtered);
-
-      // Only show menu if there are matching commands
-      if (filtered.length > 0) {
-        setShowSlashMenu(true);
-        // Reset selected index, but make sure it's within bounds
-        setSlashCommandIndex(0);
-      } else {
-        setShowSlashMenu(false);
-      }
-    } else {
-      setShowSlashMenu(false);
-      setFilteredCommands([]);
-    }
   };
 
-  const handleSlashCommandSelect = (command: SlashCommand) => {
-    const value = command.value || `/${command.command} `;
-    setCurrentMessage(value);
-    setShowSlashMenu(false);
-    setSlashCommandIndex(0);
-    // Focus back on input and set cursor to end
+  // Detect triggers whenever currentMessage changes
+  useEffect(() => {
+    if (currentMessage) {
+      detectTriggersForValue(currentMessage);
+    } else {
+      setActiveEnhancer(null);
+    }
+  }, [currentMessage, detectTriggersForValue]);
+
+  /** Handle item selection from menu */
+  const handleEnhancerSelect = (item: any) => {
+    if (!activeEnhancer) return;
+
+    const cursor =
+      messageInputRef.current?.selectionStart ?? currentMessage.length;
+    const result = activeEnhancer.enhancer.onSelect(
+      item,
+      currentMessage,
+      cursor
+    );
+
+    setCurrentMessage(result.value);
+    setActiveEnhancer(null);
+
+    // Set cursor position
     setTimeout(() => {
-      if (messageInputRef.current) {
-        messageInputRef.current.focus();
-        // Set cursor position to the end of the text
-        messageInputRef.current.setSelectionRange(value.length, value.length);
-      }
+      messageInputRef.current?.focus();
+      messageInputRef.current?.setSelectionRange(
+        result.cursorPos,
+        result.cursorPos
+      );
     }, 0);
   };
 
+  /** Send message */
   const handleSend = () => {
     if (currentMessage && currentMessage.length > 0 && !waitingForResponse) {
       onSendMessage(currentMessage);
@@ -87,91 +128,99 @@ export const MessageInput: FC<MessageInputProps> = ({
     }
   };
 
+  /** Handle Enter key */
   const handleKeyUp = (e: KeyboardEvent<HTMLDivElement>) => {
-    // Check if Enter was used to select a command
     if (e.key === "Enter" && enterUsedForCommandRef.current) {
       enterUsedForCommandRef.current = false;
-      return; // Don't send message
+      return;
     }
-
     if (
       e.key === "Enter" &&
-      !!currentMessage &&
       currentMessage.length > 0 &&
       !waitingForResponse &&
-      !showSlashMenu
+      !activeEnhancer
     ) {
       handleSend();
     }
   };
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    handleMessageChange(e.target.value);
+    const newValue = e.target.value;
+    handleMessageChange(newValue);
   };
 
-  // Handle keyboard navigation for slash commands and ESC key
+  /** Keyboard navigation for enhancer menus */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && controlledMode) {
-        onExitControlledMode();
+      if (e.key === "Escape" && controlledMode) onExitControlledMode();
+      if (e.key === "Escape") {
+        setActiveEnhancer(null);
       }
-      if (e.key === "Escape" && showSlashMenu) {
-        setShowSlashMenu(false);
-        setSlashCommandIndex(0);
-      }
-      // Handle arrow keys for slash menu navigation
-      if (showSlashMenu && filteredCommands.length > 0) {
+
+      // Menu navigation
+      if (activeEnhancer && activeEnhancer.items.length > 0) {
         if (e.key === "ArrowDown") {
           e.preventDefault();
-          setSlashCommandIndex((prev) =>
-            prev < filteredCommands.length - 1 ? prev + 1 : 0
+          setActiveEnhancer((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  selectedIndex:
+                    prev.selectedIndex < prev.items.length - 1
+                      ? prev.selectedIndex + 1
+                      : 0,
+                }
+              : null
           );
         } else if (e.key === "ArrowUp") {
           e.preventDefault();
-          setSlashCommandIndex((prev) =>
-            prev > 0 ? prev - 1 : filteredCommands.length - 1
+          setActiveEnhancer((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  selectedIndex:
+                    prev.selectedIndex > 0
+                      ? prev.selectedIndex - 1
+                      : prev.items.length - 1,
+                }
+              : null
           );
-        } else if (e.key === "Enter" && showSlashMenu) {
+        } else if (e.key === "Enter") {
           e.preventDefault();
           enterUsedForCommandRef.current = true;
-          handleSlashCommandSelect(filteredCommands[slashCommandIndex]);
+          handleEnhancerSelect(
+            activeEnhancer.items[activeEnhancer.selectedIndex]
+          );
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown as any);
     return () => window.removeEventListener("keydown", handleKeyDown as any);
-  }, [
-    controlledMode,
-    showSlashMenu,
-    slashCommandIndex,
-    filteredCommands,
-    onExitControlledMode,
-  ]);
+  }, [controlledMode, activeEnhancer, onExitControlledMode, currentMessage]);
 
-  // Clear input and focus when controlled mode is entered
+  // Clear input and focus when entering controlled mode
   useEffect(() => {
     if (controlledMode) {
       setCurrentMessage("");
-      // Focus the input field
-      setTimeout(() => {
-        if (messageInputRef.current) {
-          messageInputRef.current.focus();
-        }
-      }, 0);
+      setTimeout(() => messageInputRef.current?.focus(), 0);
     }
   }, [controlledMode]);
 
-  if (!pseudonym) {
-    return null;
-  }
+  if (!pseudonym) return null;
 
   return (
     <div className="flex bg-white pl-8">
       <div className="w-full max-w-4xl">
         <Box display="flex" alignItems="center" padding="8px">
           <div className="flex flex-col w-full">
-            <div className="border-[1px] border-b-0 border-[#A5B4FC] rounded-t-lg p-2 font-bold text-sm flex justify-between items-center">
+            {/* Header */}
+            <div
+              className="border-[1px] border-b-0 border-[#A5B4FC] rounded-t-lg p-2 font-bold text-sm flex justify-between items-center"
+              style={{
+                backgroundColor: getAvatarStyle(pseudonym, true).avatarBg,
+              }}
+            >
               <span className="uppercase">
                 Writing as {pseudonym}
                 {controlledMode && (
@@ -191,26 +240,24 @@ export const MessageInput: FC<MessageInputProps> = ({
                 </IconButton>
               )}
             </div>
+
+            {/* Input field */}
             <TextField
               id="message-input"
               inputRef={messageInputRef}
               type="text"
-              placeholder="Write a Comment"
+              placeholder="Enter your message here"
               value={currentMessage}
               onChange={handleChange}
               onKeyUp={handleKeyUp}
-              style={{
-                flex: 1,
-              }}
+              style={{ flex: 1 }}
               sx={{
-                // Root class for the input field
                 "& .MuiOutlinedInput-root": {
-                  // Class for the border around the input field
                   "& .MuiOutlinedInput-notchedOutline": {
                     borderColor: "#A5B4FC",
                     borderWidth: "1px",
-                    borderBottomLeftRadius: "8px",
-                    borderBottomRightRadius: "8px",
+                    borderBottomLeftRadius: enhancers.length > 0 ? 0 : "8px",
+                    borderBottomRightRadius: enhancers.length > 0 ? 0 : "8px",
                     borderTopLeftRadius: 0,
                     borderTopRightRadius: 0,
                   },
@@ -223,18 +270,11 @@ export const MessageInput: FC<MessageInputProps> = ({
                       <IconButton
                         onClick={handleSend}
                         aria-label="send message"
-                        disabled={
-                          !currentMessage ||
-                          currentMessage.length < 1 ||
-                          waitingForResponse
-                        }
+                        disabled={!currentMessage || waitingForResponse}
                       >
                         <Send
                           sx={{
-                            opacity:
-                              !currentMessage || currentMessage.length < 1
-                                ? 0.5
-                                : 1,
+                            opacity: !currentMessage ? 0.5 : 1,
                             color: "white",
                             backgroundColor: "#2f69c4",
                             borderRadius: "50%",
@@ -248,14 +288,61 @@ export const MessageInput: FC<MessageInputProps> = ({
                 },
               }}
             />
-            {/* Slash Command Menu */}
-            <SlashCommandMenu
-              commands={filteredCommands}
-              selectedIndex={slashCommandIndex}
-              onSelect={handleSlashCommandSelect}
-              anchorEl={messageInputRef.current}
-              open={showSlashMenu}
-            />
+
+            {/* Dynamic toolbar buttons */}
+            {enhancers.length > 0 && (
+              <div
+                className="flex gap-2 p-2 border-[1px] border-t-0 border-[#A5B4FC] rounded-b-lg"
+                style={{ backgroundColor: "#f9fafb" }}
+              >
+                {enhancers.map((enhancer) => {
+                  const isActive = activeEnhancer?.enhancer.id === enhancer.id;
+                  return (
+                    <button
+                      key={enhancer.id}
+                      onClick={() => {
+                        const cursor =
+                          messageInputRef.current?.selectionStart ??
+                          currentMessage.length;
+                        const result = enhancer.button.onClick(
+                          currentMessage,
+                          cursor
+                        );
+                        setCurrentMessage(result.value);
+                        setTimeout(() => {
+                          messageInputRef.current?.focus();
+                          messageInputRef.current?.setSelectionRange(
+                            result.cursorPos,
+                            result.cursorPos
+                          );
+                          // Re-trigger detection after cursor is positioned
+                          handleMessageChange(result.value);
+                        }, 0);
+                      }}
+                      className="flex items-center justify-center w-6 h-6 border border-gray-300 rounded bg-white hover:bg-gray-100 text-gray-700 font-mono text-sm transition-colors"
+                      title={enhancer.button.getTitle(isActive)}
+                    >
+                      {enhancer.button.icon}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Single generic popup menu */}
+            {activeEnhancer && (
+              <GenericEnhancerMenu
+                items={activeEnhancer.items}
+                selectedIndex={activeEnhancer.selectedIndex}
+                onSelect={handleEnhancerSelect}
+                renderItem={activeEnhancer.enhancer.renderItem}
+                getItemKey={(_item, index) =>
+                  `${activeEnhancer.enhancer.id}-${index}`
+                }
+                anchorEl={messageInputRef.current}
+                open={true}
+              />
+            )}
           </div>
         </Box>
       </div>

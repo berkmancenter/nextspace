@@ -2,7 +2,10 @@ import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MessageInput } from "../../components/MessageInput";
-import { SlashCommand } from "../../components/SlashCommandMenu";
+import {
+  SlashCommand,
+  createSlashCommandEnhancer,
+} from "../../components/enhancers/slashCommandEnhancer";
 
 // Mock scrollIntoView (not available in jsdom)
 Element.prototype.scrollIntoView = jest.fn();
@@ -25,6 +28,15 @@ describe("MessageInput Component", () => {
     },
   ];
 
+  const defaultProps = {
+    pseudonym: "TestUser",
+    enhancers: [createSlashCommandEnhancer(mockSlashCommands)],
+    onSendMessage: mockOnSendMessage,
+    waitingForResponse: false,
+    controlledMode: null,
+    onExitControlledMode: mockOnExitControlledMode,
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -32,32 +44,18 @@ describe("MessageInput Component", () => {
   describe("Basic Rendering", () => {
     it("renders with pseudonym", () => {
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
       expect(screen.getByText(/Writing as TestUser/i)).toBeInTheDocument();
       expect(
-        screen.getByPlaceholderText("Write a Comment")
+        screen.getByPlaceholderText("Enter your message here")
       ).toBeInTheDocument();
     });
 
     it("does not render when pseudonym is null", () => {
       const { container } = render(
-        <MessageInput
-          pseudonym={null}
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} pseudonym={null} />
       );
 
       expect(container.firstChild).toBeNull();
@@ -67,14 +65,7 @@ describe("MessageInput Component", () => {
   describe("Button State", () => {
     it("disables send button when message is empty", () => {
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
       const sendButton = screen.getByLabelText("send message");
@@ -84,17 +75,10 @@ describe("MessageInput Component", () => {
     it("enables send button when message has content", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
-      const input = screen.getByPlaceholderText("Write a Comment");
+      const input = screen.getByPlaceholderText("Enter your message here");
       const sendButton = screen.getByLabelText("send message");
 
       expect(sendButton).toBeDisabled();
@@ -107,17 +91,10 @@ describe("MessageInput Component", () => {
     it("disables send button while waiting for response", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={true}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} waitingForResponse={true} />
       );
 
-      const input = screen.getByPlaceholderText("Write a Comment");
+      const input = screen.getByPlaceholderText("Enter your message here");
       const sendButton = screen.getByLabelText("send message");
 
       await user.type(input, "Hello");
@@ -131,17 +108,10 @@ describe("MessageInput Component", () => {
     it("sends message when send button is clicked", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
-      const input = screen.getByPlaceholderText("Write a Comment");
+      const input = screen.getByPlaceholderText("Enter your message here");
       const sendButton = screen.getByLabelText("send message");
 
       await user.type(input, "Test message");
@@ -153,17 +123,10 @@ describe("MessageInput Component", () => {
     it("sends message when Enter key is pressed", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
-      const input = screen.getByPlaceholderText("Write a Comment");
+      const input = screen.getByPlaceholderText("Enter your message here");
 
       await user.type(input, "Test message{Enter}");
 
@@ -173,18 +136,11 @@ describe("MessageInput Component", () => {
     it("clears input after sending message", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
       const input = screen.getByPlaceholderText(
-        "Write a Comment"
+        "Enter your message here"
       ) as HTMLInputElement;
       const sendButton = screen.getByLabelText("send message");
 
@@ -199,17 +155,10 @@ describe("MessageInput Component", () => {
     it("does not send empty message", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
-      const input = screen.getByPlaceholderText("Write a Comment");
+      const input = screen.getByPlaceholderText("Enter your message here");
 
       // Try to send with just Enter (no message)
       await user.click(input);
@@ -221,17 +170,10 @@ describe("MessageInput Component", () => {
     it("sends message with slash command prefix", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
-      const input = screen.getByPlaceholderText("Write a Comment");
+      const input = screen.getByPlaceholderText("Enter your message here");
       await user.type(input, "/mod my question");
       await user.keyboard("{Enter}");
 
@@ -243,17 +185,10 @@ describe("MessageInput Component", () => {
     it("shows slash command menu when typing '/'", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
-      const input = screen.getByPlaceholderText("Write a Comment");
+      const input = screen.getByPlaceholderText("Enter your message here");
       await user.type(input, "/");
 
       await waitFor(() => {
@@ -267,17 +202,10 @@ describe("MessageInput Component", () => {
     it("hides slash command menu when space is typed after command", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
-      const input = screen.getByPlaceholderText("Write a Comment");
+      const input = screen.getByPlaceholderText("Enter your message here");
       await user.type(input, "/mod ");
 
       await waitFor(() => {
@@ -288,17 +216,10 @@ describe("MessageInput Component", () => {
     it("hides slash command menu when input is cleared", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
-      const input = screen.getByPlaceholderText("Write a Comment");
+      const input = screen.getByPlaceholderText("Enter your message here");
       await user.type(input, "/");
 
       await waitFor(() => {
@@ -315,18 +236,11 @@ describe("MessageInput Component", () => {
     it("selects slash command when clicked", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
       const input = screen.getByPlaceholderText(
-        "Write a Comment"
+        "Enter your message here"
       ) as HTMLInputElement;
       await user.type(input, "/");
 
@@ -346,18 +260,11 @@ describe("MessageInput Component", () => {
     it("positions cursor at end of command after selection", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
       const input = screen.getByPlaceholderText(
-        "Write a Comment"
+        "Enter your message here"
       ) as HTMLInputElement;
       await user.type(input, "/");
 
@@ -377,18 +284,11 @@ describe("MessageInput Component", () => {
     it("allows typing after slash command selection", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
       const input = screen.getByPlaceholderText(
-        "Write a Comment"
+        "Enter your message here"
       ) as HTMLInputElement;
       await user.type(input, "/");
 
@@ -411,17 +311,10 @@ describe("MessageInput Component", () => {
     it("filters commands based on typed text", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
-      const input = screen.getByPlaceholderText("Write a Comment");
+      const input = screen.getByPlaceholderText("Enter your message here");
       await user.type(input, "/m");
 
       await waitFor(() => {
@@ -433,17 +326,10 @@ describe("MessageInput Component", () => {
     it("does not show slash menu when typing regular text", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
-      const input = screen.getByPlaceholderText("Write a Comment");
+      const input = screen.getByPlaceholderText("Enter your message here");
       await user.type(input, "regular message");
 
       expect(screen.queryByText("/mod")).not.toBeInTheDocument();
@@ -452,17 +338,10 @@ describe("MessageInput Component", () => {
     it("does not show slash menu when typing slash mid-message", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
-      const input = screen.getByPlaceholderText("Write a Comment");
+      const input = screen.getByPlaceholderText("Enter your message here");
       await user.type(input, "check out http://example.com");
 
       expect(screen.queryByText("/mod")).not.toBeInTheDocument();
@@ -471,18 +350,11 @@ describe("MessageInput Component", () => {
     it("does not send message when Enter selects a slash command", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
       const input = screen.getByPlaceholderText(
-        "Write a Comment"
+        "Enter your message here"
       ) as HTMLInputElement;
       await user.type(input, "/");
 
@@ -511,14 +383,7 @@ describe("MessageInput Component", () => {
       };
 
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={controlledMode}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} controlledMode={controlledMode} />
       );
 
       expect(screen.getByText(/Feedback Mode/i)).toBeInTheDocument();
@@ -532,14 +397,7 @@ describe("MessageInput Component", () => {
       };
 
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={controlledMode}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} controlledMode={controlledMode} />
       );
 
       const closeButton = screen.getByRole("button", { name: "" });
@@ -555,14 +413,7 @@ describe("MessageInput Component", () => {
       };
 
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={controlledMode}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} controlledMode={controlledMode} />
       );
 
       // Find the close icon button
@@ -579,19 +430,12 @@ describe("MessageInput Component", () => {
 
     it("clears input when entering controlled mode", async () => {
       const { rerender } = render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
       const user = userEvent.setup();
       const input = screen.getByPlaceholderText(
-        "Write a Comment"
+        "Enter your message here"
       ) as HTMLInputElement;
 
       await user.type(input, "Some text");
@@ -605,14 +449,7 @@ describe("MessageInput Component", () => {
       };
 
       rerender(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={controlledMode}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} controlledMode={controlledMode} />
       );
 
       await waitFor(() => {
@@ -625,17 +462,10 @@ describe("MessageInput Component", () => {
     it("allows typing and sending multiple messages", async () => {
       const user = userEvent.setup();
       render(
-        <MessageInput
-          pseudonym="TestUser"
-          onSendMessage={mockOnSendMessage}
-          waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={mockOnExitControlledMode}
-          slashCommands={mockSlashCommands}
-        />
+        <MessageInput {...defaultProps} />
       );
 
-      const input = screen.getByPlaceholderText("Write a Comment");
+      const input = screen.getByPlaceholderText("Enter your message here");
 
       // Send first message
       await user.type(input, "First message{Enter}");
