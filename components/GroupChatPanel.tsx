@@ -82,8 +82,14 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(messages);
 
   // Extract unique contributors for mentions
+  // Normalize "Event Assistant Plus" to "Event Assistant" for consistency
   const contributors = useMemo(
-    () => Array.from(new Set(messages.map((m) => m.pseudonym).filter(Boolean))),
+    () => Array.from(new Set(messages.map((m) => {
+      if (m.pseudonym === "Event Assistant Plus") {
+        return "Event Assistant";
+      }
+      return m.pseudonym;
+    }).filter(Boolean))),
     [messages]
   );
 
