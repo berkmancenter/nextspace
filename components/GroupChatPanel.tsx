@@ -124,10 +124,10 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
       {/* Scrollable messages area */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-8 pt-12 bg-gray-100"
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-2 pr-2 md:px-8 pt-4 bg-gray-100"
       >
         <div
-          className="flex flex-col items-start gap-8 pb-4"
+          className="flex flex-col items-start gap-8 pb-2"
           aria-live="assertive"
         >
           {messages
@@ -217,7 +217,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
               );
             })}
           {/* Scroll target */}
-          <div ref={messagesEndRef} className="h-8" />
+          <div ref={messagesEndRef} className="h-2" />
         </div>
       </div>
 

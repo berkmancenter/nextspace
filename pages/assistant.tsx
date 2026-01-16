@@ -405,7 +405,7 @@ function EventAssistantRoom() {
           <div className="flex-1 flex flex-col relative overflow-hidden lg:order-1">
             {/* Tab navigation - only show if chat passcode is available */}
             {chatPasscode && (
-              <div className="flex border-b border-gray-300 px-8 pt-6 gap-8">
+              <div className="flex border-b border-gray-300 pl-2 pr-2 md:px-8 pt-6 gap-8">
                 <button
                   onClick={() => setActiveTab("assistant")}
                   className={`pb-3 text-sm font-bold uppercase border-b-4 transition-colors ${

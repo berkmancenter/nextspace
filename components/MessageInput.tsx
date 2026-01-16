@@ -210,7 +210,7 @@ export const MessageInput: FC<MessageInputProps> = ({
   if (!pseudonym) return null;
 
   return (
-    <div className="flex bg-white pl-8">
+    <div className="flex bg-white pl-2 pr-2 md:px-8">
       <div className="w-full max-w-4xl">
         <Box display="flex" alignItems="center" padding="8px">
           <div className="flex flex-col w-full">

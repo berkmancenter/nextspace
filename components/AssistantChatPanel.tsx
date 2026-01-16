@@ -103,10 +103,10 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
       {/* Scrollable messages area */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-8 pt-12 bg-gray-100"
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-2 pr-2 md:px-8 pt-4 bg-gray-100"
       >
         <div
-          className="flex flex-col items-start gap-8 pb-4"
+          className="flex flex-col items-start gap-8 pb-2"
           aria-live="assertive"
         >
           {messages
@@ -174,10 +174,10 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                     </div>
 
                     {/* Message content */}
-                    <div className="flex flex-col items-start flex-1">
+                    <div className="flex flex-col items-start flex-1 min-w-0">
                       {/* Message - white bubble for users, no bubble for EA */}
                       {isAssistant ? (
-                        <div className="text-gray-800 w-full">
+                        <div className="text-gray-800" style={{ width: "100%", maxWidth: "100%" }}>
                           <AssistantMessage
                             key={`msg-${i}`}
                             message={{
@@ -196,6 +196,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                           style={{
                             backgroundColor: "#FFFFFF",
                             width: "100%",
+                            maxWidth: "100%",
                           }}
                         >
                           {parsed.text}
@@ -246,7 +247,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
               );
             })}
           {/* Scroll target */}
-          <div ref={messagesEndRef} className="h-8" />
+          <div ref={messagesEndRef} className="h-2" />
         </div>
       </div>
 
