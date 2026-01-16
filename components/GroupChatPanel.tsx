@@ -1,4 +1,5 @@
 import React, { FC, useMemo } from "react";
+import Linkify from "linkify-react";
 import { MessageInput } from "./MessageInput";
 import { PseudonymousMessage } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
@@ -40,8 +41,8 @@ const parseMessageBody = (body: string | object): ParsedMessageBody => {
 };
 
 /**
- * Parse message text and highlight @mentions
- * Handles two-word pseudonyms (e.g., @John Doe)
+ * Parse message text and highlight @mentions with linkification
+ * Handles two-word pseudonyms (e.g., @John Doe) and converts URLs to clickable links
  */
 const renderMessageWithMentions = (text: string): React.ReactNode => {
   // Split by @mention pattern - matches @word or @word word
@@ -60,7 +61,21 @@ const renderMessageWithMentions = (text: string): React.ReactNode => {
         </span>
       );
     }
-    return <span key={index}>{part}</span>;
+    // Apply linkification to non-mention text
+    return (
+      <Linkify
+        key={index}
+        options={{
+          attributes: {
+            class: "text-medium-slate-blue",
+            target: "_blank",
+            rel: "noopener noreferrer",
+          },
+        }}
+      >
+        {part}
+      </Linkify>
+    );
   });
 };
 
