@@ -166,7 +166,7 @@ export function Transcript(props: {
     };
 
     try {
-      props.socket.emit("conversation:join", {
+      props.socket.emit("channel:join", {
         conversationId: props.conversationId,
         token: props.apiAccessToken,
         channel,

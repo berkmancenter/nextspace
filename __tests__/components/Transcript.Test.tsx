@@ -376,6 +376,16 @@ describe("Transcript", () => {
   it("removes socket listener on unmount", () => {
     const { unmount } = render(<Transcript {...baseProps} />);
 
+    // Verify subscription was initiated
+    expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {
+      conversationId: baseProps.conversationId,
+      token: baseProps.apiAccessToken,
+      channel: {
+        name: "transcript",
+        passcode: baseProps.transcriptPasscode,
+      },
+    });
+
     // Verify listener was added
     expect(mockSocket.on).toHaveBeenCalledWith(
       "message:new",
@@ -395,6 +405,16 @@ describe("Transcript", () => {
 
     render(<Transcript {...baseProps} />);
 
+    // Should emit channel:join
+    expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {
+      conversationId: baseProps.conversationId,
+      token: baseProps.apiAccessToken,
+      channel: {
+        name: "transcript",
+        passcode: baseProps.transcriptPasscode,
+      },
+    });
+
     // Should still add listener (we removed hasListeners check)
     expect(mockSocket.on).toHaveBeenCalledWith(
       "message:new",
@@ -406,6 +426,16 @@ describe("Transcript", () => {
     const { rerender } = render(<Transcript {...baseProps} />);
 
     const firstHandler = mockSocket.on.mock.calls[0][1];
+
+    // Verify first socket emitted channel:join
+    expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {
+      conversationId: baseProps.conversationId,
+      token: baseProps.apiAccessToken,
+      channel: {
+        name: "transcript",
+        passcode: baseProps.transcriptPasscode,
+      },
+    });
 
     // Change socket prop
     const newMockSocket = {
@@ -421,6 +451,16 @@ describe("Transcript", () => {
 
     // Old socket should have cleanup called
     expect(mockSocket.off).toHaveBeenCalledWith("message:new", firstHandler);
+
+    // New socket should emit channel:join
+    expect(newMockSocket.emit).toHaveBeenCalledWith("channel:join", {
+      conversationId: baseProps.conversationId,
+      token: baseProps.apiAccessToken,
+      channel: {
+        name: "transcript",
+        passcode: baseProps.transcriptPasscode,
+      },
+    });
 
     // New socket should have listener added
     expect(newMockSocket.on).toHaveBeenCalledWith(

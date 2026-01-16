@@ -218,11 +218,26 @@ function EventAssistantRoom() {
 
             if (agentId && userId) {
               console.log("Joining conversation");
-              // Join the direct channel for assistant
+              // Join channels - include both direct and chat if chatPasscode is available
+              const channels: components["schemas"]["Channel"][] = [
+                {
+                  name: `direct-${userId}-${agentId}`,
+                  passcode: null,
+                  direct: true,
+                },
+              ];
+              if (chatPasscode) {
+                channels.push({
+                  name: "chat",
+                  passcode: chatPasscode,
+                  direct: false,
+                });
+              }
+
               socket.emit("conversation:join", {
                 conversationId: router.query.conversationId,
                 token: Api.get().GetTokens().access,
-                channel: { name: `direct-${userId}-${agentId}` },
+                channels,
               });
             }
           });
@@ -233,17 +248,12 @@ function EventAssistantRoom() {
         });
     }
     fetchConversationData();
-  }, [socket, router, userId, agentId]);
+  }, [socket, router, userId, agentId, chatPasscode]);
 
-  // Join chat channel and load initial messages when chatPasscode becomes available
+  // Load initial chat messages when chatPasscode becomes available
   useEffect(() => {
-    if (!socket || !chatPasscode || !router.query.conversationId) return;
+    if (!chatPasscode || !router.query.conversationId) return;
 
-    socket.emit("conversation:join", {
-      conversationId: router.query.conversationId,
-      token: Api.get().GetTokens().access,
-      channel: { name: "chat", passcode: chatPasscode },
-    });
     const fetchInitialMessages = async () => {
       try {
         const chatMessages = await RetrieveData(
@@ -260,7 +270,7 @@ function EventAssistantRoom() {
     };
 
     fetchInitialMessages();
-  }, [socket, chatPasscode, router.query.conversationId]);
+  }, [chatPasscode, router.query.conversationId]);
 
   async function sendMessage(
     message: string,
