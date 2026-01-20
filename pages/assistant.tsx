@@ -315,7 +315,7 @@ function EventAssistantRoom() {
       } else {
         trackConversationEvent(
           conversationId,
-          "assistant",
+          activeTab,
           "message_sent",
           messageSource
         );
