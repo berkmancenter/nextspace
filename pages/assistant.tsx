@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
+import { Badge } from "@mui/material";
 
 import { AssistantChatPanel } from "../components/AssistantChatPanel";
 import { GroupChatPanel } from "../components/GroupChatPanel";
@@ -39,6 +40,8 @@ function EventAssistantRoom() {
   const [waitingForResponse, setWaitingForResponse] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"assistant" | "chat">("assistant");
+  const [unseenAssistantCount, setUnseenAssistantCount] = useState<number>(0);
+  const [unseenChatCount, setUnseenChatCount] = useState<number>(0);
   const [assistantMessages, setAssistantMessages] = useState<
     PseudonymousMessage[]
   >([]);
@@ -54,6 +57,9 @@ function EventAssistantRoom() {
   const [chatPasscode, setChatPasscode] = useState<string>("");
   const [assistantInputValue, setAssistantInputValue] = useState<string>("");
   const [chatInputValue, setChatInputValue] = useState<string>("");
+
+  // Ref to track active tab for socket handler
+  const activeTabRef = useRef<"assistant" | "chat">("assistant");
 
   // Available slash commands
   // Commands can optionally specify which conversation types they're available for
@@ -115,11 +121,19 @@ function EventAssistantRoom() {
             // Route messages to appropriate array based on channel
             if (data.channels && data.channels.includes("chat")) {
               setChatMessages((prev) => [...prev, data]);
+              // Increment counter if NOT viewing chat tab
+              if (activeTabRef.current !== "chat") {
+                setUnseenChatCount((prev) => prev + 1);
+              }
             } else if (
               !data.channels ||
               !data.channels.includes("transcript")
             ) {
               setAssistantMessages((prev) => [...prev, data]);
+              // Increment counter if NOT viewing assistant tab
+              if (activeTabRef.current !== "assistant") {
+                setUnseenAssistantCount((prev) => prev + 1);
+              }
             }
           }
           if (
@@ -145,6 +159,11 @@ function EventAssistantRoom() {
       }
     };
   }, [socket, joining]);
+
+  // Keep activeTabRef in sync with activeTab state
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
 
   useEffect(() => {
     if (!Api.get().GetTokens().access || !router.isReady) return;
@@ -381,6 +400,16 @@ function EventAssistantRoom() {
     await sendMessage(value, true, parentMessageId, false, "reaction");
   };
 
+  const handleTabSwitch = (tab: "assistant" | "chat") => {
+    setActiveTab(tab);
+    // Clear unseen count for the tab we're switching to
+    if (tab === "assistant") {
+      setUnseenAssistantCount(0);
+    } else {
+      setUnseenChatCount(0);
+    }
+  };
+
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-96px)] overflow-hidden">
       {errorMessage ? (
@@ -407,7 +436,7 @@ function EventAssistantRoom() {
             {chatPasscode && (
               <div className="flex border-b border-gray-300 pl-2 pr-2 md:px-8 pt-6 gap-8">
                 <button
-                  onClick={() => setActiveTab("assistant")}
+                  onClick={() => handleTabSwitch("assistant")}
                   className={`pb-3 text-sm font-bold uppercase border-b-4 transition-colors ${
                     activeTab === "assistant"
                       ? "text-gray-800"
@@ -419,10 +448,17 @@ function EventAssistantRoom() {
                       : undefined
                   }
                 >
-                  Event Assistant
+                  <Badge
+                    color="secondary"
+                    variant="dot"
+                    invisible={unseenAssistantCount === 0 || activeTab === "assistant"}
+                    sx={{ "& .MuiBadge-badge": { right: -4, top: 8 } }}
+                  >
+                    <span style={{ paddingRight: "8px" }}>Event Assistant</span>
+                  </Badge>
                 </button>
                 <button
-                  onClick={() => setActiveTab("chat")}
+                  onClick={() => handleTabSwitch("chat")}
                   className={`pb-3 text-sm font-bold uppercase border-b-4 transition-colors ${
                     activeTab === "chat"
                       ? "text-gray-800"
@@ -434,7 +470,14 @@ function EventAssistantRoom() {
                       : undefined
                   }
                 >
-                  Chat
+                  <Badge
+                    color="secondary"
+                    variant="dot"
+                    invisible={unseenChatCount === 0 || activeTab === "chat"}
+                    sx={{ "& .MuiBadge-badge": { right: -4, top: 8 } }}
+                  >
+                    <span style={{ paddingRight: "8px" }}>Chat</span>
+                  </Badge>
                 </button>
               </div>
             )}
