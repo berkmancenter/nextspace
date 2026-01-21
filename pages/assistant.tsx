@@ -408,6 +408,12 @@ function EventAssistantRoom() {
     } else {
       setUnseenChatCount(0);
     }
+    trackConversationEvent(
+      router.query.conversationId as string,
+      "assistant",
+      "tab_switched",
+      tab
+    );
   };
 
   return (
@@ -451,7 +457,9 @@ function EventAssistantRoom() {
                   <Badge
                     color="secondary"
                     variant="dot"
-                    invisible={unseenAssistantCount === 0 || activeTab === "assistant"}
+                    invisible={
+                      unseenAssistantCount === 0 || activeTab === "assistant"
+                    }
                     sx={{ "& .MuiBadge-badge": { right: -4, top: 8 } }}
                   >
                     <span style={{ paddingRight: "8px" }}>Event Assistant</span>
