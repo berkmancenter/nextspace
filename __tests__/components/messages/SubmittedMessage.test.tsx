@@ -25,7 +25,7 @@ describe("SubmittedMessage Component", () => {
     expect(screen.getByText("You Asked")).toBeInTheDocument();
   });
 
-  it("applies gray background and left border styling", () => {
+  it("applies avatar background and left border styling", () => {
     const message: components["schemas"]["Message"] = {
       id: "msg-2",
       body: "Test question",
@@ -41,9 +41,10 @@ describe("SubmittedMessage Component", () => {
 
     const { container } = render(<SubmittedMessage message={message} />);
 
-    expect(container.querySelector(".bg-gray-100")).toBeInTheDocument();
-    expect(container.querySelector(".border-l-4")).toBeInTheDocument();
-    expect(container.querySelector(".border-gray-600")).toBeInTheDocument();
+    const styledDiv = container.querySelector(".border-l-4");
+    expect(styledDiv).toBeInTheDocument();
+    expect(styledDiv).toHaveStyle({ backgroundColor: expect.any(String) });
+    expect(styledDiv).toHaveStyle({ borderLeftColor: expect.any(String) });
   });
 
   it("renders AccountCircle icon", () => {

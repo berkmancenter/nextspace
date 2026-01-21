@@ -56,37 +56,21 @@ describe("Transcript", () => {
     await user.click(toggle);
   };
 
-  it("starts collapsed and can be toggled open and closed", async () => {
+  it("starts open and can be toggled closed and open", async () => {
     const user = setupUser();
     render(<Transcript {...baseProps} />);
 
-    // Should start collapsed with "Open transcript" button
+    // Should start open with "Close transcript" button
     const toggle = screen.getByRole("button", {
-      name: /Open transcript/i,
+      name: /Close transcript/i,
     });
     expect(toggle).toBeInTheDocument();
 
-    // Should show vertical text when collapsed
+    // Should show horizontal header when open
     expect(screen.getAllByText("LIVE TRANSCRIPT").length).toBeGreaterThan(0);
 
-    // Open the transcript
+    // Close the transcript
     await user.click(toggle);
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("button", {
-          name: /Close transcript/i,
-        })
-      ).toBeInTheDocument();
-      // Should show horizontal header when open
-      expect(screen.getAllByText("LIVE TRANSCRIPT").length).toBeGreaterThan(0);
-    });
-
-    // Close it again
-    const closeButton = screen.getByRole("button", {
-      name: /Close transcript/i,
-    });
-    await user.click(closeButton);
 
     await waitFor(() => {
       expect(
@@ -94,19 +78,44 @@ describe("Transcript", () => {
           name: /Open transcript/i,
         })
       ).toBeInTheDocument();
+      // Should show vertical text when collapsed
+      expect(screen.getAllByText("LIVE TRANSCRIPT").length).toBeGreaterThan(0);
+    });
+
+    // Open it again
+    const openButton = screen.getByRole("button", {
+      name: /Open transcript/i,
+    });
+    await user.click(openButton);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", {
+          name: /Close transcript/i,
+        })
+      ).toBeInTheDocument();
     });
   });
 
-  it("displays vertical text when collapsed", () => {
+  it("displays vertical text when collapsed", async () => {
+    const user = setupUser();
     render(<Transcript {...baseProps} />);
 
-    // Should show vertical "LIVE TRANSCRIPT" text when collapsed
-    expect(screen.getAllByText("LIVE TRANSCRIPT").length).toBeGreaterThan(0);
+    // Close the transcript first (starts open now)
+    const closeButton = screen.getByRole("button", {
+      name: /Close transcript/i,
+    });
+    await user.click(closeButton);
 
-    // Should have the open button
-    expect(
-      screen.getByRole("button", { name: /Open transcript/i })
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      // Should show vertical "LIVE TRANSCRIPT" text when collapsed
+      expect(screen.getAllByText("LIVE TRANSCRIPT").length).toBeGreaterThan(0);
+
+      // Should have the open button
+      expect(
+        screen.getByRole("button", { name: /Open transcript/i })
+      ).toBeInTheDocument();
+    });
   });
 
   it("changes width when toggled", async () => {
@@ -115,27 +124,22 @@ describe("Transcript", () => {
 
     const transcriptContainer = container.firstChild as HTMLElement;
 
-    // Should start with collapsed width (w-16 = 64px)
-    expect(transcriptContainer).toHaveClass("lg:w-16");
+    // Should start open with full width (w-[33vw])
+    expect(transcriptContainer).toHaveClass("lg:w-[33vw]");
 
-    // Open transcript
+    // Close transcript
     await toggleTranscript(user);
 
     await waitFor(() => {
-      // Should expand to full width (w-[33vw])
-      expect(transcriptContainer).toHaveClass("lg:w-[33vw]");
+      // Should collapse to narrow width (w-16 = 64px)
+      expect(transcriptContainer).toHaveClass("lg:w-16");
     });
   });
 
   it("renders transcript messages when opened", async () => {
-    const user = setupUser();
     render(<Transcript {...baseProps} />);
 
-    // Should start collapsed, messages not visible
-    expect(screen.queryByText("Hello world")).not.toBeInTheDocument();
-
-    await toggleTranscript(user);
-
+    // Should start open with messages visible
     await waitFor(() => {
       expect(screen.getByText("Hello world")).toBeInTheDocument();
       expect(screen.getByText("Second message")).toBeInTheDocument();
@@ -169,14 +173,9 @@ describe("Transcript", () => {
     });
   });
 
-  it("applies focus styles when transcript is manually opened and focusTimeRange exists", async () => {
-    const user = setupUser();
-
-    // Start with transcript closed, no focusTimeRange
+  it("applies focus styles when transcript is already open and focusTimeRange is set", async () => {
+    // Start with transcript open (default), no focusTimeRange
     const { rerender } = render(<Transcript {...baseProps} />);
-
-    // Manually open transcript
-    await toggleTranscript(user);
 
     await waitFor(() => {
       expect(
@@ -376,6 +375,16 @@ describe("Transcript", () => {
   it("removes socket listener on unmount", () => {
     const { unmount } = render(<Transcript {...baseProps} />);
 
+    // Verify subscription was initiated
+    expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {
+      conversationId: baseProps.conversationId,
+      token: baseProps.apiAccessToken,
+      channel: {
+        name: "transcript",
+        passcode: baseProps.transcriptPasscode,
+      },
+    });
+
     // Verify listener was added
     expect(mockSocket.on).toHaveBeenCalledWith(
       "message:new",
@@ -395,6 +404,16 @@ describe("Transcript", () => {
 
     render(<Transcript {...baseProps} />);
 
+    // Should emit channel:join
+    expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {
+      conversationId: baseProps.conversationId,
+      token: baseProps.apiAccessToken,
+      channel: {
+        name: "transcript",
+        passcode: baseProps.transcriptPasscode,
+      },
+    });
+
     // Should still add listener (we removed hasListeners check)
     expect(mockSocket.on).toHaveBeenCalledWith(
       "message:new",
@@ -406,6 +425,16 @@ describe("Transcript", () => {
     const { rerender } = render(<Transcript {...baseProps} />);
 
     const firstHandler = mockSocket.on.mock.calls[0][1];
+
+    // Verify first socket emitted channel:join
+    expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {
+      conversationId: baseProps.conversationId,
+      token: baseProps.apiAccessToken,
+      channel: {
+        name: "transcript",
+        passcode: baseProps.transcriptPasscode,
+      },
+    });
 
     // Change socket prop
     const newMockSocket = {
@@ -421,6 +450,16 @@ describe("Transcript", () => {
 
     // Old socket should have cleanup called
     expect(mockSocket.off).toHaveBeenCalledWith("message:new", firstHandler);
+
+    // New socket should emit channel:join
+    expect(newMockSocket.emit).toHaveBeenCalledWith("channel:join", {
+      conversationId: baseProps.conversationId,
+      token: baseProps.apiAccessToken,
+      channel: {
+        name: "transcript",
+        passcode: baseProps.transcriptPasscode,
+      },
+    });
 
     // New socket should have listener added
     expect(newMockSocket.on).toHaveBeenCalledWith(

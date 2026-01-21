@@ -67,7 +67,6 @@ export const SlashCommandMenu: FC<SlashCommandMenuProps> = ({
 
   // Calculate position based on anchor element
   const rect = anchorEl.getBoundingClientRect();
-  const menuHeight = Math.min(300, commands.length * 80); // Estimate menu height
 
   return (
     <Paper
@@ -75,18 +74,18 @@ export const SlashCommandMenu: FC<SlashCommandMenuProps> = ({
       elevation={8}
       sx={{
         position: "fixed",
-        bottom: `${window.innerHeight - rect.top + 8}px`, // 8px gap above input
+        bottom: `${window.innerHeight - rect.top + 8}px`,
         left: rect.left,
         zIndex: 1400,
-        maxHeight: "300px",
-        minWidth: "350px",
+        maxHeight: 240,
+        minWidth: 280,
         overflow: "auto",
         borderRadius: "8px",
         border: "1px solid",
         borderColor: "grey.300",
       }}
     >
-      <Box sx={{ py: 0.5 }}>
+      <Box>
         {commands.map((cmd, index) => (
           <MenuItem
             key={cmd.command}
@@ -94,40 +93,13 @@ export const SlashCommandMenu: FC<SlashCommandMenuProps> = ({
             onClick={() => onSelect(cmd)}
             sx={{
               display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 2,
-              py: 1,
-              px: 2,
-              "&.Mui-selected": {
-                backgroundColor: "action.selected",
-                "&:hover": {
-                  backgroundColor: "action.selected",
-                },
-              },
-              "&:hover": {
-                backgroundColor: "action.hover",
-              },
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 0.5,
             }}
           >
-            <Typography
-              variant="body1"
-              sx={{
-                fontWeight: 600,
-                color: "primary.main",
-                fontFamily: "monospace",
-                minWidth: "60px",
-                flexShrink: 0,
-              }}
-            >
-              /{cmd.command}
-            </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                color: "text.secondary",
-              }}
-            >
+            <Typography fontWeight={600}>/{cmd.command}</Typography>
+            <Typography variant="caption" color="text.secondary">
               {cmd.description}
             </Typography>
           </MenuItem>

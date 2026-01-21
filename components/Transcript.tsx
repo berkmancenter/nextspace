@@ -19,7 +19,7 @@ export function Transcript(props: {
   apiAccessToken: string;
 }) {
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
-  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [isOpen, setIsOpen] = useState<boolean>(true);
   const [focusedMessageIds, setFocusedMessageIds] = useState<string[]>([]);
   const topRef = useRef<HTMLDivElement | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
@@ -166,7 +166,7 @@ export function Transcript(props: {
     };
 
     try {
-      props.socket.emit("conversation:join", {
+      props.socket.emit("channel:join", {
         conversationId: props.conversationId,
         token: props.apiAccessToken,
         channel,

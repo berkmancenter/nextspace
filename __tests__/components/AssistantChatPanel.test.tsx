@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { AssistantChat } from "../../components/AssistantChat";
+import { AssistantChatPanel } from "../../components/AssistantChatPanel";
 
 // Mock message components
 jest.mock("../../components/messages", () => ({
@@ -56,13 +56,6 @@ jest.mock("../../components/messages", () => ({
         : message.body?.text || "";
     return <div data-testid="moderator-submitted-message">{messageText}</div>;
   },
-  UserMessage: ({ message }: any) => {
-    const messageText =
-      typeof message.body === "string"
-        ? message.body
-        : message.body?.text || "";
-    return <div data-testid="user-message">{messageText}</div>;
-  },
 }));
 
 // Mock MessageInput component
@@ -84,7 +77,7 @@ jest.mock("../../components/MessageInput", () => ({
   ),
 }));
 
-describe("AssistantChat", () => {
+describe("AssistantChatPanel", () => {
   const mockOnSendMessage = jest.fn();
   const mockOnExitControlledMode = jest.fn();
   const mockOnPromptSelect = jest.fn();
@@ -109,7 +102,7 @@ describe("AssistantChat", () => {
   });
 
   it("renders without messages", () => {
-    render(<AssistantChat {...baseProps} />);
+    render(<AssistantChatPanel {...baseProps} />);
 
     expect(screen.getByTestId("message-input")).toBeInTheDocument();
     expect(screen.queryByTestId("assistant-message")).not.toBeInTheDocument();
@@ -133,7 +126,7 @@ describe("AssistantChat", () => {
       },
     ];
 
-    render(<AssistantChat {...baseProps} messages={messages} />);
+    render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
     expect(screen.getByText("Hello, how can I help?")).toBeInTheDocument();
     expect(screen.getByTestId("assistant-message")).toBeInTheDocument();
@@ -157,10 +150,9 @@ describe("AssistantChat", () => {
       },
     ];
 
-    render(<AssistantChat {...baseProps} messages={messages} />);
+    render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
     expect(screen.getByText("I need help")).toBeInTheDocument();
-    expect(screen.getByTestId("user-message")).toBeInTheDocument();
   });
 
   it("renders moderator_submitted messages", () => {
@@ -185,7 +177,7 @@ describe("AssistantChat", () => {
       },
     ];
 
-    render(<AssistantChat {...baseProps} messages={messages} />);
+    render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
     expect(screen.getByText("This was submitted")).toBeInTheDocument();
     expect(
@@ -225,7 +217,7 @@ describe("AssistantChat", () => {
       },
     ];
 
-    render(<AssistantChat {...baseProps} messages={messages} />);
+    render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
     expect(screen.getByText("Original message")).toBeInTheDocument();
     expect(screen.getByTestId("submitted-message")).toBeInTheDocument();
@@ -264,7 +256,7 @@ describe("AssistantChat", () => {
       },
     ];
 
-    render(<AssistantChat {...baseProps} messages={messages} />);
+    render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
     expect(screen.getByText("Main message")).toBeInTheDocument();
     expect(screen.queryByText("Child message")).not.toBeInTheDocument();
@@ -289,14 +281,14 @@ describe("AssistantChat", () => {
     ];
 
     const { container } = render(
-      <AssistantChat
+      <AssistantChatPanel
         {...baseProps}
         messages={messages}
         waitingForResponse={true}
       />
     );
 
-    // Should show animated SVG loading indicator - look for the animate-bounce class which is on the circle
+    // Should show animated SVG loading indicator
     const loadingIndicator = container.querySelector(".animate-bounce");
     expect(loadingIndicator).toBeInTheDocument();
   });
@@ -304,20 +296,7 @@ describe("AssistantChat", () => {
   it("calls onSendMessage when user sends a message", async () => {
     const user = userEvent.setup();
 
-    render(<AssistantChat {...baseProps} />);
-
-    const input = screen.getByTestId("message-input-field");
-
-    await user.type(input, "Test message");
-    await user.keyboard("{Enter}");
-
-    expect(mockOnSendMessage).toHaveBeenCalledWith("Test message");
-  });
-
-  it("calls onSendMessage when user sends a message", async () => {
-    const user = userEvent.setup();
-
-    render(<AssistantChat {...baseProps} />);
+    render(<AssistantChatPanel {...baseProps} />);
 
     const input = screen.getByTestId("message-input-field");
 
@@ -347,7 +326,7 @@ describe("AssistantChat", () => {
       },
     ];
 
-    render(<AssistantChat {...baseProps} messages={messages} />);
+    render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
     const ratingButton = screen.getByTestId("rating-button-3");
     await user.click(ratingButton);
@@ -375,7 +354,7 @@ describe("AssistantChat", () => {
       },
     ];
 
-    render(<AssistantChat {...baseProps} messages={messages} />);
+    render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
     const sayMoreButton = screen.getByTestId("say-more-button");
     await user.click(sayMoreButton);
@@ -390,7 +369,7 @@ describe("AssistantChat", () => {
 
   it("scrolls to bottom when new messages arrive", async () => {
     const { rerender, container } = render(
-      <AssistantChat {...baseProps} messages={[]} />
+      <AssistantChatPanel {...baseProps} messages={[]} />
     );
 
     // Get the scrollable messages container
@@ -426,7 +405,7 @@ describe("AssistantChat", () => {
       },
     ];
 
-    rerender(<AssistantChat {...baseProps} messages={newMessages} />);
+    rerender(<AssistantChatPanel {...baseProps} messages={newMessages} />);
 
     await waitFor(() => {
       expect(scrollTopSpy).toHaveBeenCalledWith(1000);
@@ -451,7 +430,7 @@ describe("AssistantChat", () => {
       },
     ];
 
-    render(<AssistantChat {...baseProps} messages={messages} />);
+    render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
     expect(screen.getByText("Simple string message")).toBeInTheDocument();
   });
@@ -474,7 +453,7 @@ describe("AssistantChat", () => {
       },
     ];
 
-    render(<AssistantChat {...baseProps} messages={messages} />);
+    render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
     expect(screen.getByText("Object message")).toBeInTheDocument();
   });

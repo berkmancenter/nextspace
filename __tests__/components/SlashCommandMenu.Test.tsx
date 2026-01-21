@@ -222,7 +222,7 @@ describe("SlashCommandMenu", () => {
     expect(mockOnSelect).toHaveBeenCalledWith(mockCommands[2]);
   });
 
-  it("displays commands in monospace font", () => {
+  it("displays commands with bold font weight", () => {
     render(
       <SlashCommandMenu
         commands={mockCommands}
@@ -234,7 +234,7 @@ describe("SlashCommandMenu", () => {
     );
 
     const commandText = screen.getByText("/mod");
-    expect(commandText).toHaveStyle({ fontFamily: "monospace" });
+    expect(commandText).toHaveStyle({ fontWeight: 600 });
   });
 
   it("scrolls selected item into view when selectedIndex changes", async () => {
@@ -355,7 +355,7 @@ describe("SlashCommandMenu", () => {
 
     // Menu should have max height constraint
     const menu = container.firstChild as HTMLElement;
-    expect(menu).toHaveStyle({ maxHeight: "300px" });
+    expect(menu).toHaveStyle({ maxHeight: "240px" });
     expect(menu).toHaveStyle({ overflow: "auto" });
   });
 

@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import { FC } from "react";
-import Linkify from "linkify-react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 /**
  * Props for BaseMessage component
@@ -51,16 +52,22 @@ export const MessageContent: FC<MessageContentProps> = ({
   }
 
   return (
-    <Linkify
-      options={{
-        attributes: {
-          class: "text-medium-slate-blue",
-          target: "_blank",
-          rel: "noopener noreferrer",
-        },
-      }}
-    >
-      {displayText}
-    </Linkify>
+    <div className="markdown-content">
+      <Markdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          a: ({ node, ...props }) => (
+            <a
+              {...props}
+              className="text-medium-slate-blue"
+              target="_blank"
+              rel="noopener noreferrer"
+            />
+          ),
+        }}
+      >
+        {displayText}
+      </Markdown>
+    </div>
   );
 };

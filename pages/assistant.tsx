@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
+import { Badge } from "@mui/material";
 
-import { AssistantChat } from "../components/AssistantChat";
-import { SlashCommand } from "../components/SlashCommandMenu";
+import { AssistantChatPanel } from "../components/AssistantChatPanel";
+import { GroupChatPanel } from "../components/GroupChatPanel";
+import { SlashCommand } from "../components/enhancers/slashCommandEnhancer";
 import {
   Api,
   JoinSession,
@@ -37,7 +39,13 @@ function EventAssistantRoom() {
   const [joining, setJoining] = useState(false);
   const [waitingForResponse, setWaitingForResponse] = useState(false);
 
-  const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
+  const [activeTab, setActiveTab] = useState<"assistant" | "chat">("assistant");
+  const [unseenAssistantCount, setUnseenAssistantCount] = useState<number>(0);
+  const [unseenChatCount, setUnseenChatCount] = useState<number>(0);
+  const [assistantMessages, setAssistantMessages] = useState<
+    PseudonymousMessage[]
+  >([]);
+  const [chatMessages, setChatMessages] = useState<PseudonymousMessage[]>([]);
   const [pseudonym, setPseudonym] = useState<string | null>(null);
   const [userId, setUserIdState] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
@@ -46,6 +54,12 @@ function EventAssistantRoom() {
   const [controlledMode, setControlledMode] =
     useState<ControlledInputConfig | null>(null);
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>("");
+  const [chatPasscode, setChatPasscode] = useState<string>("");
+  const [assistantInputValue, setAssistantInputValue] = useState<string>("");
+  const [chatInputValue, setChatInputValue] = useState<string>("");
+
+  // Ref to track active tab for socket handler
+  const activeTabRef = useRef<"assistant" | "chat">("assistant");
 
   // Available slash commands
   // Commands can optionally specify which conversation types they're available for
@@ -103,11 +117,24 @@ function EventAssistantRoom() {
           if (process.env.NODE_ENV !== "production")
             console.log("New message:", data);
 
-          if (
-            !data.parentMessage &&
-            (!data.channels || !data.channels.includes("transcript"))
-          ) {
-            setMessages((prev) => [...prev, data]);
+          if (!data.parentMessage) {
+            // Route messages to appropriate array based on channel
+            if (data.channels && data.channels.includes("chat")) {
+              setChatMessages((prev) => [...prev, data]);
+              // Increment counter if NOT viewing chat tab
+              if (activeTabRef.current !== "chat") {
+                setUnseenChatCount((prev) => prev + 1);
+              }
+            } else if (
+              !data.channels ||
+              !data.channels.includes("transcript")
+            ) {
+              setAssistantMessages((prev) => [...prev, data]);
+              // Increment counter if NOT viewing assistant tab
+              if (activeTabRef.current !== "assistant") {
+                setUnseenAssistantCount((prev) => prev + 1);
+              }
+            }
           }
           if (
             data.pseudonym === "Event Assistant" ||
@@ -132,6 +159,11 @@ function EventAssistantRoom() {
       }
     };
   }, [socket, joining]);
+
+  // Keep activeTabRef in sync with activeTab state
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
 
   useEffect(() => {
     if (!Api.get().GetTokens().access || !router.isReady) return;
@@ -161,7 +193,7 @@ function EventAssistantRoom() {
           createConversationFromData(conversationData).then((conversation) => {
             setConversationType(conversation.type.name);
 
-            // Get transcript passcode if channel query param exists
+            // Get transcript and chat passcodes if channel query param exists
             if (router.query.channel) {
               const transcriptPasscodeParam = GetChannelPasscode(
                 "transcript",
@@ -171,6 +203,16 @@ function EventAssistantRoom() {
 
               if (transcriptPasscodeParam) {
                 setTranscriptPasscode(transcriptPasscodeParam);
+              }
+
+              const chatPasscodeParam = GetChannelPasscode(
+                "chat",
+                router.query,
+                setErrorMessage
+              );
+
+              if (chatPasscodeParam) {
+                setChatPasscode(chatPasscodeParam);
               }
             }
 
@@ -195,10 +237,26 @@ function EventAssistantRoom() {
 
             if (agentId && userId) {
               console.log("Joining conversation");
+              // Join channels - include both direct and chat if chatPasscode is available
+              const channels: components["schemas"]["Channel"][] = [
+                {
+                  name: `direct-${userId}-${agentId}`,
+                  passcode: null,
+                  direct: true,
+                },
+              ];
+              if (chatPasscode) {
+                channels.push({
+                  name: "chat",
+                  passcode: chatPasscode,
+                  direct: false,
+                });
+              }
+
               socket.emit("conversation:join", {
                 conversationId: router.query.conversationId,
                 token: Api.get().GetTokens().access,
-                channel: { name: `direct-${userId}-${agentId}` },
+                channels,
               });
             }
           });
@@ -209,7 +267,29 @@ function EventAssistantRoom() {
         });
     }
     fetchConversationData();
-  }, [socket, router, userId, agentId]);
+  }, [socket, router, userId, agentId, chatPasscode]);
+
+  // Load initial chat messages when chatPasscode becomes available
+  useEffect(() => {
+    if (!chatPasscode || !router.query.conversationId) return;
+
+    const fetchInitialMessages = async () => {
+      try {
+        const chatMessages = await RetrieveData(
+          `messages/${router.query.conversationId}?channel=chat,${chatPasscode}`,
+          Api.get().GetTokens().access!
+        );
+
+        if (Array.isArray(chatMessages)) {
+          setChatMessages(chatMessages);
+        }
+      } catch (error) {
+        console.error("Error fetching initial chat messages:", error);
+      }
+    };
+
+    fetchInitialMessages();
+  }, [chatPasscode, router.query.conversationId]);
 
   async function sendMessage(
     message: string,
@@ -219,7 +299,12 @@ function EventAssistantRoom() {
     messageSource: "message" | "reaction" = "message"
   ) {
     if (!Api.get().GetTokens() || !message) return;
-    let channels = [{ name: `direct-${userId}-${agentId}` }];
+
+    // Use different channel based on active tab
+    let channels =
+      activeTab === "chat"
+        ? [{ name: "chat", passcode: chatPasscode }]
+        : [{ name: `direct-${userId}-${agentId}` }];
 
     // Prepend prefix if in controlled mode
     const finalMessage = controlledMode
@@ -249,16 +334,16 @@ function EventAssistantRoom() {
       } else {
         trackConversationEvent(
           conversationId,
-          "assistant",
+          activeTab,
           "message_sent",
           messageSource
         );
       }
     }
 
-    // Only set waitingForResponse for regular messages, not controlled mode messages
-    // (controlled mode messages like feedback don't generate responses)
-    if (shouldWaitForResponse && !controlledMode) {
+    // Only set waitingForResponse for assistant mode regular messages, not controlled mode messages
+    // (controlled mode messages like feedback don't generate responses, and chat mode has no assistant)
+    if (shouldWaitForResponse && !controlledMode && activeTab === "assistant") {
       setWaitingForResponse(true);
     }
 
@@ -315,6 +400,22 @@ function EventAssistantRoom() {
     await sendMessage(value, true, parentMessageId, false, "reaction");
   };
 
+  const handleTabSwitch = (tab: "assistant" | "chat") => {
+    setActiveTab(tab);
+    // Clear unseen count for the tab we're switching to
+    if (tab === "assistant") {
+      setUnseenAssistantCount(0);
+    } else {
+      setUnseenChatCount(0);
+    }
+    trackConversationEvent(
+      router.query.conversationId as string,
+      "assistant",
+      "tab_switched",
+      tab
+    );
+  };
+
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-96px)] overflow-hidden">
       {errorMessage ? (
@@ -337,19 +438,83 @@ function EventAssistantRoom() {
 
           {/* Main assistant chat view below transcript on mobile, left side on desktop */}
           <div className="flex-1 flex flex-col relative overflow-hidden lg:order-1">
+            {/* Tab navigation - only show if chat passcode is available */}
+            {chatPasscode && (
+              <div className="flex border-b border-gray-300 pl-2 pr-2 md:px-8 pt-6 gap-8">
+                <button
+                  onClick={() => handleTabSwitch("assistant")}
+                  className={`pb-3 text-sm font-bold uppercase border-b-4 transition-colors ${
+                    activeTab === "assistant"
+                      ? "text-gray-800"
+                      : "border-transparent text-gray-400 hover:text-gray-600"
+                  }`}
+                  style={
+                    activeTab === "assistant"
+                      ? { borderBottomColor: "#200434" }
+                      : undefined
+                  }
+                >
+                  <Badge
+                    color="secondary"
+                    variant="dot"
+                    invisible={
+                      unseenAssistantCount === 0 || activeTab === "assistant"
+                    }
+                    sx={{ "& .MuiBadge-badge": { right: -4, top: 8 } }}
+                  >
+                    <span style={{ paddingRight: "8px" }}>Event Assistant</span>
+                  </Badge>
+                </button>
+                <button
+                  onClick={() => handleTabSwitch("chat")}
+                  className={`pb-3 text-sm font-bold uppercase border-b-4 transition-colors ${
+                    activeTab === "chat"
+                      ? "text-gray-800"
+                      : "border-transparent text-gray-400 hover:text-gray-600"
+                  }`}
+                  style={
+                    activeTab === "chat"
+                      ? { borderBottomColor: "#200434" }
+                      : undefined
+                  }
+                >
+                  <Badge
+                    color="secondary"
+                    variant="dot"
+                    invisible={unseenChatCount === 0 || activeTab === "chat"}
+                    sx={{ "& .MuiBadge-badge": { right: -4, top: 8 } }}
+                  >
+                    <span style={{ paddingRight: "8px" }}>Chat</span>
+                  </Badge>
+                </button>
+              </div>
+            )}
+
             {isConnected ? (
-              <AssistantChat
-                messages={messages}
-                pseudonym={pseudonym}
-                waitingForResponse={waitingForResponse}
-                controlledMode={controlledMode}
-                slashCommands={slashCommands}
-                onSendMessage={sendMessage}
-                onExitControlledMode={exitControlledMode}
-                onPromptSelect={handlePromptSelect}
-                enterControlledMode={enterControlledMode}
-                sendFeedbackRating={sendFeedbackRating}
-              />
+              activeTab === "chat" ? (
+                <GroupChatPanel
+                  messages={chatMessages}
+                  pseudonym={pseudonym}
+                  inputValue={chatInputValue}
+                  onInputChange={setChatInputValue}
+                  onSendMessage={sendMessage}
+                />
+              ) : (
+                <AssistantChatPanel
+                  messages={assistantMessages}
+                  pseudonym={pseudonym}
+                  waitingForResponse={waitingForResponse}
+                  controlledMode={controlledMode}
+                  slashCommands={slashCommands}
+                  inputValue={assistantInputValue}
+                  onInputChange={setAssistantInputValue}
+                  onSendMessage={sendMessage}
+                  onExitControlledMode={exitControlledMode}
+                  onPromptSelect={handlePromptSelect}
+                  enterControlledMode={enterControlledMode}
+                  sendFeedbackRating={sendFeedbackRating}
+                />
+              )
             ) : (
               <svg
                 className="mx-auto w-12 h-5"
