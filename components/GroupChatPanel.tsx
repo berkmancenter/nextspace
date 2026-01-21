@@ -1,5 +1,7 @@
 import React, { FC, useMemo } from "react";
 import Linkify from "linkify-react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { MessageInput } from "./MessageInput";
 import { PseudonymousMessage } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
@@ -77,6 +79,32 @@ const renderMessageWithMentions = (text: string): React.ReactNode => {
       </Linkify>
     );
   });
+};
+
+/**
+ * Render assistant message with markdown support
+ * Converts markdown formatting (bold, italic, lists, etc.) to HTML
+ */
+const renderAssistantMessage = (text: string): React.ReactNode => {
+  return (
+    <div className="markdown-content">
+      <Markdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          a: ({ node, ...props }) => (
+            <a
+              {...props}
+              className="text-medium-slate-blue"
+              target="_blank"
+              rel="noopener noreferrer"
+            />
+          ),
+        }}
+      >
+        {text}
+      </Markdown>
+    </div>
+  );
 };
 
 interface GroupChatPanelProps {
@@ -230,7 +258,9 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                           border: "1px solid rgba(0, 0, 0, 0.1)",
                         }}
                       >
-                        {renderMessageWithMentions(parsed.text)}
+                        {isAssistant
+                          ? renderAssistantMessage(parsed.text)
+                          : renderMessageWithMentions(parsed.text)}
                       </div>
                     </div>
                   </div>

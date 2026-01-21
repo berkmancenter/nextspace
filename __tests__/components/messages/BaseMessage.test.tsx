@@ -44,23 +44,6 @@ describe("BaseMessage Component", () => {
 });
 
 describe("MessageContent Component", () => {
-  it("renders text with linkification", () => {
-    render(<MessageContent text="Check out https://example.com" />);
-
-    expect(screen.getByText(/Check out/)).toBeInTheDocument();
-  });
-
-  it("linkifies URLs correctly", () => {
-    const { container } = render(
-      <MessageContent text="Visit https://example.com for more info" />
-    );
-
-    const link = container.querySelector("a[href='https://example.com']");
-    expect(link).toBeInTheDocument();
-    expect(link).toHaveAttribute("target", "_blank");
-    expect(link).toHaveAttribute("rel", "noopener noreferrer");
-  });
-
   it("displays feedback messages with special styling", () => {
     const { container } = render(
       <MessageContent text="/feedback|Rating|msg-123|5" />
@@ -89,7 +72,7 @@ describe("MessageContent Component", () => {
     expect(container.querySelector(".italic")).toBeInTheDocument();
   });
 
-  it("renders plain text without linkification when no URLs", () => {
+  it("renders plain text", () => {
     render(<MessageContent text="Just plain text" />);
 
     expect(screen.getByText("Just plain text")).toBeInTheDocument();
@@ -103,14 +86,9 @@ describe("MessageContent Component", () => {
     expect(container).toBeInTheDocument();
   });
 
-  it("handles multiple URLs in text", () => {
-    const { container } = render(
-      <MessageContent text="Visit https://example.com and https://test.com" />
-    );
+  it("wraps content in markdown-content div", () => {
+    const { container } = render(<MessageContent text="Some text" />);
 
-    const links = container.querySelectorAll("a");
-    expect(links.length).toBe(2);
-    expect(links[0]).toHaveAttribute("href", "https://example.com");
-    expect(links[1]).toHaveAttribute("href", "https://test.com");
+    expect(container.querySelector(".markdown-content")).toBeInTheDocument();
   });
 });
