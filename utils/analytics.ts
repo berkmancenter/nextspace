@@ -63,7 +63,7 @@ function ensureMTM(): void {
   if (!isAnalyticsEnabled()) {
     if (process.env.NODE_ENV !== "production" && !hasWarnedAboutMissingMatomo) {
       console.log(
-        "[Analytics] Analytics is disabled via NEXT_PUBLIC_ENABLE_ANALYTICS environment variable. No tracking will occur."
+        "[Analytics] Analytics is disabled via NEXT_PUBLIC_ENABLE_ANALYTICS environment variable. No tracking will occur.",
       );
       hasWarnedAboutMissingMatomo = true;
     }
@@ -76,7 +76,7 @@ function ensureMTM(): void {
       hasWarnedAboutMissingMatomo = true;
       console.warn(
         "[Analytics] Warning: Analytics is enabled but NEXT_PUBLIC_MATOMO_URL environment variable is not set. " +
-          "No tracking will occur. Please configure NEXT_PUBLIC_MATOMO_URL in your environment variables."
+          "No tracking will occur. Please configure NEXT_PUBLIC_MATOMO_URL in your environment variables.",
       );
     }
     return;
@@ -96,7 +96,7 @@ function ensureMTM(): void {
         "[Analytics] Warning: Matomo Tag Manager does not appear to be loaded. " +
           "Analytics events will be queued but not sent to Matomo. " +
           "The site will continue to function normally. " +
-          "Please check that the Matomo script in _document.tsx is loading correctly."
+          "Please check that the Matomo script in _document.tsx is loading correctly.",
       );
     }
   }
@@ -109,7 +109,7 @@ function ensureMTM(): void {
  */
 export function trackPageView(
   pageName: string,
-  customData?: Record<string, any>
+  customData?: Record<string, any>,
 ): void {
   ensureMTM();
 
@@ -135,14 +135,14 @@ export function trackPageView(
  * Tracks a custom event
  * @param category - Event category (e.g., 'engagement', 'interaction')
  * @param action - Event action (e.g., 'button_click', 'message_send')
- * @param name - Optional event name for additional context
+ * @param name - Event name for additional context
  * @param value - Optional numeric value
  */
 export function trackEvent(
   category: string,
   action: string,
-  name?: string,
-  value?: number
+  name: string,
+  value?: number,
 ): void {
   ensureMTM();
 
@@ -155,9 +155,9 @@ export function trackEvent(
     event: "customEvent",
     eventCategory: category,
     eventAction: action,
+    eventName: name,
   };
 
-  if (name) data.eventName = name;
   if (value !== undefined) data.eventValue = value;
 
   window._mtm.push(data);
@@ -173,15 +173,15 @@ export function trackEvent(
  * @param conversationId - The conversation UUID
  * @param category - Event category (typically the page/role: 'assistant', 'moderator', 'backchannel')
  * @param action - Event action (e.g., 'message_sent', 'feedback_submitted')
- * @param name - Optional event name for additional context
+ * @param name - Event name for additional context
  * @param value - Optional numeric value
  */
 export function trackConversationEvent(
   conversationId: string,
   category: string,
   action: string,
-  name?: string,
-  value?: number
+  name: string,
+  value?: number,
 ): void {
   // Automatically set conversation ID as a custom dimension
   setCustomDimension(6, "conversation_id", conversationId, "action");
@@ -201,7 +201,7 @@ export function setCustomDimension(
   index: number,
   name: string,
   value: string,
-  scope: "visit" | "action" = "visit"
+  scope: "visit" | "action" = "visit",
 ): void {
   ensureMTM();
 
@@ -250,7 +250,7 @@ export function setUserId(userId: string): void {
  * @param metadata - Additional session metadata
  */
 export function trackSessionStart(metadata?: Record<string, any>): void {
-  trackEvent("session", "start", undefined, undefined);
+  trackEvent("session", "start", "session_started");
 
   if (metadata && typeof window !== "undefined" && window._mtm) {
     Object.entries(metadata).forEach(([key, value]) => {
@@ -268,7 +268,7 @@ export function trackSessionStart(metadata?: Record<string, any>): void {
  * @param durationSeconds - Session duration in seconds
  */
 export function trackSessionEnd(durationSeconds: number): void {
-  trackEvent("session", "end", undefined, durationSeconds);
+  trackEvent("session", "end", "session_ended", durationSeconds);
 
   if (process.env.NODE_ENV !== "production") {
     console.log("[Analytics] Session ended:", durationSeconds, "seconds");
@@ -288,7 +288,7 @@ export function trackVisibilityChange(visible: boolean): void {
  * @param status - Connection status ('connected', 'disconnected', 'error')
  */
 export function trackConnectionStatus(
-  status: "connected" | "disconnected" | "error"
+  status: "connected" | "disconnected" | "error",
 ): void {
   trackEvent("system", "connection_status", status);
 }
@@ -302,7 +302,7 @@ export function trackConnectionStatus(
 export function trackFeatureUsage(
   feature: string,
   action: "open" | "close" | "use",
-  durationSeconds?: number
+  durationSeconds?: number,
 ): void {
   trackEvent("feature", action, feature, durationSeconds);
 }
@@ -314,17 +314,17 @@ export function trackFeatureUsage(
  */
 export function trackUserLocation(
   location: "local" | "remote",
-  method: "ip" | "url" | "default"
+  method: "ip" | "url" | "default",
 ): void {
   // Track as custom dimension (index 2 for user_location)
   setCustomDimension(2, "user_location", location, "visit");
 
   // Also track as an event for analytics
-  trackEvent("session", "location_detected", location, undefined);
+  trackEvent("session", "location_detected", location);
 
   if (process.env.NODE_ENV !== "production") {
     console.log(
-      `[Analytics] User location: ${location} (detected via ${method})`
+      `[Analytics] User location: ${location} (detected via ${method})`,
     );
   }
 }
