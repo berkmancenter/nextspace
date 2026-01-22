@@ -148,7 +148,7 @@ function EventAssistantRoom() {
       (error) => {
         setErrorMessage(error);
         setJoining(false);
-      }
+      },
     );
 
     return () => {
@@ -175,7 +175,7 @@ function EventAssistantRoom() {
     async function fetchConversationData() {
       RetrieveData(
         `conversations/${router.query.conversationId}`,
-        Api.get().GetTokens().access!
+        Api.get().GetTokens().access!,
       )
         .then(async (conversationData: any) => {
           if (!conversationData) {
@@ -185,7 +185,7 @@ function EventAssistantRoom() {
           if ("error" in conversationData) {
             setErrorMessage(
               conversationData.message?.message ||
-                "Error retrieving conversation."
+                "Error retrieving conversation.",
             );
             return;
           }
@@ -198,7 +198,7 @@ function EventAssistantRoom() {
               const transcriptPasscodeParam = GetChannelPasscode(
                 "transcript",
                 router.query,
-                setErrorMessage
+                setErrorMessage,
               );
 
               if (transcriptPasscodeParam) {
@@ -208,7 +208,7 @@ function EventAssistantRoom() {
               const chatPasscodeParam = GetChannelPasscode(
                 "chat",
                 router.query,
-                setErrorMessage
+                setErrorMessage,
               );
 
               if (chatPasscodeParam) {
@@ -221,13 +221,13 @@ function EventAssistantRoom() {
             const eventAsstAgent = conversation.agents.find(
               (agent: components["schemas"]["Agent"]) =>
                 agent.agentType === "eventAssistant" ||
-                agent.agentType === "eventAssistantPlus"
+                agent.agentType === "eventAssistantPlus",
             );
             if (eventAsstAgent) {
               setAgentId(eventAsstAgent.id!);
             } else {
               setErrorMessage(
-                "This conversation does not have an event assistant agent."
+                "This conversation does not have an event assistant agent.",
               );
               return;
             }
@@ -277,7 +277,7 @@ function EventAssistantRoom() {
       try {
         const chatMessages = await RetrieveData(
           `messages/${router.query.conversationId}?channel=chat,${chatPasscode}`,
-          Api.get().GetTokens().access!
+          Api.get().GetTokens().access!,
         );
 
         if (Array.isArray(chatMessages)) {
@@ -296,7 +296,7 @@ function EventAssistantRoom() {
     shouldWaitForResponse: boolean = true,
     parentMessageId?: string,
     skipTracking: boolean = false,
-    messageSource: "message" | "reaction" = "message"
+    messageSource: "message" | "reaction" = "message",
   ) {
     if (!Api.get().GetTokens() || !message) return;
 
@@ -322,21 +322,21 @@ function EventAssistantRoom() {
           conversationId,
           "assistant",
           "command_sent",
-          commandName
+          commandName,
         );
       } else if (controlledMode) {
         trackConversationEvent(
           conversationId,
           "assistant",
           "feedback_sent",
-          controlledMode.label
+          controlledMode.label,
         );
       } else {
         trackConversationEvent(
           conversationId,
           activeTab,
           "message_sent",
-          messageSource
+          messageSource,
         );
       }
     }
@@ -387,7 +387,7 @@ function EventAssistantRoom() {
       conversationId,
       "assistant",
       "rating_submitted",
-      rating
+      rating,
     );
     const feedbackText = `/feedback|Rating|${messageId}|${rating}`;
     await sendMessage(feedbackText, false, undefined, true);
@@ -395,7 +395,7 @@ function EventAssistantRoom() {
 
   const handlePromptSelect = async (
     value: string,
-    parentMessageId?: string
+    parentMessageId?: string,
   ) => {
     await sendMessage(value, true, parentMessageId, false, "reaction");
   };
@@ -412,7 +412,7 @@ function EventAssistantRoom() {
       router.query.conversationId as string,
       "assistant",
       "tab_switched",
-      tab
+      tab,
     );
   };
 
@@ -428,6 +428,7 @@ function EventAssistantRoom() {
           {transcriptPasscode && (
             <div className="lg:order-2">
               <Transcript
+                category="assistant"
                 socket={socket}
                 conversationId={router.query.conversationId as string}
                 transcriptPasscode={transcriptPasscode}
