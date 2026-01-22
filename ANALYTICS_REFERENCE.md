@@ -33,12 +33,17 @@ React Component calls tracking function
     ↓
 utils/analytics.ts validates and formats data
     ↓
-Pushes to window._mtm data layer
+Events & Dimensions → window._paq (Matomo tracker API)
+Page Views → window._mtm (MTM data layer)
     ↓
-Matomo Tag Manager processes event
-    ↓
-Data sent to Matomo instance
+Matomo processes and sends to Matomo instance
 ```
+
+**Why Two Paths?**
+
+- **Page views** use MTM for centralized tag management
+- **Events & Custom Dimensions** use Matomo's native `_paq` API to ensure dimensions are reliably attached to events
+- Both approaches send data to the same Matomo instance
 
 ---
 
@@ -82,7 +87,7 @@ trackConversationEvent(
   conversationId: string,
   category: string,
   action: string,
-  name?: string,
+  name: string,
   value?: number
 ): void
 ```
@@ -91,7 +96,7 @@ trackConversationEvent(
 - Automatically sets conversation_id as custom dimension (index 6)
 - Category: typically the page/role context (assistant, moderator, backchannel)
 - Action: specific action taken
-- Name: optional additional context
+- Name: additional context for the event (required)
 - Value: optional numeric value
 - **Recommended for all conversation-specific tracking**
 
@@ -106,9 +111,12 @@ setCustomDimension(
 ): void
 ```
 
-- Sets custom dimensions for enriched tracking
-- Index: 1-5 (must match Matomo configuration)
+- Sets custom dimensions for enriched tracking using Matomo's native tracker API
+- Index: 1-5 for visit scope, 1-20 for action scope (must match Matomo configuration)
 - Scope: 'visit' (session-level) or 'action' (page-level)
+- Uses `_paq.push(['setCustomDimension', index, value])` for both visit and action scopes
+- For action-scoped dimensions, the value is attached to the next tracked action/event
+- For visit-scoped dimensions, the value persists for the entire visit
 
 #### Session Management
 

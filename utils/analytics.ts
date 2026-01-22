@@ -1,11 +1,16 @@
 /**
- * Matomo Tag Manager Analytics Utility
+ * Matomo Analytics Utility
  *
  * Provides helper functions for tracking events, page views, and custom dimensions
- * using Matomo Tag Manager (MTM).
+ * using Matomo's JavaScript Tracker API (_paq) and Matomo Tag Manager (MTM).
+ *
+ * Architecture:
+ * - Page views: Tracked via MTM (_mtm) for centralized tag management
+ * - Events & Custom Dimensions: Tracked via _paq for reliable dimension attachment
+ * - MTM loads the Matomo tracker script and provides initial configuration
  */
 
-// Extend Window interface to include MTM
+// Extend Window interface to include MTM and Matomo tracker
 declare global {
   interface Window {
     _mtm: any[];
@@ -132,7 +137,7 @@ export function trackPageView(
 }
 
 /**
- * Tracks a custom event
+ * Tracks a custom event using Matomo's native tracker API
  * @param category - Event category (e.g., 'engagement', 'interaction')
  * @param action - Event action (e.g., 'button_click', 'message_send')
  * @param name - Event name for additional context
@@ -146,24 +151,22 @@ export function trackEvent(
 ): void {
   ensureMTM();
 
-  // Return early if window._mtm was not initialized (analytics disabled or URL missing)
+  // Return early if analytics is disabled or not configured
   if (typeof window === "undefined" || !window._mtm) {
     return;
   }
 
-  const data: Record<string, any> = {
-    event: "customEvent",
-    eventCategory: category,
-    eventAction: action,
-    eventName: name,
-  };
+  // Initialize _paq array if it doesn't exist
+  if (!window._paq) {
+    window._paq = [];
+  }
 
-  if (value !== undefined) data.eventValue = value;
-
-  window._mtm.push(data);
+  // Use Matomo's native trackEvent API
+  // This ensures custom dimensions set via _paq are attached to the event
+  window._paq.push(["trackEvent", category, action, name, value]);
 
   if (process.env.NODE_ENV !== "production") {
-    console.log("[Analytics] Event:", data);
+    console.log("[Analytics] Event:", { category, action, name, value });
   }
 }
 
@@ -191,9 +194,9 @@ export function trackConversationEvent(
 }
 
 /**
- * Sets a custom dimension
+ * Sets a custom dimension using Matomo's native tracker API
  * @param index - Dimension index (1-5 for visit scope, 1-20 for action scope)
- * @param name - Dimension name
+ * @param name - Dimension name (for logging purposes)
  * @param value - Dimension value
  * @param scope - Dimension scope ('visit' or 'action')
  */
@@ -205,40 +208,49 @@ export function setCustomDimension(
 ): void {
   ensureMTM();
 
-  // Return early if window._mtm was not initialized (analytics disabled or URL missing)
+  // Return early if analytics is disabled or not configured
   if (typeof window === "undefined" || !window._mtm) {
     return;
   }
 
-  window._mtm.push({
-    event: "customDimension",
-    dimensionId: index,
-    dimensionName: name,
-    dimensionValue: value,
-    dimensionScope: scope,
-  });
+  // Initialize _paq array if it doesn't exist
+  if (!window._paq) {
+    window._paq = [];
+  }
+
+  // Use Matomo's native setCustomDimension API
+  // This works for both visit and action scopes
+  window._paq.push(["setCustomDimension", index, value]);
 
   if (process.env.NODE_ENV !== "production") {
-    console.log("[Analytics] Custom dimension:", { index, name, value, scope });
+    console.log("[Analytics] Custom dimension:", {
+      index,
+      name,
+      value,
+      scope,
+    });
   }
 }
 
 /**
- * Sets the user ID (pseudonym in this case)
+ * Sets the user ID (pseudonym in this case) using Matomo's native tracker API
  * @param userId - User identifier
  */
 export function setUserId(userId: string): void {
   ensureMTM();
 
-  // Return early if window._mtm was not initialized (analytics disabled or URL missing)
+  // Return early if analytics is disabled or not configured
   if (typeof window === "undefined" || !window._mtm) {
     return;
   }
 
-  window._mtm.push({
-    event: "setUserId",
-    userId,
-  });
+  // Initialize _paq array if it doesn't exist
+  if (!window._paq) {
+    window._paq = [];
+  }
+
+  // Use Matomo's native setUserId API
+  window._paq.push(["setUserId", userId]);
 
   if (process.env.NODE_ENV !== "production") {
     console.log("[Analytics] User ID set:", userId);

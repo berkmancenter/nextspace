@@ -162,25 +162,24 @@ describe("Analytics Utility", () => {
         "question",
       );
 
-      // Check that window._mtm received two pushes: dimension + event
-      expect((global.window as any)._mtm.length).toBe(2);
+      // Check that window._paq received both the dimension and event
+      expect((global.window as any)._paq.length).toBe(2);
 
-      // First push should be the dimension
-      expect((global.window as any)._mtm[0]).toMatchObject({
-        event: "customDimension",
-        dimensionId: 6,
-        dimensionName: "conversation_id",
-        dimensionValue: "conv-123",
-        dimensionScope: "action",
-      });
+      // First call: setCustomDimension
+      expect((global.window as any)._paq[0]).toEqual([
+        "setCustomDimension",
+        6,
+        "conv-123",
+      ]);
 
-      // Second push should be the event
-      expect((global.window as any)._mtm[1]).toMatchObject({
-        event: "customEvent",
-        eventCategory: "assistant",
-        eventAction: "message_sent",
-        eventName: "question",
-      });
+      // Second call: trackEvent
+      expect((global.window as any)._paq[1]).toEqual([
+        "trackEvent",
+        "assistant",
+        "message_sent",
+        "question",
+        undefined,
+      ]);
     });
 
     it("should track with event name", async () => {
@@ -193,13 +192,20 @@ describe("Analytics Utility", () => {
         "metrics_panel",
       );
 
-      expect((global.window as any)._mtm.length).toBe(2);
-      expect((global.window as any)._mtm[1]).toMatchObject({
-        event: "customEvent",
-        eventCategory: "moderator",
-        eventAction: "metrics_clicked",
-        eventName: "metrics_panel",
-      });
+      // Both dimension and event should be in _paq
+      expect((global.window as any)._paq.length).toBe(2);
+      expect((global.window as any)._paq[0]).toEqual([
+        "setCustomDimension",
+        6,
+        "conv-456",
+      ]);
+      expect((global.window as any)._paq[1]).toEqual([
+        "trackEvent",
+        "moderator",
+        "metrics_clicked",
+        "metrics_panel",
+        undefined,
+      ]);
     });
 
     it("should track message_sent with 'message' for typed messages", async () => {
@@ -212,13 +218,20 @@ describe("Analytics Utility", () => {
         "message",
       );
 
-      expect((global.window as any)._mtm.length).toBe(2);
-      expect((global.window as any)._mtm[1]).toMatchObject({
-        event: "customEvent",
-        eventCategory: "assistant",
-        eventAction: "message_sent",
-        eventName: "message",
-      });
+      // Both dimension and event should be in _paq
+      expect((global.window as any)._paq.length).toBe(2);
+      expect((global.window as any)._paq[0]).toEqual([
+        "setCustomDimension",
+        6,
+        "conv-789",
+      ]);
+      expect((global.window as any)._paq[1]).toEqual([
+        "trackEvent",
+        "assistant",
+        "message_sent",
+        "message",
+        undefined,
+      ]);
     });
 
     it("should track message_sent with 'reaction' for prompt selections", async () => {
@@ -231,13 +244,20 @@ describe("Analytics Utility", () => {
         "reaction",
       );
 
-      expect((global.window as any)._mtm.length).toBe(2);
-      expect((global.window as any)._mtm[1]).toMatchObject({
-        event: "customEvent",
-        eventCategory: "assistant",
-        eventAction: "message_sent",
-        eventName: "reaction",
-      });
+      // Both dimension and event should be in _paq
+      expect((global.window as any)._paq.length).toBe(2);
+      expect((global.window as any)._paq[0]).toEqual([
+        "setCustomDimension",
+        6,
+        "conv-789",
+      ]);
+      expect((global.window as any)._paq[1]).toEqual([
+        "trackEvent",
+        "assistant",
+        "message_sent",
+        "reaction",
+        undefined,
+      ]);
     });
 
     it("should track rating_submitted separately from message_sent", async () => {
@@ -245,13 +265,20 @@ describe("Analytics Utility", () => {
 
       trackConversationEvent("conv-101", "assistant", "rating_submitted", "5");
 
-      expect((global.window as any)._mtm.length).toBe(2);
-      expect((global.window as any)._mtm[1]).toMatchObject({
-        event: "customEvent",
-        eventCategory: "assistant",
-        eventAction: "rating_submitted",
-        eventName: "5",
-      });
+      // Both dimension and event should be in _paq
+      expect((global.window as any)._paq.length).toBe(2);
+      expect((global.window as any)._paq[0]).toEqual([
+        "setCustomDimension",
+        6,
+        "conv-101",
+      ]);
+      expect((global.window as any)._paq[1]).toEqual([
+        "trackEvent",
+        "assistant",
+        "rating_submitted",
+        "5",
+        undefined,
+      ]);
     });
 
     it("should track feedback_sent separately from message_sent", async () => {
@@ -264,13 +291,20 @@ describe("Analytics Utility", () => {
         "helpful",
       );
 
-      expect((global.window as any)._mtm.length).toBe(2);
-      expect((global.window as any)._mtm[1]).toMatchObject({
-        event: "customEvent",
-        eventCategory: "assistant",
-        eventAction: "feedback_sent",
-        eventName: "helpful",
-      });
+      // Both dimension and event should be in _paq
+      expect((global.window as any)._paq.length).toBe(2);
+      expect((global.window as any)._paq[0]).toEqual([
+        "setCustomDimension",
+        6,
+        "conv-102",
+      ]);
+      expect((global.window as any)._paq[1]).toEqual([
+        "trackEvent",
+        "assistant",
+        "feedback_sent",
+        "helpful",
+        undefined,
+      ]);
     });
 
     it("should track command_sent for slash commands", async () => {
@@ -278,13 +312,20 @@ describe("Analytics Utility", () => {
 
       trackConversationEvent("conv-103", "assistant", "command_sent", "mod");
 
-      expect((global.window as any)._mtm.length).toBe(2);
-      expect((global.window as any)._mtm[1]).toMatchObject({
-        event: "customEvent",
-        eventCategory: "assistant",
-        eventAction: "command_sent",
-        eventName: "mod",
-      });
+      // Both dimension and event should be in _paq
+      expect((global.window as any)._paq.length).toBe(2);
+      expect((global.window as any)._paq[0]).toEqual([
+        "setCustomDimension",
+        6,
+        "conv-103",
+      ]);
+      expect((global.window as any)._paq[1]).toEqual([
+        "trackEvent",
+        "assistant",
+        "command_sent",
+        "mod",
+        undefined,
+      ]);
     });
 
     it("should track command_sent for system commands", async () => {
@@ -297,13 +338,20 @@ describe("Analytics Utility", () => {
         "feedback",
       );
 
-      expect((global.window as any)._mtm.length).toBe(2);
-      expect((global.window as any)._mtm[1]).toMatchObject({
-        event: "customEvent",
-        eventCategory: "assistant",
-        eventAction: "command_sent",
-        eventName: "feedback",
-      });
+      // Both dimension and event should be in _paq
+      expect((global.window as any)._paq.length).toBe(2);
+      expect((global.window as any)._paq[0]).toEqual([
+        "setCustomDimension",
+        6,
+        "conv-104",
+      ]);
+      expect((global.window as any)._paq[1]).toEqual([
+        "trackEvent",
+        "assistant",
+        "command_sent",
+        "feedback",
+        undefined,
+      ]);
     });
   });
 });
