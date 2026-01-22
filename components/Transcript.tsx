@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "@mui/icons-material";
 import { Socket } from "socket.io-client";
 import { PseudonymousMessage } from "../types.internal";
 import { RetrieveData } from "../utils";
-import { trackFeatureUsage } from "../utils/analytics";
+import { trackFeatureUsage, trackConversationEvent } from "../utils/analytics";
+import { useVisibilityAwareDuration } from "../hooks/useVisibilityAwareDuration";
 
 /**
  * Transcript component - Sidebar style
@@ -17,37 +18,56 @@ export function Transcript(props: {
   conversationId: string;
   transcriptPasscode?: string;
   apiAccessToken: string;
+  category?: string;
 }) {
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
   const [isOpen, setIsOpen] = useState<boolean>(true);
   const [focusedMessageIds, setFocusedMessageIds] = useState<string[]>([]);
+  const [isAtBottom, setIsAtBottom] = useState<boolean>(true);
+  const [isInManualScrollMode, setIsInManualScrollMode] =
+    useState<boolean>(false);
   const topRef = useRef<HTMLDivElement | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const preserveScrollRef = useRef<{
     scrollHeight: number;
     scrollTop: number;
   } | null>(null);
-  const transcriptOpenTimeRef = useRef<number>(0);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Use visibility-aware duration hooks
+  const transcriptOpenDuration = useVisibilityAwareDuration();
+  const manualScrollDuration = useVisibilityAwareDuration();
+  const autoScrollDuration = useVisibilityAwareDuration();
 
   const handleToggle = () => {
     const newOpenState = !isOpen;
     if (newOpenState) {
-      // Opening transcript
-      transcriptOpenTimeRef.current = Date.now();
+      // Opening transcript - start tracking duration
+      transcriptOpenDuration.start();
       trackFeatureUsage("transcript", "open");
+
+      // Start autoscroll duration (transcript always opens at bottom)
+      if (!isInManualScrollMode) {
+        autoScrollDuration.start();
+      }
     } else {
-      // Closing transcript - calculate duration
-      const duration = Math.floor(
-        (Date.now() - transcriptOpenTimeRef.current) / 1000
-      );
-      trackFeatureUsage("transcript", "close", duration);
+      // Closing transcript - stop tracking and get active duration
+      const activeDuration = transcriptOpenDuration.stop();
+      trackFeatureUsage("transcript", "close", activeDuration);
+
+      // Stop any active scroll duration tracking
+      if (isInManualScrollMode) {
+        manualScrollDuration.stop();
+      } else {
+        autoScrollDuration.stop();
+      }
     }
     setIsOpen(newOpenState);
   };
 
   const applyFocusAndScroll = (
     messagesToFilter: PseudonymousMessage[],
-    shouldScroll: boolean = false
+    shouldScroll: boolean = false,
   ) => {
     if (!props.focusTimeRange || messagesToFilter.length === 0) {
       setFocusedMessageIds([]);
@@ -91,6 +111,100 @@ export function Transcript(props: {
     });
   };
 
+  // Helper function to check if scrolled to bottom
+  const checkIsAtBottom = (container: HTMLElement): boolean => {
+    return Math.abs(container.scrollTop) < 5;
+  };
+
+  // Helper function to get category with fallback
+  const getCategory = (): string => {
+    return props.category || "transcript";
+  };
+
+  // Track manual scroll session start
+  const trackManualScrollStart = useCallback(() => {
+    if (!isInManualScrollMode) {
+      // Stop autoscroll duration tracking
+      const autoScrollTime = autoScrollDuration.stop();
+      if (autoScrollTime > 0) {
+        trackConversationEvent(
+          props.conversationId,
+          getCategory(),
+          "scroll_auto_end",
+          "user_initiated",
+          autoScrollTime,
+        );
+      }
+
+      setIsInManualScrollMode(true);
+      manualScrollDuration.start();
+      trackConversationEvent(
+        props.conversationId,
+        getCategory(),
+        "scroll_manual",
+        "user_initiated",
+      );
+    }
+  }, [
+    isInManualScrollMode,
+    props.conversationId,
+    manualScrollDuration,
+    autoScrollDuration,
+  ]);
+
+  // Track return to autoscroll
+  const trackReturnToAutoScroll = useCallback(() => {
+    if (isInManualScrollMode) {
+      const activeDuration = manualScrollDuration.stop();
+      setIsInManualScrollMode(false);
+      trackConversationEvent(
+        props.conversationId,
+        getCategory(),
+        "scroll_return_auto",
+        "user_initiated",
+        activeDuration,
+      );
+
+      // Start autoscroll duration tracking
+      autoScrollDuration.start();
+    }
+  }, [
+    isInManualScrollMode,
+    props.conversationId,
+    manualScrollDuration,
+    autoScrollDuration,
+  ]);
+
+  // Throttled scroll handler
+  const handleScroll = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container || !isOpen) return;
+
+    const currentlyAtBottom = checkIsAtBottom(container);
+
+    // Clear existing timeout
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+
+    // Update state immediately
+    setIsAtBottom(currentlyAtBottom);
+
+    // Debounce the analytics tracking to avoid too many events
+    scrollTimeoutRef.current = setTimeout(() => {
+      if (currentlyAtBottom && isInManualScrollMode) {
+        trackReturnToAutoScroll();
+      } else if (!currentlyAtBottom && !isInManualScrollMode) {
+        trackManualScrollStart();
+      }
+    }, 150); // 150ms debounce
+  }, [
+    isOpen,
+    isInManualScrollMode,
+    trackManualScrollStart,
+    trackReturnToAutoScroll,
+  ]);
+
   // Preserve scroll position when new messages arrive
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -119,7 +233,7 @@ export function Transcript(props: {
       try {
         const transcriptMessages = await RetrieveData(
           `messages/${props.conversationId}?channel=transcript,${props.transcriptPasscode}`,
-          props.apiAccessToken
+          props.apiAccessToken,
         );
 
         if (Array.isArray(transcriptMessages)) {
@@ -133,14 +247,38 @@ export function Transcript(props: {
           } else if (isOpen) {
             scrollToBottom();
           }
+
+          // Start tracking durations on initial load (transcript starts open at bottom)
+          if (isOpen) {
+            transcriptOpenDuration.start();
+            if (!isInManualScrollMode) {
+              autoScrollDuration.start();
+            }
+          }
         }
       } catch (error) {
-        console.error("Error fetching initial transcript messages:", error);
+        console.error("Error fetching initial messages:", error);
       }
     };
 
     fetchInitialMessages();
   }, [props.conversationId, props.apiAccessToken, props.transcriptPasscode]);
+
+  // Effect: Add scroll event listener
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container || !isOpen) return;
+
+    container.addEventListener("scroll", handleScroll);
+
+    // Cleanup
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, [isOpen, handleScroll]);
 
   // Effect: When focusTimeRange changes → auto-open + highlight + scroll to focus
   useEffect(() => {
@@ -154,6 +292,16 @@ export function Transcript(props: {
     }
 
     applyFocusAndScroll(messages, true);
+
+    // Track focus scroll event
+    if (messages.length > 0) {
+      trackConversationEvent(
+        props.conversationId,
+        getCategory(),
+        "scroll_to_focus",
+        "focus_triggered",
+      );
+    }
   }, [props.focusTimeRange]);
 
   // Subscribe to transcript channel

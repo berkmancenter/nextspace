@@ -98,7 +98,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
       (error) => {
         setErrorMessage(error);
         setJoining(false);
-      }
+      },
     );
 
     // Cleanup
@@ -141,13 +141,13 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
       const transcriptPasscodeParam = GetChannelPasscode(
         "transcript",
         router.query,
-        setErrorMessage
+        setErrorMessage,
       );
 
       const modPasscodeParam = GetChannelPasscode(
         "moderator",
         router.query,
-        setErrorMessage
+        setErrorMessage,
       );
 
       // Store transcript passcode for Transcript component
@@ -161,7 +161,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
       const conversationMessagesResponse: PseudonymousMessage[] | ErrorMessage =
         await RetrieveData(
           `messages/${router.query.conversationId}${moderatorChannelsQuery}`,
-          apiAccessToken
+          apiAccessToken,
         );
 
       if (
@@ -170,7 +170,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
       ) {
         setErrorMessage(
           conversationMessagesResponse.message?.message ||
-            "Failed to fetch conversation messages."
+            "Failed to fetch conversation messages.",
         );
         return;
       } else if (Array.isArray(conversationMessagesResponse)) {
@@ -179,8 +179,8 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
             (message) =>
               message.channels![0] === "moderator" &&
               (message.body.hasOwnProperty("insights") ||
-                message.body.hasOwnProperty("metrics"))
-          )
+                message.body.hasOwnProperty("metrics")),
+          ),
         );
       }
 
@@ -214,7 +214,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
               <div key={index} className="mt-2">
                 {insight.value}
               </div>
-            )
+            ),
           )}
         </div>
       );
@@ -266,6 +266,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
           {transcriptEnabled && (
             <div className="lg:order-2">
               <Transcript
+                category="moderator"
                 focusTimeRange={messageFocusTimeRange}
                 socket={socket}
                 conversationId={router.query.conversationId as string}
@@ -322,7 +323,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
                             conversationId,
                             "moderator",
                             "metrics_clicked",
-                            "jump_to_transcript"
+                            "jump_to_transcript",
                           );
 
                           // Set the time range for the transcript to focus on
@@ -337,11 +338,11 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
                             "timestamp" in message.body && (
                               <>
                                 {`${new Date(
-                                  message.body.timestamp.start
+                                  message.body.timestamp.start,
                                 ).toLocaleTimeString()} -`}
                                 <br />
                                 {`${new Date(
-                                  message.body.timestamp.end
+                                  message.body.timestamp.end,
                                 ).toLocaleTimeString()}`}
                               </>
                             )}

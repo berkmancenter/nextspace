@@ -8,6 +8,7 @@ import {
   setCustomDimension,
   trackUserLocation,
 } from "../utils/analytics";
+import { useVisibilityAwareDuration } from "./useVisibilityAwareDuration";
 
 interface UseAnalyticsOptions {
   pageName?: string;
@@ -29,7 +30,7 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
   const { pageName, pageType } = options;
 
   const router = useRouter();
-  const pageEntryTime = useRef<number>(Date.now());
+  const pageDuration = useVisibilityAwareDuration();
 
   // Track page view on mount
   useEffect(() => {
@@ -43,17 +44,28 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
       }),
     });
 
-    // Reset entry time
-    pageEntryTime.current = Date.now();
+    // Start tracking page duration (visibility-aware)
+    pageDuration.start();
 
-    // Cleanup function tracks page duration
+    // Cleanup function tracks active page duration
     return () => {
-      const duration = Math.floor((Date.now() - pageEntryTime.current) / 1000);
-      if (duration > 0) {
-        setCustomDimension(4, "page_duration", duration.toString(), "action");
+      const activeDuration = pageDuration.stop();
+      if (activeDuration > 0) {
+        setCustomDimension(
+          4,
+          "page_duration",
+          activeDuration.toString(),
+          "action",
+        );
       }
     };
-  }, [pageName, router.pathname, router.asPath, router.query.conversationId]);
+  }, [
+    pageName,
+    router.pathname,
+    router.asPath,
+    router.query.conversationId,
+    pageDuration,
+  ]);
 
   // Page visibility tracking
   useEffect(() => {
@@ -105,7 +117,7 @@ export function useSessionTracking() {
     // Track session end on beforeunload
     function handleBeforeUnload() {
       const duration = Math.floor(
-        (Date.now() - sessionStartTime.current) / 1000
+        (Date.now() - sessionStartTime.current) / 1000,
       );
       trackSessionEnd(duration);
     }
