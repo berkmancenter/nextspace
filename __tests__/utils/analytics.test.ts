@@ -43,7 +43,7 @@ describe("Analytics Utility", () => {
       trackPageView("test-page");
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Analytics is disabled")
+        expect.stringContaining("Analytics is disabled"),
       );
       expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
@@ -68,19 +68,18 @@ describe("Analytics Utility", () => {
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          "NEXT_PUBLIC_MATOMO_URL environment variable is not set"
-        )
+          "NEXT_PUBLIC_MATOMO_URL environment variable is not set",
+        ),
       );
     });
 
     it("should only warn once even with multiple tracking calls", async () => {
-      const { trackPageView, trackEvent } = await import(
-        "../../utils/analytics"
-      );
+      const { trackPageView, trackEvent } =
+        await import("../../utils/analytics");
 
       trackPageView("test-page-1");
       trackPageView("test-page-2");
-      trackEvent("test", "action");
+      trackEvent("test", "action", "test_event");
 
       // Should only warn once
       expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
@@ -108,7 +107,7 @@ describe("Analytics Utility", () => {
       trackPageView("test-page");
 
       expect(consoleWarnSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining("NEXT_PUBLIC_MATOMO_URL")
+        expect.stringContaining("NEXT_PUBLIC_MATOMO_URL"),
       );
     });
   });
@@ -132,8 +131,8 @@ describe("Analytics Utility", () => {
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          "NEXT_PUBLIC_MATOMO_URL environment variable is not set"
-        )
+          "NEXT_PUBLIC_MATOMO_URL environment variable is not set",
+        ),
       );
     });
   });
@@ -160,7 +159,7 @@ describe("Analytics Utility", () => {
         "conv-123",
         "assistant",
         "message_sent",
-        "question"
+        "question",
       );
 
       // Check that window._mtm received two pushes: dimension + event
@@ -184,18 +183,23 @@ describe("Analytics Utility", () => {
       });
     });
 
-    it("should work without optional name parameter", async () => {
+    it("should track with event name", async () => {
       const { trackConversationEvent } = await import("../../utils/analytics");
 
-      trackConversationEvent("conv-456", "moderator", "metrics_clicked");
+      trackConversationEvent(
+        "conv-456",
+        "moderator",
+        "metrics_clicked",
+        "metrics_panel",
+      );
 
       expect((global.window as any)._mtm.length).toBe(2);
       expect((global.window as any)._mtm[1]).toMatchObject({
         event: "customEvent",
         eventCategory: "moderator",
         eventAction: "metrics_clicked",
+        eventName: "metrics_panel",
       });
-      expect((global.window as any)._mtm[1].eventName).toBeUndefined();
     });
 
     it("should track message_sent with 'message' for typed messages", async () => {
@@ -205,7 +209,7 @@ describe("Analytics Utility", () => {
         "conv-789",
         "assistant",
         "message_sent",
-        "message"
+        "message",
       );
 
       expect((global.window as any)._mtm.length).toBe(2);
@@ -224,7 +228,7 @@ describe("Analytics Utility", () => {
         "conv-789",
         "assistant",
         "message_sent",
-        "reaction"
+        "reaction",
       );
 
       expect((global.window as any)._mtm.length).toBe(2);
@@ -257,7 +261,7 @@ describe("Analytics Utility", () => {
         "conv-102",
         "assistant",
         "feedback_sent",
-        "helpful"
+        "helpful",
       );
 
       expect((global.window as any)._mtm.length).toBe(2);
@@ -290,7 +294,7 @@ describe("Analytics Utility", () => {
         "conv-104",
         "assistant",
         "command_sent",
-        "feedback"
+        "feedback",
       );
 
       expect((global.window as any)._mtm.length).toBe(2);

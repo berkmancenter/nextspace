@@ -42,11 +42,11 @@ function BackchannelRoom() {
   const [joining, setJoining] = useState(false);
   const [participantPasscode, setParticipantPasscode] = useState("");
   const [transcriptPasscode, setTranscriptPasscode] = useState<string | null>(
-    null
+    null,
   );
 
   const [messages, setMessages] = useState<components["schemas"]["Message"][]>(
-    []
+    [],
   );
   const [currentMessage, setCurrentMessage] = useState("");
   const [pseudonym, setPseudonym] = useState<string | null>(null);
@@ -71,7 +71,7 @@ function BackchannelRoom() {
       },
       (error) => {
         setErrorMessage(error);
-      }
+      },
     );
   }, [joining]);
 
@@ -110,12 +110,12 @@ function BackchannelRoom() {
     async function fetchConversationData() {
       if (router.query.channel) {
         setTranscriptPasscode(
-          GetChannelPasscode("transcript", router.query, setErrorMessage)
+          GetChannelPasscode("transcript", router.query, setErrorMessage),
         );
         const participantPasscodeParam = GetChannelPasscode(
           "participant",
           router.query,
-          setErrorMessage
+          setErrorMessage,
         );
 
         if (!participantPasscodeParam) return;
@@ -151,13 +151,14 @@ function BackchannelRoom() {
         conversationId,
         "backchannel",
         "quick_response_sent",
-        message
+        message,
       );
     } else {
       trackConversationEvent(
         conversationId,
         "backchannel",
-        "custom_message_sent"
+        "custom_message_sent",
+        "custom_message",
       );
     }
 
@@ -259,7 +260,8 @@ function BackchannelRoom() {
                     trackConversationEvent(
                       conversationId,
                       "backchannel",
-                      "welcome_dismissed"
+                      "welcome_dismissed",
+                      "welcome_screen",
                     );
                   }
                 }}
