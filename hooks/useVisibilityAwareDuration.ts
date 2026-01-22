@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 
 /**
  * Custom hook for tracking duration with automatic pause/resume on tab visibility changes
@@ -117,10 +117,15 @@ export function useVisibilityAwareDuration() {
     };
   }, []);
 
-  return {
-    start,
-    stop,
-    getActiveDuration,
-    isRunning,
-  };
+  // Use useMemo to return a stable object reference
+  // This prevents unnecessary re-renders in components that use this hook
+  return useMemo(
+    () => ({
+      start,
+      stop,
+      getActiveDuration,
+      isRunning,
+    }),
+    [start, stop, getActiveDuration, isRunning],
+  );
 }

@@ -299,4 +299,24 @@ describe("useVisibilityAwareDuration", () => {
 
     expect(result.current.getActiveDuration()).toBe(0);
   });
+
+  it("should return a stable object reference across re-renders", () => {
+    const { result, rerender } = renderHook(() => useVisibilityAwareDuration());
+
+    const firstReference = result.current;
+
+    // Force a re-render
+    rerender();
+
+    const secondReference = result.current;
+
+    // The returned object should be the same reference
+    expect(firstReference).toBe(secondReference);
+    expect(firstReference.start).toBe(secondReference.start);
+    expect(firstReference.stop).toBe(secondReference.stop);
+    expect(firstReference.getActiveDuration).toBe(
+      secondReference.getActiveDuration,
+    );
+    expect(firstReference.isRunning).toBe(secondReference.isRunning);
+  });
 });
