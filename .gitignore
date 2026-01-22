@@ -36,3 +36,6 @@ dist-ssr
 
 # generates types
 types.ts
+
+# TypeScript build cache
+*.tsbuildinfo
