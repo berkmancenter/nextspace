@@ -1,8 +1,7 @@
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
-import { Tooltip } from "@mui/material";
 import { io } from "socket.io-client";
-import { CloudOffOutlined, CloudOutlined } from "@mui/icons-material";
+
 import {
   PseudonymousMessage,
   ModeratorInsightsMessage,
@@ -36,11 +35,11 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
   useAnalytics({ pageType: "moderator" });
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
   const [joining, setJoining] = useState(false);
 
   const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
+  const [conversationName, setConversationName] = useState<string>("");
 
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>("");
   const [messageFocusTimeRange, setMessageFocusTimeRange] = useState<{
@@ -77,12 +76,10 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
           });
 
           socketLocal.on("connect", () => {
-            setIsConnected(true);
             trackConnectionStatus("connected");
           });
 
           socketLocal.on("disconnect", () => {
-            setIsConnected(false);
             trackConnectionStatus("disconnected");
           });
         } catch (error) {
@@ -98,7 +95,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
       (error) => {
         setErrorMessage(error);
         setJoining(false);
-      },
+      }
     );
 
     // Cleanup
@@ -141,13 +138,13 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
       const transcriptPasscodeParam = GetChannelPasscode(
         "transcript",
         router.query,
-        setErrorMessage,
+        setErrorMessage
       );
 
       const modPasscodeParam = GetChannelPasscode(
         "moderator",
         router.query,
-        setErrorMessage,
+        setErrorMessage
       );
 
       // Store transcript passcode for Transcript component
@@ -157,11 +154,21 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
 
       let moderatorChannelsQuery = `?channel=moderator,${modPasscodeParam}`;
 
+      // Fetch conversation details
+      const conversationResponse: any = await RetrieveData(
+        `conversations/${router.query.conversationId}`,
+        apiAccessToken
+      );
+
+      if (conversationResponse && !("error" in conversationResponse)) {
+        setConversationName(conversationResponse.name || "");
+      }
+
       // Fetch messages
       const conversationMessagesResponse: PseudonymousMessage[] | ErrorMessage =
         await RetrieveData(
           `messages/${router.query.conversationId}${moderatorChannelsQuery}`,
-          apiAccessToken,
+          apiAccessToken
         );
 
       if (
@@ -170,7 +177,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
       ) {
         setErrorMessage(
           conversationMessagesResponse.message?.message ||
-            "Failed to fetch conversation messages.",
+            "Failed to fetch conversation messages."
         );
         return;
       } else if (Array.isArray(conversationMessagesResponse)) {
@@ -179,8 +186,8 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
             (message) =>
               message.channels![0] === "moderator" &&
               (message.body.hasOwnProperty("insights") ||
-                message.body.hasOwnProperty("metrics")),
-          ),
+                message.body.hasOwnProperty("metrics"))
+          )
         );
       }
 
@@ -214,7 +221,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
               <div key={index} className="mt-2">
                 {insight.value}
               </div>
-            ),
+            )
           )}
         </div>
       );
@@ -279,32 +286,14 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
           {/* Main moderator content below transcript on mobile, left side on desktop */}
           <div className="flex-1 flex flex-col relative overflow-hidden lg:order-1">
             {/*  Insights/analytics view */}
-            <div className="h-full overflow-y-auto px-8 pt-12" id="scroll-view">
-              <div
-                className="max-w-2.5"
-                aria-label={`Connection status is ${
-                  isConnected ? "connected" : "disconnected"
-                }`}
-              >
-                {isConnected ? (
-                  <Tooltip
-                    title={`Conversation ID: ${process.env.NEXT_PUBLIC_LLM_FCLTR_CONVERSATION_ID}`}
-                  >
-                    <CloudOutlined sx={{ color: "green" }} />
-                  </Tooltip>
-                ) : (
-                  <Tooltip
-                    title={`Conversation ID: ${process.env.NEXT_PUBLIC_LLM_FCLTR_CONVERSATION_ID}`}
-                  >
-                    <CloudOffOutlined sx={{ color: "red" }} />
-                  </Tooltip>
-                )}
-              </div>
-              <div ref={scrollViewRef} className="mt-4 max-w-full">
+            <div className="h-full overflow-y-auto px-8 pt-4" id="scroll-view">
+              <div ref={scrollViewRef} className="mt-2 max-w-full">
                 <h2 className="text-2xl font-bold mb-4 ml-2">
-                  Hi Mod! This is the very beginning of the&nbsp;
-                  <span className="text-medium-slate-blue">#ASML</span>&nbsp;
-                  event.
+                  Hi Mod! Welcome to your&nbsp;
+                  <span className="text-medium-slate-blue">
+                    {conversationName}
+                  </span>
+                  &nbsp; event.
                 </h2>
                 <div aria-live="polite">
                   {messages.length > 0 ? (
@@ -323,7 +312,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
                             conversationId,
                             "moderator",
                             "metrics_clicked",
-                            "jump_to_transcript",
+                            "jump_to_transcript"
                           );
 
                           // Set the time range for the transcript to focus on
@@ -338,11 +327,11 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
                             "timestamp" in message.body && (
                               <>
                                 {`${new Date(
-                                  message.body.timestamp.start,
+                                  message.body.timestamp.start
                                 ).toLocaleTimeString()} -`}
                                 <br />
                                 {`${new Date(
-                                  message.body.timestamp.end,
+                                  message.body.timestamp.end
                                 ).toLocaleTimeString()}`}
                               </>
                             )}
