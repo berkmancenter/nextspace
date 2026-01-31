@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { Api, Authenticate } from "../utils";
+import SessionManager from "../utils/SessionManager";
 
 /**
  * Login Page
@@ -77,6 +78,9 @@ export default function LoginPage() {
       Api.get().SetAdminTokens(response.access.token, response.refresh.token);
       // Set regular token as well, for other operations
       Api.get().SetTokens(response.access.token, response.refresh.token);
+
+      // Mark session as authenticated
+      SessionManager.get().markAuthenticated();
 
       // Set session cookie via local API route
       await fetch("/api/session", {

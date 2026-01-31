@@ -17,6 +17,7 @@ import {
 import { components } from "../types";
 import { PseudonymousMessage } from "../types.internal";
 import { CheckAuthHeader } from "../utils/Helpers";
+import SessionManager from "../utils/SessionManager";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -41,6 +42,9 @@ function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
 
   useEffect(() => {
     if (socket || joining) return;
+
+    // Note: _app.tsx guarantees SessionManager has completed initialization
+    // before this component renders, so session is always ready here
     setJoining(true);
 
     JoinSession(
@@ -57,6 +61,7 @@ function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
       },
       (error) => {
         setErrorMessage(error);
+        setJoining(false);
       },
       isAuthenticated
     );

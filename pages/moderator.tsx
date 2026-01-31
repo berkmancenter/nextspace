@@ -25,6 +25,7 @@ import {
 
 import { Transcript } from "../components/";
 import { DefaultEase } from "../utils/Helpers";
+import SessionManager from "../utils/SessionManager";
 
 function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
   const router = useRouter();
@@ -132,8 +133,11 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
 
   useEffect(() => {
     if (socket || joining) return;
+
+    // Note: _app.tsx guarantees SessionManager has completed initialization
+    // before this component renders, so session is always ready here
     join();
-  });
+  }, [socket, joining]);
 
   useEffect(() => {
     if (!socket) return;

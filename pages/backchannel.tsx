@@ -23,6 +23,7 @@ import {
 import { DirectMessage } from "../components";
 import { components } from "../types";
 import { CheckAuthHeader } from "../utils/Helpers";
+import SessionManager from "../utils/SessionManager";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -51,6 +52,9 @@ function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
 
   useEffect(() => {
     if (Api.get().GetTokens().access || joining) return;
+
+    // Note: _app.tsx guarantees SessionManager has completed initialization
+    // before this component renders, so session is always ready here
     setJoining(true);
     JoinSession(
       (result) => {
@@ -64,6 +68,7 @@ function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
       },
       (error) => {
         setErrorMessage(error);
+        setJoining(false);
       },
       isAuthenticated
     );

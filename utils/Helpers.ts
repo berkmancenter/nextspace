@@ -220,12 +220,12 @@ export const SendData = async (
 };
 
 /**
- * Joins a session by obtaining a new pseudonym and registering it.
- * On success, it sets the API tokens and calls the success callback with the token and pseudonym.
- * On failure, it logs the error and calls the error callback with an error message.
- * @param success - Callback function to call on successful join, with token and pseudonym.
+ * Joins a session by using the existing session created on app load.
+ * Since SessionManager ensures a session always exists after initialization,
+ * this just needs to fetch the current session data.
+ * @param success - Callback function to call on successful join, with userId and pseudonym.
  * @param errorCallback - Callback function to call on error, with an error message.
- * @param isAuthenticated - Indicating if the user is authenticated.
+ * @param isAuthenticated - Optional flag indicating if the user is authenticated.
  */
 export const JoinSession = async (
   success: (result: { userId: string; pseudonym: string }) => void,
@@ -233,58 +233,30 @@ export const JoinSession = async (
   isAuthenticated?: boolean
 ) => {
   try {
-    // Get existing tokens if authenticated
-    if (isAuthenticated) {
-      const cookieRes = await fetch("/api/cookie");
-      const cookieData = await cookieRes.json();
+    // Wait for session to be ready (if still initializing)
+    const SessionManager = (await import("./SessionManager")).default;
+    await SessionManager.get().restoreSession();
 
-      if (cookieRes.status === 200 && cookieData.tokens) {
-        // User is already logged in, set tokens and return
-        Api.get().SetTokens(
-          cookieData.tokens.access,
-          cookieData.tokens.refresh
-        );
-        success({
-          userId: cookieData.userId,
-          pseudonym: cookieData.username,
-        });
-        return;
-      }
+    // At this point, a session MUST exist (either restored or newly created)
+    if (!Api.get().GetTokens().access) {
+      throw new Error("No session available after initialization");
     }
 
-    // Get new pseudonym for session
-    const pseudonymResponse = await RetrieveData("auth/newPseudonym");
+    // Get current session info from cookie
+    const cookieRes = await fetch("/api/cookie");
+    const cookieData = await cookieRes.json();
 
-    const registerResponse = await SendData("auth/register", {
-      token: pseudonymResponse.token,
-      pseudonym: pseudonymResponse.pseudonym,
-    });
+    if (cookieRes.status !== 200 || !cookieData.tokens) {
+      throw new Error("Failed to retrieve session data");
+    }
 
-    Api.get().SetTokens(
-      registerResponse.tokens.access.token,
-      registerResponse.tokens.refresh.token
-    );
+    // Ensure tokens are set in memory
+    Api.get().SetTokens(cookieData.tokens.access, cookieData.tokens.refresh);
 
-    // Set session cookie via local API route
-    await fetch("/api/session", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        username: pseudonymResponse.pseudonym,
-        // Use the access, refresh tokens and userId from the register response
-        userId: registerResponse.user.id,
-        accessToken: registerResponse.tokens.access.token,
-        refreshToken: registerResponse.tokens.refresh.token,
-        // End user session in 1 day
-        expirationFromNow: 60 * 60 * 24,
-      }),
-    });
-
+    // Return session info
     success({
-      userId: registerResponse.user.id,
-      pseudonym: pseudonymResponse.pseudonym,
+      userId: cookieData.userId,
+      pseudonym: cookieData.username,
     });
   } catch (err) {
     console.error("Failed to join:", err);

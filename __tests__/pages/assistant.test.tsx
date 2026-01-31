@@ -38,6 +38,24 @@ jest.mock("react-scroll", () => ({
   },
 }));
 
+// Mock SessionManager - must be defined before jest.mock
+jest.mock("../../utils/SessionManager", () => {
+  const mockSessionManager = {
+    get: jest.fn(() => ({
+      restoreSession: jest.fn().mockResolvedValue(true),
+      getState: jest.fn().mockReturnValue("guest"),
+      hasSession: jest.fn().mockReturnValue(true),
+      markAuthenticated: jest.fn(),
+      markGuest: jest.fn(),
+      clearSession: jest.fn(),
+    })),
+  };
+  return {
+    __esModule: true,
+    default: mockSessionManager,
+  };
+});
+
 // Mock utils
 jest.mock("../../utils", () => ({
   Api: {
