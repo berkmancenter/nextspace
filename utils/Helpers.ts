@@ -219,77 +219,33 @@ export const SendData = async (
   }
 };
 
-/**
- * Joins a session by using the existing session created on app load.
- * Since SessionManager ensures a session always exists after initialization,
- * this just needs to fetch the current session data.
- * @param success - Callback function to call on successful join, with userId and pseudonym.
- * @param errorCallback - Callback function to call on error, with an error message.
- * @param isAuthenticated - Optional flag indicating if the user is authenticated.
- */
-export const JoinSession = async (
-  success: (result: { userId: string; pseudonym: string }) => void,
-  errorCallback: (err: string) => void,
-  isAuthenticated?: boolean
-) => {
-  try {
-    // Wait for session to be ready (if still initializing)
-    const SessionManager = (await import("./SessionManager")).default;
-    await SessionManager.get().restoreSession();
-
-    // At this point, a session MUST exist (either restored or newly created)
-    if (!Api.get().GetTokens().access) {
-      throw new Error("No session available after initialization");
-    }
-
-    // Get current session info from cookie
-    const cookieRes = await fetch("/api/cookie");
-    const cookieData = await cookieRes.json();
-
-    if (cookieRes.status !== 200 || !cookieData.tokens) {
-      throw new Error("Failed to retrieve session data");
-    }
-
-    // Ensure tokens are set in memory
-    Api.get().SetTokens(cookieData.tokens.access, cookieData.tokens.refresh);
-
-    // Return session info
-    success({
-      userId: cookieData.userId,
-      pseudonym: cookieData.username,
-    });
-  } catch (err) {
-    console.error("Failed to join:", err);
-    errorCallback("Failed to join. Please try again.");
-  }
-};
 
 // Default easing class for animations
 export const DefaultEase = " ease-[cubic-bezier(0.075, 0.820, 0.165, 1.000)]";
 
 /**
- * Returns the conversation types for a particular conversation. Will use the conversationType property if set,
+ * Returns the conversation type for a particular conversation. Will use the conversationType property if set,
  * othwerwise maps agents to conversation type for legacy conversations (e.g. multiple agents combined into a single type)
  * @param conversation
- * @returns ConversationType[] the types for the conversation
+ * @returns ConversationType the type for the conversation
  */
-async function getTypesForConversation(
+async function getTypeForConversation(
   conversation: components["schemas"]["Conversation"],
   conversationTypes: components["schemas"]["ConversationType"][]
-): Promise<components["schemas"]["ConversationType"][]> {
+): Promise<components["schemas"]["ConversationType"]> {
   if (conversation.conversationType) {
     const type = conversationTypes.find(
       (type) => type.name === conversation.conversationType
     );
-    if (type) return [type];
+    if (type) return type;
   }
   const agentNames = conversation.agents.map((agent) => agent.agentType);
   // Bit of a hack to support legacy conversations without a type. Takes advantage of the fact that
   // backChannel and eventAssistant conversation types match their agent names
   // (both backChannelInsights and backChannelMetrics contain 'backChannel', the type name)
-  return conversationTypes.filter((convType) =>
+  return conversationTypes.find((convType) =>
     agentNames.some((agentName) => agentName.includes(convType.name))
-  );
+  )!;
 }
 
 function generateEventUrls(conversationData: Conversation): EventUrls {
@@ -304,42 +260,68 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
     ? { label: "Zoom", url: zoomAdapter.config?.meetingUrl as string }
     : undefined;
 
-  for (const convType of conversationData.types) {
-    if (convType.name === "backChannel") {
-      const modPasscode = conversationData.channels.find(
-        (channel) => channel.name === "moderator"
-      )?.passcode;
+  const convType = conversationData.type;
 
-      const participantPasscode = conversationData.channels.find(
-        (channel) => channel.name === "participant"
-      )?.passcode;
+  const transcriptPasscode = conversationData.channels.find(
+    (channel) => channel.name === "transcript"
+  )?.passcode;
+  const hasTranscript = Boolean(transcriptPasscode);
 
-      const transcriptPasscode = conversationData.channels.find(
-        (channel) => channel.name === "transcript"
-      )?.passcode;
-      const hasTranscript = Boolean(transcriptPasscode);
-      if (modPasscode) {
-        moderator.push({
-          label: "Back Channel",
-          url: `${urlPrefix}/moderator/?conversationId=${
-            conversationData.id
-          }&channel=moderator,${modPasscode}${
-            hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
-          }`,
-        });
-      }
-      if (participantPasscode) {
-        participant.push({
-          label: "Back Channel",
-          url: `${urlPrefix}/backchannel/?conversationId=${conversationData.id}&channel=participant,${participantPasscode}`,
-        });
-      }
-    } else if (convType.name === "eventAssistant") {
-      const eventAssistantUrl = {
-        label: "Event Assistant",
-        url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}`,
-      };
-      participant.push(eventAssistantUrl);
+  const chatPasscode = conversationData.channels.find(
+    (channel) => channel.name === "chat"
+  )?.passcode;
+  const hasChat = Boolean(chatPasscode);
+
+  const modPasscode = conversationData.channels.find(
+    (channel) => channel.name === "moderator"
+  )?.passcode;
+
+  const modUrl = modPasscode
+    ? `${urlPrefix}/moderator/?conversationId=${
+        conversationData.id
+      }&channel=moderator,${modPasscode}${
+        hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
+      }`
+    : "";
+
+  if (convType.name === "backChannel") {
+    const participantPasscode = conversationData.channels.find(
+      (channel) => channel.name === "participant"
+    )?.passcode;
+
+    if (participantPasscode) {
+      participant.push({
+        label: "Back Channel",
+        url: `${urlPrefix}/backchannel/?conversationId=${conversationData.id}&channel=participant,${participantPasscode}`,
+      });
+    }
+    if (modPasscode) {
+      moderator.push({
+        label: "Back Channel",
+        url: modUrl,
+      });
+    }
+  } else if (convType.name === "eventAssistant") {
+    const eventAssistantUrl = {
+      label: "Event Assistant",
+      url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
+        hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
+      }${hasChat ? `&channel=chat,${chatPasscode}` : ""}`,
+    };
+    participant.push(eventAssistantUrl);
+  } else if (convType.name === "eventAssistantPlus") {
+    const eventAssistantPlusUrl = {
+      label: "Event Assistant Plus",
+      url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
+        hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
+      }${hasChat ? `&channel=chat,${chatPasscode}` : ""}`,
+    };
+    participant.push(eventAssistantPlusUrl);
+    if (modPasscode) {
+      moderator.push({
+        label: "Event Assistant Plus",
+        url: modUrl,
+      });
     }
   }
 
@@ -369,15 +351,15 @@ export const createConversationFromData = async (
 ): Promise<Conversation> => {
   const { conversationTypes, availablePlatforms } = await Api.get().GetConfig();
 
-  const types = await getTypesForConversation(data, conversationTypes);
+  const type = await getTypeForConversation(data, conversationTypes);
   const eventUrls = generateEventUrls({
     ...data,
-    types,
+    type,
   } as Conversation);
 
   return {
     ...data,
-    types,
+    type,
     eventUrls,
     platformTypes: availablePlatforms.filter((platform) =>
       data.platforms?.some((p) => p === platform.name)

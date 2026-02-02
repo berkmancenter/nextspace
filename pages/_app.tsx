@@ -11,6 +11,8 @@ import {
 } from "@mui/material";
 import { Layout } from "../components";
 import SessionManager from "../utils/SessionManager";
+import { validateEnv } from "../utils/validateEnv";
+import { useSessionTracking } from "../hooks/useAnalytics";
 
 // Pages that don't require session creation
 // Add more pages here as needed (e.g., "/about", "/privacy", "/terms")
@@ -29,9 +31,24 @@ function shouldSkipSession(pathname: string): boolean {
   return SESSION_BLACKLIST.includes(pathname);
 }
 
+// Validate environment variables on app initialization
+if (typeof window === "undefined") {
+  try {
+    validateEnv();
+  } catch (error) {
+    console.error(
+      error instanceof Error ? error.message : "Environment validation failed"
+    );
+    throw error;
+  }
+}
+
 export default function App({ Component, pageProps }: AppProps) {
   const [sessionReady, setSessionReady] = useState(false);
   const router = useRouter();
+
+  // Track session-level analytics
+  useSessionTracking();
 
   const theme = createTheme({
     typography: {
@@ -39,19 +56,18 @@ export default function App({ Component, pageProps }: AppProps) {
     },
   });
 
-  // Restore or create session on app initialization
+  // Restore or create session on app initialization (once)
   useEffect(() => {
     const initSession = async () => {
-      // Skip session creation for blacklisted pages
-      if (shouldSkipSession(router.pathname)) {
+      const skipCreation = shouldSkipSession(router.pathname);
+      
+      if (skipCreation) {
         console.log(`Skipping session creation for ${router.pathname}`);
-        setSessionReady(true);
-        return;
       }
 
-      // Initialize session (restore existing or create new guest)
+      // Always try to restore existing session, but skip creation on blacklisted pages
       try {
-        await SessionManager.get().restoreSession();
+        await SessionManager.get().restoreSession({ skipCreation });
       } catch (error) {
         console.error("Session initialization failed:", error);
       }
@@ -59,7 +75,8 @@ export default function App({ Component, pageProps }: AppProps) {
     };
 
     initSession();
-  }, [router.pathname]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
 
   // Show loading state while restoring session
   if (!sessionReady) {

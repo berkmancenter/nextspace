@@ -18,18 +18,18 @@ export const metadata: Metadata = {
  */
 export const Layout = ({
   children,
-  isAuthenticated,
-}: Readonly<{ children: React.ReactNode; isAuthenticated: boolean }>) => {
+  isAuthenticated = false,
+}: Readonly<{ children: React.ReactNode; isAuthenticated?: boolean }>) => {
   const router = useRouter();
   const currentUrl = router.isReady ? router.asPath : "";
 
   // Pages where footer should be hidden (full-screen chat interfaces)
-  const hideFooter = currentUrl.includes("/conversation");
+  const hideFooter = currentUrl.includes("conversationId");
 
   return (
     <div
       className={`min-h-screen flex flex-col ${
-        currentUrl.includes("conversation")
+        currentUrl.includes("conversationId")
           ? "bg-[#FFFFFF]"
           : "bg-main bg-transparent bg-cover bg-center bg-no-repeat"
       }`}

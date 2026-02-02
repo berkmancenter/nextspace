@@ -75,12 +75,24 @@ export default function LoginPage() {
       // TODO: we should not store admin tokens locally in memory like this;
       // while technically not easily accessed by browser, this is not good practice.
       // client should have to call a local API route to decrypt the cookie and then send requests.
-      Api.get().SetAdminTokens(response.access.token, response.refresh.token);
+      Api.get().SetAdminTokens(response.tokens.access.token, response.tokens.refresh.token);
       // Set regular token as well, for other operations
-      Api.get().SetTokens(response.access.token, response.refresh.token);
+      Api.get().SetTokens(response.tokens.access.token, response.tokens.refresh.token);
 
-      // Mark session as authenticated
-      SessionManager.get().markAuthenticated();
+      const userId = response.user?.id || response.userId;
+      
+      // Get the active pseudonym for the user
+      const activePseudonym = response.user?.pseudonyms?.find(
+        (p: any) => p.active
+      )?.pseudonym;
+      
+      if (!activePseudonym) {
+        setFormError("No active pseudonym found for user.");
+        return;
+      }
+
+      // Mark session as authenticated with user info
+      SessionManager.get().markAuthenticated(activePseudonym, userId);
 
       // Set session cookie via local API route
       await fetch("/api/session", {
@@ -89,9 +101,10 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username: formData.get("username"),
-          accessToken: response.access.token,
-          refreshToken: response.refresh.token,
+          username: activePseudonym,
+          userId: userId,
+          accessToken: response.tokens.access.token,
+          refreshToken: response.tokens.refresh.token,
         }),
       });
       setFormSuccess(true);

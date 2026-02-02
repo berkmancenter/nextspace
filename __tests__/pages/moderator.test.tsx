@@ -1,9 +1,9 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { act } from "react";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
 import ModeratorScreen from "../../pages/moderator";
-import { JoinSession, RetrieveData } from "../../utils";
+import { RetrieveData } from "../../utils";
 
 // Mock dependencies
 jest.mock("next/router", () => ({
@@ -14,6 +14,10 @@ jest.mock("socket.io-client", () => ({
   io: jest.fn(),
 }));
 
+jest.mock("../../components/Transcript", () => ({
+  Transcript: jest.fn(() => <div data-testid="transcript-component" />),
+}));
+
 jest.mock("../../utils", () => ({
   Api: {
     get: jest.fn().mockReturnValue({
@@ -21,7 +25,6 @@ jest.mock("../../utils", () => ({
       GetTokens: jest.fn().mockReturnValue({ access: "mock-token" }),
     }),
   },
-  JoinSession: jest.fn(),
   GetChannelPasscode: jest.fn().mockReturnValue("mock-passcode"),
   RetrieveData: jest.fn(),
   QueryParamsError: jest.fn().mockReturnValue("Query params error"),
@@ -32,6 +35,31 @@ jest.mock("react-scroll", () => ({
     scrollToTop: jest.fn(),
   },
 }));
+
+// Mock useSessionJoin
+const mockUseSessionJoin = jest.fn();
+jest.mock("../../utils/useSessionJoin", () => ({
+  useSessionJoin: (...args: any[]) => mockUseSessionJoin(...args),
+}));
+
+// Mock SessionManager
+jest.mock("../../utils/SessionManager", () => {
+  const mockSessionManager = {
+    get: jest.fn(() => ({
+      restoreSession: jest.fn().mockResolvedValue(true),
+      getState: jest.fn().mockReturnValue("authenticated"),
+      hasSession: jest.fn().mockReturnValue(true),
+      getSessionInfo: jest.fn().mockReturnValue({
+        userId: "moderator-123",
+        username: "ModeratorUser",
+      }),
+    })),
+  };
+  return {
+    __esModule: true,
+    default: mockSessionManager,
+  };
+});
 
 describe("ModeratorScreen", () => {
   const mockRouter = {
@@ -79,28 +107,20 @@ describe("ModeratorScreen", () => {
     },
   ];
 
-  const mockTranscript = [
-    {
-      id: "3",
-      pseudonym: "User1",
-      createdAt: "2025-10-17T12:02:00Z",
-      channels: ["transcript"],
-      body: {
-        preset: false,
-        text: "Hello world",
-      },
-    },
-  ];
-
   beforeEach(() => {
     jest.clearAllMocks();
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
     (io as jest.Mock).mockReturnValue(mockSocket);
-    (JoinSession as jest.Mock).mockResolvedValue({});
-    (RetrieveData as jest.Mock).mockResolvedValue([
-      ...mockMessages,
-      ...mockTranscript,
-    ]);
+    (RetrieveData as jest.Mock).mockResolvedValue(mockMessages);
+    
+    // Default mock implementation for useSessionJoin
+    mockUseSessionJoin.mockReturnValue({
+      socket: mockSocket,
+      pseudonym: "ModeratorUser",
+      userId: "moderator-123",
+      isConnected: true,
+      errorMessage: null,
+    });
   });
 
   it("renders the moderator screen with insight and metric messages", async () => {
@@ -113,8 +133,16 @@ describe("ModeratorScreen", () => {
       expect(
         screen.getByText(/The audience is expressing/)
       ).toBeInTheDocument();
-      expect(screen.getByText("“happiness”")).toBeInTheDocument();
+      expect(screen.getByText(/happiness/)).toBeInTheDocument();
     });
+  });
+
+  it("renders Transcript when transcript passcode exists", async () => {
+    await act(async () => {
+      render(<ModeratorScreen isAuthenticated />);
+    });
+
+    expect(screen.getByTestId("transcript-component")).toBeInTheDocument();
   });
 
   it("shows error message when query params are invalid", async () => {
@@ -145,41 +173,5 @@ describe("ModeratorScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("API error")).toBeInTheDocument();
     });
-  });
-
-  it("toggles transcript visibility when button is clicked", async () => {
-    await act(async () => {
-      render(<ModeratorScreen isAuthenticated={true} />);
-    });
-
-    const transcriptButton = screen.getByLabelText(/Open transcript view/);
-
-    await act(async () => {
-      fireEvent.click(transcriptButton);
-    });
-
-    expect(screen.getByLabelText(/Close transcript view/)).toBeInTheDocument();
-
-    await act(async () => {
-      fireEvent.click(screen.getByLabelText(/Close transcript view/));
-    });
-
-    expect(screen.getByLabelText(/Open transcript view/)).toBeInTheDocument();
-  });
-
-  it("scrolls to top when the arrow button is clicked", async () => {
-    await act(async () => {
-      render(<ModeratorScreen isAuthenticated={true} />);
-    });
-
-    const arrowUpButton = screen.getByLabelText("go to top");
-
-    await act(async () => {
-      fireEvent.click(arrowUpButton);
-    });
-
-    expect(
-      require("react-scroll").animateScroll.scrollToTop
-    ).toHaveBeenCalled();
   });
 });

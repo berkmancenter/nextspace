@@ -1,6 +1,5 @@
 import { FC, ReactNode, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import { io } from "socket.io-client";
 import {
   Box,
   Button,
@@ -15,15 +14,18 @@ import { Element, scroller } from "react-scroll";
 import {
   Api,
   GetChannelPasscode,
-  JoinSession,
   QueryParamsError,
   SendData,
 } from "../utils";
 
-import { DirectMessage } from "../components";
 import { components } from "../types";
+import { BackchannelMessage } from "../components/messages/BackchannelMessage";
 import { CheckAuthHeader } from "../utils/Helpers";
-import SessionManager from "../utils/SessionManager";
+import { useSessionJoin } from "../utils/useSessionJoin";
+import { useAnalytics } from "../hooks/useAnalytics";
+import {
+  trackConversationEvent,
+} from "../utils/analytics";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -32,61 +34,33 @@ export const getServerSideProps = async (context: { req: any }) => {
 function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
   const router = useRouter();
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Initialize page-level analytics
+  useAnalytics({ pageType: "backchannel" });
+
   const [showWelcome, setShowWelcome] = useState(true);
-  const [isConnected, setIsConnected] = useState(false);
-  const [joining, setJoining] = useState(false);
   const [participantPasscode, setParticipantPasscode] = useState("");
   const [transcriptPasscode, setTranscriptPasscode] = useState<string | null>(
-    null
+    null,
   );
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  const [messages, setMessages] = useState<
-    (components["schemas"]["Message"] & { date: Date })[]
-  >([]);
+  const [messages, setMessages] = useState<components["schemas"]["Message"][]>(
+    [],
+  );
   const [currentMessage, setCurrentMessage] = useState("");
-  const [pseudonym, setPseudonym] = useState<string | null>(null);
-  const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
 
   const messageInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (Api.get().GetTokens().access || joining) return;
+  // Use custom hook for session joining
+  const {
+    socket,
+    pseudonym,
+    isConnected,
+    errorMessage: sessionError,
+  } = useSessionJoin(isAuthenticated);
 
-    // Note: _app.tsx guarantees SessionManager has completed initialization
-    // before this component renders, so session is always ready here
-    setJoining(true);
-    JoinSession(
-      (result) => {
-        setPseudonym(result.pseudonym);
-        let socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
-          auth: { token: Api.get().GetTokens().access },
-        });
-        // Set the socket instance in state
-        setSocket(socketLocal);
-        setJoining(false);
-      },
-      (error) => {
-        setErrorMessage(error);
-        setJoining(false);
-      },
-      isAuthenticated
-    );
-  }, [joining, isAuthenticated]);
-
-  useEffect(() => {
-    if (!socket) return;
-    socket.on("error", (error: string) => {
-      console.error("Socket error:", error);
-    });
-    socket.on("connect", () => setIsConnected(true));
-    socket.on("disconnect", () => setIsConnected(false));
-
-    return () => {
-      socket.off("connect", () => setIsConnected(true));
-      socket.off("disconnect", () => setIsConnected(false));
-    };
-  }, [socket]);
+  // Combine session and local errors
+  const errorMessage = sessionError || localError;
 
   useEffect(() => {
     if (participantPasscode || !router.isReady) return;
@@ -95,19 +69,19 @@ function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
       !router.query.channel ||
       router.query.channel.length === 0
     ) {
-      setErrorMessage(QueryParamsError(router));
+      setLocalError(QueryParamsError(router));
       return;
     }
 
     async function fetchConversationData() {
       if (router.query.channel) {
         setTranscriptPasscode(
-          GetChannelPasscode("transcript", router.query, setErrorMessage)
+          GetChannelPasscode("transcript", router.query, setLocalError)
         );
         const participantPasscodeParam = GetChannelPasscode(
           "participant",
           router.query,
-          setErrorMessage
+          setLocalError
         );
 
         if (!participantPasscodeParam) return;
@@ -136,6 +110,24 @@ function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
         passcode: transcriptPasscode,
       });
 
+    // Track message send
+    const conversationId = router.query.conversationId as string;
+    if (preset) {
+      trackConversationEvent(
+        conversationId,
+        "backchannel",
+        "quick_response_sent",
+        message,
+      );
+    } else {
+      trackConversationEvent(
+        conversationId,
+        "backchannel",
+        "custom_message_sent",
+        "custom_message",
+      );
+    }
+
     SendData("messages", {
       body: {
         text: message || "This is a test message",
@@ -150,7 +142,6 @@ function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
           ...prev,
           {
             ...message[0],
-            date: new Date(),
           },
         ]);
         setCurrentMessage("");
@@ -166,7 +157,7 @@ function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
       })
       .catch((error) => {
         console.error("Failed to send message:", error);
-        setErrorMessage("Failed to send message. Please try again.");
+        setLocalError("Failed to send message. Please try again.");
       });
   }
 
@@ -228,7 +219,18 @@ function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
               <Button
                 variant="contained"
                 color="primary"
-                onClick={() => setShowWelcome(false)}
+                onClick={() => {
+                  setShowWelcome(false);
+                  const conversationId = router.query.conversationId as string;
+                  if (conversationId) {
+                    trackConversationEvent(
+                      conversationId,
+                      "backchannel",
+                      "welcome_dismissed",
+                      "welcome_screen",
+                    );
+                  }
+                }}
                 sx={{ marginTop: "1rem", maxWidth: "10rem" }}
               >
                 Got it!
@@ -282,11 +284,9 @@ function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
                   id="scroll-container"
                 >
                   {messages.map((message, i) => (
-                    <DirectMessage
+                    <BackchannelMessage
                       key={`msg-${i}`}
-                      text={(message.body as any).text}
-                      date={message.date}
-                      theme="backchannel"
+                      message={{ ...message, body: (message.body as any).text }}
                     />
                   ))}
                   <div className="mt-20 w-full block" />

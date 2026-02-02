@@ -61,7 +61,7 @@ describe("SessionManager", () => {
 
       const result = await sessionManager.restoreSession();
 
-      expect(result).toBe(true);
+      expect(result).toEqual({ userId: "user-123", username: "testuser" });
       expect(global.fetch).toHaveBeenCalledWith("/api/cookie");
       expect(mockApiInstance.SetTokens).toHaveBeenCalledWith(
         "mock-access-token",
@@ -198,7 +198,7 @@ describe("SessionManager", () => {
       // Second call should return immediately
       const result = await sessionManager.restoreSession();
 
-      expect(result).toBe(true);
+      expect(result).toEqual({ userId: "user-123", username: "testuser" });
       expect(global.fetch).not.toHaveBeenCalled();
     });
   });
@@ -243,6 +243,73 @@ describe("SessionManager", () => {
       expect(sessionManager.getState()).toBe("authenticated");
     });
 
+    it("updates session info when marking as authenticated with parameters", () => {
+      sessionManager.markAuthenticated("authenticatedUser", "auth-user-123");
+      
+      expect(sessionManager.getState()).toBe("authenticated");
+      expect(sessionManager.getSessionInfo()).toEqual({
+        userId: "auth-user-123",
+        username: "authenticatedUser",
+      });
+    });
+
+    it("preserves existing session info when marking as authenticated without parameters", async () => {
+      // First set up a guest session
+      const mockCookieData = {
+        tokens: { access: "token", refresh: "refresh" },
+        userId: "guest-123",
+        username: "GuestUser",
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        json: async () => mockCookieData,
+      });
+
+      await sessionManager.restoreSession();
+      
+      // Now mark as authenticated without parameters
+      sessionManager.markAuthenticated();
+      
+      expect(sessionManager.getState()).toBe("authenticated");
+      // Session info should still be the guest info
+      expect(sessionManager.getSessionInfo()).toEqual({
+        userId: "guest-123",
+        username: "GuestUser",
+      });
+    });
+
+    it("updates session info from guest to authenticated user on login", async () => {
+      // First set up a guest session
+      const mockGuestData = {
+        tokens: { access: "guest-token", refresh: "guest-refresh" },
+        userId: "guest-456",
+        username: "GuestUser789",
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        json: async () => mockGuestData,
+      });
+
+      await sessionManager.restoreSession();
+      
+      expect(sessionManager.getState()).toBe("guest");
+      expect(sessionManager.getSessionInfo()).toEqual({
+        userId: "guest-456",
+        username: "GuestUser789",
+      });
+
+      // Simulate login - mark as authenticated with new user info
+      sessionManager.markAuthenticated("realuser", "real-user-123");
+      
+      expect(sessionManager.getState()).toBe("authenticated");
+      expect(sessionManager.getSessionInfo()).toEqual({
+        userId: "real-user-123",
+        username: "realuser",
+      });
+    });
+
     it("marks session as guest", () => {
       sessionManager.markGuest();
       expect(sessionManager.getState()).toBe("guest");
@@ -252,9 +319,43 @@ describe("SessionManager", () => {
       sessionManager.markGuest();
       sessionManager.clearSession();
 
-      expect(sessionManager.getState()).toBe("ready");
+      expect(sessionManager.getState()).toBe("cleared");
+      expect(sessionManager.getSessionInfo()).toBeNull();
       expect(mockApiInstance.ClearTokens).toHaveBeenCalled();
       expect(mockApiInstance.ClearAdminTokens).toHaveBeenCalled();
+    });
+
+    it("skips session creation when skipCreation is true", async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 401,
+        json: async () => ({ error: "No session cookie found" }),
+      });
+
+      const result = await sessionManager.restoreSession({ skipCreation: true });
+
+      expect(result).toBeNull();
+      expect(sessionManager.getState()).toBe("cleared");
+      // Should only have called cookie check, not pseudonym/register
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("restores existing session even with skipCreation true", async () => {
+      const mockCookieData = {
+        tokens: { access: "token", refresh: "refresh" },
+        userId: "user-123",
+        username: "testuser",
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        json: async () => mockCookieData,
+      });
+
+      const result = await sessionManager.restoreSession({ skipCreation: true });
+
+      expect(result).toEqual({ userId: "user-123", username: "testuser" });
+      expect(sessionManager.hasSession()).toBe(true);
+      expect(sessionManager.getState()).toBe("authenticated");
     });
   });
 

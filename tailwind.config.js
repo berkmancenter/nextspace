@@ -1,5 +1,5 @@
 module.exports = {
-  content: ["./pages/*.tsx", "./components/*.tsx"],
+  content: ["./pages/**/*.tsx", "./components/**/*.tsx"],
   corePlugins: {
     preflight: false,
   },

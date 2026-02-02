@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { EncryptJWT } from "jose";
+import { withEnvValidation } from "../../utils/withEnvValidation";
 
 /**
  * API route to handle setting the session cookie upon user login.
@@ -7,16 +8,7 @@ import { EncryptJWT } from "jose";
  * @param res The outgoing response object
  * @returns A JSON response indicating successful cookie set
  */
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  // Check that secret exists
-  if (!process.env.SESSION_SECRET) {
-    res.status(500).json({ error: "SESSION_SECRET is not set." });
-    return;
-  }
-
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const sessionData = req.body;
   const secret = new TextEncoder().encode(process.env.SESSION_SECRET!);
 
@@ -57,3 +49,5 @@ export default async function handler(
   );
   res.status(200).json({ message: "Successfully set cookie!" });
 }
+
+export default withEnvValidation(handler, ["SESSION_SECRET"]);
