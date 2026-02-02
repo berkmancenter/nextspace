@@ -222,7 +222,7 @@ export const SendData = async (
 /**
  * Joins a session by using the existing session created on app load.
  * Since SessionManager ensures a session always exists after initialization,
- * this just needs to fetch the current session data.
+ * this just needs to get the current session info.
  * @param success - Callback function to call on successful join, with userId and pseudonym.
  * @param errorCallback - Callback function to call on error, with an error message.
  * @param isAuthenticated - Optional flag indicating if the user is authenticated.
@@ -235,28 +235,21 @@ export const JoinSession = async (
   try {
     // Wait for session to be ready (if still initializing)
     const SessionManager = (await import("./SessionManager")).default;
-    await SessionManager.get().restoreSession();
+    const sessionInfo = await SessionManager.get().restoreSession();
 
     // At this point, a session MUST exist (either restored or newly created)
-    if (!Api.get().GetTokens().access) {
+    if (!sessionInfo) {
       throw new Error("No session available after initialization");
     }
 
-    // Get current session info from cookie
-    const cookieRes = await fetch("/api/cookie");
-    const cookieData = await cookieRes.json();
-
-    if (cookieRes.status !== 200 || !cookieData.tokens) {
-      throw new Error("Failed to retrieve session data");
+    if (!Api.get().GetTokens().access) {
+      throw new Error("No access token available");
     }
 
-    // Ensure tokens are set in memory
-    Api.get().SetTokens(cookieData.tokens.access, cookieData.tokens.refresh);
-
-    // Return session info
+    // Return session info directly from SessionManager
     success({
-      userId: cookieData.userId,
-      pseudonym: cookieData.username,
+      userId: sessionInfo.userId,
+      pseudonym: sessionInfo.username,
     });
   } catch (err) {
     console.error("Failed to join:", err);

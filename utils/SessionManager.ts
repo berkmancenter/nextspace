@@ -7,10 +7,16 @@ type SessionState =
   | "guest"
   | "authenticated";
 
+type SessionInfo = {
+  userId: string;
+  username: string;
+};
+
 class SessionManager {
   private static _instance: SessionManager;
   private sessionState: SessionState = "uninitialized";
-  private initializationPromise: Promise<void> | null = null;
+  private initializationPromise: Promise<SessionInfo | null> | null = null;
+  private currentSession: SessionInfo | null = null;
 
   private constructor() {}
 
@@ -28,30 +34,30 @@ class SessionManager {
   /**
    * Restore session from encrypted cookie if it exists.
    * This should be called once on app initialization.
+   * @returns SessionInfo if session exists, null otherwise
    */
-  async restoreSession(): Promise<boolean> {
+  async restoreSession(): Promise<SessionInfo | null> {
     // Prevent multiple simultaneous initialization attempts
     if (this.initializationPromise) {
-      await this.initializationPromise;
-      return this.sessionState !== "uninitialized";
+      return await this.initializationPromise;
     }
 
     if (this.sessionState !== "uninitialized") {
-      return true; // Already initialized
+      return this.currentSession; // Already initialized
     }
 
     this.sessionState = "initializing";
     this.initializationPromise = this._restoreSession();
 
     try {
-      await this.initializationPromise;
-      return this.sessionState !== "uninitialized";
+      const sessionInfo = await this.initializationPromise;
+      return sessionInfo;
     } finally {
       this.initializationPromise = null;
     }
   }
 
-  private async _restoreSession(): Promise<void> {
+  private async _restoreSession(): Promise<SessionInfo | null> {
     try {
       const response = await fetch("/api/cookie");
       const data = await response.json();
@@ -68,21 +74,26 @@ class SessionManager {
             ? "authenticated"
             : "guest";
 
+        this.currentSession = {
+          userId: data.userId,
+          username: data.username,
+        };
+
         console.log(`Session restored: ${this.sessionState}`, data.username);
-        return;
+        return this.currentSession;
       }
     } catch (error) {
       console.error("Failed to restore session:", error);
     }
 
     // No existing session - create a new guest session immediately
-    await this._createGuestSession();
+    return await this._createGuestSession();
   }
 
   /**
    * Create a new guest session (called when no existing session found)
    */
-  private async _createGuestSession(): Promise<void> {
+  private async _createGuestSession(): Promise<SessionInfo> {
     try {
       console.log("Creating new guest session...");
 
@@ -124,12 +135,25 @@ class SessionManager {
       });
 
       this.sessionState = "guest";
+      this.currentSession = {
+        userId: registerResponse.user.id,
+        username: pseudonymResponse.pseudonym,
+      };
+
       console.log("Guest session created:", pseudonymResponse.pseudonym);
+      return this.currentSession;
     } catch (error) {
       console.error("Failed to create guest session:", error);
       this.sessionState = "ready";
       throw error;
     }
+  }
+
+  /**
+   * Get current session info
+   */
+  getSessionInfo(): SessionInfo | null {
+    return this.currentSession;
   }
 
   /**

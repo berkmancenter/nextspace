@@ -26,6 +26,7 @@ const adminPagesBase: Record<string, { icon: JSX.Element; url: string }> = {
 
 // Regular user pages navigation items
 const userPages: Record<string, { icon: JSX.Element; url: string }> = {
+  "Log In": { icon: <LoginIcon />, url: "/login" },
   "Give Feedback": {
     icon: <FeedbackOutlinedIcon />,
     url: "https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform",
@@ -45,7 +46,7 @@ const userPages: Record<string, { icon: JSX.Element; url: string }> = {
 export const Header = ({
   className = "",
   variant = "transparent",
-  isAuthenticated,
+  isAuthenticated = false,
 }: HeaderProps) => {
   const variantStyles = {
     transparent: "flex-end bg-transparent shadow-none",
@@ -75,33 +76,43 @@ export const Header = ({
   };
 
   const NavItems = () => {
-    return Object.keys(currentPages).map((pageName) => {
-      const isExternalLink = currentPages[pageName].url.startsWith("http");
-      return (
-        <Link
-          href={currentPages[pageName].url}
-          key={pageName}
-          target={isExternalLink ? "_blank" : undefined}
-          rel={isExternalLink ? "noopener noreferrer" : undefined}
-        >
-          <Button
-            sx={{
-              textTransform: "capitalize",
-              "&:hover": { color: "#4845d2" },
-              fontSize: "1rem",
-              color:
-                router.asPath === currentPages[pageName].url
-                  ? "#4845d2"
-                  : "grey",
-              backgroundColor: "transparent",
-            }}
-            startIcon={currentPages[pageName].icon}
+    return Object.keys(currentPages)
+      .map((pageName) => {
+        const pageData = currentPages[pageName];
+        
+        // Guard against undefined/invalid page data
+        if (!pageData?.url) {
+          console.warn(`Navigation item "${pageName}" has no URL`);
+          return null;
+        }
+        
+        const isExternalLink = pageData.url.startsWith("http");
+        return (
+          <Link
+            href={pageData.url}
+            key={pageName}
+            target={isExternalLink ? "_blank" : undefined}
+            rel={isExternalLink ? "noopener noreferrer" : undefined}
           >
-            {pageName}
-          </Button>
-        </Link>
-      );
-    });
+            <Button
+              sx={{
+                textTransform: "capitalize",
+                "&:hover": { color: "#4845d2" },
+                fontSize: "1rem",
+                color:
+                  router.asPath === pageData.url
+                    ? "#4845d2"
+                    : "grey",
+                backgroundColor: "transparent",
+              }}
+              startIcon={pageData.icon}
+            >
+              {pageName}
+            </Button>
+          </Link>
+        );
+      })
+      .filter((item) => item !== null);
   };
 
   return (

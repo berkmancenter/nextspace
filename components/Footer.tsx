@@ -18,8 +18,8 @@ export const Footer = ({ className = "" }: FooterProps) => {
   const currentYear = new Date().getFullYear();
 
   const footerLinks = [
-    { label: "About", url: process.env.NEXT_PUBLIC_ABOUT_URL! },
-  ];
+    { label: "About", url: process.env.NEXT_PUBLIC_ABOUT_URL || "#" },
+  ].filter(link => link.url && link.url !== "#");
 
   return (
     <footer

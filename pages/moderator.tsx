@@ -1,7 +1,6 @@
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 import { IconButton, Tooltip } from "@mui/material";
-import { io } from "socket.io-client";
 import {
   ArrowUpwardOutlined,
   CloudOffOutlined,
@@ -17,7 +16,6 @@ import {
 } from "../types.internal";
 import {
   Api,
-  JoinSession,
   GetChannelPasscode,
   RetrieveData,
   QueryParamsError,
@@ -25,16 +23,12 @@ import {
 
 import { Transcript } from "../components/";
 import { DefaultEase } from "../utils/Helpers";
-import SessionManager from "../utils/SessionManager";
+import { useSessionJoin } from "../utils/useSessionJoin";
 
 function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
   const router = useRouter();
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [joining, setJoining] = useState(false);
-
-  const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
 
   const [transcript, setTranscript] = useState<PseudonymousMessage[]>([]);
@@ -44,6 +38,16 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
 
   const scrollViewRef = useRef<HTMLDivElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
+
+  // Use custom hook for session joining
+  const {
+    socket,
+    isConnected,
+    errorMessage: sessionError,
+  } = useSessionJoin(isAuthenticated);
+
+  // Combine session and local errors
+  const errorMessage = sessionError || localError;
 
   /**
    * Filters transcript elements based on a given timespan
@@ -73,40 +77,6 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
     );
   }
 
-  /**
-   * Authenticates the user and retrieves an API token.
-   * @returns The API token as a string.
-   */
-  const join = async () => {
-    setJoining(true);
-    JoinSession(
-      () => {
-        const token = Api.get().GetTokens().access;
-        let socketLocal;
-        try {
-          // Initialize the socket connection
-          socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
-            auth: { token },
-          });
-          socketLocal.on("connect_error", (err: any) => {
-            console.error("Socket connection error:", err);
-            setErrorMessage("Failed to connect to the socket server.");
-          });
-        } catch (error) {
-          console.error("Error initializing socket:", error);
-          setErrorMessage("Failed to connect to the socket server.");
-          return;
-        }
-        // Set the socket instance in state
-        setSocket(socketLocal);
-        setJoining(false);
-      },
-      (error) => {
-        setErrorMessage(error);
-      }
-    );
-  };
-
   // Handle shortcut key is pressed (debugging purposes)
   useEffect(() => {
     function keyDownHandler(e: globalThis.KeyboardEvent) {
@@ -131,28 +101,6 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
     };
   });
 
-  useEffect(() => {
-    if (socket || joining) return;
-
-    // Note: _app.tsx guarantees SessionManager has completed initialization
-    // before this component renders, so session is always ready here
-    join();
-  }, [socket, joining]);
-
-  useEffect(() => {
-    if (!socket) return;
-    socket.on("error", (error: string) => {
-      console.error("Socket error:", error);
-    });
-    socket.on("connect", () => setIsConnected(true));
-    socket.on("disconnect", () => setIsConnected(false));
-
-    return () => {
-      socket.off("connect", () => setIsConnected(true));
-      socket.off("disconnect", () => setIsConnected(false));
-    };
-  }, [socket]);
-
   const apiAccessToken = Api.get().GetTokens().access;
 
   useEffect(() => {
@@ -161,21 +109,21 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
       if (
         !router.query.conversationId ||
         !router.query.channel ||
-        router.query.channel.length === 0
-      ) {
-        setErrorMessage(QueryParamsError(router));
-        return;
-      }
+      router.query.channel.length === 0
+    ) {
+      setLocalError(QueryParamsError(router));
+      return;
+    }
       const transcriptPasscodeParam = GetChannelPasscode(
         "transcript",
         router.query,
-        setErrorMessage
+        setLocalError
       );
 
       const modPasscodeParam = GetChannelPasscode(
         "moderator",
         router.query,
-        setErrorMessage
+        setLocalError
       );
       let moderatorChannelsQuery = `?channel=moderator,${modPasscodeParam}`;
       // Add transcript channel and passcode passed 1in query
@@ -193,7 +141,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
         conversationMessagesResponse &&
         "error" in conversationMessagesResponse
       ) {
-        setErrorMessage(
+        setLocalError(
           conversationMessagesResponse.message?.message ||
             "Failed to fetch conversation messages."
         );

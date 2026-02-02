@@ -18,8 +18,8 @@ export const metadata: Metadata = {
  */
 export const Layout = ({
   children,
-  isAuthenticated,
-}: Readonly<{ children: React.ReactNode; isAuthenticated: boolean }>) => {
+  isAuthenticated = false,
+}: Readonly<{ children: React.ReactNode; isAuthenticated?: boolean }>) => {
   const router = useRouter();
   const currentUrl = router.isReady ? router.asPath : "";
 

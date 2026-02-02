@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import { io } from "socket.io-client";
 import { Box, IconButton, InputAdornment, TextField } from "@mui/material";
 import { Send } from "@mui/icons-material";
 
@@ -9,7 +8,6 @@ import { Element, scroller } from "react-scroll";
 import { DirectMessage } from "../components";
 import {
   Api,
-  JoinSession,
   RefreshToken,
   RetrieveData,
   SendData,
@@ -17,7 +15,7 @@ import {
 import { components } from "../types";
 import { PseudonymousMessage } from "../types.internal";
 import { CheckAuthHeader } from "../utils/Helpers";
-import SessionManager from "../utils/SessionManager";
+import { useSessionJoin } from "../utils/useSessionJoin";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -26,65 +24,30 @@ export const getServerSideProps = async (context: { req: any }) => {
 function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
   const router = useRouter();
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [joining, setJoining] = useState(false);
   const [waitingForResponse, setWaitingForResponse] = useState(false);
-
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
   const [currentMessage, setCurrentMessage] = useState("");
-  const [pseudonym, setPseudonym] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
-  const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const messageInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (socket || joining) return;
+  // Use custom hook for session joining
+  const {
+    socket,
+    pseudonym,
+    userId,
+    isConnected,
+    errorMessage: sessionError,
+  } = useSessionJoin(isAuthenticated);
 
-    // Note: _app.tsx guarantees SessionManager has completed initialization
-    // before this component renders, so session is always ready here
-    setJoining(true);
-
-    JoinSession(
-      (result) => {
-        setPseudonym(result.pseudonym);
-        setUserId(result.userId);
-        let socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
-          auth: { token: Api.get().GetTokens().access },
-        });
-
-        // Set the socket instance in state
-        setSocket(socketLocal);
-        setJoining(false);
-      },
-      (error) => {
-        setErrorMessage(error);
-        setJoining(false);
-      },
-      isAuthenticated
-    );
-  }, [socket, joining, isAuthenticated]);
-
-  useEffect(() => {
-    if (!socket) return;
-    socket.on("error", (error: string) => {
-      console.error("Socket error:", error);
-    });
-    socket.on("connect", () => setIsConnected(true));
-    socket.on("disconnect", () => setIsConnected(false));
-
-    return () => {
-      socket.off("connect", () => setIsConnected(true));
-      socket.off("disconnect", () => setIsConnected(false));
-    };
-  }, [socket]);
+  // Combine session and local errors
+  const errorMessage = sessionError || localError;
 
   useEffect(() => {
     if (!Api.get().GetTokens().access || !router.isReady) return;
     if (!router.query.conversationId) {
-      setErrorMessage("Please provide a Conversation ID.");
+      setLocalError("Please provide a Conversation ID.");
       return;
     }
 
@@ -98,12 +61,12 @@ function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
         );
       } catch (e) {
         console.error("Error retrieving conversation:", e);
-        setErrorMessage("Failed to fetch conversation data.");
+        setLocalError("Failed to fetch conversation data.");
         return;
       }
 
       if (!conversation) {
-        setErrorMessage("Conversation not found.");
+        setLocalError("Conversation not found.");
         return;
       }
 
@@ -119,7 +82,7 @@ function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
           Api.get().GetTokens().refresh as string
         );
         if (!tokensResponse || "error" in tokensResponse) {
-          setErrorMessage("Session expired. Please log in again.");
+          setLocalError("Session expired. Please log in again.");
           return;
         }
         Api.get().SetTokens(
@@ -132,14 +95,14 @@ function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
         return null;
       }
       if ("error" in conversation) {
-        setErrorMessage(
+        setLocalError(
           conversation.message?.message || "Error retrieving conversation."
         );
         return;
       }
 
       if (!conversation.agents || conversation.agents.length === 0) {
-        setErrorMessage("No agents found in this conversation.");
+        setLocalError("No agents found in this conversation.");
         return;
       }
       // Check if the event has an event assistant agent
@@ -166,7 +129,7 @@ function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
           if (dmHistory && Array.isArray(dmHistory)) setMessages(dmHistory);
         }
       } else {
-        setErrorMessage(
+        setLocalError(
           "This conversation does not have an event assistant agent."
         );
         return;
