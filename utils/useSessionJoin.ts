@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { Api } from "./Helpers";
-import { JoinSession } from "./Helpers";
+import { Api, JoinSession } from "./";
 
 /**
  * Custom hook to handle session joining and socket initialization.

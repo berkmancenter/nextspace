@@ -61,7 +61,7 @@ describe("SessionManager", () => {
 
       const result = await sessionManager.restoreSession();
 
-      expect(result).toBe(true);
+      expect(result).toEqual({ userId: "user-123", username: "testuser" });
       expect(global.fetch).toHaveBeenCalledWith("/api/cookie");
       expect(mockApiInstance.SetTokens).toHaveBeenCalledWith(
         "mock-access-token",
@@ -198,7 +198,7 @@ describe("SessionManager", () => {
       // Second call should return immediately
       const result = await sessionManager.restoreSession();
 
-      expect(result).toBe(true);
+      expect(result).toEqual({ userId: "user-123", username: "testuser" });
       expect(global.fetch).not.toHaveBeenCalled();
     });
   });
