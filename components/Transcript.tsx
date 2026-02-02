@@ -6,15 +6,9 @@ import {
   PlayArrow,
   Delete,
   ReportProblem,
+  Download,
 } from "@mui/icons-material";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  Button,
-} from "@mui/material";
+import { Dialog, Button } from "@mui/material";
 import { Socket } from "socket.io-client";
 import { PseudonymousMessage } from "../types.internal";
 import { RetrieveData, SendData } from "../utils";
@@ -251,6 +245,42 @@ export function Transcript(props: {
     } catch (error) {
       console.error("Error deleting transcript:", error);
       setError("Failed to delete transcript");
+    }
+  };
+
+  // Handler for downloading transcript
+  const handleDownload = async () => {
+    setError(null);
+    try {
+      // Fetch the formatted transcript text
+      const textContent = await RetrieveData(
+        `transcript/${props.conversationId}`,
+        props.apiAccessToken,
+        "text",
+      );
+
+      if (!textContent || typeof textContent !== "string") {
+        setError("Failed to fetch transcript for download");
+        return;
+      }
+
+      // Create blob and download
+      const blob = new Blob([textContent], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `transcript_${props.conversationId}_${new Date().toISOString().split("T")[0]}.txt`;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading transcript:", error);
+      setError("Failed to download transcript");
     }
   };
 
@@ -535,23 +565,23 @@ export function Transcript(props: {
             {props.showControls && (
               <>
                 <div className="w-full h-px bg-white/40 my-3" />
-                <div className="flex gap-3">
+                <div className="flex gap-2">
                   <button
                     onClick={() => setShowPauseResumeConfirm(true)}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 border-white rounded-lg text-white hover:bg-white/10 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 border-2 border-white rounded-lg text-white hover:bg-white/10 transition-colors"
                     aria-label={
                       transcriptActive ? "Pause recording" : "Resume recording"
                     }
                   >
                     {transcriptActive ? (
                       <>
-                        <Pause className="w-5 h-5" />
-                        <span className="text-base font-medium">Pause</span>
+                        <Pause className="w-4 h-4" />
+                        <span className="text-sm font-medium">Pause</span>
                       </>
                     ) : (
                       <>
-                        <PlayArrow className="w-5 h-5" />
-                        <span className="text-base font-medium">Resume</span>
+                        <PlayArrow className="w-4 h-4" />
+                        <span className="text-sm font-medium">Resume</span>
                       </>
                     )}
                   </button>
@@ -563,15 +593,15 @@ export function Transcript(props: {
                         }
                       }}
                       disabled={transcriptActive}
-                      className={`w-full flex items-center justify-center gap-2 px-4 py-2 border-2 border-white rounded-lg text-white transition-colors ${
+                      className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 border-2 border-white rounded-lg text-white transition-colors ${
                         transcriptActive
                           ? "opacity-50 cursor-not-allowed"
                           : "hover:bg-white/10"
                       }`}
                       aria-label="Delete transcript"
                     >
-                      <Delete className="w-5 h-5" />
-                      <span className="text-base font-medium">Delete</span>
+                      <Delete className="w-4 h-4" />
+                      <span className="text-sm font-medium">Delete</span>
                     </button>
                     {transcriptActive && (
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
@@ -580,6 +610,14 @@ export function Transcript(props: {
                       </div>
                     )}
                   </div>
+                  <button
+                    onClick={handleDownload}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 border-2 border-white rounded-lg text-white hover:bg-white/10 transition-colors"
+                    aria-label="Download transcript"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span className="text-sm font-medium">Download</span>
+                  </button>
                 </div>
                 {error && (
                   <div className="mt-3 p-3 bg-red-500/20 border border-red-500/50 rounded-lg">
