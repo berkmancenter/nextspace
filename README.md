@@ -10,7 +10,11 @@ This view displays what an event moderator uses when assessing insights and metr
 
 ### Backchannel (participant)
 
-This view displays what an event participant uses to send in questions and feedback during an event. The nomenclature for this channel being utilized is currently a "backchannel". The `BackchannelRoom` function initially attempts to register a new pseudonym for the session and sets local API tokens, if successful. It then joins the socket.io instance and the relevant conversation. The `SendData` utility function is used here to send messages from the user to the API.
+This view displays what an event participant uses to send in questions and feedback during an event that uses only the Back Channel agent. The nomenclature for this channel being utilized is currently a "backchannel". The `BackchannelRoom` function initially attempts to register a new pseudonym for the session and sets local API tokens, if successful. It then joins the socket.io instance and the relevant conversation. The `SendData` utility function is used here to send messages from the user to the API.
+
+### Assistant (participant)
+
+This view is for event participants to interact with Event Assistant or Event Assistant Plus. It provides an interface to send and receive direct messages with the agent, and with Event Assistant Plus, to send messages to the moderator. If the event has enabled it and it is provided in the URL as a parameter, a transcript view is also visible.
 
 ## Getting Started
 
@@ -57,6 +61,8 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
     Render the moderator view; see "App views overview".
   - **backchannel.tsx**
     Render the backchannel (participant) view; see "App views overview".
+  - **assistant.tsx**
+    Render the assistant (participant) view; see "App views overview".
   - **signup.tsx**
     Allows users to create an account with username, email, and password.
 
@@ -75,17 +81,32 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
 
 ### .env file
 
-Please see the `env.template` to see the needed parameters. Here is a breakdown of what each parameter does.
+Please see the `.env.template` file to see all available parameters. Copy it to `.env` and fill in the required values.
+
+**The application will fail to start if any required environment variables are missing**, with clear error messages indicating which variables need to be set.
+
+#### Required Environment Variables
+
+These variables **must** be set for the application to run:
 
 ```
-NEXT_PUBLIC_API_URL: the URL you are using to interact with the backend
-NEXT_PUBLIC_API_USER: the username that you have registered with the API; see "For first-time setup"
-NEXT_PUBLIC_API_PASSWORD: the password of the registered user
-NEXT_PUBLIC_SOCKET_URL: the URL to the socket.io instance you are interacting with, e.g. "ws://localhost:5555/?EIO=4&transport=websocket"
-NEXT_PUBLIC_DEFAULT_TOPIC_ID: the ID of the default topic that you are submitting new events to; used within the event creation form
-NEXT_PUBLIC_ZOOM_URL_PATTERN: optional - Zoom URL regex pattern to match against on event creation form, Defaults to "/https:\/\/[\w-]*\.?zoom.us\/.*/g". Must be string.
-NEXT_PUBLIC_ZOOM_DOMAIN: optional - Zoom domain for validation error messages. Defaults to zoom.us.
-SESSION_SECRET: crypto key used to encrypt session cookie. Please see at https://github.com/panva/jose/issues/210#jwe-alg.
+NEXT_PUBLIC_API_URL=<your-backend-url>
+  The URL you are using to interact with the backend API, e.g. http://localhost:3000/v1
+
+NEXT_PUBLIC_SOCKET_URL=<your-socket-url>
+  The URL to the socket.io instance, e.g. "ws://localhost:5555/?EIO=4&transport=websocket"
+
+NEXT_PUBLIC_DEFAULT_TOPIC_ID=<topic-id>
+  The ID of the default topic for submitting new events; used within the event creation form
+
+NEXT_PUBLIC_ABOUT_URL=<about-url>
+  The URL for the About page footer link
+
+SESSION_SECRET=<secret-key>
+  Crypto key used to encrypt session cookies with A128CBC-HS256 algorithm
+  Must be at least 32 characters (256 bits)
+  Generate securely: openssl rand -base64 32
+  See https://github.com/panva/jose/issues/210#jwe-alg
 ```
 
 ### Install and run
@@ -116,8 +137,16 @@ The above example generates types against LLM Engine running locally. You can al
 
 #### Run the development server:
 
+On default port 8080:
+
 ```bash
 npm run dev
+```
+
+OR, to run on a different port if needed
+
+```bash
+npm x next -- dev -p <PORT>
 ```
 
 #### View the app:
@@ -173,6 +202,37 @@ The transcript channel password is provided only if you are utilizing one of the
 ## Deploy your changes to Vercel
 
 This repo automatically has changes deployed to Vercel via the Vercel for GitHub [app](https://github.com/apps/vercel). Changes merged to the `main` branch will be deployed to production, while any feature branch will automatically be deployed to a preview URL. If you have forked this repo and want to deploy changes without usage of this app, you can do so via [the CLI](https://vercel.com/docs/cli).
+
+## Analytics Integration
+
+Nextspace includes built-in open source **Matomo Tag Manager** integration for comprehensive analytics tracking:
+
+- Session duration and active time measurement
+- Page navigation and engagement tracking
+- User behavior patterns and feature usage
+- Connection status monitoring
+- Mobile vs desktop usage
+
+The implementation is privacy-friendly (pseudonymized IDs, no message content tracking) and can be easily disabled via environment variable. Analytics gracefully degrades if Matomo isn't configured—the site continues to function normally.
+
+### Documentation
+
+- 📖 **[ANALYTICS_SETUP.md](./ANALYTICS_SETUP.md)** - Complete setup guide for Matomo and MTM configuration
+- 💻 **[ANALYTICS_REFERENCE.md](./ANALYTICS_REFERENCE.md)** - Technical implementation details and developer reference
+
+### Quick Start
+
+**To disable analytics:**
+
+```bash
+NEXT_PUBLIC_ENABLE_ANALYTICS=false
+```
+
+**To enable analytics** (requires Matomo Tag Manager setup):
+
+```bash
+NEXT_PUBLIC_ENABLE_ANALYTICS=true  # or omit (enabled by default)
+```
 
 ## License
 

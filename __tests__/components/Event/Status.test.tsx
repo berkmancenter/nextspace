@@ -75,15 +75,13 @@ describe("EventStatus", () => {
         },
       ],
     },
-    types: [
-      {
-        name: "eventAssistant",
-        label: "Event Assistant",
-        description: "An assistant to answer questions about an event",
-        platforms: [],
-        properties: [],
-      },
-    ],
+    type: {
+      name: "eventAssistant",
+      label: "Event Assistant",
+      description: "An assistant to answer questions about an event",
+      platforms: [],
+      properties: [],
+    },
   };
 
   const conversationTypes: components["schemas"]["ConversationType"][] = [
@@ -232,20 +230,6 @@ describe("EventStatus", () => {
     );
     expect(
       screen.getByText("The event is currently active.")
-    ).toBeInTheDocument();
-  });
-
-  it("formats multiple conversation type labels correctly", () => {
-    const conversationWithMultipleAgents = {
-      ...mockConversationData,
-      types: conversationTypes,
-    };
-    render(<EventStatus conversationData={conversationWithMultipleAgents} />);
-
-    expect(
-      screen.getByText(
-        /Event 'Test Event' includes the Back Channel and Event Assistant/
-      )
     ).toBeInTheDocument();
   });
 });

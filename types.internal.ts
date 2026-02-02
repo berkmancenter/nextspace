@@ -28,7 +28,7 @@ export interface EventUrls {
 }
 
 export type Conversation = components["schemas"]["Conversation"] & {
-  types: components["schemas"]["ConversationType"][];
+  type: components["schemas"]["ConversationType"];
   eventUrls: EventUrls;
   platformTypes?: components["schemas"]["PlatformConfig"][];
 };
@@ -64,16 +64,10 @@ export interface HeaderProps extends BaseComponentProps {
  * Extends the base Message schema with additional properties.
  * @property {any} body - The body of the message.
  * @property {string[]} channels - The channels associated with the message.
- * @property {"Back Channel Insights Agent" | "Back Channel Metrics Agent" | "Event Assistant"} pseudonym - The pseudonym of the agent sending the message.
+ * @property {"Back Channel Insights Agent" | "Back Channel Metrics Agent" | "Event Assistant" | "Event Assistant Plus"} pseudonym - The pseudonym of the agent sending the message.
  */
 export type PseudonymousMessage = components["schemas"]["Message"] & {
   body: any;
-  // TODO: it would be great for the Message base schema to include channels
-  channels: string[];
-  pseudonym:
-    | "Back Channel Insights Agent"
-    | "Back Channel Metrics Agent"
-    | "Event Assistant";
 };
 
 /**
@@ -123,3 +117,13 @@ export type ModeratorInsightsMessage = PseudonymousMessage & {
     };
   };
 };
+
+export interface MessageProps {
+  message: components["schemas"]["Message"];
+}
+
+export interface ControlledInputConfig {
+  prefix: string;
+  icon: React.ReactNode;
+  label: string;
+}

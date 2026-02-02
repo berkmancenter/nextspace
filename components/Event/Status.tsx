@@ -65,9 +65,9 @@ export const EventStatus: React.FC<{
         Event Status
       </Typography>
       <p className="mt-2 text-center">
-        {`Event '${conversationData.name}' includes the ${formatList(
-          conversationData.types.map((type) => type.label || type.name)
-        )}${
+        {`Event '${conversationData.name}' includes the ${
+          conversationData.type.label || conversationData.type.name
+        }${
           conversationData.platformTypes?.length
             ? ` in ${formatList(
                 conversationData.platformTypes.map(

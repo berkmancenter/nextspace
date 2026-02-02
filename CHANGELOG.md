@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.3.0](https://github.com/berkmancenter/nextspace/compare/v1.2.1...v1.3.0) (2025-12-19)
+
+
+### Features
+
+* add event desc, speakers, moderators to and event creation form, break into multi steps ([6923fc3](https://github.com/berkmancenter/nextspace/commit/6923fc3cdcfc7d34d5eb9575a38b5ca67aba6a06))
+* implement user feedback UI for Event Assistant ([6ce003f](https://github.com/berkmancenter/nextspace/commit/6ce003f64bde4e39f25725c42fca0644fafce0b6))
+* remove zoom validation as no longer needed. Add checks for environment variables ([f24169c](https://github.com/berkmancenter/nextspace/commit/f24169ce3453e6d48aa419c6631bad7c5013ba79))
+* remove zoom validation as no longer needed. Add checks for environment variables ([232df5a](https://github.com/berkmancenter/nextspace/commit/232df5a1b260edae9e54f625f719e7c02c65dbf2))
+
+
+### Bug Fixes
+
+* ensure footer is excluded from all chat pages ([987f509](https://github.com/berkmancenter/nextspace/commit/987f50956d87184d251f8a747cc721999c392f64))
+
+## [1.2.1](https://github.com/berkmancenter/nextspace/compare/v1.2.0...v1.2.1) (2025-12-08)
+
+
+### Bug Fixes
+
+* assistant page not preserving message time ([6c0b11f](https://github.com/berkmancenter/nextspace/commit/6c0b11f871ac49e14f2a7e9d1d33920231b8d7af))
+
 ## [1.2.0](https://github.com/berkmancenter/nextspace/compare/v1.1.0...v1.2.0) (2025-12-08)
 
 

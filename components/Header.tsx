@@ -141,7 +141,7 @@ export const Header = ({
             </List>
           </Drawer>
         </div>
-        <Box className="hidden lg:flex flex-row justify-end grow-1 space-x-6">
+        <Box className="hidden lg:flex flex-row justify-end grow-1 gap-x-6">
           {NavItems()}
         </Box>
       </Toolbar>

@@ -18,10 +18,14 @@ import {
   SendData,
 } from "../utils";
 
-import { DirectMessage } from "../components";
 import { components } from "../types";
+import { BackchannelMessage } from "../components/messages/BackchannelMessage";
 import { CheckAuthHeader } from "../utils/Helpers";
 import { useSessionJoin } from "../utils/useSessionJoin";
+import { useAnalytics } from "../hooks/useAnalytics";
+import {
+  trackConversationEvent,
+} from "../utils/analytics";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -30,16 +34,19 @@ export const getServerSideProps = async (context: { req: any }) => {
 function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
   const router = useRouter();
 
+  // Initialize page-level analytics
+  useAnalytics({ pageType: "backchannel" });
+
   const [showWelcome, setShowWelcome] = useState(true);
   const [participantPasscode, setParticipantPasscode] = useState("");
   const [transcriptPasscode, setTranscriptPasscode] = useState<string | null>(
-    null
+    null,
   );
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const [messages, setMessages] = useState<
-    (components["schemas"]["Message"] & { date: Date })[]
-  >([]);
+  const [messages, setMessages] = useState<components["schemas"]["Message"][]>(
+    [],
+  );
   const [currentMessage, setCurrentMessage] = useState("");
 
   const messageInputRef = useRef<HTMLInputElement>(null);
@@ -103,6 +110,24 @@ function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
         passcode: transcriptPasscode,
       });
 
+    // Track message send
+    const conversationId = router.query.conversationId as string;
+    if (preset) {
+      trackConversationEvent(
+        conversationId,
+        "backchannel",
+        "quick_response_sent",
+        message,
+      );
+    } else {
+      trackConversationEvent(
+        conversationId,
+        "backchannel",
+        "custom_message_sent",
+        "custom_message",
+      );
+    }
+
     SendData("messages", {
       body: {
         text: message || "This is a test message",
@@ -117,7 +142,6 @@ function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
           ...prev,
           {
             ...message[0],
-            date: new Date(),
           },
         ]);
         setCurrentMessage("");
@@ -195,7 +219,18 @@ function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
               <Button
                 variant="contained"
                 color="primary"
-                onClick={() => setShowWelcome(false)}
+                onClick={() => {
+                  setShowWelcome(false);
+                  const conversationId = router.query.conversationId as string;
+                  if (conversationId) {
+                    trackConversationEvent(
+                      conversationId,
+                      "backchannel",
+                      "welcome_dismissed",
+                      "welcome_screen",
+                    );
+                  }
+                }}
                 sx={{ marginTop: "1rem", maxWidth: "10rem" }}
               >
                 Got it!
@@ -249,11 +284,9 @@ function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
                   id="scroll-container"
                 >
                   {messages.map((message, i) => (
-                    <DirectMessage
+                    <BackchannelMessage
                       key={`msg-${i}`}
-                      text={(message.body as any).text}
-                      date={message.date}
-                      theme="backchannel"
+                      message={{ ...message, body: (message.body as any).text }}
                     />
                   ))}
                   <div className="mt-20 w-full block" />

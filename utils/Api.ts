@@ -39,7 +39,7 @@ export const Authenticate = async (username: string, password: string) => {
 
   const data = await response.json();
   console.log("Response:", data);
-  return data.tokens;
+  return data;
 };
 
 /**

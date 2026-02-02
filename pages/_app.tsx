@@ -11,6 +11,8 @@ import {
 } from "@mui/material";
 import { Layout } from "../components";
 import SessionManager from "../utils/SessionManager";
+import { validateEnv } from "../utils/validateEnv";
+import { useSessionTracking } from "../hooks/useAnalytics";
 
 // Pages that don't require session creation
 // Add more pages here as needed (e.g., "/about", "/privacy", "/terms")
@@ -29,9 +31,24 @@ function shouldSkipSession(pathname: string): boolean {
   return SESSION_BLACKLIST.includes(pathname);
 }
 
+// Validate environment variables on app initialization
+if (typeof window === "undefined") {
+  try {
+    validateEnv();
+  } catch (error) {
+    console.error(
+      error instanceof Error ? error.message : "Environment validation failed"
+    );
+    throw error;
+  }
+}
+
 export default function App({ Component, pageProps }: AppProps) {
   const [sessionReady, setSessionReady] = useState(false);
   const router = useRouter();
+
+  // Track session-level analytics
+  useSessionTracking();
 
   const theme = createTheme({
     typography: {
