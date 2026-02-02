@@ -3,9 +3,9 @@ import { Api } from "./Helpers";
 type SessionState =
   | "uninitialized"
   | "initializing"
-  | "ready"
   | "guest"
-  | "authenticated";
+  | "authenticated"
+  | "cleared";
 
 type SessionInfo = {
   userId: string;
@@ -34,9 +34,10 @@ class SessionManager {
   /**
    * Restore session from encrypted cookie if it exists.
    * This should be called once on app initialization.
+   * @param options.skipCreation - If true, don't create a new guest session if none exists
    * @returns SessionInfo if session exists, null otherwise
    */
-  async restoreSession(): Promise<SessionInfo | null> {
+  async restoreSession(options?: { skipCreation?: boolean }): Promise<SessionInfo | null> {
     // Prevent multiple simultaneous initialization attempts
     if (this.initializationPromise) {
       return await this.initializationPromise;
@@ -47,7 +48,7 @@ class SessionManager {
     }
 
     this.sessionState = "initializing";
-    this.initializationPromise = this._restoreSession();
+    this.initializationPromise = this._restoreSession(options?.skipCreation);
 
     try {
       const sessionInfo = await this.initializationPromise;
@@ -57,7 +58,7 @@ class SessionManager {
     }
   }
 
-  private async _restoreSession(): Promise<SessionInfo | null> {
+  private async _restoreSession(skipCreation?: boolean): Promise<SessionInfo | null> {
     try {
       const response = await fetch("/api/cookie");
       const data = await response.json();
@@ -86,7 +87,13 @@ class SessionManager {
       console.error("Failed to restore session:", error);
     }
 
-    // No existing session - create a new guest session immediately
+    // No existing session - create a new guest session only if allowed
+    if (skipCreation) {
+      console.log("Skipping guest session creation (blacklisted page)");
+      this.sessionState = "cleared";
+      return null;
+    }
+
     return await this._createGuestSession();
   }
 
@@ -167,9 +174,19 @@ class SessionManager {
 
   /**
    * Mark session as authenticated (called after login)
+   * @param username - The authenticated user's username
+   * @param userId - The authenticated user's ID
    */
-  markAuthenticated(): void {
+  markAuthenticated(username?: string, userId?: string): void {
     this.sessionState = "authenticated";
+    
+    // Update session info if provided
+    if (username !== undefined && userId !== undefined) {
+      this.currentSession = {
+        userId: userId,
+        username: username,
+      };
+    }
   }
 
   /**
@@ -183,7 +200,8 @@ class SessionManager {
    * Clear session state (called on logout)
    */
   clearSession(): void {
-    this.sessionState = "ready";
+    this.sessionState = "cleared";
+    this.currentSession = null;
     Api.get().ClearTokens();
     Api.get().ClearAdminTokens();
   }

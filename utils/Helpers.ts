@@ -219,43 +219,6 @@ export const SendData = async (
   }
 };
 
-/**
- * Joins a session by using the existing session created on app load.
- * Since SessionManager ensures a session always exists after initialization,
- * this just needs to get the current session info.
- * @param success - Callback function to call on successful join, with userId and pseudonym.
- * @param errorCallback - Callback function to call on error, with an error message.
- * @param isAuthenticated - Optional flag indicating if the user is authenticated.
- */
-export const JoinSession = async (
-  success: (result: { userId: string; pseudonym: string }) => void,
-  errorCallback: (err: string) => void,
-  isAuthenticated?: boolean
-) => {
-  try {
-    // Wait for session to be ready (if still initializing)
-    const SessionManager = (await import("./SessionManager")).default;
-    const sessionInfo = await SessionManager.get().restoreSession();
-
-    // At this point, a session MUST exist (either restored or newly created)
-    if (!sessionInfo) {
-      throw new Error("No session available after initialization");
-    }
-
-    if (!Api.get().GetTokens().access) {
-      throw new Error("No access token available");
-    }
-
-    // Return session info directly from SessionManager
-    success({
-      userId: sessionInfo.userId,
-      pseudonym: sessionInfo.username,
-    });
-  } catch (err) {
-    console.error("Failed to join:", err);
-    errorCallback("Failed to join. Please try again.");
-  }
-};
 
 // Default easing class for animations
 export const DefaultEase = " ease-[cubic-bezier(0.075, 0.820, 0.165, 1.000)]";

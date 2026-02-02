@@ -39,19 +39,18 @@ export default function App({ Component, pageProps }: AppProps) {
     },
   });
 
-  // Restore or create session on app initialization
+  // Restore or create session on app initialization (once)
   useEffect(() => {
     const initSession = async () => {
-      // Skip session creation for blacklisted pages
-      if (shouldSkipSession(router.pathname)) {
+      const skipCreation = shouldSkipSession(router.pathname);
+      
+      if (skipCreation) {
         console.log(`Skipping session creation for ${router.pathname}`);
-        setSessionReady(true);
-        return;
       }
 
-      // Initialize session (restore existing or create new guest)
+      // Always try to restore existing session, but skip creation on blacklisted pages
       try {
-        await SessionManager.get().restoreSession();
+        await SessionManager.get().restoreSession({ skipCreation });
       } catch (error) {
         console.error("Session initialization failed:", error);
       }
@@ -59,7 +58,8 @@ export default function App({ Component, pageProps }: AppProps) {
     };
 
     initSession();
-  }, [router.pathname]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
 
   // Show loading state while restoring session
   if (!sessionReady) {

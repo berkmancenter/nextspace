@@ -1,64 +1,70 @@
 import { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { Api, JoinSession } from "./";
+import { Api } from "./";
+import SessionManager from "./SessionManager";
 
 /**
- * Custom hook to handle session joining and socket initialization.
- * Prevents infinite loops and provides consistent session management across pages.
+ * Custom hook to handle socket initialization.
+ * _app.tsx guarantees SessionManager has completed initialization before pages render.
  * 
- * @param isAuthenticated - Whether the user is authenticated
- * @param onSuccess - Optional callback when join succeeds
- * @param onError - Optional callback when join fails
- * @returns Object containing socket, pseudonym, userId, joining state, and error message
+ * @param isAuthenticated - Whether the user is authenticated (unused, kept for backward compatibility)
+ * @param onSuccess - Optional callback when session info is retrieved
+ * @param onError - Optional callback when session retrieval fails
+ * @returns Object containing socket, pseudonym, userId, and connection state
  */
 export function useSessionJoin(
-  isAuthenticated: boolean,
+  isAuthenticated?: boolean,
   onSuccess?: (result: { userId: string; pseudonym: string }) => void,
   onError?: (error: string) => void
 ) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [pseudonym, setPseudonym] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [joining, setJoining] = useState(false);
-  const [joinAttempted, setJoinAttempted] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
-  // Join session once
+  // Initialize socket and session info once
   useEffect(() => {
-    // Prevent infinite loop: only attempt join once
-    if (socket || joining || joinAttempted) return;
+    // Only initialize once
+    if (initialized) return;
+    setInitialized(true);
 
-    // Note: _app.tsx guarantees SessionManager has completed initialization
-    // before this component renders, so session is always ready here
-    setJoining(true);
-    setJoinAttempted(true);
+    // Get session info from SessionManager (already initialized by _app.tsx)
+    const sessionInfo = SessionManager.get().getSessionInfo();
+    
+    if (!sessionInfo) {
+      const error = "No session available";
+      setErrorMessage(error);
+      onError?.(error);
+      return;
+    }
 
-    JoinSession(
-      (result) => {
-        setPseudonym(result.pseudonym);
-        setUserId(result.userId);
-        
-        const socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
-          auth: { token: Api.get().GetTokens().access },
-        });
+    const tokens = Api.get().GetTokens();
+    if (!tokens.access) {
+      const error = "No access token available";
+      setErrorMessage(error);
+      onError?.(error);
+      return;
+    }
 
-        setSocket(socketLocal);
-        setJoining(false);
+    // Set session info
+    setPseudonym(sessionInfo.username);
+    setUserId(sessionInfo.userId);
+    
+    // Create socket connection
+    const socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
+      auth: { token: tokens.access },
+    });
 
-        // Call optional success callback
-        onSuccess?.(result);
-      },
-      (error) => {
-        setErrorMessage(error);
-        setJoining(false);
+    setSocket(socketLocal);
 
-        // Call optional error callback
-        onError?.(error);
-      },
-      isAuthenticated
-    );
-  }, [socket, joining, joinAttempted, isAuthenticated, onSuccess, onError]);
+    // Call optional success callback
+    onSuccess?.({
+      userId: sessionInfo.userId,
+      pseudonym: sessionInfo.username,
+    });
+  }, [initialized, onSuccess, onError]);
 
   // Handle socket connection events
   useEffect(() => {
@@ -85,7 +91,6 @@ export function useSessionJoin(
     socket,
     pseudonym,
     userId,
-    joining,
     isConnected,
     errorMessage,
   };

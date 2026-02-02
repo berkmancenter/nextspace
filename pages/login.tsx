@@ -79,8 +79,11 @@ export default function LoginPage() {
       // Set regular token as well, for other operations
       Api.get().SetTokens(response.access.token, response.refresh.token);
 
-      // Mark session as authenticated
-      SessionManager.get().markAuthenticated();
+      const username = formData.get("username")!.toString();
+      const userId = response.user?.id || response.userId;
+
+      // Mark session as authenticated with user info
+      SessionManager.get().markAuthenticated(username, userId);
 
       // Set session cookie via local API route
       await fetch("/api/session", {
@@ -89,7 +92,8 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username: formData.get("username"),
+          username: username,
+          userId: userId,
           accessToken: response.access.token,
           refreshToken: response.refresh.token,
         }),

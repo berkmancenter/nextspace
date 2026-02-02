@@ -4,9 +4,26 @@ import { io } from "socket.io-client";
 // Mock socket.io-client
 jest.mock("socket.io-client");
 
+// Mock SessionManager - Define mocks before jest.mock to avoid hoisting issues
+const mockGetSessionInfo = jest.fn();
+const mockSessionManagerInstance = {
+  getSessionInfo: mockGetSessionInfo,
+  restoreSession: jest.fn(),
+  getState: jest.fn(),
+  hasSession: jest.fn(),
+};
+
+jest.mock("../../utils/SessionManager", () => {
+  return {
+    __esModule: true,
+    default: {
+      get: jest.fn(() => mockSessionManagerInstance),
+    },
+  };
+});
+
 // Mock Helpers module
 jest.mock("../../utils/Helpers", () => ({
-  JoinSession: jest.fn(),
   Api: {
     get: jest.fn(() => ({
       GetTokens: jest.fn(() => ({ access: "mock-token", refresh: "mock-refresh" })),
@@ -16,15 +33,23 @@ jest.mock("../../utils/Helpers", () => ({
 
 // Import after mocking
 import { useSessionJoin } from "../../utils/useSessionJoin";
-import { JoinSession } from "../../utils/Helpers";
+import SessionManager from "../../utils/SessionManager";
+import { Api } from "../../utils/Helpers";
 
 describe("useSessionJoin", () => {
   const mockIo = io as jest.MockedFunction<typeof io>;
-  const mockJoinSession = JoinSession as jest.MockedFunction<typeof JoinSession>;
+  const mockApi = Api as jest.Mocked<typeof Api>;
   let mockSocket: any;
+  let mockGetTokens: jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    
+    // Reset the mocked instance functions
+    mockGetSessionInfo.mockReturnValue({
+      userId: "test-user",
+      username: "test-pseudonym",
+    });
     
     // Create mock socket
     mockSocket = {
@@ -35,56 +60,58 @@ describe("useSessionJoin", () => {
     };
     
     mockIo.mockReturnValue(mockSocket as any);
+
+    // Setup Api mock
+    mockGetTokens = jest.fn(() => ({ access: "mock-token", refresh: "mock-refresh" }));
+    mockApi.get.mockReturnValue({
+      GetTokens: mockGetTokens,
+    } as any);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  it("should initialize with correct default state", () => {
+  it("should initialize with correct default state", async () => {
     const { result } = renderHook(() => useSessionJoin(false));
 
-    expect(result.current.socket).toBeNull();
-    expect(result.current.pseudonym).toBeNull();
-    expect(result.current.userId).toBeNull();
-    expect(result.current.isConnected).toBe(false);
-    expect(result.current.errorMessage).toBeNull();
+    // Initially socket and user info should be set after mount
+    await waitFor(() => {
+      expect(result.current.socket).toBe(mockSocket);
+      expect(result.current.pseudonym).toBe("test-pseudonym");
+      expect(result.current.userId).toBe("test-user");
+      expect(result.current.isConnected).toBe(false);
+      expect(result.current.errorMessage).toBeNull();
+    });
   });
 
-  it("should call JoinSession on mount", async () => {
-    mockJoinSession.mockImplementation((success) => {
-      success({ userId: "test-user", pseudonym: "test-pseudonym" });
-    });
-
+  it("should get session info from SessionManager on mount", async () => {
     renderHook(() => useSessionJoin(false));
 
     await waitFor(() => {
-      expect(mockJoinSession).toHaveBeenCalledTimes(1);
+      expect(mockGetSessionInfo).toHaveBeenCalledTimes(1);
     });
   });
 
-  it("should only attempt join once (prevents infinite loop)", async () => {
-    mockJoinSession.mockImplementation((success) => {
-      success({ userId: "test-user", pseudonym: "test-pseudonym" });
-    });
-
+  it("should only initialize once (prevents infinite loop)", async () => {
     const { rerender } = renderHook(() => useSessionJoin(false));
 
     await waitFor(() => {
-      expect(mockJoinSession).toHaveBeenCalledTimes(1);
+      expect(mockGetSessionInfo).toHaveBeenCalledTimes(1);
     });
 
-    // Rerender should not trigger another join
+    // Rerender should not trigger another initialization
     rerender();
     
     await waitFor(() => {
-      expect(mockJoinSession).toHaveBeenCalledTimes(1);
+      expect(mockGetSessionInfo).toHaveBeenCalledTimes(1);
     });
   });
 
-  it("should set pseudonym and userId on successful join", async () => {
-    mockJoinSession.mockImplementation((success) => {
-      success({ userId: "test-user-123", pseudonym: "TestPseudonym" });
+  it("should set pseudonym and userId from session info", async () => {
+    mockGetSessionInfo.mockReturnValue({
+      userId: "test-user-123",
+      username: "TestPseudonym",
     });
 
     const { result } = renderHook(() => useSessionJoin(false));
@@ -95,11 +122,7 @@ describe("useSessionJoin", () => {
     });
   });
 
-  it("should create socket on successful join", async () => {
-    mockJoinSession.mockImplementation((success) => {
-      success({ userId: "test-user", pseudonym: "test-pseudonym" });
-    });
-
+  it("should create socket with session info", async () => {
     const { result } = renderHook(() => useSessionJoin(false));
 
     await waitFor(() => {
@@ -113,24 +136,27 @@ describe("useSessionJoin", () => {
     });
   });
 
-  it("should set error message on join failure", async () => {
-    const errorMsg = "Failed to join session";
-    mockJoinSession.mockImplementation((_, error) => {
-      error(errorMsg);
-    });
+  it("should set error message when no session info available", async () => {
+    mockGetSessionInfo.mockReturnValue(null);
 
     const { result } = renderHook(() => useSessionJoin(false));
 
     await waitFor(() => {
-      expect(result.current.errorMessage).toBe(errorMsg);
+      expect(result.current.errorMessage).toBe("No session available");
+    });
+  });
+
+  it("should set error message when no access token available", async () => {
+    mockGetTokens.mockReturnValue({ access: null, refresh: null });
+
+    const { result } = renderHook(() => useSessionJoin(false));
+
+    await waitFor(() => {
+      expect(result.current.errorMessage).toBe("No access token available");
     });
   });
 
   it("should register socket event handlers", async () => {
-    mockJoinSession.mockImplementation((success) => {
-      success({ userId: "test-user", pseudonym: "test-pseudonym" });
-    });
-
     renderHook(() => useSessionJoin(false));
 
     await waitFor(() => {
@@ -146,10 +172,6 @@ describe("useSessionJoin", () => {
       if (event === "connect") {
         connectHandler = handler;
       }
-    });
-
-    mockJoinSession.mockImplementation((success) => {
-      success({ userId: "test-user", pseudonym: "test-pseudonym" });
     });
 
     const { result } = renderHook(() => useSessionJoin(false));
@@ -174,10 +196,6 @@ describe("useSessionJoin", () => {
       }
     });
 
-    mockJoinSession.mockImplementation((success) => {
-      success({ userId: "test-user", pseudonym: "test-pseudonym" });
-    });
-
     const { result } = renderHook(() => useSessionJoin(false));
 
     await waitFor(() => {
@@ -192,28 +210,8 @@ describe("useSessionJoin", () => {
     });
   });
 
-  it("should pass isAuthenticated to JoinSession", async () => {
-    mockJoinSession.mockImplementation((success) => {
-      success({ userId: "test-user", pseudonym: "test-pseudonym" });
-    });
-
-    renderHook(() => useSessionJoin(true));
-
-    await waitFor(() => {
-      expect(mockJoinSession).toHaveBeenCalledWith(
-        expect.any(Function),
-        expect.any(Function),
-        true
-      );
-    });
-  });
-
   it("should call optional success callback", async () => {
     const onSuccess = jest.fn();
-    
-    mockJoinSession.mockImplementation((success) => {
-      success({ userId: "test-user", pseudonym: "test-pseudonym" });
-    });
 
     renderHook(() => useSessionJoin(false, onSuccess));
 
@@ -225,26 +223,18 @@ describe("useSessionJoin", () => {
     });
   });
 
-  it("should call optional error callback", async () => {
+  it("should call optional error callback when no session", async () => {
     const onError = jest.fn();
-    const errorMsg = "Join failed";
-    
-    mockJoinSession.mockImplementation((_, error) => {
-      error(errorMsg);
-    });
+    mockGetSessionInfo.mockReturnValue(null);
 
     renderHook(() => useSessionJoin(false, undefined, onError));
 
     await waitFor(() => {
-      expect(onError).toHaveBeenCalledWith(errorMsg);
+      expect(onError).toHaveBeenCalledWith("No session available");
     });
   });
 
   it("should cleanup socket event listeners on unmount", async () => {
-    mockJoinSession.mockImplementation((success) => {
-      success({ userId: "test-user", pseudonym: "test-pseudonym" });
-    });
-
     const { unmount } = renderHook(() => useSessionJoin(false));
 
     await waitFor(() => {
@@ -268,10 +258,6 @@ describe("useSessionJoin", () => {
       }
     });
 
-    mockJoinSession.mockImplementation((success) => {
-      success({ userId: "test-user", pseudonym: "test-pseudonym" });
-    });
-
     renderHook(() => useSessionJoin(false));
 
     await waitFor(() => {
@@ -285,5 +271,14 @@ describe("useSessionJoin", () => {
     expect(consoleError).toHaveBeenCalledWith("Socket error:", socketError);
     
     consoleError.mockRestore();
+  });
+
+  it("accepts isAuthenticated parameter for backward compatibility", async () => {
+    // The parameter is no longer used but should not cause errors
+    const { result } = renderHook(() => useSessionJoin(true));
+
+    await waitFor(() => {
+      expect(result.current.socket).toBe(mockSocket);
+    });
   });
 });

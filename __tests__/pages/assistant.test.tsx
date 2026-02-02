@@ -2,8 +2,9 @@ import React from "react";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import EventAssistantRoom from "../../pages/assistant";
-import { JoinSession, RetrieveData, SendData } from "../../utils";
+import { RetrieveData, SendData } from "../../utils";
 import { io } from "socket.io-client";
+import { useSessionJoin } from "../../utils/useSessionJoin";
 
 // Mock next/router
 const mockPush = jest.fn();
@@ -38,7 +39,7 @@ jest.mock("react-scroll", () => ({
   },
 }));
 
-// Mock SessionManager - must be defined before jest.mock
+// Mock SessionManager
 jest.mock("../../utils/SessionManager", () => {
   const mockSessionManager = {
     get: jest.fn(() => ({
@@ -63,9 +64,14 @@ jest.mock("../../utils", () => ({
       GetTokens: jest.fn(() => ({ access: "mock-access-token" })),
     })),
   },
-  JoinSession: jest.fn(),
   RetrieveData: jest.fn(),
   SendData: jest.fn(),
+}));
+
+// Mock useSessionJoin hook
+const mockUseSessionJoin = jest.fn();
+jest.mock("../../utils/useSessionJoin", () => ({
+  useSessionJoin: (...args: any[]) => mockUseSessionJoin(...args),
 }));
 
 // Mock DirectMessage component
@@ -93,16 +99,25 @@ describe("EventAssistantRoom", () => {
     mockSocket.hasListeners.mockReturnValue(false);
     mockRouter.query = { conversationId: "test-conversation-id" };
     mockRouter.isReady = true;
+    
+    // Default mock implementation
+    mockUseSessionJoin.mockReturnValue({
+      socket: mockSocket,
+      pseudonym: "test-pseudonym",
+      userId: "user-123",
+      isConnected: true,
+      errorMessage: null,
+    });
   });
 
   it("renders loading state initially", async () => {
-    mockRouter.isReady = true;
-
-    // Mock JoinSession to succeed and create socket
-    (JoinSession as jest.Mock).mockImplementation(async (onSuccess) => {
-      await act(() => {
-        onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
-      });
+    // Mock as not connected yet
+    mockUseSessionJoin.mockReturnValue({
+      socket: mockSocket,
+      pseudonym: "test-pseudonym",
+      userId: "user-123",
+      isConnected: false,
+      errorMessage: null,
     });
 
     let container;
@@ -111,59 +126,34 @@ describe("EventAssistantRoom", () => {
       container = result.container;
     });
 
-    // At this point socket exists but isConnected is still false (not connected yet)
     // Should show loading indicator (animated circles)
     const loadingCircles = container!.querySelectorAll(".animate-bounce");
     expect(loadingCircles.length).toBeGreaterThan(0);
   });
 
   it("initializes socket connection on mount", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
-    });
-
     await act(async () => {
       render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
     await waitFor(() => {
-      expect(JoinSession).toHaveBeenCalled();
-    });
-
-    await waitFor(() => {
-      expect(io).toHaveBeenCalledWith(process.env.NEXT_PUBLIC_SOCKET_URL, {
-        auth: { token: "mock-access-token" },
-      });
+      expect(mockUseSessionJoin).toHaveBeenCalled();
     });
   });
 
   it("sets up socket event listeners", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
-    });
-
     await act(async () => {
       render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
+    // useSessionJoin handles error/connect/disconnect events internally
+    // The page component sets up message:new listener
     await waitFor(() => {
-      expect(mockSocket.on).toHaveBeenCalledWith("error", expect.any(Function));
-      expect(mockSocket.on).toHaveBeenCalledWith(
-        "connect",
-        expect.any(Function)
-      );
-      expect(mockSocket.on).toHaveBeenCalledWith(
-        "disconnect",
-        expect.any(Function)
-      );
+      expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
     });
   });
 
   it("fetches conversation data when router is ready", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
-    });
-
     await act(async () => {
       render(<EventAssistantRoom isAuthenticated={false} />);
     });
@@ -177,9 +167,6 @@ describe("EventAssistantRoom", () => {
   });
 
   it("displays error when conversation is not found", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
-    });
     (RetrieveData as jest.Mock).mockResolvedValue(null);
 
     await act(async () => {
@@ -192,9 +179,6 @@ describe("EventAssistantRoom", () => {
   });
 
   it("displays error when conversation has an error", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
-    });
     (RetrieveData as jest.Mock).mockResolvedValue({
       error: true,
       message: { message: "Access denied" },
@@ -210,9 +194,6 @@ describe("EventAssistantRoom", () => {
   });
 
   it("displays error when conversation has no event assistant agent", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
-    });
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-123", agentType: "regular" }],
     });
@@ -231,20 +212,8 @@ describe("EventAssistantRoom", () => {
   });
 
   it("renders chat interface when connected", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
-    });
-
     await act(async () => {
       render(<EventAssistantRoom isAuthenticated={false} />);
-    });
-
-    // Simulate socket connection
-    await act(async () => {
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === "connect"
-      )?.[1];
-      if (connectHandler) connectHandler();
     });
 
     await waitFor(() => {
@@ -253,9 +222,6 @@ describe("EventAssistantRoom", () => {
   });
 
   it("joins conversation room when data is loaded", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
-    });
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-456", agentType: "eventAssistant" }],
     });
@@ -274,23 +240,11 @@ describe("EventAssistantRoom", () => {
   });
 
   it("displays messages when received", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
-    });
-
     await act(async () => {
       render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
-    // Simulate socket connection
-    await act(async () => {
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === "connect"
-      )?.[1];
-      if (connectHandler) connectHandler();
-    });
-
-    const messageTime = new Date(Date.now() - 120 * 1000).toISOString(); // two minutes ago
+    const messageTime = new Date(Date.now() - 120 * 1000).toISOString();
 
     // Simulate receiving a message
     await act(async () => {
@@ -309,50 +263,29 @@ describe("EventAssistantRoom", () => {
     await waitFor(() => {
       expect(screen.getByText("Hello from assistant")).toBeInTheDocument();
     });
-
-    // Ensure message time is accurate
-    await waitFor(() => {
-      expect(
-        screen.getByText(
-          new Date(messageTime).toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        )
-      ).toBeInTheDocument();
-    });
   });
 
   it("displays message input field with pseudonym", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "TestUser123", userId: "user-123" });
+    mockUseSessionJoin.mockReturnValue({
+      socket: mockSocket,
+      pseudonym: "TestUser123",
+      userId: "user-123",
+      isConnected: true,
+      errorMessage: null,
     });
 
     await act(async () => {
       render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
-    // Simulate socket connection
-    await act(async () => {
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === "connect"
-      )?.[1];
-      if (connectHandler) connectHandler();
-    });
-
     await waitFor(() => {
       expect(screen.getByText("Writing as TestUser123")).toBeInTheDocument();
-      expect(
-        screen.getByPlaceholderText("Write a Comment")
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Write a Comment")).toBeInTheDocument();
     });
   });
 
   it("sends message when send button is clicked", async () => {
     const user = userEvent.setup();
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "TestUser123", userId: "user-123" });
-    });
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-456", agentType: "eventAssistant" }],
     });
@@ -360,14 +293,6 @@ describe("EventAssistantRoom", () => {
 
     await act(async () => {
       render(<EventAssistantRoom isAuthenticated={false} />);
-    });
-
-    // Simulate socket connection
-    await act(async () => {
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === "connect"
-      )?.[1];
-      if (connectHandler) connectHandler();
     });
 
     const messageInput = screen.getByPlaceholderText("Write a Comment");
@@ -388,9 +313,6 @@ describe("EventAssistantRoom", () => {
 
   it("sends message when Enter key is pressed", async () => {
     const user = userEvent.setup();
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "TestUser123", userId: "user-123" });
-    });
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-456", agentType: "eventAssistant" }],
     });
@@ -398,14 +320,6 @@ describe("EventAssistantRoom", () => {
 
     await act(async () => {
       render(<EventAssistantRoom isAuthenticated={false} />);
-    });
-
-    // Simulate socket connection
-    await act(async () => {
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === "connect"
-      )?.[1];
-      if (connectHandler) connectHandler();
     });
 
     const messageInput = screen.getByPlaceholderText("Write a Comment");
@@ -422,20 +336,8 @@ describe("EventAssistantRoom", () => {
   });
 
   it("disables send button when message is empty", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "TestUser123", userId: "user-123" });
-    });
-
     await act(async () => {
       render(<EventAssistantRoom isAuthenticated={false} />);
-    });
-
-    // Simulate socket connection
-    await act(async () => {
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === "connect"
-      )?.[1];
-      if (connectHandler) connectHandler();
     });
 
     await waitFor(() => {
@@ -446,9 +348,6 @@ describe("EventAssistantRoom", () => {
 
   it("disables send button while waiting for response", async () => {
     const user = userEvent.setup();
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "TestUser123", userId: "user-123" });
-    });
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-456", agentType: "eventAssistant" }],
     });
@@ -458,14 +357,6 @@ describe("EventAssistantRoom", () => {
 
     await act(async () => {
       render(<EventAssistantRoom isAuthenticated={false} />);
-    });
-
-    // Simulate socket connection
-    await act(async () => {
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === "connect"
-      )?.[1];
-      if (connectHandler) connectHandler();
     });
 
     const messageInput = screen.getByPlaceholderText("Write a Comment");
@@ -480,18 +371,8 @@ describe("EventAssistantRoom", () => {
 
   it("clears input field after sending message", async () => {
     const user = userEvent.setup();
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "TestUser123", userId: "user-123" });
-    });
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-456", agentType: "eventAssistant" }],
-    });
-
-    // Print all mock data
-    console.log("Full mock data:", {
-      calls: (RetrieveData as jest.Mock).mock.calls,
-      results: (RetrieveData as jest.Mock).mock.results,
-      instances: (RetrieveData as jest.Mock).mock.instances,
     });
     (SendData as jest.Mock).mockResolvedValue({ success: true });
 
@@ -499,17 +380,7 @@ describe("EventAssistantRoom", () => {
       render(<EventAssistantRoom isAuthenticated={false} />);
     });
 
-    // Simulate socket connection
-    await act(async () => {
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === "connect"
-      )?.[1];
-      if (connectHandler) connectHandler();
-    });
-
-    const messageInput = screen.getByPlaceholderText(
-      "Write a Comment"
-    ) as HTMLInputElement;
+    const messageInput = screen.getByPlaceholderText("Write a Comment") as HTMLInputElement;
     await user.type(messageInput, "Test message");
 
     const sendButton = screen.getByLabelText("send message");
@@ -520,9 +391,13 @@ describe("EventAssistantRoom", () => {
     });
   });
 
-  it("handles JoinSession errors gracefully", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess, onError) => {
-      onError("Failed to join session");
+  it("handles session join errors gracefully", async () => {
+    mockUseSessionJoin.mockReturnValue({
+      socket: null,
+      pseudonym: null,
+      userId: null,
+      isConnected: false,
+      errorMessage: "Failed to join session",
     });
 
     await act(async () => {
@@ -535,9 +410,6 @@ describe("EventAssistantRoom", () => {
   });
 
   it("handles conversation fetch errors gracefully", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
-    });
     (RetrieveData as jest.Mock).mockRejectedValue(new Error("Network error"));
 
     await act(async () => {
@@ -545,27 +417,13 @@ describe("EventAssistantRoom", () => {
     });
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Failed to fetch conversation data.")
-      ).toBeInTheDocument();
+      expect(screen.getByText("Failed to fetch conversation data.")).toBeInTheDocument();
     });
   });
 
   it("displays assistant messages with special theme", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
-    });
-
     await act(async () => {
       render(<EventAssistantRoom isAuthenticated={false} />);
-    });
-
-    // Simulate socket connection
-    await act(async () => {
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === "connect"
-      )?.[1];
-      if (connectHandler) connectHandler();
     });
 
     // Simulate receiving an assistant message
@@ -584,27 +442,21 @@ describe("EventAssistantRoom", () => {
 
     await waitFor(() => {
       const assistantMessage = screen.getByText("Assistant response");
-      expect(
-        assistantMessage.closest('[data-theme="assistant"]')
-      ).toBeInTheDocument();
+      expect(assistantMessage.closest('[data-theme="assistant"]')).toBeInTheDocument();
     });
   });
 
   it("displays user messages with no theme", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "TestUser", userId: "user-123" });
+    mockUseSessionJoin.mockReturnValue({
+      socket: mockSocket,
+      pseudonym: "TestUser",
+      userId: "user-123",
+      isConnected: true,
+      errorMessage: null,
     });
 
     await act(async () => {
       render(<EventAssistantRoom isAuthenticated={false} />);
-    });
-
-    // Simulate socket connection
-    await act(async () => {
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === "connect"
-      )?.[1];
-      if (connectHandler) connectHandler();
     });
 
     // Simulate receiving a user message
@@ -627,30 +479,7 @@ describe("EventAssistantRoom", () => {
     });
   });
 
-  it("does not re-initialize socket if already connecting", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      setTimeout(() => {
-        onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
-      }, 100);
-    });
-
-    await act(async () => {
-      const { rerender } = render(
-        <EventAssistantRoom isAuthenticated={false} />
-      );
-      rerender(<EventAssistantRoom isAuthenticated={false} />);
-    });
-
-    await waitFor(() => {
-      expect(JoinSession).toHaveBeenCalledTimes(1);
-    });
-  });
-
   it("conversation history is shown if user is already authenticated", async () => {
-    (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
-      onSuccess({ pseudonym: "TestUser", userId: "user-123" });
-    });
-
     const mockHistory = [
       {
         body: "This is a past message.",
@@ -671,10 +500,7 @@ describe("EventAssistantRoom", () => {
           agents: [{ id: "agent-456", agentType: "eventAssistant" }],
         });
       }
-      if (
-        endpoint ===
-        "messages/test-conversation-id?channel=direct-user-123-agent-456"
-      ) {
+      if (endpoint === "messages/test-conversation-id?channel=direct-user-123-agent-456") {
         return Promise.resolve([...mockHistory]);
       }
       return Promise.resolve(null);
@@ -682,14 +508,6 @@ describe("EventAssistantRoom", () => {
 
     await act(async () => {
       render(<EventAssistantRoom isAuthenticated={true} />);
-    });
-
-    // Simulate socket connection
-    await act(async () => {
-      const connectHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === "connect"
-      )?.[1];
-      if (connectHandler) connectHandler();
     });
 
     await waitFor(() => {

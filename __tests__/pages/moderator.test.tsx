@@ -3,7 +3,7 @@ import { act } from "react";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
 import ModeratorScreen from "../../pages/moderator";
-import { JoinSession, RetrieveData } from "../../utils";
+import { RetrieveData } from "../../utils";
 
 // Mock dependencies
 jest.mock("next/router", () => ({
@@ -21,7 +21,6 @@ jest.mock("../../utils", () => ({
       GetTokens: jest.fn().mockReturnValue({ access: "mock-token" }),
     }),
   },
-  JoinSession: jest.fn(),
   GetChannelPasscode: jest.fn().mockReturnValue("mock-passcode"),
   RetrieveData: jest.fn(),
   QueryParamsError: jest.fn().mockReturnValue("Query params error"),
@@ -32,6 +31,31 @@ jest.mock("react-scroll", () => ({
     scrollToTop: jest.fn(),
   },
 }));
+
+// Mock useSessionJoin
+const mockUseSessionJoin = jest.fn();
+jest.mock("../../utils/useSessionJoin", () => ({
+  useSessionJoin: (...args: any[]) => mockUseSessionJoin(...args),
+}));
+
+// Mock SessionManager
+jest.mock("../../utils/SessionManager", () => {
+  const mockSessionManager = {
+    get: jest.fn(() => ({
+      restoreSession: jest.fn().mockResolvedValue(true),
+      getState: jest.fn().mockReturnValue("authenticated"),
+      hasSession: jest.fn().mockReturnValue(true),
+      getSessionInfo: jest.fn().mockReturnValue({
+        userId: "moderator-123",
+        username: "ModeratorUser",
+      }),
+    })),
+  };
+  return {
+    __esModule: true,
+    default: mockSessionManager,
+  };
+});
 
 describe("ModeratorScreen", () => {
   const mockRouter = {
@@ -96,11 +120,19 @@ describe("ModeratorScreen", () => {
     jest.clearAllMocks();
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
     (io as jest.Mock).mockReturnValue(mockSocket);
-    (JoinSession as jest.Mock).mockResolvedValue({});
     (RetrieveData as jest.Mock).mockResolvedValue([
       ...mockMessages,
       ...mockTranscript,
     ]);
+    
+    // Default mock implementation for useSessionJoin
+    mockUseSessionJoin.mockReturnValue({
+      socket: mockSocket,
+      pseudonym: "ModeratorUser",
+      userId: "moderator-123",
+      isConnected: true,
+      errorMessage: null,
+    });
   });
 
   it("renders the moderator screen with insight and metric messages", async () => {

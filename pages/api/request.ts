@@ -24,7 +24,7 @@ export default async function handler(
   }
 
   // Ensure the decrypted cookie has access token
-  if (!cookie.access) {
+  if (!cookie.payload?.access) {
     return res.status(401).json({ error: "Not logged in" });
   }
 
@@ -32,13 +32,13 @@ export default async function handler(
   if (req.method !== "POST")
     apiResponse = await RetrieveData(
       req.query.apiEndpoint as string,
-      cookie.access
+      cookie.payload.access
     );
   else {
     apiResponse = await SendData(
       req.body.apiEndpoint,
       req.body.payload,
-      cookie.access
+      cookie.payload.access
     );
   }
 
