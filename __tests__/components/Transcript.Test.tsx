@@ -36,7 +36,11 @@ describe("Transcript", () => {
     emit: jest.fn(),
     on: jest.fn(),
     off: jest.fn(),
+    once: jest.fn(),
+    onAny: jest.fn(),
+    offAny: jest.fn(),
     listenerCount: jest.fn().mockReturnValue(0),
+    connected: true,
   };
 
   const baseProps = {
@@ -67,7 +71,20 @@ describe("Transcript", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (RetrieveData as jest.Mock).mockResolvedValue(transcriptMessages);
+    // Mock RetrieveData to handle both conversation and message fetching
+    (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+      if (url.startsWith("conversations/")) {
+        // Return conversation data
+        return Promise.resolve({
+          name: "Test Conversation",
+          transcript: { status: "active" },
+        });
+      } else if (url.startsWith("messages/")) {
+        // Return transcript messages
+        return Promise.resolve(transcriptMessages);
+      }
+      return Promise.resolve(null);
+    });
   });
 
   const setupUser = () => userEvent.setup();
@@ -337,12 +354,19 @@ describe("Transcript", () => {
   });
 
   it("applies focus after messages load if focusTimeRange was set before messages arrived", async () => {
-    (RetrieveData as jest.Mock).mockImplementation(
-      () =>
-        new Promise((resolve) =>
+    (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+      if (url.startsWith("conversations/")) {
+        return Promise.resolve({
+          name: "Test Conversation",
+          transcript: { status: "active" },
+        });
+      } else if (url.startsWith("messages/")) {
+        return new Promise((resolve) =>
           setTimeout(() => resolve(transcriptMessages), 100),
-        ),
-    );
+        );
+      }
+      return Promise.resolve(null);
+    });
 
     render(
       <Transcript
@@ -465,7 +489,11 @@ describe("Transcript", () => {
       emit: jest.fn(),
       on: jest.fn(),
       off: jest.fn(),
+      once: jest.fn(),
+      onAny: jest.fn(),
+      offAny: jest.fn(),
       listenerCount: jest.fn().mockReturnValue(0),
+      connected: true,
       auth: { token: "mock-token" },
       hasListeners: jest.fn(() => false),
     };

@@ -1,8 +1,23 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { ChevronLeft, ChevronRight } from "@mui/icons-material";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Pause,
+  PlayArrow,
+  Delete,
+  ReportProblem,
+} from "@mui/icons-material";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
+} from "@mui/material";
 import { Socket } from "socket.io-client";
 import { PseudonymousMessage } from "../types.internal";
-import { RetrieveData } from "../utils";
+import { RetrieveData, SendData } from "../utils";
 import { trackFeatureUsage, trackConversationEvent } from "../utils/analytics";
 import { useVisibilityAwareDuration } from "../hooks/useVisibilityAwareDuration";
 
@@ -19,12 +34,18 @@ export function Transcript(props: {
   transcriptPasscode?: string;
   apiAccessToken: string;
   category?: string;
+  showControls?: boolean;
 }) {
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
   const [isOpen, setIsOpen] = useState<boolean>(true);
   const [focusedMessageIds, setFocusedMessageIds] = useState<string[]>([]);
   const [isAtBottom, setIsAtBottom] = useState<boolean>(true);
   const [isInManualScrollMode, setIsInManualScrollMode] =
+    useState<boolean>(false);
+  const [transcriptActive, setTranscriptActive] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
+  const [showPauseResumeConfirm, setShowPauseResumeConfirm] =
     useState<boolean>(false);
   const topRef = useRef<HTMLDivElement | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
@@ -175,6 +196,64 @@ export function Transcript(props: {
     autoScrollDuration,
   ]);
 
+  // Handler for pausing transcript
+  const handlePause = async () => {
+    setShowPauseResumeConfirm(false);
+    setError(null);
+    try {
+      const response = await SendData(
+        `transcript/${props.conversationId}/pause`,
+        {},
+        props.apiAccessToken,
+      );
+      if (response && response.error) {
+        setError(response.message || "Failed to pause transcript");
+      }
+    } catch (error) {
+      console.error("Error pausing transcript:", error);
+      setError("Failed to pause transcript");
+    }
+  };
+
+  // Handler for resuming transcript
+  const handleResume = async () => {
+    setShowPauseResumeConfirm(false);
+    setError(null);
+    try {
+      const response = await SendData(
+        `transcript/${props.conversationId}/resume`,
+        {},
+        props.apiAccessToken,
+      );
+      if (response && response.error) {
+        setError(response.message || "Failed to resume transcript");
+      }
+    } catch (error) {
+      console.error("Error resuming transcript:", error);
+      setError("Failed to resume transcript");
+    }
+  };
+
+  // Handler for deleting transcript
+  const handleDelete = async () => {
+    setShowDeleteConfirm(false);
+    setError(null);
+    try {
+      const response = await SendData(
+        `transcript/${props.conversationId}`,
+        {},
+        props.apiAccessToken,
+        { method: "DELETE" },
+      );
+      if (response && response.error) {
+        setError(response.message || "Failed to delete transcript");
+      }
+    } catch (error) {
+      console.error("Error deleting transcript:", error);
+      setError("Failed to delete transcript");
+    }
+  };
+
   // Throttled scroll handler
   const handleScroll = useCallback(() => {
     const container = messagesContainerRef.current;
@@ -220,7 +299,7 @@ export function Transcript(props: {
     }
   }, [messages]);
 
-  // Fetch initial messages
+  // Fetch initial conversation state and messages
   useEffect(() => {
     if (
       !props.conversationId ||
@@ -229,8 +308,21 @@ export function Transcript(props: {
     )
       return;
 
-    const fetchInitialMessages = async () => {
+    const fetchInitialData = async () => {
       try {
+        // Fetch conversation details to get initial transcript status
+        const conversationResponse: any = await RetrieveData(
+          `conversations/${props.conversationId}`,
+          props.apiAccessToken,
+        );
+
+        if (conversationResponse && !("error" in conversationResponse)) {
+          setTranscriptActive(
+            conversationResponse.transcript?.status === "active",
+          );
+        }
+
+        // Fetch messages
         const transcriptMessages = await RetrieveData(
           `messages/${props.conversationId}?channel=transcript,${props.transcriptPasscode}`,
           props.apiAccessToken,
@@ -257,11 +349,11 @@ export function Transcript(props: {
           }
         }
       } catch (error) {
-        console.error("Error fetching initial messages:", error);
+        console.error("Error fetching initial data:", error);
       }
     };
 
-    fetchInitialMessages();
+    fetchInitialData();
   }, [props.conversationId, props.apiAccessToken, props.transcriptPasscode]);
 
   // Effect: Add scroll event listener
@@ -313,16 +405,31 @@ export function Transcript(props: {
       passcode: props.transcriptPasscode || "",
     };
 
-    try {
-      props.socket.emit("channel:join", {
-        conversationId: props.conversationId,
-        token: props.apiAccessToken,
-        channel,
-      });
+    const joinChannel = () => {
+      try {
+        props.socket!.emit("channel:join", {
+          conversationId: props.conversationId,
+          token: props.apiAccessToken,
+          channel,
+        });
 
-      console.log("Joined transcript channel");
-    } catch (error) {
-      console.error("Error joining transcript channel:", error);
+        console.log("Joined transcript channel", {
+          conversationId: props.conversationId,
+          channel,
+          socketId: props.socket!.id,
+          connected: props.socket!.connected,
+        });
+      } catch (error) {
+        console.error("Error joining transcript channel:", error);
+      }
+    };
+
+    // Join immediately if already connected, or wait for connect event
+    if (props.socket.connected) {
+      joinChannel();
+    } else {
+      console.log("Socket not connected, waiting for connect event");
+      props.socket.once("connect", joinChannel);
     }
 
     const messageHandler = (data: PseudonymousMessage) => {
@@ -349,8 +456,38 @@ export function Transcript(props: {
 
     props.socket.on("message:new", messageHandler);
 
+    const transcriptStatusHandler = (data: {
+      status: "active" | "paused" | "stopped" | "deleted";
+    }) => {
+      console.log("Transcript status update:", data);
+
+      // Always handle deleted status - clear all messages
+      if (data.status === "deleted") {
+        setMessages([]);
+        return;
+      }
+
+      // Track active/paused status
+      setTranscriptActive(data.status === "active");
+    };
+
+    console.log("Setting up transcript:status listener", {
+      socketId: props.socket.id,
+      conversationId: props.conversationId,
+    });
+    props.socket.on("transcript:status", transcriptStatusHandler);
+
+    // Add catch-all listener to see all events
+    const catchAllHandler = (eventName: string, ...args: any[]) => {
+      console.log("Socket received event:", eventName, args);
+    };
+    props.socket.onAny(catchAllHandler);
+
     return () => {
+      props.socket?.off("connect", joinChannel);
       props.socket?.off("message:new", messageHandler);
+      props.socket?.off("transcript:status", transcriptStatusHandler);
+      props.socket?.offAny(catchAllHandler);
     };
   }, [
     props.socket,
@@ -368,19 +505,98 @@ export function Transcript(props: {
       }`}
     >
       {/* Header with toggle */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-[#200434] relative before:absolute before:inset-0 before:bg-white/20 before:pointer-events-none flex-shrink-0">
+      <div
+        className={`border-b border-white/10 bg-[#200434] relative before:absolute before:inset-0 before:bg-white/20 before:pointer-events-none flex-shrink-0 ${
+          isOpen && props.showControls ? "px-4 pt-2 pb-4" : "px-4 py-2"
+        }`}
+      >
         {isOpen ? (
           <>
-            <h2 className="text-xl font-semibold tracking-wide">
-              LIVE TRANSCRIPT
-            </h2>
-            <button
-              onClick={handleToggle}
-              className="text-white hover:bg-white/10 rounded p-1 transition-colors"
-              aria-label="Close transcript"
-            >
-              <ChevronRight className="transition-transform -rotate-270 lg:rotate-0" />
-            </button>
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-3 h-3 rounded-full ${
+                    transcriptActive ? "bg-red-500" : "bg-gray-400"
+                  }`}
+                  aria-label="Recording status indicator"
+                />
+                <h2 className="text-xl font-semibold tracking-wide">
+                  LIVE TRANSCRIPT
+                </h2>
+              </div>
+              <button
+                onClick={handleToggle}
+                className="text-white hover:bg-white/10 rounded p-1 transition-colors"
+                aria-label="Close transcript"
+              >
+                <ChevronRight className="transition-transform -rotate-270 lg:rotate-0" />
+              </button>
+            </div>
+            {props.showControls && (
+              <>
+                <div className="w-full h-px bg-white/40 my-3" />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowPauseResumeConfirm(true)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 border-white rounded-lg text-white hover:bg-white/10 transition-colors"
+                    aria-label={
+                      transcriptActive ? "Pause recording" : "Resume recording"
+                    }
+                  >
+                    {transcriptActive ? (
+                      <>
+                        <Pause className="w-5 h-5" />
+                        <span className="text-base font-medium">Pause</span>
+                      </>
+                    ) : (
+                      <>
+                        <PlayArrow className="w-5 h-5" />
+                        <span className="text-base font-medium">Resume</span>
+                      </>
+                    )}
+                  </button>
+                  <div className="flex-1 relative group">
+                    <button
+                      onClick={() => {
+                        if (!transcriptActive) {
+                          setShowDeleteConfirm(true);
+                        }
+                      }}
+                      disabled={transcriptActive}
+                      className={`w-full flex items-center justify-center gap-2 px-4 py-2 border-2 border-white rounded-lg text-white transition-colors ${
+                        transcriptActive
+                          ? "opacity-50 cursor-not-allowed"
+                          : "hover:bg-white/10"
+                      }`}
+                      aria-label="Delete transcript"
+                    >
+                      <Delete className="w-5 h-5" />
+                      <span className="text-base font-medium">Delete</span>
+                    </button>
+                    {transcriptActive && (
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                        Pause transcript before deleting
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {error && (
+                  <div className="mt-3 p-3 bg-red-500/20 border border-red-500/50 rounded-lg">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm text-red-200">{error}</p>
+                      <button
+                        onClick={() => setError(null)}
+                        className="text-red-200 hover:text-white transition-colors flex-shrink-0"
+                        aria-label="Dismiss error"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </>
         ) : (
           <>
@@ -440,6 +656,145 @@ export function Transcript(props: {
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Dialog
+        open={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: "16px",
+              padding: "32px 24px",
+              maxWidth: "440px",
+              textAlign: "center",
+            },
+          },
+        }}
+      >
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 rounded-full border-2 border-red-400 flex items-center justify-center">
+            <ReportProblem sx={{ fontSize: 40, color: "#f87171" }} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Delete transcription?
+          </h2>
+          <p className="text-gray-600 text-base leading-relaxed max-w-sm">
+            This will permanently delete the transcription feed for all
+            participants and cannot be undone.
+          </p>
+          <div className="flex flex-col gap-3 w-full mt-2">
+            <Button
+              onClick={handleDelete}
+              variant="contained"
+              sx={{
+                backgroundColor: "#b91c1c",
+                color: "white",
+                padding: "12px 24px",
+                borderRadius: "8px",
+                textTransform: "none",
+                fontSize: "16px",
+                fontWeight: 600,
+                "&:hover": {
+                  backgroundColor: "#991b1b",
+                },
+              }}
+              autoFocus
+            >
+              Yes, Delete
+            </Button>
+            <Button
+              onClick={() => setShowDeleteConfirm(false)}
+              sx={{
+                color: "#4b5563",
+                textTransform: "none",
+                fontSize: "16px",
+                fontWeight: 500,
+                textDecoration: "underline",
+                "&:hover": {
+                  backgroundColor: "transparent",
+                  textDecoration: "underline",
+                },
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Pause/Resume Confirmation Modal */}
+      <Dialog
+        open={showPauseResumeConfirm}
+        onClose={() => setShowPauseResumeConfirm(false)}
+        aria-labelledby="pause-resume-dialog-title"
+        aria-describedby="pause-resume-dialog-description"
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: "16px",
+              padding: "32px 24px",
+              maxWidth: "440px",
+              textAlign: "center",
+            },
+          },
+        }}
+      >
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 rounded-full border-2 border-red-400 flex items-center justify-center">
+            <ReportProblem sx={{ fontSize: 40, color: "#f87171" }} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {transcriptActive
+              ? "Pause transcription?"
+              : "Resume transcription?"}
+          </h2>
+          <p className="text-gray-600 text-base leading-relaxed max-w-sm">
+            {transcriptActive
+              ? "This will pause the transcription feed for all participants and will affect the bot's ability to engage."
+              : "This will resume the transcription feed for all participants."}
+          </p>
+          <div className="flex flex-col gap-3 w-full mt-2">
+            <Button
+              onClick={transcriptActive ? handlePause : handleResume}
+              variant="contained"
+              sx={{
+                backgroundColor: "#b91c1c",
+                color: "white",
+                padding: "12px 24px",
+                borderRadius: "8px",
+                textTransform: "none",
+                fontSize: "16px",
+                fontWeight: 600,
+                "&:hover": {
+                  backgroundColor: "#991b1b",
+                },
+              }}
+              autoFocus
+            >
+              {transcriptActive ? "Yes, Pause" : "Yes, Resume"}
+            </Button>
+            <Button
+              onClick={() => setShowPauseResumeConfirm(false)}
+              sx={{
+                color: "#4b5563",
+                textTransform: "none",
+                fontSize: "16px",
+                fontWeight: 500,
+                textDecoration: "underline",
+                "&:hover": {
+                  backgroundColor: "transparent",
+                  textDecoration: "underline",
+                },
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

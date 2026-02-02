@@ -279,6 +279,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
                 conversationId={router.query.conversationId as string}
                 transcriptPasscode={transcriptPasscode}
                 apiAccessToken={apiAccessToken!}
+                showControls={true}
               />
             </div>
           )}
