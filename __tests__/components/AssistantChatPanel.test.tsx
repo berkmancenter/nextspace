@@ -278,6 +278,20 @@ describe("AssistantChatPanel", () => {
         upVotes: [],
         downVotes: [],
       },
+      {
+        id: "2",
+        pseudonym: "test-user",
+        createdAt: "2025-10-17T12:01:00Z",
+        body: { text: "Tell me more" },
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "tu-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      },
     ];
 
     const { container } = render(
@@ -288,7 +302,7 @@ describe("AssistantChatPanel", () => {
       />
     );
 
-    // Should show animated SVG loading indicator
+    // Should show animated SVG bot loading indicator below the user's message
     const loadingIndicator = container.querySelector(".animate-bounce");
     expect(loadingIndicator).toBeInTheDocument();
   });
