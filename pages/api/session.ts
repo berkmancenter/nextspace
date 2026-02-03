@@ -28,6 +28,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     access: sessionData.accessToken,
     refresh: sessionData.refreshToken,
     userId: sessionData.userId,
+    accessExpiresAt: sessionData.accessExpiresAt,
   })
     .setProtectedHeader({ alg: "dir", enc: "A128CBC-HS256" })
     .setExpirationTime(

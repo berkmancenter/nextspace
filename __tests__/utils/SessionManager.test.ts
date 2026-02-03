@@ -52,6 +52,7 @@ describe("SessionManager", () => {
         },
         userId: "user-123",
         username: "testuser",
+        accessExpiresAt: Date.now() + 3600000, // 1 hour from now
       };
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -78,6 +79,7 @@ describe("SessionManager", () => {
         },
         userId: "guest-456",
         username: "GuestUser123", // Starts with "Guest"
+        accessExpiresAt: Date.now() + 3600000,
       };
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -98,7 +100,7 @@ describe("SessionManager", () => {
 
       const mockRegisterResponse = {
         tokens: {
-          access: { token: "new-access-token" },
+          access: { token: "new-access-token", expiresAt: Date.now() + 3600000 },
           refresh: { token: "new-refresh-token" },
         },
         user: { id: "new-user-id" },
@@ -181,6 +183,7 @@ describe("SessionManager", () => {
         tokens: { access: "token", refresh: "refresh" },
         userId: "user-123",
         username: "testuser",
+        accessExpiresAt: Date.now() + 3600000,
       };
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -209,6 +212,7 @@ describe("SessionManager", () => {
         tokens: { access: "token", refresh: "refresh" },
         userId: "guest-123",
         username: "GuestUser",
+        accessExpiresAt: Date.now() + 3600000,
       };
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -226,6 +230,7 @@ describe("SessionManager", () => {
         tokens: { access: "token", refresh: "refresh" },
         userId: "user-123",
         username: "authenticateduser",
+        accessExpiresAt: Date.now() + 3600000,
       };
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -259,6 +264,7 @@ describe("SessionManager", () => {
         tokens: { access: "token", refresh: "refresh" },
         userId: "guest-123",
         username: "GuestUser",
+        accessExpiresAt: Date.now() + 3600000,
       };
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -285,6 +291,7 @@ describe("SessionManager", () => {
         tokens: { access: "guest-token", refresh: "guest-refresh" },
         userId: "guest-456",
         username: "GuestUser789",
+        accessExpiresAt: Date.now() + 3600000,
       };
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -344,6 +351,7 @@ describe("SessionManager", () => {
         tokens: { access: "token", refresh: "refresh" },
         userId: "user-123",
         username: "testuser",
+        accessExpiresAt: Date.now() + 3600000,
       };
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -370,7 +378,7 @@ describe("SessionManager", () => {
         .mockResolvedValueOnce({
           json: async () => ({
             tokens: {
-              access: { token: "access" },
+              access: { token: "access", expiresAt: Date.now() + 3600000 },
               refresh: { token: "refresh" },
             },
             user: { id: "user-id" },
@@ -412,6 +420,7 @@ describe("SessionManager", () => {
         tokens: { access: "token", refresh: "refresh" },
         userId: "user-123",
         username: "testuser",
+        accessExpiresAt: Date.now() + 3600000,
       };
 
       (global.fetch as jest.Mock).mockImplementation(async () => {
@@ -431,6 +440,139 @@ describe("SessionManager", () => {
         "initializing",
         "authenticated",
       ]);
+    });
+  });
+
+  describe("Token Refresh", () => {
+    it("schedules token refresh before expiration", async () => {
+      const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes from now
+      const mockCookieData = {
+        tokens: { access: "token", refresh: "refresh" },
+        userId: "user-123",
+        username: "testuser",
+        accessExpiresAt: expiresAt,
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        json: async () => mockCookieData,
+      });
+
+      const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+      
+      await sessionManager.restoreSession();
+
+      // Timer should be set for 5 minutes from now (10min - 5min threshold)
+      expect(setTimeoutSpy).toHaveBeenCalled();
+      
+      setTimeoutSpy.mockRestore();
+    });
+
+    it("refreshes token immediately if expiration is near", async () => {
+      const expiresAt = Date.now() + 2 * 60 * 1000; // 2 minutes from now (within threshold)
+      const mockCookieData = {
+        tokens: { access: "token", refresh: "refresh" },
+        userId: "user-123",
+        username: "testuser",
+        accessExpiresAt: expiresAt,
+      };
+
+      const mockRefreshResponse = {
+        tokens: {
+          access: "new-access-token",
+          refresh: "new-refresh-token",
+        },
+        accessExpiresAt: Date.now() + 60 * 60 * 1000,
+      };
+
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          status: 200,
+          json: async () => mockCookieData,
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockRefreshResponse,
+        });
+
+      await sessionManager.restoreSession();
+
+      // Wait for async refresh to complete
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(global.fetch).toHaveBeenCalledWith("/api/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+
+    it("updates tokens after successful refresh", async () => {
+      const mockRefreshResponse = {
+        tokens: {
+          access: "new-access-token",
+          refresh: "new-refresh-token",
+        },
+        accessExpiresAt: Date.now() + 60 * 60 * 1000,
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockRefreshResponse,
+      });
+
+      await sessionManager.forceRefresh();
+
+      expect(mockApiInstance.SetTokens).toHaveBeenCalledWith(
+        "new-access-token",
+        "new-refresh-token"
+      );
+    });
+
+    it("clears session on refresh failure with 401", async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+      });
+
+      await sessionManager.forceRefresh();
+
+      expect(sessionManager.getState()).toBe("cleared");
+      expect(mockApiInstance.ClearTokens).toHaveBeenCalled();
+    });
+
+    it("prevents multiple simultaneous refresh attempts", async () => {
+      const mockRefreshResponse = {
+        tokens: { access: "new-token", refresh: "new-refresh" },
+        accessExpiresAt: Date.now() + 3600000,
+      };
+
+      let callCount = 0;
+      (global.fetch as jest.Mock).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            callCount++;
+            setTimeout(
+              () =>
+                resolve({
+                  ok: true,
+                  json: async () => mockRefreshResponse,
+                }),
+              50
+            );
+          })
+      );
+
+      // Call refresh multiple times simultaneously
+      const promises = [
+        sessionManager.forceRefresh(),
+        sessionManager.forceRefresh(),
+        sessionManager.forceRefresh(),
+      ];
+
+      await Promise.all(promises);
+
+      // Should only call the API once due to mutex
+      expect(callCount).toBe(1);
     });
   });
 });

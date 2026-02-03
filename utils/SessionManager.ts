@@ -17,8 +17,21 @@ class SessionManager {
   private sessionState: SessionState = "uninitialized";
   private initializationPromise: Promise<SessionInfo | null> | null = null;
   private currentSession: SessionInfo | null = null;
+  private accessExpiresAt: number | null = null;
+  private refreshTimer: NodeJS.Timeout | null = null;
+  private isRefreshing: boolean = false;
+  
+  // Refresh tokens 5 minutes before expiration
+  private readonly REFRESH_THRESHOLD_MS = 5 * 60 * 1000;
 
-  private constructor() {}
+  private constructor() {
+    // Cleanup timer on page unload
+    if (typeof window !== "undefined") {
+      window.addEventListener("beforeunload", () => {
+        this.stopRefreshTimer();
+      });
+    }
+  }
 
   static get() {
     if (!this._instance) {
@@ -80,6 +93,10 @@ class SessionManager {
           username: data.username,
         };
 
+        // Store expiration time and start refresh timer
+        this.accessExpiresAt = data.accessExpiresAt;
+        this.startRefreshTimer();
+
         console.log(`Session restored: ${this.sessionState}`, data.username);
         return this.currentSession;
       }
@@ -137,6 +154,7 @@ class SessionManager {
           userId: registerResponse.user.id,
           accessToken: registerResponse.tokens.access.token,
           refreshToken: registerResponse.tokens.refresh.token,
+          accessExpiresAt: registerResponse.tokens.access.expiresAt,
           expirationFromNow: 60 * 60 * 24 * 30, // 30 days like Vue app
         }),
       });
@@ -146,6 +164,10 @@ class SessionManager {
         userId: registerResponse.user.id,
         username: pseudonymResponse.pseudonym,
       };
+
+      // Store expiration time and start refresh timer
+      this.accessExpiresAt = registerResponse.tokens.access.expiresAt;
+      this.startRefreshTimer();
 
       console.log("Guest session created:", pseudonymResponse.pseudonym);
       return this.currentSession;
@@ -202,8 +224,109 @@ class SessionManager {
   clearSession(): void {
     this.sessionState = "cleared";
     this.currentSession = null;
+    this.accessExpiresAt = null;
+    this.stopRefreshTimer();
     Api.get().ClearTokens();
     Api.get().ClearAdminTokens();
+  }
+
+  /**
+   * Start the proactive token refresh timer
+   */
+  private startRefreshTimer(): void {
+    // Only run in browser environment
+    if (typeof window === "undefined") return;
+    
+    this.stopRefreshTimer(); // Clear any existing timer
+    
+    if (!this.accessExpiresAt) {
+      console.warn("Cannot start refresh timer: no expiration time available");
+      return;
+    }
+
+    const expiresAt = new Date(this.accessExpiresAt).getTime();
+    const now = Date.now();
+    const timeUntilExpiration = expiresAt - now;
+    const timeUntilRefresh = timeUntilExpiration - this.REFRESH_THRESHOLD_MS;
+
+    if (timeUntilRefresh <= 0) {
+      // Token is already expired or about to expire, refresh immediately
+      console.log("Token near expiration, refreshing immediately");
+      this.refreshTokens();
+    } else {
+      // Schedule refresh before expiration
+      console.log(`Scheduling token refresh in ${Math.round(timeUntilRefresh / 1000)}s`);
+      this.refreshTimer = setTimeout(() => {
+        this.refreshTokens();
+      }, timeUntilRefresh);
+    }
+  }
+
+  /**
+   * Stop the refresh timer
+   */
+  private stopRefreshTimer(): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+  }
+
+  /**
+   * Refresh tokens proactively before they expire
+   */
+  private async refreshTokens(): Promise<void> {
+    // Prevent multiple simultaneous refresh attempts
+    if (this.isRefreshing) {
+      console.log("Refresh already in progress, skipping");
+      return;
+    }
+
+    this.isRefreshing = true;
+
+    try {
+      console.log("Refreshing access token...");
+      
+      const response = await fetch("/api/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        console.error("Token refresh failed:", response.status);
+        
+        // If refresh fails with 401, session is invalid - clear it
+        if (response.status === 401) {
+          console.log("Session expired, clearing session");
+          this.clearSession();
+        }
+        return;
+      }
+
+      const data = await response.json();
+
+      // Update tokens in memory
+      Api.get().SetTokens(data.tokens.access, data.tokens.refresh);
+
+      // Update expiration time
+      this.accessExpiresAt = data.accessExpiresAt;
+
+      console.log("Token refreshed successfully");
+
+      // Schedule next refresh
+      this.startRefreshTimer();
+    } catch (error) {
+      console.error("Error refreshing token:", error);
+    } finally {
+      this.isRefreshing = false;
+    }
+  }
+
+  /**
+   * Manually trigger a token refresh (useful for testing or forcing refresh)
+   */
+  async forceRefresh(): Promise<void> {
+    await this.refreshTokens();
   }
 }
 

@@ -105,6 +105,7 @@ export default function LoginPage() {
           userId: userId,
           accessToken: response.tokens.access.token,
           refreshToken: response.tokens.refresh.token,
+          accessExpiresAt: response.tokens.access.expiresAt,
         }),
       });
       setFormSuccess(true);
