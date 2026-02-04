@@ -2,22 +2,15 @@ import { FC, useState } from "react";
 import { Box, Button, alpha } from "@mui/material";
 import { Check } from "@mui/icons-material";
 import { BaseMessage, MessageContent } from "./BaseMessage";
-import { MessageFeedback } from "../MessageFeedback";
-import { ControlledInputConfig, MessageProps } from "../../types.internal";
+import { MessageProps } from "../../types.internal";
 
 export interface AssistantMessageProps extends MessageProps {
   onPromptSelect?: (value: string, parentMessageId?: string) => void;
-  onPopulateFeedbackText?: (config: ControlledInputConfig) => void;
-  onSendFeedbackRating?: (messageId: string, rating: string) => void;
-  messageType?: string;
 }
 
 export const AssistantMessage: FC<AssistantMessageProps> = ({
   message,
   onPromptSelect,
-  onPopulateFeedbackText,
-  onSendFeedbackRating,
-  messageType,
 }) => {
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
 
@@ -36,16 +29,10 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
 
   const className = hasPromptOptions
     ? "bg-purple-100 border-l-4 border-purple-500 rounded-lg p-3"
-    : "bg-light-gray rounded-2xl p-3";
+    : "";
 
   return (
     <BaseMessage className={className}>
-      {!hasPromptOptions && (
-        <p className="py-3 text-xs text-dark-blue font-bold uppercase">
-          Event Assistant
-        </p>
-      )}
-
       <MessageContent text={message.body as string} />
 
       {hasPromptOptions && (
@@ -107,13 +94,6 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
         </Box>
       )}
 
-      {message.id && !messageType && (
-        <MessageFeedback
-          messageId={message.id}
-          onPopulateFeedbackText={onPopulateFeedbackText}
-          onSendFeedbackRating={onSendFeedbackRating}
-        />
-      )}
     </BaseMessage>
   );
 };

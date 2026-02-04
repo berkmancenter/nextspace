@@ -55,6 +55,7 @@ function EventAssistantRoom() {
     useState<ControlledInputConfig | null>(null);
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>("");
   const [chatPasscode, setChatPasscode] = useState<string>("");
+  const [eventName, setEventName] = useState<string>("");
   const [assistantInputValue, setAssistantInputValue] = useState<string>("");
   const [chatInputValue, setChatInputValue] = useState<string>("");
 
@@ -192,6 +193,7 @@ function EventAssistantRoom() {
 
           createConversationFromData(conversationData).then((conversation) => {
             setConversationType(conversation.type.name);
+            if (conversation.name) setEventName(conversation.name);
 
             // Get transcript and chat passcodes if channel query param exists
             if (router.query.channel) {
@@ -496,6 +498,7 @@ function EventAssistantRoom() {
                 <GroupChatPanel
                   messages={chatMessages}
                   pseudonym={pseudonym}
+                  eventName={eventName}
                   inputValue={chatInputValue}
                   onInputChange={setChatInputValue}
                   onSendMessage={sendMessage}
@@ -507,6 +510,7 @@ function EventAssistantRoom() {
                   waitingForResponse={waitingForResponse}
                   controlledMode={controlledMode}
                   slashCommands={slashCommands}
+                  eventName={eventName}
                   inputValue={assistantInputValue}
                   onInputChange={setAssistantInputValue}
                   onSendMessage={sendMessage}

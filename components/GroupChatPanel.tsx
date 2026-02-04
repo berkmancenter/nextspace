@@ -110,6 +110,7 @@ const renderAssistantMessage = (text: string): React.ReactNode => {
 interface GroupChatPanelProps {
   messages: PseudonymousMessage[];
   pseudonym: string | null;
+  eventName?: string;
   inputValue?: string;
   onInputChange?: (value: string) => void;
   onSendMessage: (message: string) => void;
@@ -118,6 +119,7 @@ interface GroupChatPanelProps {
 export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   messages,
   pseudonym,
+  eventName,
   inputValue,
   onInputChange,
   onSendMessage,
@@ -127,13 +129,20 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   // Extract unique contributors for mentions
   // Normalize "Event Assistant Plus" to "Event Assistant" for consistency
   const contributors = useMemo(
-    () => Array.from(new Set(messages.map((m) => {
-      if (m.pseudonym === "Event Assistant Plus") {
-        return "Event Assistant";
-      }
-      return m.pseudonym;
-    }).filter(Boolean))),
-    [messages]
+    () =>
+      Array.from(
+        new Set(
+          messages
+            .map((m) => {
+              if (m.pseudonym === "Event Assistant Plus") {
+                return "Event Assistant";
+              }
+              return m.pseudonym;
+            })
+            .filter(Boolean),
+        ),
+      ),
+    [messages],
   );
 
   // Create enhancers for chat mode (mentions only)
@@ -179,6 +188,20 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
           className="flex flex-col items-start gap-4 pb-2"
           aria-live="assertive"
         >
+          {/* Panel title and subtitle */}
+          <div className="w-full pt-4 pb-2">
+            <h2 className="text-xl font-bold uppercase tracking-wide text-gray-900">
+              Welcome to&nbsp;
+              <span className="text-medium-slate-blue">
+                {eventName || "Your Event"}
+              </span>
+              &nbsp;Group Chat
+            </h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Chat in real time with other event participants.
+            </p>
+          </div>
+
           {messages
             .filter((message) => !message.parentMessage)
             .map((message, i) => {
@@ -211,7 +234,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                           {
                             hour: "2-digit",
                             minute: "2-digit",
-                          }
+                          },
                         )}
                       </span>
                     </div>

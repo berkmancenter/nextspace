@@ -4,6 +4,7 @@ import {
   SubmittedMessage,
   ModeratorSubmittedMessage,
 } from "../components/messages";
+import { MessageFeedback } from "./MessageFeedback";
 import { MessageInput } from "./MessageInput";
 import {
   SlashCommand,
@@ -53,6 +54,7 @@ interface AssistantChatPanelProps {
   waitingForResponse: boolean;
   controlledMode: ControlledInputConfig | null;
   slashCommands: SlashCommand[];
+  eventName?: string;
   inputValue?: string;
   onInputChange?: (value: string) => void;
   onSendMessage: (message: string) => void;
@@ -68,6 +70,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   waitingForResponse,
   controlledMode,
   slashCommands,
+  eventName,
   inputValue,
   onInputChange,
   onSendMessage,
@@ -109,37 +112,95 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
           className="flex flex-col items-start gap-4 pb-2"
           aria-live="assertive"
         >
+          {/* Panel title and subtitle */}
+          <div className="w-full pt-4 pb-2">
+            <h2 className="text-xl font-bold uppercase tracking-wide text-gray-900">
+              Welcome to&nbsp;
+              <span className="text-medium-slate-blue">
+                {eventName || "Your Event"}
+              </span>
+              &nbsp;
+            </h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Ask the Event Assistant any questions about the event — this
+              conversation is private.
+            </p>
+          </div>
+
           {messages
             .filter((message) => !message.parentMessage)
             .map((message, i) => {
               const isAssistant =
                 message.pseudonym === "Event Assistant" ||
                 message.pseudonym === "Event Assistant Plus";
+              const isCurrentUser = message.pseudonym === pseudonym;
 
               const parsed = parseMessageBody(message.body);
               const messageType = parsed.type;
               const style = isAssistant
                 ? getAssistantAvatarStyle()
-                : getAvatarStyle(message.pseudonym, true);
+                : getAvatarStyle(message.pseudonym, isCurrentUser);
 
-              // Check if this is a special message type that needs old components
-              if (messageType === "moderator_submitted") {
+              const displayName =
+                message.pseudonym === "Event Assistant Plus"
+                  ? "Event Assistant"
+                  : message.pseudonym;
+
+              const hasPromptOptions =
+                message.prompt?.options &&
+                message.prompt.options.length > 0 &&
+                message.prompt.type === "singleChoice";
+
+              // Special message types rendered in the same avatar+name layout
+              if (
+                messageType === "moderator_submitted" ||
+                submittedIds.includes(message.id)
+              ) {
                 return (
                   <div key={`msg-${i}`} className="w-full">
-                    <ModeratorSubmittedMessage
-                      message={{
-                        ...message,
-                        body: parsed.text,
-                      }}
-                    />
-                  </div>
-                );
-              }
-
-              if (submittedIds.includes(message.id)) {
-                return (
-                  <div key={`msg-${i}`} className="w-full">
-                    <SubmittedMessage message={message} />
+                    <div
+                      className={`flex gap-1.5 mb-1 ${
+                        isCurrentUser ? "flex-row-reverse" : "flex-row"
+                      }`}
+                    >
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-xl flex-shrink-0"
+                        style={{ backgroundColor: style.avatarBg }}
+                      >
+                        <style.icon fontSize="inherit" />
+                      </div>
+                      <div
+                        className={`flex flex-col ${
+                          isCurrentUser ? "items-end" : "items-start"
+                        } flex-1 min-w-0`}
+                      >
+                        <div
+                          className={`text-sm font-bold mb-1 ${
+                            isCurrentUser ? "text-right" : "text-left"
+                          }`}
+                        >
+                          {displayName}
+                          {isCurrentUser && (
+                            <span className="text-gray-600 font-normal">
+                              {" "}
+                              (You)
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ width: "85%" }}>
+                          {messageType === "moderator_submitted" ? (
+                            <ModeratorSubmittedMessage
+                              message={{
+                                ...message,
+                                body: parsed.text,
+                              }}
+                            />
+                          ) : (
+                            <SubmittedMessage message={message} />
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 );
               }
@@ -157,14 +218,18 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                           {
                             hour: "2-digit",
                             minute: "2-digit",
-                          }
+                          },
                         )}
                       </span>
                     </div>
                   ) : null}
 
                   {/* Message with avatar */}
-                  <div className="flex gap-1.5 mb-1">
+                  <div
+                    className={`flex gap-1.5 mb-1 ${
+                      isCurrentUser ? "flex-row-reverse" : "flex-row"
+                    }`}
+                  >
                     {/* Avatar */}
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center text-xl flex-shrink-0"
@@ -174,29 +239,81 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                     </div>
 
                     {/* Message content */}
-                    <div className="flex flex-col items-start flex-1 min-w-0">
-                      {/* Message - white bubble for users, no bubble for EA */}
+                    <div
+                      className={`flex flex-col ${
+                        isCurrentUser ? "items-end" : "items-start"
+                      } flex-1 min-w-0`}
+                    >
+                      {/* Name */}
+                      <div
+                        className={`text-sm font-bold mb-1 ${
+                          isCurrentUser ? "text-right" : "text-left"
+                        }`}
+                      >
+                        {displayName}
+                        {isCurrentUser && (
+                          <span className="text-gray-600 font-normal">
+                            {" "}
+                            (You)
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Message bubble */}
                       {isAssistant ? (
-                        <div className="text-gray-800" style={{ width: "100%", maxWidth: "100%" }}>
-                          <AssistantMessage
-                            key={`msg-${i}`}
-                            message={{
-                              ...message,
-                              body: parsed.text,
-                            }}
-                            onPromptSelect={onPromptSelect}
-                            onPopulateFeedbackText={enterControlledMode}
-                            onSendFeedbackRating={sendFeedbackRating}
-                            messageType={parsed.type}
-                          />
-                        </div>
+                        <>
+                          {hasPromptOptions ? (
+                            /* Prompt messages keep their own purple card styling */
+                            <div style={{ width: "85%" }}>
+                              <AssistantMessage
+                                key={`msg-${i}`}
+                                message={{
+                                  ...message,
+                                  body: parsed.text,
+                                }}
+                                onPromptSelect={onPromptSelect}
+                              />
+                            </div>
+                          ) : (
+                            <div
+                              className="rounded-2xl px-2 py-1 text-gray-800 self-start"
+                              style={{
+                                backgroundColor: style.bubbleBg,
+                                width: "85%",
+                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                              }}
+                            >
+                              <AssistantMessage
+                                key={`msg-${i}`}
+                                message={{
+                                  ...message,
+                                  body: parsed.text,
+                                }}
+                                onPromptSelect={onPromptSelect}
+                              />
+                            </div>
+                          )}
+
+                          {/* Feedback - rendered below the bubble */}
+                          {message.id && !messageType && (
+                            <div className="mt-0">
+                              <MessageFeedback
+                                messageId={message.id}
+                                onPopulateFeedbackText={enterControlledMode}
+                                onSendFeedbackRating={sendFeedbackRating}
+                              />
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <div
-                          className="rounded-2xl px-2 py-1 text-gray-800 self-start"
+                          className={`rounded-2xl px-2 py-1 text-gray-800 ${
+                            isCurrentUser ? "self-end" : "self-start"
+                          }`}
                           style={{
-                            backgroundColor: "#FFFFFF",
-                            width: "100%",
-                            maxWidth: "100%",
+                            backgroundColor: style.bubbleBg,
+                            width: "85%",
+                            border: "1px solid rgba(0, 0, 0, 0.1)",
                           }}
                         >
                           {parsed.text}
@@ -226,10 +343,26 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                               {/* Antenna line */}
                               <line x1="16" y1="7.5" x2="16" y2="10" />
                               {/* Head */}
-                              <rect x="8" y="10" width="16" height="12" rx="6" />
+                              <rect
+                                x="8"
+                                y="10"
+                                width="16"
+                                height="12"
+                                rx="6"
+                              />
                               {/* Eyes */}
-                              <circle cx="12" cy="16" r="1.5" fill="currentColor" />
-                              <circle cx="20" cy="16" r="1.5" fill="currentColor" />
+                              <circle
+                                cx="12"
+                                cy="16"
+                                r="1.5"
+                                fill="currentColor"
+                              />
+                              <circle
+                                cx="20"
+                                cy="16"
+                                r="1.5"
+                                fill="currentColor"
+                              />
                               {/* Smile */}
                               <path
                                 d="M13 19 Q16 21 19 19"
@@ -242,7 +375,9 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                               {/* Body/Base */}
                               <rect x="13" y="22" width="6" height="5" rx="2" />
                             </svg>
-                            <span className="text-xs text-gray-500 italic">thinking...</span>
+                            <span className="text-xs text-gray-500 italic">
+                              thinking...
+                            </span>
                           </div>
                         )}
                     </div>

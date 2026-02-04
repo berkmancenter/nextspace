@@ -4,43 +4,12 @@ import { AssistantChatPanel } from "../../components/AssistantChatPanel";
 
 // Mock message components
 jest.mock("../../components/messages", () => ({
-  AssistantMessage: ({
-    message,
-    onPopulateFeedbackText,
-    onSendFeedbackRating,
-    messageType,
-  }: any) => {
+  AssistantMessage: ({ message }: any) => {
     const messageText =
       typeof message.body === "string"
         ? message.body
         : message.body?.text || "";
-    return (
-      <div data-testid="assistant-message">
-        {messageText}
-        {message.id && !messageType && (
-          <div data-testid="message-feedback" data-message-id={message.id}>
-            <button
-              data-testid="rating-button-3"
-              onClick={() => onSendFeedbackRating?.(message.id, 3)}
-            >
-              3
-            </button>
-            <button
-              data-testid="say-more-button"
-              onClick={() =>
-                onPopulateFeedbackText?.({
-                  prefix: `/feedback|Text|${message.id}|`,
-                  icon: null,
-                  label: "Feedback Mode",
-                })
-              }
-            >
-              Say more
-            </button>
-          </div>
-        )}
-      </div>
-    );
+    return <div data-testid="assistant-message">{messageText}</div>;
   },
   SubmittedMessage: ({ message }: any) => {
     const messageText =
@@ -56,6 +25,32 @@ jest.mock("../../components/messages", () => ({
         : message.body?.text || "";
     return <div data-testid="moderator-submitted-message">{messageText}</div>;
   },
+}));
+
+// Mock MessageFeedback component
+jest.mock("../../components/MessageFeedback", () => ({
+  MessageFeedback: ({ messageId, onPopulateFeedbackText, onSendFeedbackRating }: any) => (
+    <div data-testid="message-feedback" data-message-id={messageId}>
+      <button
+        data-testid="rating-button-3"
+        onClick={() => onSendFeedbackRating?.(messageId, 3)}
+      >
+        3
+      </button>
+      <button
+        data-testid="say-more-button"
+        onClick={() =>
+          onPopulateFeedbackText?.({
+            prefix: `/feedback|Text|${messageId}|`,
+            icon: null,
+            label: "Feedback Mode",
+          })
+        }
+      >
+        Say more
+      </button>
+    </div>
+  ),
 }));
 
 // Mock MessageInput component
@@ -90,6 +85,7 @@ describe("AssistantChatPanel", () => {
     waitingForResponse: false,
     controlledMode: null,
     slashCommands: [],
+    eventName: "Tech Summit",
     onSendMessage: mockOnSendMessage,
     onExitControlledMode: mockOnExitControlledMode,
     onPromptSelect: mockOnPromptSelect,
