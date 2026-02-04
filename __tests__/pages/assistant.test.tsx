@@ -59,6 +59,19 @@ jest.mock("../../utils", () => ({
   },
   RetrieveData: jest.fn(),
   SendData: jest.fn(),
+  GetChannelPasscode: jest.fn((channel: string, query: any) => {
+    // Extract passcode from query.channel parameter
+    if (!query.channel) return null;
+    
+    const channels = Array.isArray(query.channel) ? query.channel : [query.channel];
+    const matchingChannel = channels.find((c: string) => c.includes(channel));
+    
+    if (matchingChannel) {
+      const parts = matchingChannel.split(',');
+      return parts[1] || null;
+    }
+    return null;
+  }),
 }));
 
 // Mock useSessionJoin hook
@@ -292,6 +305,138 @@ describe("EventAssistantRoom", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Failed to join session")).toBeInTheDocument();
+    });
+  });
+
+  it("loads initial assistant messages on page load", async () => {
+    const mockMessages = [
+      { id: "1", body: "Hello", pseudonym: "User", channels: ["direct-user-123-agent-123"] },
+      { id: "2", body: "Hi there!", pseudonym: "Event Assistant", channels: ["direct-user-123-agent-123"] },
+    ];
+
+    (RetrieveData as jest.Mock)
+      .mockResolvedValueOnce({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+      })
+      .mockResolvedValueOnce(mockMessages);
+
+    (createConversationFromData as jest.Mock).mockResolvedValue({
+      agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+      type: { name: "eventAssistant" },
+    });
+
+    await act(async () => {
+      render(<EventAssistantRoom isAuthenticated={false} />);
+    });
+
+    await waitFor(() => {
+      expect(RetrieveData).toHaveBeenCalledWith(
+        "messages/test-conversation-id?channel=direct-user-123-agent-123",
+        "mock-access-token"
+      );
+    });
+  });
+
+  it("emits conversation:join when socket, userId, and agentId are available", async () => {
+    (RetrieveData as jest.Mock).mockResolvedValue({
+      agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+    });
+
+    (createConversationFromData as jest.Mock).mockResolvedValue({
+      agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+      type: { name: "eventAssistant" },
+    });
+
+    await act(async () => {
+      render(<EventAssistantRoom isAuthenticated={false} />);
+    });
+
+    await waitFor(() => {
+      expect(mockSocket.emit).toHaveBeenCalledWith("conversation:join", {
+        conversationId: "test-conversation-id",
+        token: "mock-access-token",
+        channels: [
+          {
+            name: "direct-user-123-agent-123",
+            passcode: null,
+            direct: true,
+          },
+        ],
+      });
+    });
+  });
+
+  it("includes chat channel in conversation:join when chatPasscode is available", async () => {
+    mockRouter.query = {
+      conversationId: "test-conversation-id",
+      channel: ["transcript,transcript-pass", "chat,chat-pass"],
+    };
+
+    (RetrieveData as jest.Mock).mockResolvedValue({
+      agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+    });
+
+    (createConversationFromData as jest.Mock).mockResolvedValue({
+      agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+      type: { name: "eventAssistant" },
+    });
+
+    await act(async () => {
+      render(<EventAssistantRoom isAuthenticated={false} />);
+    });
+
+    await waitFor(() => {
+      expect(mockSocket.emit).toHaveBeenCalledWith("conversation:join", {
+        conversationId: "test-conversation-id",
+        token: "mock-access-token",
+        channels: [
+          {
+            name: "direct-user-123-agent-123",
+            passcode: null,
+            direct: true,
+          },
+          {
+            name: "chat",
+            passcode: "chat-pass",
+            direct: false,
+          },
+        ],
+      });
+    });
+  });
+
+  it("loads initial chat messages when chatPasscode becomes available", async () => {
+    mockRouter.query = {
+      conversationId: "test-conversation-id",
+      channel: "chat,chat-pass",
+    };
+
+    const mockChatMessages = [
+      { id: "1", body: "Chat message 1", pseudonym: "User1", channels: ["chat"] },
+      { id: "2", body: "Chat message 2", pseudonym: "User2", channels: ["chat"] },
+    ];
+
+    (RetrieveData as jest.Mock)
+      .mockResolvedValueOnce({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+      })
+      .mockResolvedValueOnce(mockChatMessages)
+      .mockResolvedValueOnce([]);
+
+    (createConversationFromData as jest.Mock).mockResolvedValue({
+      agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+      type: { name: "eventAssistant" },
+    });
+
+    await act(async () => {
+      render(<EventAssistantRoom isAuthenticated={false} />);
+    });
+
+    await waitFor(() => {
+      expect(RetrieveData).toHaveBeenCalledWith(
+        "messages/test-conversation-id?channel=chat,chat-pass",
+        "mock-access-token"
+      );
     });
   });
 });

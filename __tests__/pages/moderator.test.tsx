@@ -174,4 +174,31 @@ describe("ModeratorScreen", () => {
       expect(screen.getByText("API error")).toBeInTheDocument();
     });
   });
+
+  it("loads initial moderator messages on page load", async () => {
+    await act(async () => {
+      render(<ModeratorScreen isAuthenticated={true} />);
+    });
+
+    await waitFor(() => {
+      expect(RetrieveData).toHaveBeenCalledWith(
+        "messages/test-conversation?channel=moderator,mock-passcode",
+        "mock-token"
+      );
+    });
+  });
+
+  it("emits conversation:join with moderator channel", async () => {
+    await act(async () => {
+      render(<ModeratorScreen isAuthenticated={true} />);
+    });
+
+    await waitFor(() => {
+      expect(mockSocket.emit).toHaveBeenCalledWith("conversation:join", {
+        conversationId: "test-conversation",
+        token: "mock-token",
+        channel: { name: "moderator", passcode: "mock-passcode" },
+      });
+    });
+  });
 });
