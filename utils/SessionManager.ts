@@ -156,7 +156,7 @@ class SessionManager {
       return this.currentSession;
     } catch (error) {
       console.error("Failed to create guest session:", error);
-      this.sessionState = "ready";
+      this.sessionState = "cleared";
       throw error;
     }
   }

@@ -409,7 +409,7 @@ describe("SessionManager", () => {
       await expect(sessionManager.restoreSession()).rejects.toThrow(
         "API down"
       );
-      expect(sessionManager.getState()).toBe("ready");
+      expect(sessionManager.getState()).toBe("cleared");
     });
   });
 

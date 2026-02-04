@@ -1,4 +1,9 @@
 import "@testing-library/jest-dom";
+import { TextEncoder, TextDecoder } from "util";
+
+// Polyfill TextEncoder/TextDecoder for Node.js environment
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder as typeof global.TextDecoder;
 
 // Mock react-markdown and remark-gfm since they're ESM-only
 jest.mock("react-markdown", () => ({

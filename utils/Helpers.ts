@@ -1,5 +1,5 @@
 import { ParsedUrlQuery } from "querystring";
-import { RefreshToken, RetrieveData, Request } from "./";
+import { fetchWithTokenRefresh, RetrieveData, Request } from "./";
 import { components } from "../types";
 import { Conversation, EventUrl, EventUrls } from "../types.internal";
 
@@ -162,45 +162,32 @@ export const SendData = async (
   accessToken?: string,
   fetchOptions?: RequestInit
 ) => {
-  const apiI = Api.get();
-  let API_TOKENS = apiI.GetTokens();
-  let options = fetchOptions || {
+  const API_TOKENS = Api.get().GetTokens();
+  
+  let options: RequestInit = fetchOptions || {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
   };
+  
   // Ensure headers is a mutable object
   if (!options.headers) {
     options.headers = {};
   }
+  
   // Add Authorization header; use provided accessToken if available
   (options.headers as Record<string, string>)["Authorization"] = accessToken
     ? `Bearer ${accessToken}`
     : `Bearer ${API_TOKENS.access}`;
 
   try {
-    const response = await fetch(
+    const response = await fetchWithTokenRefresh(
       `${process.env.NEXT_PUBLIC_API_URL}/${urlSuffix}`,
-      {
-        method: options.method,
-        headers: options.headers,
-        body: options.body,
-      }
+      options,
+      !accessToken // Use stored tokens if no explicit accessToken provided
     );
-
-    // If 401 Unauthorized, refresh the token
-    if (response.status === 401 && API_TOKENS.refresh) {
-      console.log("Token expired, refreshing...");
-      // Refresh the token
-      const tokensResponse = await RefreshToken(API_TOKENS.refresh);
-      apiI.SetTokens(tokensResponse.access.token, tokensResponse.refresh.token);
-
-      // Retry the request with the new token
-      SendData(urlSuffix, payload);
-      return null;
-    }
 
     // TODO: Handle other status codes as needed
     if (!response.ok) {
