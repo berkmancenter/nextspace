@@ -208,42 +208,43 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
           );
           return;
         }
-
-        if (!socket || !socket.auth) {
-          return;
-        }
-
-        if (agentId && userId) {
-          console.log("Joining conversation");
-          // Join channels - include both direct and chat if chatPasscode is available
-          const channels: components["schemas"]["Channel"][] = [
-            {
-              name: `direct-${userId}-${agentId}`,
-              passcode: null,
-              direct: true,
-            },
-          ];
-          if (chatPasscode) {
-            channels.push({
-              name: "chat",
-              passcode: chatPasscode,
-              direct: false,
-            });
-          }
-
-          socket.emit("conversation:join", {
-            conversationId: router.query.conversationId,
-            token: Api.get().GetTokens().access,
-            channels,
-          });
-        }
       } catch (error) {
         console.error("Error fetching conversation data:", error);
         setLocalError("Failed to fetch conversation data.");
       }
     }
     fetchConversationData();
-  }, [socket, router, userId, agentId, chatPasscode]);
+  }, [socket, router]);
+
+  // Join conversation when socket, agentId, and userId are all available
+  useEffect(() => {
+    if (!socket || !socket.auth || !agentId || !userId || !router.query.conversationId) {
+      return;
+    }
+
+    console.log("Joining conversation");
+    // Join channels - include both direct and chat if chatPasscode is available
+    const channels: components["schemas"]["Channel"][] = [
+      {
+        name: `direct-${userId}-${agentId}`,
+        passcode: null,
+        direct: true,
+      },
+    ];
+    if (chatPasscode) {
+      channels.push({
+        name: "chat",
+        passcode: chatPasscode,
+        direct: false,
+      });
+    }
+
+    socket.emit("conversation:join", {
+      conversationId: router.query.conversationId,
+      token: Api.get().GetTokens().access,
+      channels,
+    });
+  }, [socket, agentId, userId, chatPasscode, router.query.conversationId]);
 
   // Load initial chat messages when chatPasscode becomes available
   useEffect(() => {
@@ -266,6 +267,29 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
 
     fetchInitialMessages();
   }, [chatPasscode, router.query.conversationId]);
+
+  // Load initial assistant messages when userId and agentId become available
+  useEffect(() => {
+    if (!userId || !agentId || !router.query.conversationId) return;
+
+    const fetchInitialAssistantMessages = async () => {
+      try {
+        const directChannelName = `direct-${userId}-${agentId}`;
+        const assistantMessages = await RetrieveData(
+          `messages/${router.query.conversationId}?channel=${directChannelName}`,
+          Api.get().GetTokens().access!,
+        );
+
+        if (Array.isArray(assistantMessages)) {
+          setAssistantMessages(assistantMessages);
+        }
+      } catch (error) {
+        console.error("Error fetching initial assistant messages:", error);
+      }
+    };
+
+    fetchInitialAssistantMessages();
+  }, [userId, agentId, router.query.conversationId]);
 
   async function sendMessage(
     message: string,
