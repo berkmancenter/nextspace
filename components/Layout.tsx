@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { Header } from "./Header";
 import { Footer } from "./Footer";
+import { AuthType } from "../types.internal";
 
 export const metadata: Metadata = {
   title: "Nextspace",
@@ -14,12 +15,13 @@ export const metadata: Metadata = {
  *
  * Wraps the main content of the app with a header and background.
  * @param children - The child components to render within the layout.
+ * @param authType - The authentication type of the current user.
  * @returns A React component for the layout.
  */
 export const Layout = ({
   children,
-  isAuthenticated = false,
-}: Readonly<{ children: React.ReactNode; isAuthenticated?: boolean }>) => {
+  authType = "guest",
+}: Readonly<{ children: React.ReactNode; authType?: AuthType }>) => {
   const router = useRouter();
   const currentUrl = router.isReady ? router.asPath : "";
 
@@ -34,7 +36,7 @@ export const Layout = ({
           : "bg-main bg-transparent bg-cover bg-center bg-no-repeat"
       }`}
     >
-      <Header isAuthenticated={isAuthenticated} />
+      <Header authType={authType} />
 
       <main className="flex-1">{children}</main>
 

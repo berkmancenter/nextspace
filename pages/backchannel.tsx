@@ -22,6 +22,7 @@ import { components } from "../types";
 import { BackchannelMessage } from "../components/messages/BackchannelMessage";
 import { CheckAuthHeader } from "../utils/Helpers";
 import { useSessionJoin } from "../utils/useSessionJoin";
+import { AuthType } from "../types.internal";
 import { useAnalytics } from "../hooks/useAnalytics";
 import {
   trackConversationEvent,
@@ -31,7 +32,7 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
-function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
+function BackchannelRoom({ authType }: { authType: AuthType }) {
   const router = useRouter();
 
   // Initialize page-level analytics
@@ -57,7 +58,7 @@ function BackchannelRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
     pseudonym,
     isConnected,
     errorMessage: sessionError,
-  } = useSessionJoin(isAuthenticated);
+  } = useSessionJoin();
 
   // Combine session and local errors
   const errorMessage = sessionError || localError;

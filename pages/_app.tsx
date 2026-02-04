@@ -13,6 +13,7 @@ import { Layout } from "../components";
 import SessionManager from "../utils/SessionManager";
 import { validateEnv } from "../utils/validateEnv";
 import { useSessionTracking } from "../hooks/useAnalytics";
+import { AuthType } from "../types.internal";
 
 // Pages that don't require session creation
 // Add more pages here as needed (e.g., "/about", "/privacy", "/terms")
@@ -84,7 +85,7 @@ export default function App({ Component, pageProps }: AppProps) {
     return (
       <AppCacheProvider>
         <ThemeProvider theme={theme}>
-          <Layout isAuthenticated={pageProps.isAuthenticated || false}>
+          <Layout authType={(pageProps.authType as AuthType) || "guest"}>
             <Head>
               <title>NextSpace</title>
             </Head>
@@ -123,7 +124,7 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <AppCacheProvider>
       <ThemeProvider theme={theme}>
-        <Layout isAuthenticated={pageProps.isAuthenticated || false}>
+        <Layout authType={(pageProps.authType as AuthType) || "guest"}>
           <Head>
             <title>NextSpace</title>
           </Head>

@@ -367,15 +367,15 @@ export const createConversationFromData = async (
   };
 };
 
-/** Check if the request has the authentication header set
+/** Check the authentication type from request headers
  * @param headers - The request headers
- * @returns An object containing the isAuthenticated property
+ * @returns An object containing the authType property
  */
 export const CheckAuthHeader = (headers: Record<string, string>) => {
-  const isAuthenticated = headers && headers["x-is-authenticated"] === "true";
+  const authType = headers && headers["x-auth-type"] ? headers["x-auth-type"] : "guest";
   return {
     props: {
-      isAuthenticated,
+      authType,
     },
   };
 };

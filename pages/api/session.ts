@@ -23,11 +23,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return;
   }
 
+  // Validate authType
+  const authType = sessionData.authType || "guest";
+  if (!["guest", "user", "admin"].includes(authType)) {
+    res
+      .status(400)
+      .json({ error: "authType must be one of: guest, user, admin" });
+    return;
+  }
+
   // Create encrypted JWT cookie
   const cookie = await new EncryptJWT({
     access: sessionData.accessToken,
     refresh: sessionData.refreshToken,
     userId: sessionData.userId,
+    authType: authType,
   })
     .setProtectedHeader({ alg: "dir", enc: "A128CBC-HS256" })
     .setExpirationTime(

@@ -18,6 +18,7 @@ import {
 import { Transcript } from "../components/";
 import { CheckAuthHeader } from "../utils/Helpers";
 import { useSessionJoin } from "../utils/useSessionJoin";
+import { AuthType } from "../types.internal";
 import { useAnalytics } from "../hooks/useAnalytics";
 import {
   trackConversationEvent,
@@ -27,7 +28,7 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
-function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
+function ModeratorScreen({ authType }: { authType: AuthType }) {
   const router = useRouter();
 
   // Initialize page-level analytics
@@ -49,7 +50,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
     socket,
     isConnected,
     errorMessage: sessionError,
-  } = useSessionJoin(isAuthenticated);
+  } = useSessionJoin();
 
   // Combine session and local errors
   const errorMessage = sessionError || localError;

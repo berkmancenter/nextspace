@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { CircularProgress } from "@mui/material";
 import { CheckAuthHeader, getConversation } from "../../../../utils/Helpers";
+import { AuthType } from "../../../../types.internal";
 
 import { EventStatus } from "../../../../components";
 import { Conversation } from "../../../../types.internal";
@@ -10,7 +11,7 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
-function EventScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
+function EventScreen({ authType }: { authType: AuthType }) {
   const router = useRouter();
   const { id } = router.query;
 

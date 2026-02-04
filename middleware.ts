@@ -8,7 +8,7 @@ export async function middleware(request: NextRequest) {
   const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
   try {
     const token = (await cookies()).get("nextspace-session")?.value;
-    // If no token and trying to access admin, redirect to signup, else mark as not authenticated
+    // If no token and trying to access admin, redirect to signup, else mark as guest
     if (!token) {
       if (isAdminRoute) {
         const url = request.nextUrl.clone();
@@ -16,17 +16,27 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(url);
       }
 
-      requestHeaders.set("x-is-authenticated", "false");
+      requestHeaders.set("x-auth-type", "guest");
       return NextResponse.next({ headers: requestHeaders });
     }
     const cookie: JWTDecryptResult = await decryptCookie(token);
 
     // Ensure the decrypted cookie has access token
     if (!cookie || !cookie.payload.access) throw new Error("Not logged in");
-    requestHeaders.set("x-is-authenticated", "true");
+    
+    // Set authType from cookie (defaults to "guest" if not present)
+    const authType = (cookie.payload.authType as string) || "guest";
+    requestHeaders.set("x-auth-type", authType);
 
-    // If logged in and hitting /admin exactly, redirect to /admin/events
-    if (request.nextUrl.pathname === "/admin") {
+    // Only allow admin users to access admin routes
+    if (isAdminRoute && authType !== "admin") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/signup";
+      return NextResponse.redirect(url);
+    }
+
+    // If logged in as admin and hitting /admin exactly, redirect to /admin/events
+    if (request.nextUrl.pathname === "/admin" && authType === "admin") {
       const url = request.nextUrl.clone();
       url.pathname = "/admin/events";
       return NextResponse.redirect(url, { headers: requestHeaders });
@@ -42,7 +52,7 @@ export async function middleware(request: NextRequest) {
       request.nextUrl.pathname === "/signup" ||
       request.nextUrl.pathname === "/login"
     ) {
-      requestHeaders.set("x-is-authenticated", "false");
+      requestHeaders.set("x-auth-type", "guest");
       return NextResponse.next({ headers: requestHeaders });
     }
 

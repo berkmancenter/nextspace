@@ -9,7 +9,7 @@ import LoginIcon from "@mui/icons-material/Login";
 import LogoutIcon from "@mui/icons-material/Logout";
 import FeedbackOutlinedIcon from "@mui/icons-material/FeedbackOutlined";
 
-import { HeaderProps, PageName } from "../types.internal";
+import { AuthType, HeaderProps, PageName } from "../types.internal";
 import Logo from "./Logo";
 import { Close, Menu } from "@mui/icons-material";
 import { useRouter } from "next/router";
@@ -39,14 +39,14 @@ const userPages: Record<string, { icon: JSX.Element; url: string }> = {
  * This component renders the header for the app.
  * @param {object} props
  * @property {string} className - Optional Tailwind classes for styling.
- * @property {string} activeTab - The currently active tab/page name.
  * @property {string} variant - The variant of the header, either "transparent" or "solid".
+ * @property {AuthType} authType - The authentication type of the current user.
  * @returns A React component for the header.
  */
 export const Header = ({
   className = "",
   variant = "transparent",
-  isAuthenticated = false,
+  authType = "guest",
 }: HeaderProps) => {
   const variantStyles = {
     transparent: "flex-end bg-transparent shadow-none",
@@ -56,20 +56,38 @@ export const Header = ({
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  // Build admin pages with dynamic auth button
-  const adminPages = {
-    ...adminPagesBase,
-    [isAuthenticated ? "Log Out" : "Log In"]: {
-      icon: isAuthenticated ? <LogoutIcon /> : <LoginIcon />,
-      url: isAuthenticated ? "/logout" : "/login",
-    },
-    "Give Feedback": {
-      icon: <FeedbackOutlinedIcon />,
-      url: "https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform",
-    },
-  };
-
-  const currentPages = isAuthenticated ? adminPages : userPages;
+  // Build pages based on authType
+  let currentPages: Record<string, { icon: JSX.Element; url: string }>;
+  
+  if (authType === "admin") {
+    // Admin users see admin pages + logout
+    currentPages = {
+      ...adminPagesBase,
+      "Log Out": {
+        icon: <LogoutIcon />,
+        url: "/logout",
+      },
+      "Give Feedback": {
+        icon: <FeedbackOutlinedIcon />,
+        url: "https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform",
+      },
+    };
+  } else if (authType === "user") {
+    // Regular logged-in users see logout + feedback (future: add user-specific pages)
+    currentPages = {
+      "Log Out": {
+        icon: <LogoutIcon />,
+        url: "/logout",
+      },
+      "Give Feedback": {
+        icon: <FeedbackOutlinedIcon />,
+        url: "https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform",
+      },
+    };
+  } else {
+    // Guest users see login + feedback
+    currentPages = userPages;
+  }
 
   const toggleDrawer = (newOpen: boolean) => () => {
     setOpen(newOpen);

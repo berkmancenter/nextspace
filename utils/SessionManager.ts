@@ -141,6 +141,7 @@ class SessionManager {
           userId: registerResponse.user.id,
           accessToken: registerResponse.tokens.access.token,
           refreshToken: registerResponse.tokens.refresh.token,
+          authType: "guest",
           expirationFromNow: 60 * 60 * 24 * 30, // 30 days like Vue app
         }),
       });

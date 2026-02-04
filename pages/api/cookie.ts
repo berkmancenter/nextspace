@@ -28,6 +28,7 @@ export default async function handler(
         },
         userId: decrypted.payload.userId,
         username: decrypted.payload.sub,
+        authType: decrypted.payload.authType || "guest",
       };
     } catch (error) {
       console.error("Failed to decrypt cookie:", error);

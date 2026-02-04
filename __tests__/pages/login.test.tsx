@@ -159,7 +159,7 @@ describe("LoginPage", () => {
       );
     });
 
-    // Verify session cookie API was called with pseudonym
+    // Verify session cookie API was called with pseudonym and authType: "admin"
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         "/api/session",
@@ -170,6 +170,7 @@ describe("LoginPage", () => {
             userId: "user123",
             accessToken: "access-token-123",
             refreshToken: "refresh-token-456",
+            authType: "admin",
           }),
         })
       );
@@ -348,6 +349,7 @@ describe("LoginPage", () => {
             userId: "legacy-user-id",
             accessToken: "access-token-123",
             refreshToken: "refresh-token-456",
+            authType: "admin",
           }),
         })
       );
@@ -406,6 +408,7 @@ describe("LoginPage", () => {
             userId: "auth-user-456",
             accessToken: "new-auth-access-token",
             refreshToken: "new-auth-refresh-token",
+            authType: "admin",
           }),
         })
       );

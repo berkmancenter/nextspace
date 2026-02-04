@@ -140,6 +140,15 @@ describe("SessionManager", () => {
           }),
         })
       );
+      
+      // Verify authType: "guest" is sent when creating session cookie
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/session",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining('"authType":"guest"'),
+        })
+      );
     });
 
     it("prevents multiple simultaneous initialization attempts", async () => {

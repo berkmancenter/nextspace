@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { RetrieveData } from "../../utils";
 import { Api, CheckAuthHeader, getConversation } from "../../utils/Helpers";
+import { AuthType } from "../../types.internal";
 
 import React from "react";
 import {
@@ -259,7 +260,7 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
-function EventScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
+function EventScreen({ authType }: { authType: AuthType }) {
   const router = useRouter();
   const [conversationsList, setConversationsList] =
     useState<components["schemas"]["Conversation"][]>();

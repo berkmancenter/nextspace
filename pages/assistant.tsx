@@ -15,6 +15,7 @@ import { components } from "../types";
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
 import { CheckAuthHeader, createConversationFromData } from "../utils/Helpers";
 import { useAnalytics } from "../hooks/useAnalytics";
+import { AuthType } from "../types.internal";
 import {
   trackConversationEvent,
   setUserId,
@@ -26,7 +27,7 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
-function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
+function EventAssistantRoom({ authType }: { authType: AuthType }) {
   const router = useRouter();
 
   // Initialize page-level analytics
@@ -61,7 +62,7 @@ function EventAssistantRoom({ isAuthenticated }: { isAuthenticated: boolean }) {
     userId,
     isConnected,
     errorMessage: sessionError,
-  } = useSessionJoin(isAuthenticated);
+  } = useSessionJoin();
 
   // Combine session and local errors
   const errorMessage = sessionError || localError;
