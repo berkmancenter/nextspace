@@ -29,6 +29,15 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
 
 - **docs/**
   Auto-generated static HTML files for code documentation.
+
+- **hooks/**
+  Custom React hooks used across the app.
+  - **useAnalytics.ts**
+    Hook for tracking session-level analytics (session start/end, page views, active time).
+  - **useAutoScroll.ts**
+    Hook for automatically scrolling to bottom of message lists.
+  - **useVisibilityAwareDuration.ts**
+    Hook for tracking time spent on a page while visible (excludes time when tab is hidden).
 - **pages/**
   Next.js pages for the app.
 
@@ -41,6 +50,8 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
         Checks the `[id]` and renders an `EventStatus` component.
   - **api/**
     Client-side public API routes; see [Next.js docs](https://nextjs.org/docs/pages/building-your-application/routing/api-routes)
+    - **check-location.ts**
+      Route to detect if user is connecting from local or remote IP address.
     - **cookie.ts**
       Route to see if user has stored cookie and then decrypt it, return tokens and user info.
     - **logout.ts**
@@ -68,6 +79,8 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
 
 - **utils/**
   Various utilities used across the app; see [docs/](https://github.com/berkmancenter/nextspace/blob/docs) for a detailed breakdown of each method.
+  - **analytics.ts**
+    Matomo analytics integration for tracking events, page views, and custom dimensions.
   - **Api.ts**
     Helper methods for fetching data from the LLM Engine API.
   - **Decrypt.ts**
@@ -76,6 +89,16 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
     Checks if router query parameters are valid.
   - **Helpers.ts**
     General data-handling methods.
+  - **ipRangeChecker.ts**
+    Checks if IP addresses are within specified CIDR ranges for location detection.
+  - **SessionManager.ts**
+    Singleton that manages session state across the app. Automatically restores sessions from encrypted cookies on app initialization, creates guest sessions for new users, and handles transitions between guest and authenticated states. Certain pages (home, login, signup, logout) skip session creation to avoid unnecessary guest accounts.
+  - **useSessionJoin.ts**
+    Hook for initializing socket connections with session info from SessionManager.
+  - **validateEnv.ts**
+    Validates required environment variables on app startup.
+  - **withEnvValidation.ts**
+    Higher-order function for API route handlers to validate environment variables.
 
 </details>
 
