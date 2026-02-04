@@ -37,7 +37,9 @@ class SessionManager {
    * @param options.skipCreation - If true, don't create a new guest session if none exists
    * @returns SessionInfo if session exists, null otherwise
    */
-  async restoreSession(options?: { skipCreation?: boolean }): Promise<SessionInfo | null> {
+  async restoreSession(options?: {
+    skipCreation?: boolean;
+  }): Promise<SessionInfo | null> {
     // Prevent multiple simultaneous initialization attempts
     if (this.initializationPromise) {
       return await this.initializationPromise;
@@ -58,7 +60,9 @@ class SessionManager {
     }
   }
 
-  private async _restoreSession(skipCreation?: boolean): Promise<SessionInfo | null> {
+  private async _restoreSession(
+    skipCreation?: boolean,
+  ): Promise<SessionInfo | null> {
     try {
       const response = await fetch("/api/cookie");
       const data = await response.json();
@@ -89,7 +93,7 @@ class SessionManager {
 
     // No existing session - create a new guest session only if allowed
     if (skipCreation) {
-      console.log("Skipping guest session creation (blacklisted page)");
+      console.log("Skipping guest session creation (blocklisted page)");
       this.sessionState = "cleared";
       return null;
     }
@@ -106,7 +110,7 @@ class SessionManager {
 
       // Get new pseudonym from API
       const pseudonymResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/newPseudonym`
+        `${process.env.NEXT_PUBLIC_API_URL}/auth/newPseudonym`,
       ).then((res) => res.json());
 
       // Register as guest
@@ -119,13 +123,13 @@ class SessionManager {
             token: pseudonymResponse.token,
             pseudonym: pseudonymResponse.pseudonym,
           }),
-        }
+        },
       ).then((res) => res.json());
 
       // Set tokens in memory
       Api.get().SetTokens(
         registerResponse.tokens.access.token,
-        registerResponse.tokens.refresh.token
+        registerResponse.tokens.refresh.token,
       );
 
       // Set encrypted cookie via API route
@@ -179,7 +183,7 @@ class SessionManager {
    */
   markAuthenticated(username?: string, userId?: string): void {
     this.sessionState = "authenticated";
-    
+
     // Update session info if provided
     if (username !== undefined && userId !== undefined) {
       this.currentSession = {

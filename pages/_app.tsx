@@ -16,19 +16,20 @@ import { useSessionTracking } from "../hooks/useAnalytics";
 
 // Pages that don't require session creation
 // Add more pages here as needed (e.g., "/about", "/privacy", "/terms")
-const SESSION_BLACKLIST = [
+const SESSION_BLOCKLIST = [
   "/", // Home page
   "/_error", // Error page
   "/404", // 404 page
   "/login", // Login page
   "/signup", // Signup page
+  "/logout",
 ];
 
 /**
  * Check if current route should skip session creation
  */
 function shouldSkipSession(pathname: string): boolean {
-  return SESSION_BLACKLIST.includes(pathname);
+  return SESSION_BLOCKLIST.includes(pathname);
 }
 
 // Validate environment variables on app initialization
@@ -37,7 +38,7 @@ if (typeof window === "undefined") {
     validateEnv();
   } catch (error) {
     console.error(
-      error instanceof Error ? error.message : "Environment validation failed"
+      error instanceof Error ? error.message : "Environment validation failed",
     );
     throw error;
   }
@@ -60,12 +61,12 @@ export default function App({ Component, pageProps }: AppProps) {
   useEffect(() => {
     const initSession = async () => {
       const skipCreation = shouldSkipSession(router.pathname);
-      
+
       if (skipCreation) {
         console.log(`Skipping session creation for ${router.pathname}`);
       }
 
-      // Always try to restore existing session, but skip creation on blacklisted pages
+      // Always try to restore existing session, but skip creation on blocklisted pages
       try {
         await SessionManager.get().restoreSession({ skipCreation });
       } catch (error) {

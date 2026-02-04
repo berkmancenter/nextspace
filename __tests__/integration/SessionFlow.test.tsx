@@ -47,7 +47,7 @@ describe("Session Management Integration Tests", () => {
   });
 
   describe("Test Scenario 1: New visitor → visits home page", () => {
-    it("should NOT create session on blacklisted page", async () => {
+    it("should NOT create session on blocklisted page", async () => {
       mockRouter.pathname = "/";
 
       const mockSessionManager = {
@@ -202,13 +202,16 @@ describe("Session Management Integration Tests", () => {
       mockRouter.pathname = "/assistant";
       await mockSessionManager.restoreSession();
 
-      const initialCallCount = mockSessionManager.restoreSession.mock.calls.length;
+      const initialCallCount =
+        mockSessionManager.restoreSession.mock.calls.length;
 
       // Navigate to home
       mockRouter.pathname = "/";
       // Home page should skip session initialization
 
-      expect(mockSessionManager.restoreSession).toHaveBeenCalledTimes(initialCallCount);
+      expect(mockSessionManager.restoreSession).toHaveBeenCalledTimes(
+        initialCallCount,
+      );
       expect(mockSessionManager.hasSession()).toBe(true);
     });
   });
@@ -306,7 +309,7 @@ describe("Session Management Integration Tests", () => {
             new Promise((resolve) => {
               initializationCount++;
               setTimeout(() => resolve(true), initializationDelay);
-            })
+            }),
         ),
         getState: jest.fn().mockReturnValue("initializing"),
       };
