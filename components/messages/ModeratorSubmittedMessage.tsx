@@ -7,7 +7,7 @@ import { MessageProps } from "../../types.internal";
 export const ModeratorSubmittedMessage: FC<MessageProps> = ({ message }) => {
   return (
     <BaseMessage>
-      <div className="ml-15 bg-blue-50 border-l-4 border-blue-500 rounded-lg p-3">
+      <div className="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-3">
         <Box display="flex" alignItems="center" gap="8px" marginBottom="8px">
           <CheckCircleOutline
             sx={{

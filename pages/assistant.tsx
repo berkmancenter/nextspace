@@ -39,7 +39,7 @@ function EventAssistantRoom() {
   const [joining, setJoining] = useState(false);
   const [waitingForResponse, setWaitingForResponse] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"assistant" | "chat">("assistant");
+  const [activeTab, setActiveTab] = useState<"assistant" | "chat">("chat");
   const [unseenAssistantCount, setUnseenAssistantCount] = useState<number>(0);
   const [unseenChatCount, setUnseenChatCount] = useState<number>(0);
   const [assistantMessages, setAssistantMessages] = useState<
@@ -55,6 +55,7 @@ function EventAssistantRoom() {
     useState<ControlledInputConfig | null>(null);
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>("");
   const [chatPasscode, setChatPasscode] = useState<string>("");
+  const [eventName, setEventName] = useState<string>("");
   const [assistantInputValue, setAssistantInputValue] = useState<string>("");
   const [chatInputValue, setChatInputValue] = useState<string>("");
 
@@ -192,6 +193,7 @@ function EventAssistantRoom() {
 
           createConversationFromData(conversationData).then((conversation) => {
             setConversationType(conversation.type.name);
+            if (conversation.name) setEventName(conversation.name);
 
             // Get transcript and chat passcodes if channel query param exists
             if (router.query.channel) {
@@ -443,6 +445,28 @@ function EventAssistantRoom() {
             {chatPasscode && (
               <div className="flex border-b border-gray-300 pl-2 pr-2 md:px-8 pt-6 gap-8">
                 <button
+                  onClick={() => handleTabSwitch("chat")}
+                  className={`pb-3 text-sm font-bold uppercase border-b-4 transition-colors ${
+                    activeTab === "chat"
+                      ? "text-gray-800"
+                      : "border-transparent text-gray-400 hover:text-gray-600"
+                  }`}
+                  style={
+                    activeTab === "chat"
+                      ? { borderBottomColor: "#200434" }
+                      : undefined
+                  }
+                >
+                  <Badge
+                    color="secondary"
+                    variant="dot"
+                    invisible={unseenChatCount === 0 || activeTab === "chat"}
+                    sx={{ "& .MuiBadge-badge": { right: -4, top: 8 } }}
+                  >
+                    <span style={{ paddingRight: "8px" }}>Chat</span>
+                  </Badge>
+                </button>
+                <button
                   onClick={() => handleTabSwitch("assistant")}
                   className={`pb-3 text-sm font-bold uppercase border-b-4 transition-colors ${
                     activeTab === "assistant"
@@ -466,28 +490,6 @@ function EventAssistantRoom() {
                     <span style={{ paddingRight: "8px" }}>Event Assistant</span>
                   </Badge>
                 </button>
-                <button
-                  onClick={() => handleTabSwitch("chat")}
-                  className={`pb-3 text-sm font-bold uppercase border-b-4 transition-colors ${
-                    activeTab === "chat"
-                      ? "text-gray-800"
-                      : "border-transparent text-gray-400 hover:text-gray-600"
-                  }`}
-                  style={
-                    activeTab === "chat"
-                      ? { borderBottomColor: "#200434" }
-                      : undefined
-                  }
-                >
-                  <Badge
-                    color="secondary"
-                    variant="dot"
-                    invisible={unseenChatCount === 0 || activeTab === "chat"}
-                    sx={{ "& .MuiBadge-badge": { right: -4, top: 8 } }}
-                  >
-                    <span style={{ paddingRight: "8px" }}>Chat</span>
-                  </Badge>
-                </button>
               </div>
             )}
 
@@ -496,6 +498,7 @@ function EventAssistantRoom() {
                 <GroupChatPanel
                   messages={chatMessages}
                   pseudonym={pseudonym}
+                  eventName={eventName}
                   inputValue={chatInputValue}
                   onInputChange={setChatInputValue}
                   onSendMessage={sendMessage}
@@ -507,6 +510,7 @@ function EventAssistantRoom() {
                   waitingForResponse={waitingForResponse}
                   controlledMode={controlledMode}
                   slashCommands={slashCommands}
+                  eventName={eventName}
                   inputValue={assistantInputValue}
                   onInputChange={setAssistantInputValue}
                   onSendMessage={sendMessage}

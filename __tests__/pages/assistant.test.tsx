@@ -10,7 +10,7 @@ import { io } from "socket.io-client";
 const mockPush = jest.fn();
 const mockRouter = {
   push: mockPush,
-  query: { conversationId: "test-conversation-id" },
+  query: { conversationId: "test-conversation-id" } as any,
   isReady: true,
 };
 
@@ -41,6 +41,12 @@ jest.mock("../../utils", () => ({
   JoinSession: jest.fn(),
   RetrieveData: jest.fn(),
   SendData: jest.fn(),
+  GetChannelPasscode: jest.fn((channel: string) => {
+    // Mock implementation that returns passcode based on channel
+    if (channel === "chat") return "test-chat-passcode";
+    if (channel === "transcript") return "test-transcript-passcode";
+    return null;
+  }),
 }));
 
 // Mock message components
@@ -193,11 +199,11 @@ describe("EventAssistantRoom", () => {
       expect(mockSocket.on).toHaveBeenCalledWith("error", expect.any(Function));
       expect(mockSocket.on).toHaveBeenCalledWith(
         "connect",
-        expect.any(Function)
+        expect.any(Function),
       );
       expect(mockSocket.on).toHaveBeenCalledWith(
         "disconnect",
-        expect.any(Function)
+        expect.any(Function),
       );
     });
   });
@@ -214,7 +220,7 @@ describe("EventAssistantRoom", () => {
     await waitFor(() => {
       expect(RetrieveData).toHaveBeenCalledWith(
         "conversations/test-conversation-id",
-        "mock-access-token"
+        "mock-access-token",
       );
     });
   });
@@ -272,19 +278,32 @@ describe("EventAssistantRoom", () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          "This conversation does not have an event assistant agent."
-        )
+          "This conversation does not have an event assistant agent.",
+        ),
       ).toBeInTheDocument();
     });
   });
 
   describe("Conversation-Type-Specific Commands", () => {
     it("shows /mod command for Event Assistant Plus", async () => {
+      // Set up router query with channel and chat passcode
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-passcode",
+      };
+
       (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
         onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
       });
-      (RetrieveData as jest.Mock).mockResolvedValue({
-        agents: [{ id: "agent-456", agentType: "eventAssistantPlus" }],
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-456", agentType: "eventAssistantPlus" }],
+          });
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]); // Return empty chat messages
+        }
+        return Promise.resolve(null);
       });
       (createConversationFromData as jest.Mock).mockResolvedValue({
         agents: [{ id: "agent-456", agentType: "eventAssistantPlus" }],
@@ -297,14 +316,14 @@ describe("EventAssistantRoom", () => {
 
       await act(async () => {
         const connectHandler = mockSocket.on.mock.calls.find(
-          (call) => call[0] === "connect"
+          (call) => call[0] === "connect",
         )?.[1];
         if (connectHandler) connectHandler();
       });
 
       await waitFor(() => {
         expect(
-          screen.getByPlaceholderText("Enter your message here")
+          screen.getByPlaceholderText("Enter your message here"),
         ).toBeInTheDocument();
       });
 
@@ -320,6 +339,11 @@ describe("EventAssistantRoom", () => {
       });
 
       const user = userEvent.setup();
+
+      // Click on the Event Assistant tab to switch from Chat (default) to Assistant
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
       const input = screen.getByPlaceholderText("Enter your message here");
 
       await user.type(input, "/");
@@ -328,16 +352,29 @@ describe("EventAssistantRoom", () => {
         () => {
           expect(screen.getByText("/mod")).toBeInTheDocument();
         },
-        { timeout: 3000 }
+        { timeout: 3000 },
       );
     });
 
     it("does not show /mod command for Event Assistant (non-Plus)", async () => {
+      // Set up router query with channel and chat passcode
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-passcode",
+      };
+
       (JoinSession as jest.Mock).mockImplementation((onSuccess) => {
         onSuccess({ pseudonym: "test-pseudonym", userId: "user-123" });
       });
-      (RetrieveData as jest.Mock).mockResolvedValue({
-        agents: [{ id: "agent-456", agentType: "eventAssistant" }],
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-456", agentType: "eventAssistant" }],
+          });
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]); // Return empty chat messages
+        }
+        return Promise.resolve(null);
       });
       (createConversationFromData as jest.Mock).mockResolvedValue({
         agents: [{ id: "agent-456", agentType: "eventAssistant" }],
@@ -350,18 +387,23 @@ describe("EventAssistantRoom", () => {
 
       await act(async () => {
         const connectHandler = mockSocket.on.mock.calls.find(
-          (call) => call[0] === "connect"
+          (call) => call[0] === "connect",
         )?.[1];
         if (connectHandler) connectHandler();
       });
 
       await waitFor(() => {
         expect(
-          screen.getByPlaceholderText("Enter your message here")
+          screen.getByPlaceholderText("Enter your message here"),
         ).toBeInTheDocument();
       });
 
       const user = userEvent.setup();
+
+      // Click on the Event Assistant tab to switch from Chat (default) to Assistant
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
       const input = screen.getByPlaceholderText("Enter your message here");
 
       await user.type(input, "/");

@@ -128,22 +128,20 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
   }
 
   return (
-    <Box display="flex" flexDirection="column" gap="0.5rem" marginTop="0.5rem">
+    <Box display="flex" flexDirection="column" gap="0.5rem" marginTop="0.25rem">
       {/* Live region for announcements */}
       <div aria-live="polite" aria-atomic="true">
         <VisuallyHidden>{announcement}</VisuallyHidden>
       </div>
 
       {/* Header Row */}
-      <Box display="flex" justifyContent="space-between" alignItems="center">
-        <Typography
-          variant="body2"
-          id="rating-group-label"
-          className="text-gray-600"
-        >
-          How did the bot do?
-        </Typography>
-      </Box>
+      <Typography
+        variant="caption"
+        id="rating-group-label"
+        className="text-gray-600"
+      >
+        How did the bot do?
+      </Typography>
       {/* Feedback Buttons Row */}
       <Box
         display="flex"
@@ -171,27 +169,29 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
             }
             className={
               selectedFeedback === option.text
-                ? "border-2 border-primary text-primary"
-                : "border-2 border-gray-300 text-gray-700"
+                ? "border border-primary text-primary"
+                : "border text-primary"
             }
             sx={{
-              minWidth: "64px",
-              height: "40px",
-              paddingX: "16px",
-              borderRadius: "6px",
+              minWidth: "44px",
+              height: "30px",
+              paddingX: "10px",
+              borderRadius: "5px",
+              borderWidth: "1px",
+              borderColor:
+                selectedFeedback === option.text ? undefined : "#666666",
               backgroundColor: (theme) =>
                 selectedFeedback === option.text
                   ? alpha(theme.palette.primary.main, 0.08)
                   : "white",
               textTransform: "none",
-              fontSize: "0.875rem",
-              fontWeight: 500,
+              fontSize: "0.6875rem",
+              fontWeight: 700,
               "&:hover": {
-                borderWidth: "2px",
-                backgroundColor: (theme) =>
-                  selectedFeedback === option.text
-                    ? alpha(theme.palette.primary.main, 0.12)
-                    : theme.palette.action.hover,
+                borderWidth: "1px",
+                borderColor: "#4A0979",
+                backgroundColor: "#4A0979",
+                color: "white",
               },
               "&:focus-visible": {
                 outline: "2px solid",
@@ -199,7 +199,7 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
                 outlineOffset: "2px",
               },
               "&.Mui-disabled": {
-                borderWidth: "2px",
+                borderWidth: "1px",
                 borderColor: (theme) => theme.palette.action.disabled,
                 color: (theme) => theme.palette.text.disabled,
                 backgroundColor: "transparent",
@@ -208,7 +208,7 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
           >
             {selectedFeedback === option.text ? (
               <>
-                <Check fontSize="small" aria-hidden="true" sx={{ mr: 0.5 }} />
+                <Check fontSize="small" aria-hidden="true" sx={{ mr: 0.25 }} />
                 {option.text}
               </>
             ) : (
@@ -220,11 +220,8 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
 
       {/* Conditional "Say More" Message - shown after rating selection */}
       {selectedFeedback !== null && (
-        <Box className="bg-light-gray rounded-2xl p-3" marginTop="1rem">
-          <p className="py-3 text-xs text-dark-blue font-bold uppercase">
-            Event Assistant
-          </p>
-          <Typography variant="body1">
+        <Box className="bg-light-gray rounded-2xl p-3" marginTop="0.5rem">
+          <Typography variant="body2">
             Thank you for your input!{" "}
             <Link
               component="button"
