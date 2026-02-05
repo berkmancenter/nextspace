@@ -276,7 +276,7 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
       }`
     : "";
 
-  if (convType.name === "backChannel") {
+  if (convType && convType.name === "backChannel") {
     const participantPasscode = conversationData.channels.find(
       (channel) => channel.name === "participant"
     )?.passcode;
@@ -293,7 +293,7 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
         url: modUrl,
       });
     }
-  } else if (convType.name === "eventAssistant") {
+  } else if (convType && convType.name === "eventAssistant") {
     const eventAssistantUrl = {
       label: "Event Assistant",
       url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
@@ -301,7 +301,7 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
       }${hasChat ? `&channel=chat,${chatPasscode}` : ""}`,
     };
     participant.push(eventAssistantUrl);
-  } else if (convType.name === "eventAssistantPlus") {
+  } else if (convType && convType.name === "eventAssistantPlus") {
     const eventAssistantPlusUrl = {
       label: "Event Assistant Plus",
       url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${

@@ -145,8 +145,6 @@ describe("Events Page", () => {
           participant: [],
         },
       });
-    const result = await Request("conversations/userConversations");
-    console.log("Request returns:", result);
 
     await act(async () => {
       render(<EventsPage authType={"user"} />);
@@ -235,8 +233,6 @@ describe("Events Page", () => {
       },
       { timeout: 3000 },
     );
-
-    console.log(screen.debug());
 
     // Load More button should be visible
     const loadMoreButton = screen.getByText("Load More");

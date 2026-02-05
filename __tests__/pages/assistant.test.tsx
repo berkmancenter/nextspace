@@ -27,6 +27,9 @@ const mockSocket = {
   onAny: jest.fn(),
   offAny: jest.fn(),
   emit: jest.fn(),
+  once: jest.fn(),
+  onAny: jest.fn(),
+  offAny: jest.fn(),
   auth: { token: "mock-token" },
   hasListeners: jest.fn(() => false),
 };
