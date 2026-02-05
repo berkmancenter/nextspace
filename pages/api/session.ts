@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { EncryptJWT, jwtDecrypt } from "jose";
 import { withEnvValidation } from "../../utils/withEnvValidation";
+import { CURRENT_COOKIE_VERSION } from "../../utils/cookieValidator";
 
 /**
  * API route to handle setting and updating the session cookie.
@@ -39,6 +40,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         refresh: refreshToken,
         userId: payload.userId,
         authType: payload.authType || "guest",
+        version: CURRENT_COOKIE_VERSION,
       })
         .setProtectedHeader({ alg: "dir", enc: "A128CBC-HS256" })
         .setExpirationTime(payload.exp || "30d")
@@ -96,6 +98,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       refresh: sessionData.refreshToken,
       userId: sessionData.userId,
       authType: authType,
+      version: CURRENT_COOKIE_VERSION,
     })
       .setProtectedHeader({ alg: "dir", enc: "A128CBC-HS256" })
       .setExpirationTime(

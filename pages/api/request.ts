@@ -3,6 +3,7 @@ import decryptCookie from "../../utils/Decrypt";
 import { RetrieveData, SendData } from "../../utils";
 import { withEnvValidation } from "../../utils/withEnvValidation";
 import { EncryptJWT } from "jose";
+import { validateCookie, CURRENT_COOKIE_VERSION } from "../../utils/cookieValidator";
 
 /**
  * Refresh tokens using the refresh token from the cookie
@@ -60,6 +61,7 @@ async function updateSessionCookie(
     refresh: newRefreshToken,
     userId: existingCookie.userId,
     authType: existingCookie.authType || "guest",
+    version: CURRENT_COOKIE_VERSION,
   })
     .setProtectedHeader({ alg: "dir", enc: "A128CBC-HS256" })
     .setExpirationTime(existingCookie.exp || "30d")
@@ -96,6 +98,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (!cookie) {
     return res.status(401).json({ error: "Invalid token" });
+  }
+
+  // Validate cookie structure
+  const validation = validateCookie(cookie);
+  if (!validation.isValid) {
+    console.warn("Invalid cookie in request API:", validation.error);
+    
+    // Clear the invalid cookie
+    res.setHeader(
+      "Set-Cookie",
+      `nextspace-session=; HttpOnly; ${
+        process.env.NODE_ENV === "production" ? "Secure;" : ""
+      } SameSite=Strict; Max-Age=0; Path=/`
+    );
+    
+    return res.status(401).json({ 
+      error: "Invalid cookie format",
+      reason: validation.error,
+      requiresNewSession: true
+    });
   }
 
   // Ensure the decrypted cookie has access token

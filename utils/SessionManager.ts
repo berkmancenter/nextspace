@@ -86,6 +86,11 @@ class SessionManager {
 
         console.log(`Session restored: ${this.sessionState}`, data.username);
         return this.currentSession;
+      } else if (data.requiresNewSession) {
+        // Cookie was invalid/malformed and has been cleared by the API
+        console.warn("Invalid cookie detected and cleared:", data.error, data.reason);
+        Api.get().ClearTokens();
+        Api.get().ClearAdminTokens();
       }
     } catch (error) {
       console.error("Failed to restore session:", error);
