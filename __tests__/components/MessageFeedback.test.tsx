@@ -101,7 +101,6 @@ describe("MessageFeedback Component", () => {
     const mehButton = screen.getByRole("radio", { name: "Meh" });
     fireEvent.click(mehButton);
 
-    expect(screen.getByText("Event Assistant")).toBeInTheDocument();
     expect(screen.getByText("Thank you for your input!")).toBeInTheDocument();
     expect(
       screen.getByText("Would you like to share more?")

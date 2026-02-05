@@ -1,7 +1,7 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Transcript } from "../../components/Transcript";
-import { RetrieveData } from "../../utils";
+import { RetrieveData, SendData } from "../../utils";
 import {
   trackConversationEvent,
   trackFeatureUsage,
@@ -9,6 +9,7 @@ import {
 
 jest.mock("../../utils", () => ({
   RetrieveData: jest.fn(),
+  SendData: jest.fn(),
 }));
 
 jest.mock("../../utils/analytics", () => ({
@@ -36,7 +37,11 @@ describe("Transcript", () => {
     emit: jest.fn(),
     on: jest.fn(),
     off: jest.fn(),
+    once: jest.fn(),
+    onAny: jest.fn(),
+    offAny: jest.fn(),
     listenerCount: jest.fn().mockReturnValue(0),
+    connected: true,
   };
 
   const baseProps = {
@@ -67,7 +72,20 @@ describe("Transcript", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (RetrieveData as jest.Mock).mockResolvedValue(transcriptMessages);
+    // Mock RetrieveData to handle both conversation and message fetching
+    (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+      if (url.startsWith("conversations/")) {
+        // Return conversation data
+        return Promise.resolve({
+          name: "Test Conversation",
+          transcript: { status: "active" },
+        });
+      } else if (url.startsWith("messages/")) {
+        // Return transcript messages
+        return Promise.resolve(transcriptMessages);
+      }
+      return Promise.resolve(null);
+    });
   });
 
   const setupUser = () => userEvent.setup();
@@ -337,12 +355,19 @@ describe("Transcript", () => {
   });
 
   it("applies focus after messages load if focusTimeRange was set before messages arrived", async () => {
-    (RetrieveData as jest.Mock).mockImplementation(
-      () =>
-        new Promise((resolve) =>
+    (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+      if (url.startsWith("conversations/")) {
+        return Promise.resolve({
+          name: "Test Conversation",
+          transcript: { status: "active" },
+        });
+      } else if (url.startsWith("messages/")) {
+        return new Promise((resolve) =>
           setTimeout(() => resolve(transcriptMessages), 100),
-        ),
-    );
+        );
+      }
+      return Promise.resolve(null);
+    });
 
     render(
       <Transcript
@@ -465,7 +490,11 @@ describe("Transcript", () => {
       emit: jest.fn(),
       on: jest.fn(),
       off: jest.fn(),
+      once: jest.fn(),
+      onAny: jest.fn(),
+      offAny: jest.fn(),
       listenerCount: jest.fn().mockReturnValue(0),
+      connected: true,
       auth: { token: "mock-token" },
       hasListeners: jest.fn(() => false),
     };
@@ -540,6 +569,645 @@ describe("Transcript", () => {
     expect(
       screen.getByRole("button", { name: /Open transcript/i }),
     ).toBeInTheDocument();
+  });
+
+  // Tests for transcript controls (pause, resume, delete, download)
+  describe("Transcript Controls", () => {
+    const controlsProps = {
+      ...baseProps,
+      showControls: true,
+    };
+
+    // Store original methods for cleanup
+    let originalCreateObjectURL: typeof URL.createObjectURL;
+    let originalRevokeObjectURL: typeof URL.revokeObjectURL;
+
+    beforeEach(() => {
+      // Mock SendData for control actions
+      global.fetch = jest.fn();
+
+      // Store original URL methods
+      originalCreateObjectURL = global.URL.createObjectURL;
+      originalRevokeObjectURL = global.URL.revokeObjectURL;
+    });
+
+    afterEach(() => {
+      delete (global as any).fetch;
+
+      // Restore URL methods
+      global.URL.createObjectURL = originalCreateObjectURL;
+      global.URL.revokeObjectURL = originalRevokeObjectURL;
+    });
+
+    it("renders control buttons when showControls is true", async () => {
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Pause recording")).toBeInTheDocument();
+        expect(screen.getByLabelText("Delete transcript")).toBeInTheDocument();
+        expect(screen.getByLabelText("Download transcript")).toBeInTheDocument();
+      });
+    });
+
+    it("does not render control buttons when showControls is false", () => {
+      render(<Transcript {...baseProps} />);
+
+      expect(
+        screen.queryByLabelText("Pause recording"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText("Delete transcript"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText("Download transcript"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows pause button when transcript is active", async () => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/")) {
+          return Promise.resolve({
+            name: "Test Conversation",
+            transcript: { status: "active" },
+          });
+        } else if (url.startsWith("messages/")) {
+          return Promise.resolve(transcriptMessages);
+        }
+        return Promise.resolve(null);
+      });
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Pause recording")).toBeInTheDocument();
+        expect(screen.getByText("Pause")).toBeInTheDocument();
+      });
+    });
+
+    it("shows resume button when transcript is paused", async () => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/")) {
+          return Promise.resolve({
+            name: "Test Conversation",
+            transcript: { status: "paused" },
+          });
+        } else if (url.startsWith("messages/")) {
+          return Promise.resolve(transcriptMessages);
+        }
+        return Promise.resolve(null);
+      });
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Resume recording")).toBeInTheDocument();
+        expect(screen.getByText("Resume")).toBeInTheDocument();
+      });
+    });
+
+    it("opens confirmation modal when pause button is clicked", async () => {
+      const user = setupUser();
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Pause recording")).toBeInTheDocument();
+      });
+
+      const pauseButton = screen.getByLabelText("Pause recording");
+      await user.click(pauseButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Pause transcription?")).toBeInTheDocument();
+        expect(screen.getByText("Yes, Pause")).toBeInTheDocument();
+      });
+    });
+
+    it("opens confirmation modal when resume button is clicked", async () => {
+      const user = setupUser();
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/")) {
+          return Promise.resolve({
+            name: "Test Conversation",
+            transcript: { status: "paused" },
+          });
+        } else if (url.startsWith("messages/")) {
+          return Promise.resolve(transcriptMessages);
+        }
+        return Promise.resolve(null);
+      });
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Resume recording")).toBeInTheDocument();
+      });
+
+      const resumeButton = screen.getByLabelText("Resume recording");
+      await user.click(resumeButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Resume transcription?")).toBeInTheDocument();
+        expect(screen.getByText("Yes, Resume")).toBeInTheDocument();
+      });
+    });
+
+    it("opens confirmation modal when delete button is clicked", async () => {
+      const user = setupUser();
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/")) {
+          return Promise.resolve({
+            name: "Test Conversation",
+            transcript: { status: "paused" },
+          });
+        } else if (url.startsWith("messages/")) {
+          return Promise.resolve(transcriptMessages);
+        }
+        return Promise.resolve(null);
+      });
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Delete transcript")).toBeInTheDocument();
+      });
+
+      const deleteButton = screen.getByLabelText("Delete transcript");
+      await user.click(deleteButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Delete transcription?")).toBeInTheDocument();
+        expect(screen.getByText("Yes, Delete")).toBeInTheDocument();
+      });
+    });
+
+    it("disables delete button when transcript is active", async () => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/")) {
+          return Promise.resolve({
+            name: "Test Conversation",
+            transcript: { status: "active" },
+          });
+        } else if (url.startsWith("messages/")) {
+          return Promise.resolve(transcriptMessages);
+        }
+        return Promise.resolve(null);
+      });
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        const deleteButton = screen.getByLabelText("Delete transcript");
+        expect(deleteButton).toBeDisabled();
+      });
+    });
+
+    it("enables delete button when transcript is paused", async () => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/")) {
+          return Promise.resolve({
+            name: "Test Conversation",
+            transcript: { status: "paused" },
+          });
+        } else if (url.startsWith("messages/")) {
+          return Promise.resolve(transcriptMessages);
+        }
+        return Promise.resolve(null);
+      });
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        const deleteButton = screen.getByLabelText("Delete transcript");
+        expect(deleteButton).not.toBeDisabled();
+      });
+    });
+
+    it("downloads transcript when download button is clicked", async () => {
+      const user = setupUser();
+      const mockTranscriptText = "Test transcript content\nLine 2";
+
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/")) {
+          return Promise.resolve({
+            name: "Test Conversation",
+            transcript: { status: "active" },
+          });
+        } else if (url.startsWith("messages/")) {
+          return Promise.resolve(transcriptMessages);
+        } else if (url.startsWith("transcript/")) {
+          return Promise.resolve(mockTranscriptText);
+        }
+        return Promise.resolve(null);
+      });
+
+      // Mock URL.createObjectURL and revokeObjectURL
+      const mockCreateObjectURL = jest.fn(() => "blob:mock-url");
+      const mockRevokeObjectURL = jest.fn();
+      global.URL.createObjectURL = mockCreateObjectURL;
+      global.URL.revokeObjectURL = mockRevokeObjectURL;
+
+      // Mock HTMLAnchorElement.prototype.click
+      const mockClick = jest.fn();
+      const originalClick = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = mockClick;
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByLabelText("Download transcript"),
+        ).toBeInTheDocument();
+      });
+
+      const downloadButton = screen.getByLabelText("Download transcript");
+      await user.click(downloadButton);
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          `transcript/${baseProps.conversationId}`,
+          baseProps.apiAccessToken,
+          "text",
+        );
+        expect(mockCreateObjectURL).toHaveBeenCalled();
+        expect(mockClick).toHaveBeenCalled();
+        expect(mockRevokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
+      });
+
+      // Cleanup
+      HTMLAnchorElement.prototype.click = originalClick;
+    });
+
+    it("shows error message when download fails", async () => {
+      const user = setupUser();
+
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/")) {
+          return Promise.resolve({
+            name: "Test Conversation",
+            transcript: { status: "active" },
+          });
+        } else if (url.startsWith("messages/")) {
+          return Promise.resolve(transcriptMessages);
+        } else if (url.startsWith("transcript/")) {
+          return Promise.resolve(null);
+        }
+        return Promise.resolve(null);
+      });
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByLabelText("Download transcript"),
+        ).toBeInTheDocument();
+      });
+
+      const downloadButton = screen.getByLabelText("Download transcript");
+      await user.click(downloadButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Failed to fetch transcript for download"),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("closes confirmation modal when cancel is clicked", async () => {
+      const user = setupUser();
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/")) {
+          return Promise.resolve({
+            name: "Test Conversation",
+            transcript: { status: "paused" },
+          });
+        } else if (url.startsWith("messages/")) {
+          return Promise.resolve(transcriptMessages);
+        }
+        return Promise.resolve(null);
+      });
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Delete transcript")).toBeInTheDocument();
+      });
+
+      const deleteButton = screen.getByLabelText("Delete transcript");
+      await user.click(deleteButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Delete transcription?")).toBeInTheDocument();
+      });
+
+      const cancelButton = screen.getByText("Cancel");
+      await user.click(cancelButton);
+
+      await waitFor(() => {
+        expect(
+          screen.queryByText("Delete transcription?"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it("dismisses error message when X is clicked", async () => {
+      const user = setupUser();
+
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/")) {
+          return Promise.resolve({
+            name: "Test Conversation",
+            transcript: { status: "active" },
+          });
+        } else if (url.startsWith("messages/")) {
+          return Promise.resolve(transcriptMessages);
+        } else if (url.startsWith("transcript/")) {
+          return Promise.resolve(null);
+        }
+        return Promise.resolve(null);
+      });
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByLabelText("Download transcript"),
+        ).toBeInTheDocument();
+      });
+
+      const downloadButton = screen.getByLabelText("Download transcript");
+      await user.click(downloadButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Failed to fetch transcript for download"),
+        ).toBeInTheDocument();
+      });
+
+      const dismissButton = screen.getByLabelText("Dismiss error");
+      await user.click(dismissButton);
+
+      await waitFor(() => {
+        expect(
+          screen.queryByText("Failed to fetch transcript for download"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it("calls pause API when pause is confirmed", async () => {
+      const user = setupUser();
+      (SendData as jest.Mock).mockResolvedValue({ success: true });
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Pause recording")).toBeInTheDocument();
+      });
+
+      const pauseButton = screen.getByLabelText("Pause recording");
+      await user.click(pauseButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Yes, Pause")).toBeInTheDocument();
+      });
+
+      const confirmButton = screen.getByText("Yes, Pause");
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          `transcript/${baseProps.conversationId}/pause`,
+          {},
+          baseProps.apiAccessToken,
+        );
+      });
+    });
+
+    it("calls resume API when resume is confirmed", async () => {
+      const user = setupUser();
+      (SendData as jest.Mock).mockResolvedValue({ success: true });
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/")) {
+          return Promise.resolve({
+            name: "Test Conversation",
+            transcript: { status: "paused" },
+          });
+        } else if (url.startsWith("messages/")) {
+          return Promise.resolve(transcriptMessages);
+        }
+        return Promise.resolve(null);
+      });
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Resume recording")).toBeInTheDocument();
+      });
+
+      const resumeButton = screen.getByLabelText("Resume recording");
+      await user.click(resumeButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Yes, Resume")).toBeInTheDocument();
+      });
+
+      const confirmButton = screen.getByText("Yes, Resume");
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          `transcript/${baseProps.conversationId}/resume`,
+          {},
+          baseProps.apiAccessToken,
+        );
+      });
+    });
+
+    it("calls delete API when delete is confirmed", async () => {
+      const user = setupUser();
+      (SendData as jest.Mock).mockResolvedValue({ success: true });
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/")) {
+          return Promise.resolve({
+            name: "Test Conversation",
+            transcript: { status: "paused" },
+          });
+        } else if (url.startsWith("messages/")) {
+          return Promise.resolve(transcriptMessages);
+        }
+        return Promise.resolve(null);
+      });
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Delete transcript")).toBeInTheDocument();
+      });
+
+      const deleteButton = screen.getByLabelText("Delete transcript");
+      await user.click(deleteButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Yes, Delete")).toBeInTheDocument();
+      });
+
+      const confirmButton = screen.getByText("Yes, Delete");
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          `transcript/${baseProps.conversationId}`,
+          {},
+          baseProps.apiAccessToken,
+          { method: "DELETE" },
+        );
+      });
+    });
+
+    it("shows error when pause API fails", async () => {
+      const user = setupUser();
+      (SendData as jest.Mock).mockResolvedValue({
+        error: true,
+        message: "Network error",
+      });
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Pause recording")).toBeInTheDocument();
+      });
+
+      const pauseButton = screen.getByLabelText("Pause recording");
+      await user.click(pauseButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Yes, Pause")).toBeInTheDocument();
+      });
+
+      const confirmButton = screen.getByText("Yes, Pause");
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Network error")).toBeInTheDocument();
+      });
+    });
+
+    it("shows error when resume API fails", async () => {
+      const user = setupUser();
+      (SendData as jest.Mock).mockResolvedValue({
+        error: true,
+        message: "Network error",
+      });
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/")) {
+          return Promise.resolve({
+            name: "Test Conversation",
+            transcript: { status: "paused" },
+          });
+        } else if (url.startsWith("messages/")) {
+          return Promise.resolve(transcriptMessages);
+        }
+        return Promise.resolve(null);
+      });
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Resume recording")).toBeInTheDocument();
+      });
+
+      const resumeButton = screen.getByLabelText("Resume recording");
+      await user.click(resumeButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Yes, Resume")).toBeInTheDocument();
+      });
+
+      const confirmButton = screen.getByText("Yes, Resume");
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Network error")).toBeInTheDocument();
+      });
+    });
+
+    it("shows error when delete API fails", async () => {
+      const user = setupUser();
+      (SendData as jest.Mock).mockResolvedValue({
+        error: true,
+        message: "Network error",
+      });
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/")) {
+          return Promise.resolve({
+            name: "Test Conversation",
+            transcript: { status: "paused" },
+          });
+        } else if (url.startsWith("messages/")) {
+          return Promise.resolve(transcriptMessages);
+        }
+        return Promise.resolve(null);
+      });
+
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Delete transcript")).toBeInTheDocument();
+      });
+
+      const deleteButton = screen.getByLabelText("Delete transcript");
+      await user.click(deleteButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Yes, Delete")).toBeInTheDocument();
+      });
+
+      const confirmButton = screen.getByText("Yes, Delete");
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Network error")).toBeInTheDocument();
+      });
+    });
+
+    it("updates transcript status when socket receives transcript:status event", async () => {
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Pause recording")).toBeInTheDocument();
+      });
+
+      // Find the transcript:status handler
+      const statusHandler = mockSocket.on.mock.calls.find(
+        (call) => call[0] === "transcript:status",
+      )?.[1];
+
+      // Simulate receiving a paused status
+      statusHandler?.({ status: "paused" });
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Resume recording")).toBeInTheDocument();
+      });
+    });
+
+    it("clears messages when socket receives deleted status", async () => {
+      render(<Transcript {...controlsProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Hello world")).toBeInTheDocument();
+      });
+
+      // Find the transcript:status handler
+      const statusHandler = mockSocket.on.mock.calls.find(
+        (call) => call[0] === "transcript:status",
+      )?.[1];
+
+      // Simulate receiving a deleted status
+      statusHandler?.({ status: "deleted" });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Hello world")).not.toBeInTheDocument();
+      });
+    });
   });
 
   // New tests for scroll analytics functionality

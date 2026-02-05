@@ -5,6 +5,7 @@ export {
   Request,
   SocketStateHandler,
   fetchWithTokenRefresh,
+  getUserTimezone,
 } from "./Api";
 export { SendData, Api, GetChannelPasscode } from "./Helpers";
 export { QueryParamsError } from "./ErrorHandler";

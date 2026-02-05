@@ -21,7 +21,7 @@ export const SubmittedMessage: FC<MessageProps> = ({ message }) => {
   return (
     <BaseMessage>
       <div
-        className="ml-15 border-l-4 rounded-lg p-3"
+        className="border-l-4 rounded-lg p-3"
         style={{
           backgroundColor: style.avatarBg,
           borderLeftColor: borderColor,

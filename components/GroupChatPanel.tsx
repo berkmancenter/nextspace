@@ -110,6 +110,7 @@ const renderAssistantMessage = (text: string): React.ReactNode => {
 interface GroupChatPanelProps {
   messages: PseudonymousMessage[];
   pseudonym: string | null;
+  eventName?: string;
   inputValue?: string;
   onInputChange?: (value: string) => void;
   onSendMessage: (message: string) => void;
@@ -118,6 +119,7 @@ interface GroupChatPanelProps {
 export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   messages,
   pseudonym,
+  eventName,
   inputValue,
   onInputChange,
   onSendMessage,
@@ -127,13 +129,20 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   // Extract unique contributors for mentions
   // Normalize "Event Assistant Plus" to "Event Assistant" for consistency
   const contributors = useMemo(
-    () => Array.from(new Set(messages.map((m) => {
-      if (m.pseudonym === "Event Assistant Plus") {
-        return "Event Assistant";
-      }
-      return m.pseudonym;
-    }).filter(Boolean))),
-    [messages]
+    () =>
+      Array.from(
+        new Set(
+          messages
+            .map((m) => {
+              if (m.pseudonym === "Event Assistant Plus") {
+                return "Event Assistant";
+              }
+              return m.pseudonym;
+            })
+            .filter(Boolean),
+        ),
+      ),
+    [messages],
   );
 
   // Create enhancers for chat mode (mentions only)
@@ -160,7 +169,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
 
     return (
       <div
-        className="w-12 h-12 rounded-full flex items-center justify-center text-3xl flex-shrink-0"
+        className="w-8 h-8 rounded-full flex items-center justify-center text-xl flex-shrink-0"
         style={{ backgroundColor: style.avatarBg }}
       >
         <Icon fontSize="inherit" />
@@ -173,12 +182,26 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
       {/* Scrollable messages area */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-2 pr-2 md:px-8 pt-4 bg-gray-100"
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-2 pr-2 md:px-8 pt-2 bg-gray-100"
       >
         <div
-          className="flex flex-col items-start gap-8 pb-2"
+          className="flex flex-col items-start gap-4 pb-2"
           aria-live="assertive"
         >
+          {/* Panel title and subtitle */}
+          <div className="w-full pt-4 pb-2">
+            <h2 className="text-xl font-bold uppercase tracking-wide text-gray-900">
+              Welcome to&nbsp;
+              <span className="text-medium-slate-blue">
+                {eventName || "Your Event"}
+              </span>
+              &nbsp;Group Chat
+            </h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Chat in real time with other event participants.
+            </p>
+          </div>
+
           {messages
             .filter((message) => !message.parentMessage)
             .map((message, i) => {
@@ -204,14 +227,14 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                   {i === 0 ||
                   new Date(messages[i - 1].createdAt!).getHours() !==
                     new Date(message.createdAt!).getHours() ? (
-                    <div className="flex justify-center my-4">
+                    <div className="flex justify-center my-1">
                       <span className="text-sm text-gray-400">
                         {new Date(message.createdAt!).toLocaleTimeString(
                           "en-US",
                           {
                             hour: "2-digit",
                             minute: "2-digit",
-                          }
+                          },
                         )}
                       </span>
                     </div>
@@ -219,7 +242,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
 
                   {/* Message with avatar */}
                   <div
-                    className={`flex gap-3 mb-4 ${
+                    className={`flex gap-1.5 mb-1 ${
                       isCurrentUser ? "flex-row-reverse" : "flex-row"
                     }`}
                   >
@@ -249,7 +272,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
 
                       {/* Message bubble */}
                       <div
-                        className={`rounded-2xl px-4 py-3 text-gray-800 ${
+                        className={`rounded-2xl px-2 py-1 text-gray-800 ${
                           isCurrentUser ? "self-end" : "self-start"
                         }`}
                         style={{

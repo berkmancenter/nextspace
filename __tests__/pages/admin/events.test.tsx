@@ -69,6 +69,7 @@ jest.mock("next/router", () => ({
 
 jest.mock("../../../utils", () => ({
   Request: jest.fn(), // Ensure Request is mocked
+  getUserTimezone: jest.fn(() => "America/New_York"), // Mock timezone
 }));
 
 jest.setTimeout(120000);

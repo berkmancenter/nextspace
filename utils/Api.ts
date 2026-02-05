@@ -162,6 +162,19 @@ export const RefreshToken = async (refreshToken: string) => {
 };
 
 /**
+ * Gets the user's timezone using the Intl API.
+ * @returns The IANA timezone identifier (e.g., "America/New_York")
+ */
+export const getUserTimezone = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (error) {
+    console.warn("Failed to get user timezone, defaulting to UTC:", error);
+    return "UTC";
+  }
+};
+
+/**
  * Retrieve data from the API.
  * @param urlSuffix - The endpoint suffix to retrieve data from.
  * @param token - Optional bearer token for authorization.
@@ -173,15 +186,21 @@ export const RetrieveData = async (
   token?: string,
   dataType?: string
 ) => {
-  const options: RequestInit = {
-    method: "GET",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  const headers: Record<string, string> = {
+    "X-Timezone": getUserTimezone(),
   };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
   try {
     const response = await fetchWithTokenRefresh(
       `${process.env.NEXT_PUBLIC_API_URL}/${urlSuffix}`,
-      options,
+      {
+        method: "GET",
+        headers,
+      },
       !token // Use stored tokens if no explicit token provided
     );
 

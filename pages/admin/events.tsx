@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { RetrieveData } from "../../utils";
-import { Api, CheckAuthHeader, getConversation } from "../../utils/Helpers";
+import { getUserTimezone } from "../../utils";
+import { CheckAuthHeader, getConversation } from "../../utils/Helpers";
 import { AuthType } from "../../types.internal";
 
 import React from "react";
@@ -68,7 +68,7 @@ const EventCard = ({ event }: { event: Conversation }) => {
                     hour: "numeric",
                     minute: "2-digit",
                     hour12: true,
-                    timeZone: "America/New_York",
+                    timeZone: getUserTimezone(),
                     timeZoneName: "short",
                   })
                 : new Date(event.createdAt!).toLocaleString("en-US", {
@@ -78,7 +78,7 @@ const EventCard = ({ event }: { event: Conversation }) => {
                     hour: "numeric",
                     minute: "2-digit",
                     hour12: true,
-                    timeZone: "America/New_York",
+                    timeZone: getUserTimezone(),
                     timeZoneName: "short",
                   })}
               {event.active && (
@@ -276,7 +276,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
    * Filter conversations to only include those with scheduledTime in the future
    */
   const filterUpcomingConversations = (
-    conversations: components["schemas"]["Conversation"][]
+    conversations: components["schemas"]["Conversation"][],
   ) => {
     const now = new Date();
     return conversations.filter((conv) => {
@@ -295,18 +295,18 @@ function EventScreen({ authType }: { authType: AuthType }) {
    */
   const fetchDetailedConversations = async (
     list: components["schemas"]["Conversation"][],
-    indices: number[]
+    indices: number[],
   ) => {
     const detailedConversations = await Promise.all(
       indices.map(async (index) => {
         const conversationId = list[index].id;
         return await getConversation(conversationId!);
-      })
+      }),
     );
 
     // Filter out null values from failed fetches
     const validConversations = detailedConversations.filter(
-      (conv): conv is Conversation => conv !== null
+      (conv): conv is Conversation => conv !== null,
     );
 
     setLoadedConversations([
@@ -328,7 +328,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
 
       if ("error" in data) {
         setErrorMessage(
-          data.message?.message || "Failed to fetch conversations."
+          data.message?.message || "Failed to fetch conversations.",
         );
         setIsInitialLoading(false);
         return;

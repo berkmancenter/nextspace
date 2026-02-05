@@ -11,7 +11,7 @@ import { useSessionJoin } from "../../utils/useSessionJoin";
 const mockPush = jest.fn();
 const mockRouter = {
   push: mockPush,
-  query: { conversationId: "test-conversation-id" },
+  query: { conversationId: "test-conversation-id" } as any,
   isReady: true,
 };
 
@@ -23,6 +23,9 @@ jest.mock("next/router", () => ({
 const mockSocket = {
   on: jest.fn(),
   off: jest.fn(),
+  once: jest.fn(),
+  onAny: jest.fn(),
+  offAny: jest.fn(),
   emit: jest.fn(),
   auth: { token: "mock-token" },
   hasListeners: jest.fn(() => false),
@@ -241,7 +244,7 @@ describe("EventAssistantRoom", () => {
     await waitFor(() => {
       expect(RetrieveData).toHaveBeenCalledWith(
         "conversations/test-conversation-id",
-        "mock-access-token"
+        "mock-access-token",
       );
     });
   });
@@ -290,8 +293,8 @@ describe("EventAssistantRoom", () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          "This conversation does not have an event assistant agent."
-        )
+          "This conversation does not have an event assistant agent.",
+        ),
       ).toBeInTheDocument();
     });
   });
@@ -408,6 +411,135 @@ describe("EventAssistantRoom", () => {
           },
         ],
       });
+    });
+  });
+
+  describe("Conversation-Type-Specific Commands", () => {
+    it("shows /mod command for Event Assistant Plus", async () => {
+      // Set up router query with channel and chat passcode
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-passcode",
+      };
+
+      mockUseSessionJoin.mockReturnValue({
+        socket: mockSocket,
+        pseudonym: "test-pseudonym",
+        userId: "user-123",
+        isConnected: true,
+        errorMessage: null,
+      });
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-456", agentType: "eventAssistantPlus" }],
+          });
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]); // Return empty chat messages
+        }
+        return Promise.resolve(null);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-456", agentType: "eventAssistantPlus" }],
+        type: { name: "eventAssistantPlus" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom isAuthenticated={false} />);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByPlaceholderText("Enter your message here"),
+        ).toBeInTheDocument();
+      });
+
+      // Wait for all promises to resolve (conversation data loading)
+      await act(async () => {
+        await Promise.resolve(); // Let RetrieveData promise resolve
+        await Promise.resolve(); // Let createConversationFromData promise resolve
+      });
+
+      // Allow React to process state updates
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      const user = userEvent.setup();
+
+      // Click on the Event Assistant tab to switch from Chat (default) to Assistant
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      const input = screen.getByPlaceholderText("Enter your message here");
+
+      await user.type(input, "/");
+
+      await waitFor(
+        () => {
+          expect(screen.getByText("/mod")).toBeInTheDocument();
+        },
+        { timeout: 3000 },
+      );
+    });
+
+    it("does not show /mod command for Event Assistant (non-Plus)", async () => {
+      // Set up router query with channel and chat passcode
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-passcode",
+      };
+
+      mockUseSessionJoin.mockReturnValue({
+        socket: mockSocket,
+        pseudonym: "test-pseudonym",
+        userId: "user-123",
+        isConnected: true,
+        errorMessage: null,
+      });
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-456", agentType: "eventAssistant" }],
+          });
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]); // Return empty chat messages
+        }
+        return Promise.resolve(null);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-456", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom isAuthenticated={false} />);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByPlaceholderText("Enter your message here"),
+        ).toBeInTheDocument();
+      });
+
+      const user = userEvent.setup();
+
+      // Click on the Event Assistant tab to switch from Chat (default) to Assistant
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      const input = screen.getByPlaceholderText("Enter your message here");
+
+      await user.type(input, "/");
+
+      await waitFor(
+        () => {
+          expect(screen.queryByText("/mod")).not.toBeInTheDocument();
+        },
+        { timeout: 3000 },
+      );
     });
   });
 

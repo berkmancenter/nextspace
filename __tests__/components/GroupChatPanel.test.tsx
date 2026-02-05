@@ -26,6 +26,7 @@ describe("GroupChatPanel", () => {
   const baseProps = {
     messages: [],
     pseudonym: "test-user",
+    eventName: "Tech Summit",
     onSendMessage: mockOnSendMessage,
   };
 

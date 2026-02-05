@@ -199,6 +199,11 @@ export const SendData = async (
       };
     }
 
+    // Handle responses with no content (204 or empty body)
+    if (response.status === 204 || response.headers.get("Content-Length") === "0") {
+      return { success: true };
+    }
+
     const data = await response.json();
     return data;
   } catch (error) {
