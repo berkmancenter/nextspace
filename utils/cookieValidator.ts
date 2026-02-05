@@ -52,7 +52,7 @@ export function validateCookie(
     return { isValid: false, error: "Cookie payload is missing" };
   }
 
-  const payload = cookie.payload as CookiePayload;
+  const payload = cookie.payload as unknown as CookiePayload;
 
   // Check cookie version
   const cookieVersion = payload.version || "0"; // Treat missing version as version 0 (legacy)
