@@ -72,6 +72,12 @@ jest.mock("../../utils", () => ({
     }
     return null;
   }),
+  emitWithTokenRefresh: jest.fn((socket, event, data, onSuccess) => {
+    // Simulate successful emit
+    if (onSuccess) onSuccess();
+    // Also call socket.emit so existing tests can verify it
+    socket.emit(event, data);
+  }),
 }));
 
 // Mock useSessionJoin hook

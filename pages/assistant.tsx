@@ -10,6 +10,7 @@ import {
   RetrieveData,
   SendData,
   GetChannelPasscode,
+  emitWithTokenRefresh,
 } from "../utils";
 import { components } from "../types";
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
@@ -239,11 +240,18 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       });
     }
 
-    socket.emit("conversation:join", {
-      conversationId: router.query.conversationId,
-      token: Api.get().GetTokens().access,
-      channels,
-    });
+    // Use emitWithTokenRefresh to handle token expiration
+    emitWithTokenRefresh(
+      socket,
+      "conversation:join",
+      {
+        conversationId: router.query.conversationId,
+        token: Api.get().GetTokens().access,
+        channels,
+      },
+      () => console.log("Successfully joined conversation"),
+      (error) => console.error("Failed to join conversation:", error)
+    );
   }, [socket, agentId, userId, chatPasscode, router.query.conversationId]);
 
   // Load initial chat messages when chatPasscode becomes available

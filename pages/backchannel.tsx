@@ -16,6 +16,7 @@ import {
   GetChannelPasscode,
   QueryParamsError,
   SendData,
+  emitWithTokenRefresh,
 } from "../utils";
 
 import { components } from "../types";
@@ -89,11 +90,18 @@ function BackchannelRoom({ authType }: { authType: AuthType }) {
         setParticipantPasscode(participantPasscodeParam);
 
         if (!socket) return;
-        socket.send("conversation:join", {
-          conversationId: router.query.conversationId,
-          token: Api.get().GetTokens().access,
-          threadId: router.query.threadId,
-        });
+        // Use emitWithTokenRefresh to handle token expiration
+        emitWithTokenRefresh(
+          socket,
+          "conversation:join",
+          {
+            conversationId: router.query.conversationId,
+            token: Api.get().GetTokens().access,
+            threadId: router.query.threadId,
+          },
+          () => console.log("Successfully joined backchannel conversation"),
+          (error) => console.error("Error joining backchannel conversation:", error)
+        );
       }
     }
     fetchConversationData();

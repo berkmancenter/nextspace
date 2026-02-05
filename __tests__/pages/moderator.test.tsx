@@ -28,6 +28,12 @@ jest.mock("../../utils", () => ({
   GetChannelPasscode: jest.fn().mockReturnValue("mock-passcode"),
   RetrieveData: jest.fn(),
   QueryParamsError: jest.fn().mockReturnValue("Query params error"),
+  emitWithTokenRefresh: jest.fn((socket, event, data, onSuccess) => {
+    // Simulate successful emit
+    if (onSuccess) onSuccess();
+    // Also call socket.emit so existing tests can verify it
+    socket.emit(event, data);
+  }),
 }));
 
 jest.mock("react-scroll", () => ({

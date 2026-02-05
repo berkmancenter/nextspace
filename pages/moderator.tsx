@@ -13,6 +13,7 @@ import {
   GetChannelPasscode,
   RetrieveData,
   QueryParamsError,
+  emitWithTokenRefresh,
 } from "../utils";
 
 import { Transcript } from "../components/";
@@ -134,11 +135,18 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
       if (!socket) return;
 
       try {
-        socket.emit("conversation:join", {
-          conversationId: router.query.conversationId,
-          token: apiAccessToken,
-          channel: { name: "moderator", passcode: modPasscodeParam },
-        });
+        // Use emitWithTokenRefresh to handle token expiration
+        emitWithTokenRefresh(
+          socket,
+          "conversation:join",
+          {
+            conversationId: router.query.conversationId,
+            token: apiAccessToken,
+            channel: { name: "moderator", passcode: modPasscodeParam },
+          },
+          () => console.log("Successfully joined moderator conversation"),
+          (error) => console.error("Error sending conversation:join message:", error)
+        );
       } catch (error) {
         console.error("Error sending conversation:join message:", error);
       }
