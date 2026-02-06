@@ -156,7 +156,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
               }
               return m.pseudonym;
             })
-            .filter(Boolean),
+            .filter((x): x is string => Boolean(x)),
         ),
       ),
     [messages],
