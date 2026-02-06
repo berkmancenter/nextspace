@@ -1,11 +1,12 @@
 import { useRouter } from "next/router";
 import { Event } from "../../../components";
 import { CheckAuthHeader } from "../../../utils/Helpers";
+import { AuthType } from "../../../types.internal";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
-function EventScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
+function EventScreen({ authType }: { authType: AuthType }) {
   const router = useRouter();
   const { id, type } = router.query;
 

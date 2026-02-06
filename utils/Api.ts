@@ -3,6 +3,70 @@
  * @file Helper methods for fetching data from the LLM Facilitator API
  */
 
+import { Api } from "./Helpers";
+
+/**
+ * Wrapper for fetch that automatically handles token refresh on 401 responses.
+ * @param url - The URL to fetch
+ * @param options - Fetch options
+ * @param useStoredTokens - Whether to automatically use stored tokens for authorization
+ * @returns Promise with the fetch response
+ */
+export const fetchWithTokenRefresh = async (
+  url: string,
+  options: RequestInit,
+  useStoredTokens: boolean = false
+): Promise<Response> => {
+  const apiI = Api.get();
+  let API_TOKENS = apiI.GetTokens();
+
+  // If useStoredTokens is true and no Authorization header is set, add it
+  if (useStoredTokens && API_TOKENS.access) {
+    if (!options.headers) {
+      options.headers = {};
+    }
+    const headers = options.headers as Record<string, string>;
+    if (!headers["Authorization"]) {
+      headers["Authorization"] = `Bearer ${API_TOKENS.access}`;
+    }
+  }
+
+  // First attempt
+  let response = await fetch(url, options);
+
+  // If 401 and we have a refresh token, try refreshing
+  if (response.status === 401 && API_TOKENS.refresh) {
+    console.log("Token expired, refreshing...");
+
+    const tokensResponse = await RefreshToken(API_TOKENS.refresh);
+
+    if (tokensResponse?.access?.token && tokensResponse?.refresh?.token) {
+      // Update tokens in memory
+      apiI.SetTokens(tokensResponse.access.token, tokensResponse.refresh.token);
+      API_TOKENS = apiI.GetTokens();
+
+      // Update session cookie with new tokens
+      await fetch("/api/session", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          accessToken: tokensResponse.access.token,
+          refreshToken: tokensResponse.refresh.token,
+        }),
+      });
+
+      // Retry with new token
+      const headers = new Headers(options.headers);
+      headers.set("Authorization", `Bearer ${tokensResponse.access.token}`);
+      response = await fetch(url, { ...options, headers });
+    }
+  }
+
+  return response;
+};
+
 /**
  * Authenticate the user with the API.
  * @returns Promise with access and refresh tokens
@@ -37,7 +101,7 @@ export const Authenticate = async (username: string, password: string) => {
 
   const data = await response.json();
   console.log("Response:", data);
-  return data.tokens;
+  return data;
 };
 
 /**
@@ -63,6 +127,25 @@ export const RefreshToken = async (refreshToken: string) => {
       headers: options.headers,
       body: options.body,
     });
+
+    // If 401 Unauthorized, all tokens have expired, clear local session
+    if (response.status === 401) {
+      const logoutResponse = await fetch("/api/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      // Clear tokens from local Api instance
+      Api.get().ClearTokens();
+      Api.get().ClearAdminTokens();
+
+      if (!logoutResponse.ok) {
+        throw new Error("Logout failed");
+      }
+      return;
+    }
 
     if (!response.ok) {
       throw new Error("Network response was not ok");
@@ -112,12 +195,13 @@ export const RetrieveData = async (
   }
 
   try {
-    const response = await fetch(
+    const response = await fetchWithTokenRefresh(
       `${process.env.NEXT_PUBLIC_API_URL}/${urlSuffix}`,
       {
         method: "GET",
         headers,
-      }
+      },
+      !token // Use stored tokens if no explicit token provided
     );
 
     if (!response.ok) {

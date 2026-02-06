@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/router";
 import { CircularProgress, Box, Typography } from "@mui/material";
 import { Api } from "../utils";
+import SessionManager from "../utils/SessionManager";
 
 /**
  * Logout page component
@@ -25,14 +26,16 @@ export default function Logout() {
           throw new Error("Logout failed");
         }
 
-        Api.get().ClearAdminTokens();
+        // Clear session state
+        SessionManager.get().clearSession();
 
-        // Redirect to /admin home
-        router.push("/admin");
+        // Redirect to home page
+        router.push("/");
       } catch (error) {
         console.error("Error during logout:", error);
-        // Even if there's an error, redirect to /admin home
-        router.push("/admin");
+        // Even if there's an error, clear session and redirect
+        SessionManager.get().clearSession();
+        router.push("/");
       }
     };
     performLogout();

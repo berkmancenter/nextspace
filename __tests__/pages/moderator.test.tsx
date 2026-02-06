@@ -3,7 +3,7 @@ import { act } from "react";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
 import ModeratorScreen from "../../pages/moderator";
-import { JoinSession, RetrieveData } from "../../utils";
+import { RetrieveData } from "../../utils";
 
 // Mock dependencies
 jest.mock("next/router", () => ({
@@ -25,10 +25,15 @@ jest.mock("../../utils", () => ({
       GetTokens: jest.fn().mockReturnValue({ access: "mock-token" }),
     }),
   },
-  JoinSession: jest.fn(),
   GetChannelPasscode: jest.fn().mockReturnValue("mock-passcode"),
   RetrieveData: jest.fn(),
   QueryParamsError: jest.fn().mockReturnValue("Query params error"),
+  emitWithTokenRefresh: jest.fn((socket, event, data, onSuccess) => {
+    // Simulate successful emit
+    if (onSuccess) onSuccess();
+    // Also call socket.emit so existing tests can verify it
+    socket.emit(event, data);
+  }),
 }));
 
 jest.mock("react-scroll", () => ({
@@ -36,6 +41,31 @@ jest.mock("react-scroll", () => ({
     scrollToTop: jest.fn(),
   },
 }));
+
+// Mock useSessionJoin
+const mockUseSessionJoin = jest.fn();
+jest.mock("../../utils/useSessionJoin", () => ({
+  useSessionJoin: (...args: any[]) => mockUseSessionJoin(...args),
+}));
+
+// Mock SessionManager
+jest.mock("../../utils/SessionManager", () => {
+  const mockSessionManager = {
+    get: jest.fn(() => ({
+      restoreSession: jest.fn().mockResolvedValue(true),
+      getState: jest.fn().mockReturnValue("authenticated"),
+      hasSession: jest.fn().mockReturnValue(true),
+      getSessionInfo: jest.fn().mockReturnValue({
+        userId: "moderator-123",
+        username: "ModeratorUser",
+      }),
+    })),
+  };
+  return {
+    __esModule: true,
+    default: mockSessionManager,
+  };
+});
 
 describe("ModeratorScreen", () => {
   const mockRouter = {
@@ -87,8 +117,16 @@ describe("ModeratorScreen", () => {
     jest.clearAllMocks();
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
     (io as jest.Mock).mockReturnValue(mockSocket);
-    (JoinSession as jest.Mock).mockImplementation((success) => success());
     (RetrieveData as jest.Mock).mockResolvedValue(mockMessages);
+    
+    // Default mock implementation for useSessionJoin
+    mockUseSessionJoin.mockReturnValue({
+      socket: mockSocket,
+      pseudonym: "ModeratorUser",
+      userId: "moderator-123",
+      isConnected: true,
+      errorMessage: null,
+    });
   });
 
   it("renders the moderator screen with insight and metric messages", async () => {
@@ -101,7 +139,7 @@ describe("ModeratorScreen", () => {
       expect(
         screen.getByText(/The audience is expressing/)
       ).toBeInTheDocument();
-      expect(screen.getByText("“happiness”")).toBeInTheDocument();
+      expect(screen.getByText(/happiness/)).toBeInTheDocument();
     });
   });
 
@@ -140,6 +178,33 @@ describe("ModeratorScreen", () => {
 
     await waitFor(() => {
       expect(screen.getByText("API error")).toBeInTheDocument();
+    });
+  });
+
+  it("loads initial moderator messages on page load", async () => {
+    await act(async () => {
+      render(<ModeratorScreen isAuthenticated={true} />);
+    });
+
+    await waitFor(() => {
+      expect(RetrieveData).toHaveBeenCalledWith(
+        "messages/test-conversation?channel=moderator,mock-passcode",
+        "mock-token"
+      );
+    });
+  });
+
+  it("emits conversation:join with moderator channel", async () => {
+    await act(async () => {
+      render(<ModeratorScreen isAuthenticated={true} />);
+    });
+
+    await waitFor(() => {
+      expect(mockSocket.emit).toHaveBeenCalledWith("conversation:join", {
+        conversationId: "test-conversation",
+        token: "mock-token",
+        channel: { name: "moderator", passcode: "mock-passcode" },
+      });
     });
   });
 });

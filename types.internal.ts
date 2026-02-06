@@ -1,5 +1,13 @@
 import { components } from "./types";
 
+/**
+ * Authentication type for user sessions
+ * @property "guest" - Anonymous user with persistent pseudonym (not logged in)
+ * @property "user" - Logged-in regular user
+ * @property "admin" - Logged-in admin user with access to admin features
+ */
+export type AuthType = "guest" | "user" | "admin";
+
 export interface BaseComponentProps {
   className?: string; // Optional Tailwind styling
 }
@@ -56,7 +64,7 @@ export type PageName = "Conversation" | "Survey";
 
 export interface HeaderProps extends BaseComponentProps {
   variant?: "transparent" | "solid"; // Optional styling variants
-  isAuthenticated?: boolean; // Optional authentication status
+  authType?: AuthType; // Optional authentication type
 }
 
 /**

@@ -1,5 +1,5 @@
 import { ParsedUrlQuery } from "querystring";
-import { RefreshToken, RetrieveData, Request } from "./";
+import { fetchWithTokenRefresh, RetrieveData, Request } from "./";
 import { components } from "../types";
 import { Conversation, EventUrl, EventUrls } from "../types.internal";
 
@@ -59,6 +59,12 @@ export class Api {
 
   ClearAdminTokens() {
     this.ADMIN_TOKENS = {
+      access: null,
+      refresh: null,
+    };
+  }
+  ClearTokens() {
+    this.API_TOKENS = {
       access: null,
       refresh: null,
     };
@@ -156,45 +162,32 @@ export const SendData = async (
   accessToken?: string,
   fetchOptions?: RequestInit
 ) => {
-  const apiI = Api.get();
-  let API_TOKENS = apiI.GetTokens();
-  let options = fetchOptions || {
+  const API_TOKENS = Api.get().GetTokens();
+  
+  let options: RequestInit = fetchOptions || {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
   };
+  
   // Ensure headers is a mutable object
   if (!options.headers) {
     options.headers = {};
   }
+  
   // Add Authorization header; use provided accessToken if available
   (options.headers as Record<string, string>)["Authorization"] = accessToken
     ? `Bearer ${accessToken}`
     : `Bearer ${API_TOKENS.access}`;
 
   try {
-    const response = await fetch(
+    const response = await fetchWithTokenRefresh(
       `${process.env.NEXT_PUBLIC_API_URL}/${urlSuffix}`,
-      {
-        method: options.method,
-        headers: options.headers,
-        body: options.body,
-      }
+      options,
+      !accessToken // Use stored tokens if no explicit accessToken provided
     );
-
-    // If 401 Unauthorized, refresh the token
-    if (response.status === 401 && API_TOKENS.refresh) {
-      console.log("Token expired, refreshing...");
-      // Refresh the token
-      const tokensResponse = await RefreshToken(API_TOKENS.refresh);
-      apiI.SetTokens(tokensResponse.access.token, tokensResponse.refresh.token);
-
-      // Retry the request with the new token
-      SendData(urlSuffix, payload);
-      return null;
-    }
 
     // TODO: Handle other status codes as needed
     if (!response.ok) {
@@ -218,39 +211,6 @@ export const SendData = async (
   }
 };
 
-/**
- * Joins a session by obtaining a new pseudonym and registering it.
- * On success, it sets the API tokens and calls the success callback with the token and pseudonym.
- * On failure, it logs the error and calls the error callback with an error message.
- * @param success - Callback function to call on successful join, with token and pseudonym.
- * @param errorCallback - Callback function to call on error, with an error message.
- */
-export const JoinSession = async (
-  success: (result: { userId: string; pseudonym: string }) => void,
-  errorCallback: (err: string) => void
-) => {
-  try {
-    // Get new pseudonym for session
-    const pseudonymResponse = await RetrieveData("auth/newPseudonym");
-
-    const registerResponse = await SendData("auth/register", {
-      token: pseudonymResponse.token,
-      pseudonym: pseudonymResponse.pseudonym,
-    });
-
-    Api.get().SetTokens(
-      registerResponse.tokens.access.token,
-      registerResponse.tokens.refresh.token
-    );
-    success({
-      userId: registerResponse.user.id,
-      pseudonym: pseudonymResponse.pseudonym,
-    });
-  } catch (err) {
-    console.error("Failed to join:", err);
-    errorCallback("Failed to join. Please try again.");
-  }
-};
 
 // Default easing class for animations
 export const DefaultEase = " ease-[cubic-bezier(0.075, 0.820, 0.165, 1.000)]";
@@ -399,15 +359,15 @@ export const createConversationFromData = async (
   };
 };
 
-/** Check if the request has the authentication header set
+/** Check the authentication type from request headers
  * @param headers - The request headers
- * @returns An object containing the isAuthenticated property
+ * @returns An object containing the authType property
  */
 export const CheckAuthHeader = (headers: Record<string, string>) => {
-  const isAuthenticated = headers && headers["x-is-authenticated"] === "true";
+  const authType = headers && headers["x-auth-type"] ? headers["x-auth-type"] : "guest";
   return {
     props: {
-      isAuthenticated,
+      authType,
     },
   };
 };

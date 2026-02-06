@@ -2,6 +2,50 @@
 
 This repo is for the Nextspace frontend. It uses React, Typescript, and [Next.js](https://nextjs.org/). Production is hosted on [Vercel](https://vercel.com/frameworks/nextjs). For more info on the Nextspace backend, check out [LLM Engine](https://github.com/berkmancenter/llm_engine).
 
+## Authentication
+
+Nextspace uses a hybrid authentication model that supports both anonymous participation and authenticated administrative access.
+
+### Authentication Types
+
+**Guest (authType="guest")**
+- Automatically created when users visit most pages
+- Assigned a pseudonym (e.g., "Gentle Deer", "Brave Fox") for participation in conversations
+- No login required - sessions are created automatically in the background
+- Can access public pages and participate in events
+- Session persists via encrypted cookie for 30 days
+
+**Admin (authType="admin")**
+- Requires explicit login with username and password via `/login`
+- Full access to administrative routes (`/admin/*`)
+- Can create and manage events, configure agents, view analytics
+- Non-admin users attempting to access `/admin` routes are redirected to signup
+
+**User (authType="user")**
+- Planned for future implementation
+- Would represent authenticated users without admin privileges
+- Currently not fully implemented in the application
+
+### How It Works
+
+1. **Guest Sessions**: When a user visits Nextspace, `SessionManager` automatically creates a guest session with a pseudonymous identity. This allows users to participate in conversations without creating an account.
+
+2. **Admin Authentication**: Administrators log in through `/login` with credentials. Upon successful authentication, the session cookie is updated with `authType: "admin"`, granting access to administrative features.
+
+3. **Session Management**: All sessions (guest and admin) are stored in encrypted HTTP-only cookies using JWT with A128CBC-HS256 encryption. The `middleware.ts` file validates these cookies and sets the appropriate `x-auth-type` header for each request.
+
+4. **Route Protection**: The middleware automatically:
+   - Redirects unauthenticated users from `/admin` routes to `/signup`
+   - Allows guest access to public routes
+   - Validates admin credentials for protected routes
+
+### Important Notes
+
+- Guest pseudonyms are for **participation**, not authentication
+- Session cookies are encrypted and HTTP-only for security
+- Certain pages (home, login, signup, logout) skip automatic guest session creation to avoid unnecessary accounts
+- The `SESSION_SECRET` environment variable must be at least 32 characters for secure cookie encryption
+
 ## App views overview
 
 ### Moderator
@@ -29,6 +73,15 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
 
 - **docs/**
   Auto-generated static HTML files for code documentation.
+
+- **hooks/**
+  Custom React hooks used across the app.
+  - **useAnalytics.ts**
+    Hook for tracking session-level analytics (session start/end, page views, active time).
+  - **useAutoScroll.ts**
+    Hook for automatically scrolling to bottom of message lists.
+  - **useVisibilityAwareDuration.ts**
+    Hook for tracking time spent on a page while visible (excludes time when tab is hidden).
 - **pages/**
   Next.js pages for the app.
 
@@ -41,6 +94,10 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
         Checks the `[id]` and renders an `EventStatus` component.
   - **api/**
     Client-side public API routes; see [Next.js docs](https://nextjs.org/docs/pages/building-your-application/routing/api-routes)
+    - **check-location.ts**
+      Route to detect if user is connecting from local or remote IP address.
+    - **cookie.ts**
+      Route to see if user has stored cookie and then decrypt it, return tokens and user info.
     - **logout.ts**
       Route to handle user logout by clearing the session cookie.
     - **request.ts**
@@ -66,6 +123,8 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
 
 - **utils/**
   Various utilities used across the app; see [docs/](https://github.com/berkmancenter/nextspace/blob/docs) for a detailed breakdown of each method.
+  - **analytics.ts**
+    Matomo analytics integration for tracking events, page views, and custom dimensions.
   - **Api.ts**
     Helper methods for fetching data from the LLM Engine API.
   - **Decrypt.ts**
@@ -74,6 +133,16 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
     Checks if router query parameters are valid.
   - **Helpers.ts**
     General data-handling methods.
+  - **ipRangeChecker.ts**
+    Checks if IP addresses are within specified CIDR ranges for location detection.
+  - **SessionManager.ts**
+    Singleton that manages session state across the app. Automatically restores sessions from encrypted cookies on app initialization, creates guest sessions for new users, and handles transitions between guest and authenticated states. Certain pages (home, login, signup, logout) skip session creation to avoid unnecessary guest accounts.
+  - **useSessionJoin.ts**
+    Hook for initializing socket connections with session info from SessionManager.
+  - **validateEnv.ts**
+    Validates required environment variables on app startup.
+  - **withEnvValidation.ts**
+    Higher-order function for API route handlers to validate environment variables.
 
 </details>
 

@@ -1,6 +1,5 @@
 import { FC, ReactNode, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import { io } from "socket.io-client";
 import {
   Box,
   Button,
@@ -15,86 +14,55 @@ import { Element, scroller } from "react-scroll";
 import {
   Api,
   GetChannelPasscode,
-  JoinSession,
   QueryParamsError,
   SendData,
+  emitWithTokenRefresh,
 } from "../utils";
 
 import { components } from "../types";
 import { BackchannelMessage } from "../components/messages/BackchannelMessage";
+import { CheckAuthHeader } from "../utils/Helpers";
+import { useSessionJoin } from "../utils/useSessionJoin";
+import { AuthType } from "../types.internal";
 import { useAnalytics } from "../hooks/useAnalytics";
 import {
-  trackEvent,
   trackConversationEvent,
-  trackConnectionStatus,
-  setUserId,
 } from "../utils/analytics";
 
-function BackchannelRoom() {
+export const getServerSideProps = async (context: { req: any }) => {
+  return CheckAuthHeader(context.req.headers);
+};
+
+function BackchannelRoom({ authType }: { authType: AuthType }) {
   const router = useRouter();
 
   // Initialize page-level analytics
   useAnalytics({ pageType: "backchannel" });
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(true);
-  const [isConnected, setIsConnected] = useState(false);
-  const [joining, setJoining] = useState(false);
   const [participantPasscode, setParticipantPasscode] = useState("");
   const [transcriptPasscode, setTranscriptPasscode] = useState<string | null>(
     null,
   );
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const [messages, setMessages] = useState<components["schemas"]["Message"][]>(
     [],
   );
   const [currentMessage, setCurrentMessage] = useState("");
-  const [pseudonym, setPseudonym] = useState<string | null>(null);
-  const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
 
   const messageInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (Api.get().GetTokens().access || joining) return;
-    setJoining(true);
-    JoinSession(
-      (result) => {
-        setPseudonym(result.pseudonym);
-        // Track user ID (pseudonym)
-        setUserId(result.pseudonym);
-        let socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
-          auth: { token: Api.get().GetTokens().access },
-        });
-        // Set the socket instance in state
-        setSocket(socketLocal);
-        setJoining(false);
-      },
-      (error) => {
-        setErrorMessage(error);
-      },
-    );
-  }, [joining]);
+  // Use custom hook for session joining
+  const {
+    socket,
+    pseudonym,
+    isConnected,
+    errorMessage: sessionError,
+  } = useSessionJoin();
 
-  useEffect(() => {
-    if (!socket) return;
-    socket.on("error", (error: string) => {
-      console.error("Socket error:", error);
-      trackConnectionStatus("error");
-    });
-    socket.on("connect", () => {
-      setIsConnected(true);
-      trackConnectionStatus("connected");
-    });
-    socket.on("disconnect", () => {
-      setIsConnected(false);
-      trackConnectionStatus("disconnected");
-    });
-
-    return () => {
-      socket.off("connect", () => setIsConnected(true));
-      socket.off("disconnect", () => setIsConnected(false));
-    };
-  }, [socket]);
+  // Combine session and local errors
+  const errorMessage = sessionError || localError;
 
   useEffect(() => {
     if (participantPasscode || !router.isReady) return;
@@ -103,30 +71,37 @@ function BackchannelRoom() {
       !router.query.channel ||
       router.query.channel.length === 0
     ) {
-      setErrorMessage(QueryParamsError(router));
+      setLocalError(QueryParamsError(router));
       return;
     }
 
     async function fetchConversationData() {
       if (router.query.channel) {
         setTranscriptPasscode(
-          GetChannelPasscode("transcript", router.query, setErrorMessage),
+          GetChannelPasscode("transcript", router.query, setLocalError)
         );
         const participantPasscodeParam = GetChannelPasscode(
           "participant",
           router.query,
-          setErrorMessage,
+          setLocalError
         );
 
         if (!participantPasscodeParam) return;
         setParticipantPasscode(participantPasscodeParam);
 
         if (!socket) return;
-        socket.send("conversation:join", {
-          conversationId: router.query.conversationId,
-          token: Api.get().GetTokens().access,
-          threadId: router.query.threadId,
-        });
+        // Use emitWithTokenRefresh to handle token expiration
+        emitWithTokenRefresh(
+          socket,
+          "conversation:join",
+          {
+            conversationId: router.query.conversationId,
+            token: Api.get().GetTokens().access,
+            threadId: router.query.threadId,
+          },
+          () => console.log("Successfully joined backchannel conversation"),
+          (error) => console.error("Error joining backchannel conversation:", error)
+        );
       }
     }
     fetchConversationData();
@@ -191,7 +166,7 @@ function BackchannelRoom() {
       })
       .catch((error) => {
         console.error("Failed to send message:", error);
-        setErrorMessage("Failed to send message. Please try again.");
+        setLocalError("Failed to send message. Please try again.");
       });
   }
 

@@ -1,6 +1,5 @@
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
-import { io } from "socket.io-client";
 
 import {
   PseudonymousMessage,
@@ -10,34 +9,32 @@ import {
 } from "../types.internal";
 import {
   Api,
-  JoinSession,
   GetChannelPasscode,
   RetrieveData,
   QueryParamsError,
+  emitWithTokenRefresh,
 } from "../utils";
 
 import { Transcript } from "../components/";
 import { CheckAuthHeader } from "../utils/Helpers";
+import { useSessionJoin } from "../utils/useSessionJoin";
+import { AuthType } from "../types.internal";
 import { useAnalytics } from "../hooks/useAnalytics";
 import {
   trackConversationEvent,
-  trackConnectionStatus,
 } from "../utils/analytics";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
-function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
+function ModeratorScreen({ authType }: { authType: AuthType }) {
   const router = useRouter();
 
   // Initialize page-level analytics
   useAnalytics({ pageType: "moderator" });
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [joining, setJoining] = useState(false);
-
-  const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
   const [conversationName, setConversationName] = useState<string>("");
 
@@ -49,65 +46,15 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
 
   const scrollViewRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (socket || joining) return;
+  // Use custom hook for session joining
+  const {
+    socket,
+    isConnected,
+    errorMessage: sessionError,
+  } = useSessionJoin();
 
-    let socketLocal: ReturnType<typeof io> | null = null;
-
-    setJoining(true);
-    JoinSession(
-      () => {
-        const token = Api.get().GetTokens().access;
-        try {
-          // Initialize the socket connection
-          socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
-            auth: { token },
-          });
-
-          // Attach all listeners immediately
-          socketLocal.on("connect_error", (err: any) => {
-            console.error("Socket connection error:", err);
-            setErrorMessage("Failed to connect to the socket server.");
-          });
-
-          socketLocal.on("error", (error: string) => {
-            console.error("Socket error:", error);
-            trackConnectionStatus("error");
-          });
-
-          socketLocal.on("connect", () => {
-            trackConnectionStatus("connected");
-          });
-
-          socketLocal.on("disconnect", () => {
-            trackConnectionStatus("disconnected");
-          });
-        } catch (error) {
-          console.error("Error initializing socket:", error);
-          setErrorMessage("Failed to connect to the socket server.");
-          setJoining(false);
-          return;
-        }
-
-        setSocket(socketLocal);
-        setJoining(false);
-      },
-      (error) => {
-        setErrorMessage(error);
-        setJoining(false);
-      },
-    );
-
-    // Cleanup
-    return () => {
-      if (socketLocal) {
-        socketLocal.off("connect");
-        socketLocal.off("disconnect");
-        socketLocal.off("error");
-        socketLocal.off("connect_error");
-      }
-    };
-  }, [socket, joining]);
+  // Combine session and local errors
+  const errorMessage = sessionError || localError;
 
   const apiAccessToken = Api.get().GetTokens().access;
 
@@ -130,21 +77,25 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
 
     async function fetchConversationData() {
       if (!router.isReady || !apiAccessToken) return;
-      if (!router.query.conversationId || !router.query.channel) {
-        setErrorMessage(QueryParamsError(router));
+      if (
+        !router.query.conversationId ||
+        !router.query.channel ||
+        router.query.channel.length === 0
+      ) {
+        setLocalError(QueryParamsError(router));
         return;
       }
 
       const transcriptPasscodeParam = GetChannelPasscode(
         "transcript",
         router.query,
-        setErrorMessage,
+        setLocalError
       );
 
       const modPasscodeParam = GetChannelPasscode(
         "moderator",
         router.query,
-        setErrorMessage,
+        setLocalError
       );
 
       // Store transcript passcode for Transcript component
@@ -175,7 +126,7 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
         conversationMessagesResponse &&
         "error" in conversationMessagesResponse
       ) {
-        setErrorMessage(
+        setLocalError(
           conversationMessagesResponse.message?.message ||
             "Failed to fetch conversation messages.",
         );
@@ -194,11 +145,18 @@ function ModeratorScreen({ isAuthenticated }: { isAuthenticated: boolean }) {
       if (!socket) return;
 
       try {
-        socket.emit("conversation:join", {
-          conversationId: router.query.conversationId,
-          token: apiAccessToken,
-          channel: { name: "moderator", passcode: modPasscodeParam },
-        });
+        // Use emitWithTokenRefresh to handle token expiration
+        emitWithTokenRefresh(
+          socket,
+          "conversation:join",
+          {
+            conversationId: router.query.conversationId,
+            token: apiAccessToken,
+            channel: { name: "moderator", passcode: modPasscodeParam },
+          },
+          () => console.log("Successfully joined moderator conversation"),
+          (error) => console.error("Error sending conversation:join message:", error)
+        );
       } catch (error) {
         console.error("Error sending conversation:join message:", error);
       }

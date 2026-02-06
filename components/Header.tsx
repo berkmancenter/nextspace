@@ -9,7 +9,7 @@ import LoginIcon from "@mui/icons-material/Login";
 import LogoutIcon from "@mui/icons-material/Logout";
 import FeedbackOutlinedIcon from "@mui/icons-material/FeedbackOutlined";
 
-import { HeaderProps, PageName } from "../types.internal";
+import { AuthType, HeaderProps, PageName } from "../types.internal";
 import Logo from "./Logo";
 import { Close, Menu } from "@mui/icons-material";
 import { useRouter } from "next/router";
@@ -26,6 +26,7 @@ const adminPagesBase: Record<string, { icon: JSX.Element; url: string }> = {
 
 // Regular user pages navigation items
 const userPages: Record<string, { icon: JSX.Element; url: string }> = {
+  "Log In": { icon: <LoginIcon />, url: "/login" },
   "Give Feedback": {
     icon: <FeedbackOutlinedIcon />,
     url: "https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform",
@@ -38,14 +39,14 @@ const userPages: Record<string, { icon: JSX.Element; url: string }> = {
  * This component renders the header for the app.
  * @param {object} props
  * @property {string} className - Optional Tailwind classes for styling.
- * @property {string} activeTab - The currently active tab/page name.
  * @property {string} variant - The variant of the header, either "transparent" or "solid".
+ * @property {AuthType} authType - The authentication type of the current user.
  * @returns A React component for the header.
  */
 export const Header = ({
   className = "",
   variant = "transparent",
-  isAuthenticated,
+  authType = "guest",
 }: HeaderProps) => {
   const variantStyles = {
     transparent: "flex-end bg-transparent shadow-none",
@@ -55,49 +56,92 @@ export const Header = ({
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  // Build admin pages with dynamic auth button
-  const adminPages = {
-    ...adminPagesBase,
-    [isAuthenticated ? "Log Out" : "Log In"]: {
-      icon: isAuthenticated ? <LogoutIcon /> : <LoginIcon />,
-      url: isAuthenticated ? "/logout" : "/login",
-    },
-    "Give Feedback": {
-      icon: <FeedbackOutlinedIcon />,
-      url: "https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform",
-    },
-  };
+  // Check if current route starts with /admin
+  const isAdminRoute = router.pathname.startsWith('/admin');
 
-  const currentPages = isAuthenticated ? adminPages : userPages;
+  // Build pages based on authType
+  let currentPages: Record<string, { icon: JSX.Element; url: string }>;
+  
+  if (authType === "admin") {
+    // Admin users see admin pages + logout
+    currentPages = {
+      ...adminPagesBase,
+      "Log Out": {
+        icon: <LogoutIcon />,
+        url: "/logout",
+      },
+      "Give Feedback": {
+        icon: <FeedbackOutlinedIcon />,
+        url: "https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform",
+      },
+    };
+  } else if (authType === "user") {
+    // Regular logged-in users see logout + feedback (future: add user-specific pages)
+    currentPages = {
+      "Log Out": {
+        icon: <LogoutIcon />,
+        url: "/logout",
+      },
+      "Give Feedback": {
+        icon: <FeedbackOutlinedIcon />,
+        url: "https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform",
+      },
+    };
+  } else {
+    // Guest users: show login button only on admin routes
+    currentPages = {
+      ...(isAdminRoute && {
+        "Log In": { icon: <LoginIcon />, url: "/login" },
+      }),
+      "Give Feedback": {
+        icon: <FeedbackOutlinedIcon />,
+        url: "https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform",
+      },
+    };
+  }
 
   const toggleDrawer = (newOpen: boolean) => () => {
     setOpen(newOpen);
   };
 
   const NavItems = () => {
-    return Object.keys(currentPages).map((pageName) => {
-      const isExternalLink = currentPages[pageName].url.startsWith("http");
-      return (
-        <Button
-          component="a"
-          href={currentPages[pageName].url}
-          key={pageName}
-          target={isExternalLink ? "_blank" : undefined}
-          rel={isExternalLink ? "noopener noreferrer" : undefined}
-          sx={{
-            textTransform: "capitalize",
-            "&:hover": { color: "#4845d2" },
-            fontSize: "1rem",
-            color:
-              router.asPath === currentPages[pageName].url ? "#4845d2" : "grey",
-            backgroundColor: "transparent",
-          }}
-          startIcon={currentPages[pageName].icon}
-        >
-          {pageName}
-        </Button>
-      );
-    });
+    return Object.keys(currentPages)
+      .map((pageName) => {
+        const pageData = currentPages[pageName];
+        
+        // Guard against undefined/invalid page data
+        if (!pageData?.url) {
+          console.warn(`Navigation item "${pageName}" has no URL`);
+          return null;
+        }
+        
+        const isExternalLink = pageData.url.startsWith("http");
+        return (
+          <Link
+            href={pageData.url}
+            key={pageName}
+            target={isExternalLink ? "_blank" : undefined}
+            rel={isExternalLink ? "noopener noreferrer" : undefined}
+          >
+            <Button
+              sx={{
+                textTransform: "capitalize",
+                "&:hover": { color: "#4845d2" },
+                fontSize: "1rem",
+                color:
+                  router.asPath === pageData.url
+                    ? "#4845d2"
+                    : "grey",
+                backgroundColor: "transparent",
+              }}
+              startIcon={pageData.icon}
+            >
+              {pageName}
+            </Button>
+          </Link>
+        );
+      })
+      .filter((item) => item !== null);
   };
 
   return (

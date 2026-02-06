@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
-import { io } from "socket.io-client";
 import { Badge } from "@mui/material";
 
 import { AssistantChatPanel } from "../components/AssistantChatPanel";
@@ -8,35 +7,34 @@ import { GroupChatPanel } from "../components/GroupChatPanel";
 import { SlashCommand } from "../components/enhancers/slashCommandEnhancer";
 import {
   Api,
-  JoinSession,
   RetrieveData,
   SendData,
   GetChannelPasscode,
+  emitWithTokenRefresh,
 } from "../utils";
 import { components } from "../types";
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
 import { CheckAuthHeader, createConversationFromData } from "../utils/Helpers";
 import { useAnalytics } from "../hooks/useAnalytics";
+import { AuthType } from "../types.internal";
 import {
   trackConversationEvent,
-  trackConnectionStatus,
   setUserId,
 } from "../utils/analytics";
 import { Transcript } from "../components/";
+import { useSessionJoin } from "../utils/useSessionJoin";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
-function EventAssistantRoom() {
+function EventAssistantRoom({ authType }: { authType: AuthType }) {
   const router = useRouter();
 
   // Initialize page-level analytics
   useAnalytics({ pageType: "assistant" });
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [joining, setJoining] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [waitingForResponse, setWaitingForResponse] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"assistant" | "chat">("chat");
@@ -46,11 +44,8 @@ function EventAssistantRoom() {
     PseudonymousMessage[]
   >([]);
   const [chatMessages, setChatMessages] = useState<PseudonymousMessage[]>([]);
-  const [pseudonym, setPseudonym] = useState<string | null>(null);
-  const [userId, setUserIdState] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [conversationType, setConversationType] = useState<string | null>(null);
-  const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
   const [controlledMode, setControlledMode] =
     useState<ControlledInputConfig | null>(null);
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>("");
@@ -61,6 +56,18 @@ function EventAssistantRoom() {
 
   // Ref to track active tab for socket handler
   const activeTabRef = useRef<"assistant" | "chat">("assistant");
+
+  // Use custom hook for session joining
+  const {
+    socket,
+    pseudonym,
+    userId,
+    isConnected,
+    errorMessage: sessionError,
+  } = useSessionJoin();
+
+  // Combine session and local errors
+  const errorMessage = sessionError || localError;
 
   // Available slash commands
   // Commands can optionally specify which conversation types they're available for
@@ -82,194 +89,172 @@ function EventAssistantRoom() {
     return conversationType && cmd.conversationTypes.includes(conversationType);
   });
 
+  // Set up message listener
   useEffect(() => {
-    if (socket || joining) return;
+    if (!socket) return;
 
-    let socketLocal: ReturnType<typeof io> | null = null;
+    const messageHandler = (data: PseudonymousMessage) => {
+      if (process.env.NODE_ENV !== "production")
+        console.log("New message:", data);
 
-    setJoining(true);
-
-    JoinSession(
-      (result) => {
-        setPseudonym(result.pseudonym);
-        setUserIdState(result.userId);
-        // Track user ID (pseudonym)
-        setUserId(result.pseudonym);
-
-        socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
-          auth: { token: Api.get().GetTokens().access },
-        });
-
-        // Set up all listeners immediately
-        socketLocal.on("error", (error: string) => {
-          console.error("Socket error:", error);
-          trackConnectionStatus("error");
-        });
-
-        socketLocal.on("connect", () => {
-          trackConnectionStatus("connected");
-          setIsConnected(true);
-        });
-        socketLocal.on("disconnect", () => {
-          setIsConnected(false);
-          trackConnectionStatus("disconnected");
-        });
-        socketLocal.on("message:new", (data) => {
-          if (process.env.NODE_ENV !== "production")
-            console.log("New message:", data);
-
-          if (!data.parentMessage) {
-            // Route messages to appropriate array based on channel
-            if (data.channels && data.channels.includes("chat")) {
-              setChatMessages((prev) => [...prev, data]);
-              // Increment counter if NOT viewing chat tab
-              if (activeTabRef.current !== "chat") {
-                setUnseenChatCount((prev) => prev + 1);
-              }
-            } else if (
-              !data.channels ||
-              !data.channels.includes("transcript")
-            ) {
-              setAssistantMessages((prev) => [...prev, data]);
-              // Increment counter if NOT viewing assistant tab
-              if (activeTabRef.current !== "assistant") {
-                setUnseenAssistantCount((prev) => prev + 1);
-              }
-            }
+      if (!data.parentMessage) {
+        // Route messages to appropriate array based on channel
+        if (data.channels && data.channels.includes("chat")) {
+          setChatMessages((prev) => [...prev, data]);
+          // Increment counter if NOT viewing chat tab
+          if (activeTabRef.current !== "chat") {
+            setUnseenChatCount((prev) => prev + 1);
           }
-          if (
-            data.pseudonym === "Event Assistant" ||
-            data.pseudonym === "Event Assistant Plus"
-          )
-            setWaitingForResponse(false);
-        });
-        setSocket(socketLocal);
-        setJoining(false);
-      },
-      (error) => {
-        setErrorMessage(error);
-        setJoining(false);
-      },
-    );
+        } else if (
+          !data.channels ||
+          !data.channels.includes("transcript")
+        ) {
+          setAssistantMessages((prev) => [...prev, data]);
+          // Increment counter if NOT viewing assistant tab
+          if (activeTabRef.current !== "assistant") {
+            setUnseenAssistantCount((prev) => prev + 1);
+          }
+        }
+      }
+      if (
+        data.pseudonym === "Event Assistant" ||
+        data.pseudonym === "Event Assistant Plus"
+      )
+        setWaitingForResponse(false);
+    };
+
+    if (!socket.hasListeners("message:new")) {
+      socket.on("message:new", messageHandler);
+    }
 
     return () => {
-      if (socketLocal) {
-        socketLocal.off("connect");
-        socketLocal.off("disconnect");
-        socketLocal.off("error");
-      }
+      socket.off("message:new", messageHandler);
     };
-  }, [socket, joining]);
+  }, [socket]);
 
   // Keep activeTabRef in sync with activeTab state
   useEffect(() => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
 
+  // Track user ID when available
+  useEffect(() => {
+    if (pseudonym) {
+      setUserId(pseudonym);
+    }
+  }, [pseudonym]);
+
   useEffect(() => {
     if (!Api.get().GetTokens().access || !router.isReady) return;
     if (!router.query.conversationId) {
-      setErrorMessage("Please provide a Conversation ID.");
+      setLocalError("Please provide a Conversation ID.");
       return;
     }
 
     async function fetchConversationData() {
-      RetrieveData(
-        `conversations/${router.query.conversationId}`,
-        Api.get().GetTokens().access!,
-      )
-        .then(async (conversationData: any) => {
-          if (!conversationData) {
-            setErrorMessage("Conversation not found.");
-            return;
+      try {
+        const conversationData = await RetrieveData(
+          `conversations/${router.query.conversationId}`,
+          Api.get().GetTokens().access!,
+        );
+
+        if (!conversationData) {
+          setLocalError("Conversation not found.");
+          return;
+        }
+        if ("error" in conversationData) {
+          setLocalError(
+            conversationData.message?.message ||
+              "Error retrieving conversation.",
+          );
+          return;
+        }
+
+        const conversation = await createConversationFromData(conversationData);
+        setConversationType(conversation.type.name);
+        if (conversation.name) setEventName(conversation.name);
+
+        // Get transcript and chat passcodes if channel query param exists
+        if (router.query.channel) {
+          const transcriptPasscodeParam = GetChannelPasscode(
+            "transcript",
+            router.query,
+            setLocalError,
+          );
+
+          if (transcriptPasscodeParam) {
+            setTranscriptPasscode(transcriptPasscodeParam);
           }
-          if ("error" in conversationData) {
-            setErrorMessage(
-              conversationData.message?.message ||
-                "Error retrieving conversation.",
-            );
-            return;
+
+          const chatPasscodeParam = GetChannelPasscode(
+            "chat",
+            router.query,
+            setLocalError,
+          );
+
+          if (chatPasscodeParam) {
+            setChatPasscode(chatPasscodeParam);
           }
+        }
 
-          createConversationFromData(conversationData).then((conversation) => {
-            setConversationType(conversation.type.name);
-            if (conversation.name) setEventName(conversation.name);
-
-            // Get transcript and chat passcodes if channel query param exists
-            if (router.query.channel) {
-              const transcriptPasscodeParam = GetChannelPasscode(
-                "transcript",
-                router.query,
-                setErrorMessage,
-              );
-
-              if (transcriptPasscodeParam) {
-                setTranscriptPasscode(transcriptPasscodeParam);
-              }
-
-              const chatPasscodeParam = GetChannelPasscode(
-                "chat",
-                router.query,
-                setErrorMessage,
-              );
-
-              if (chatPasscodeParam) {
-                setChatPasscode(chatPasscodeParam);
-              }
-            }
-
-            // Check if the event has an event assistant agent
-            // TODO: This should really be a property of the conversation, not inferred from agents
-            const eventAsstAgent = conversation.agents.find(
-              (agent: components["schemas"]["Agent"]) =>
-                agent.agentType === "eventAssistant" ||
-                agent.agentType === "eventAssistantPlus",
-            );
-            if (eventAsstAgent) {
-              setAgentId(eventAsstAgent.id!);
-            } else {
-              setErrorMessage(
-                "This conversation does not have an event assistant agent.",
-              );
-              return;
-            }
-            if (!socket || !socket.auth) {
-              return;
-            }
-
-            if (agentId && userId) {
-              console.log("Joining conversation");
-              // Join channels - include both direct and chat if chatPasscode is available
-              const channels: components["schemas"]["Channel"][] = [
-                {
-                  name: `direct-${userId}-${agentId}`,
-                  passcode: null,
-                  direct: true,
-                },
-              ];
-              if (chatPasscode) {
-                channels.push({
-                  name: "chat",
-                  passcode: chatPasscode,
-                  direct: false,
-                });
-              }
-
-              socket.emit("conversation:join", {
-                conversationId: router.query.conversationId,
-                token: Api.get().GetTokens().access,
-                channels,
-              });
-            }
-          });
-        })
-        .catch((error) => {
-          console.error("Error fetching conversation data:", error);
-          setErrorMessage("Failed to fetch conversation data.");
-        });
+        // Check if the event has an event assistant agent
+        const eventAsstAgent = conversation.agents.find(
+          (agent: components["schemas"]["Agent"]) =>
+            agent.agentType === "eventAssistant" ||
+            agent.agentType === "eventAssistantPlus",
+        );
+        if (eventAsstAgent) {
+          setAgentId(eventAsstAgent.id!);
+        } else {
+          setLocalError(
+            "This conversation does not have an event assistant agent.",
+          );
+          return;
+        }
+      } catch (error) {
+        console.error("Error fetching conversation data:", error);
+        setLocalError("Failed to fetch conversation data.");
+      }
     }
     fetchConversationData();
-  }, [socket, router, userId, agentId, chatPasscode]);
+  }, [socket, router]);
+
+  // Join conversation when socket, agentId, and userId are all available
+  useEffect(() => {
+    if (!socket || !socket.auth || !agentId || !userId || !router.query.conversationId) {
+      return;
+    }
+
+    console.log("Joining conversation");
+    // Join channels - include both direct and chat if chatPasscode is available
+    const channels: components["schemas"]["Channel"][] = [
+      {
+        name: `direct-${userId}-${agentId}`,
+        passcode: null,
+        direct: true,
+      },
+    ];
+    if (chatPasscode) {
+      channels.push({
+        name: "chat",
+        passcode: chatPasscode,
+        direct: false,
+      });
+    }
+
+    // Use emitWithTokenRefresh to handle token expiration
+    emitWithTokenRefresh(
+      socket,
+      "conversation:join",
+      {
+        conversationId: router.query.conversationId,
+        token: Api.get().GetTokens().access,
+        channels,
+      },
+      () => console.log("Successfully joined conversation"),
+      (error) => console.error("Failed to join conversation:", error)
+    );
+  }, [socket, agentId, userId, chatPasscode, router.query.conversationId]);
 
   // Load initial chat messages when chatPasscode becomes available
   useEffect(() => {
@@ -292,6 +277,29 @@ function EventAssistantRoom() {
 
     fetchInitialMessages();
   }, [chatPasscode, router.query.conversationId]);
+
+  // Load initial assistant messages when userId and agentId become available
+  useEffect(() => {
+    if (!userId || !agentId || !router.query.conversationId) return;
+
+    const fetchInitialAssistantMessages = async () => {
+      try {
+        const directChannelName = `direct-${userId}-${agentId}`;
+        const assistantMessages = await RetrieveData(
+          `messages/${router.query.conversationId}?channel=${directChannelName}`,
+          Api.get().GetTokens().access!,
+        );
+
+        if (Array.isArray(assistantMessages)) {
+          setAssistantMessages(assistantMessages);
+        }
+      } catch (error) {
+        console.error("Error fetching initial assistant messages:", error);
+      }
+    };
+
+    fetchInitialAssistantMessages();
+  }, [userId, agentId, router.query.conversationId]);
 
   async function sendMessage(
     message: string,
