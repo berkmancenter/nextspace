@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import { getUserTimezone } from "../../utils";
 import { CheckAuthHeader, getConversation } from "../../utils/Helpers";
-import { AuthType } from "../../types.internal";
+import { useSessionJoin } from "../../utils/useSessionJoin";
 
 import React from "react";
 import {
@@ -24,20 +24,25 @@ import ComputerIcon from "@mui/icons-material/Computer";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ReportProblem from "@mui/icons-material/ReportProblem";
 import { components } from "../../types";
-import { Conversation, ErrorMessage } from "../../types.internal";
+import { AuthType, Conversation, ErrorMessage } from "../../types.internal";
 import { Request } from "../../utils/Api";
 import { SendData } from "../../utils/Helpers";
 
 const EventCard = ({
   event,
   onDelete,
+  currentUserId,
 }: {
   event: Conversation;
   onDelete: (id: string) => void;
+  currentUserId: string | null;
 }) => {
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Check if current user is the owner of this event
+  const isOwner = currentUserId && event.owner === currentUserId;
 
   const handleCopyLink = async (url: string) => {
     try {
@@ -86,16 +91,23 @@ const EventCard = ({
                   {event.name}
                 </Typography>
               </Tooltip>
+              {isOwner && (
+                <span className="inline-block mt-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                  My Event
+                </span>
+              )}
             </div>
-            <Tooltip title="Delete event">
-              <IconButton
-                size="small"
-                onClick={handleDeleteClick}
-                className="text-gray-500 hover:text-red-600"
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            {isOwner && (
+              <Tooltip title="Delete event">
+                <IconButton
+                  size="small"
+                  onClick={handleDeleteClick}
+                  className="text-gray-500 hover:text-red-600"
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
           </div>
 
           {/* Date and Platforms */}
@@ -298,7 +310,8 @@ const EventCard = ({
             id="delete-dialog-description"
             className="text-gray-600 text-base leading-relaxed max-w-sm"
           >
-            This will permanently delete "{event.name}" and cannot be undone.
+            This will permanently delete &quot;{event.name}&quot; and cannot be
+            undone.
           </p>
           <div className="flex flex-col gap-3 w-full mt-2">
             <Button
@@ -389,6 +402,10 @@ export const getServerSideProps = async (context: { req: any }) => {
 
 function EventScreen({ authType }: { authType: AuthType }) {
   const router = useRouter();
+
+  // Get userId from session
+  const { userId } = useSessionJoin();
+
   const [conversationsList, setConversationsList] =
     useState<components["schemas"]["Conversation"][]>();
   const [loadedConversations, setLoadedConversations] = useState<
@@ -399,47 +416,43 @@ function EventScreen({ authType }: { authType: AuthType }) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [includePast, setIncludePast] = useState(false);
+  const [myEventsOnly, setMyEventsOnly] = useState(false);
   const allConversationsRef = useRef<
     components["schemas"]["Conversation"][] | null
   >(null);
 
   /**
-   * Filter conversations to upcoming or past events
-   * @param past true to return past events, false for upcoming
+   * Filter conversations based on whether to include past events and owner
+   * @param includePast true to include all events, false for only active/future
+   * @param myEventsOnly true to show only events owned by current user
    */
   const filterConversations = (
     conversations: components["schemas"]["Conversation"][],
-    past: boolean,
+    includePast: boolean,
+    myEventsOnly: boolean = false,
   ) => {
     const now = new Date();
     return conversations.filter((conv) => {
-      if (past) {
-        if (conv.active) return false;
-        if (!conv.scheduledTime) return true;
-        return new Date(conv.scheduledTime) <= now;
+      // Filter by owner if myEventsOnly is enabled
+      if (myEventsOnly && conv.owner !== userId) {
+        return false;
       }
-      if (!conv.scheduledTime) return conv.active;
-      if (conv.active) return true; // Show all active events
-      return new Date(conv.scheduledTime) > now;
-    });
-  };
 
-  /**
-   * Sort conversations by time
-   * @param ascending true for earliest first (upcoming), false for latest first (past)
-   */
-  const sortConversations = (
-    conversations: components["schemas"]["Conversation"][],
-    ascending: boolean,
-  ) => {
-    return [...conversations].sort((a, b) => {
-      const aTime = a.scheduledTime
-        ? new Date(a.scheduledTime).getTime()
-        : new Date(a.createdAt!).getTime();
-      const bTime = b.scheduledTime
-        ? new Date(b.scheduledTime).getTime()
-        : new Date(b.createdAt!).getTime();
-      return ascending ? aTime - bTime : bTime - aTime;
+      const scheduledTime = conv.scheduledTime
+        ? new Date(conv.scheduledTime)
+        : null;
+      const isPastEvent = scheduledTime ? scheduledTime <= now : false;
+
+      // Always show active events
+      if (conv.active) return true;
+
+      // Show future events
+      if (scheduledTime && scheduledTime > now) return true;
+
+      // Show past events only if includePast is true
+      if (isPastEvent && includePast) return true;
+
+      return false;
     });
   };
 
@@ -516,10 +529,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
       currentIndex += batchSize;
     }
 
-    setLoadedConversations((prev) => [
-      ...(replace ? [] : prev),
-      ...allValid,
-    ]);
+    setLoadedConversations((prev) => [...(replace ? [] : prev), ...allValid]);
 
     return currentIndex;
   };
@@ -527,7 +537,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
   useEffect(() => {
     async function fetchInitialConversations() {
       const data: components["schemas"]["Conversation"][] | ErrorMessage =
-        await Request("conversations/userConversations");
+        await Request("conversations");
 
       // If unauthorized, redirect to login
       if ("error" in data && data.message?.code === 401) {
@@ -546,20 +556,29 @@ function EventScreen({ authType }: { authType: AuthType }) {
       // Store raw response for tab switching
       allConversationsRef.current = data;
 
-      // Filter to only upcoming events and sort chronologically
-      const upcomingConversations = filterConversations(data, false);
-      const sortedConversations = sortConversations(
-        upcomingConversations,
-        true,
-      );
-      setConversationsList(sortedConversations);
+      // Filter to only active/future events (not past)
+      const filtered = filterConversations(data, false, myEventsOnly);
+
+      // Sort: active events first, then all others by most recent
+      const sorted = [...filtered].sort((a, b) => {
+        // Pin active events to the top
+        if (a.active && !b.active) return -1;
+        if (!a.active && b.active) return 1;
+
+        // For non-active events (or both active), sort by most recent first
+        const aTime = a.scheduledTime
+          ? new Date(a.scheduledTime).getTime()
+          : new Date(a.createdAt!).getTime();
+        const bTime = b.scheduledTime
+          ? new Date(b.scheduledTime).getTime()
+          : new Date(b.createdAt!).getTime();
+
+        return bTime - aTime; // Most recent first
+      });
+      setConversationsList(sorted);
 
       // Load first 6 details
-      const nextIndex = await fetchDetailedConversations(
-        sortedConversations,
-        0,
-        6,
-      );
+      const nextIndex = await fetchDetailedConversations(sorted, 0, 6);
       setEventsShown(nextIndex);
       setIsInitialLoading(false);
     }
@@ -587,19 +606,57 @@ function EventScreen({ authType }: { authType: AuthType }) {
     setIncludePast(include);
     setIsInitialLoading(true);
 
-    const sortedUpcoming = sortConversations(
-      filterConversations(allConversationsRef.current, false),
-      true,
-    );
-    const sorted = include
-      ? [
-          ...sortedUpcoming,
-          ...sortConversations(
-            filterConversations(allConversationsRef.current, true),
-            true,
-          ),
-        ]
-      : sortedUpcoming;
+    // Filter based on whether to include past events
+    const filtered = filterConversations(allConversationsRef.current, include, myEventsOnly);
+
+    // Sort: active events first, then all others by most recent
+    const sorted = [...filtered].sort((a, b) => {
+      // Pin active events to the top
+      if (a.active && !b.active) return -1;
+      if (!a.active && b.active) return 1;
+
+      // For non-active events (or both active), sort by most recent first
+      const aTime = a.scheduledTime
+        ? new Date(a.scheduledTime).getTime()
+        : new Date(a.createdAt!).getTime();
+      const bTime = b.scheduledTime
+        ? new Date(b.scheduledTime).getTime()
+        : new Date(b.createdAt!).getTime();
+
+      return bTime - aTime; // Most recent first
+    });
+
+    setConversationsList(sorted);
+
+    const nextIndex = await fetchDetailedConversations(sorted, 0, 6, true);
+    setEventsShown(nextIndex);
+    setIsInitialLoading(false);
+  };
+
+  const handleMyEventsToggle = async (showOnlyMine: boolean) => {
+    if (!allConversationsRef.current) return;
+    setMyEventsOnly(showOnlyMine);
+    setIsInitialLoading(true);
+
+    // Filter based on owner and past events settings
+    const filtered = filterConversations(allConversationsRef.current, includePast, showOnlyMine);
+
+    // Sort: active events first, then all others by most recent
+    const sorted = [...filtered].sort((a, b) => {
+      // Pin active events to the top
+      if (a.active && !b.active) return -1;
+      if (!a.active && b.active) return 1;
+
+      // For non-active events (or both active), sort by most recent first
+      const aTime = a.scheduledTime
+        ? new Date(a.scheduledTime).getTime()
+        : new Date(a.createdAt!).getTime();
+      const bTime = b.scheduledTime
+        ? new Date(b.scheduledTime).getTime()
+        : new Date(b.createdAt!).getTime();
+
+      return bTime - aTime; // Most recent first
+    });
 
     setConversationsList(sorted);
 
@@ -617,7 +674,18 @@ function EventScreen({ authType }: { authType: AuthType }) {
         <Typography color="error">{errorMessage}</Typography>
       ) : (
         <div className="w-3/4 space-y-6">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <label className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-3 py-1 cursor-pointer">
+              <span className="text-xs text-gray-500 select-none">
+                My events only
+              </span>
+              <Switch
+                checked={myEventsOnly}
+                onChange={(e) => handleMyEventsToggle(e.target.checked)}
+                size="small"
+                sx={{ m: 0 }}
+              />
+            </label>
             <label className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-3 py-1 cursor-pointer">
               <span className="text-xs text-gray-500 select-none">
                 Include past events
@@ -662,6 +730,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
                       key={event.id}
                       event={event}
                       onDelete={handleDelete}
+                      currentUserId={userId}
                     />
                   ))}
 
