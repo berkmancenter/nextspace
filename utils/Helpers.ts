@@ -355,6 +355,28 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
         url: modUrl,
       });
     }
+  } else if (convType.name === "eventChannelMediator") {
+    const eventChannelMediatorUrl = {
+      label: "Event Channel Mediator",
+      url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
+        hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
+      }${hasChat ? `&channel=chat,${chatPasscode}` : ""}`,
+    };
+    participant.push(eventChannelMediatorUrl);
+  } else if (convType.name === "eventChannelMediatorPlus") {
+    const eventChannelMediatorPlusUrl = {
+      label: "Event Channel Mediator Plus",
+      url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
+        hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
+      }${hasChat ? `&channel=chat,${chatPasscode}` : ""}`,
+    };
+    participant.push(eventChannelMediatorPlusUrl);
+    if (modPasscode) {
+      moderator.push({
+        label: "Event Channel Mediator Plus",
+        url: modUrl,
+      });
+    }
   }
 
   return {

@@ -21,7 +21,10 @@ jest.mock("next/router", () => ({
 // Mock socket.io-client
 const mockSocket = {
   on: jest.fn(),
+  once: jest.fn(),
   off: jest.fn(),
+  onAny: jest.fn(),
+  offAny: jest.fn(),
   emit: jest.fn(),
   auth: { token: "mock-token" },
   hasListeners: jest.fn(() => false),

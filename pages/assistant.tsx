@@ -69,7 +69,7 @@ function EventAssistantRoom() {
       command: "mod",
       description: "Submit a question to the moderator",
       value: "/mod ",
-      conversationTypes: ["eventAssistantPlus"],
+      conversationTypes: ["eventAssistantPlus", "eventChannelMediatorPlus"],
     },
   ];
 
@@ -139,7 +139,9 @@ function EventAssistantRoom() {
           }
           if (
             data.pseudonym === "Event Assistant" ||
-            data.pseudonym === "Event Assistant Plus"
+            data.pseudonym === "Event Assistant Plus" ||
+            data.pseudonym === "Event Channel Mediator" ||
+            data.pseudonym === "Event Channel Mediator Plus"
           )
             setWaitingForResponse(false);
         });
@@ -223,7 +225,9 @@ function EventAssistantRoom() {
             const eventAsstAgent = conversation.agents.find(
               (agent: components["schemas"]["Agent"]) =>
                 agent.agentType === "eventAssistant" ||
-                agent.agentType === "eventAssistantPlus",
+                agent.agentType === "eventAssistantPlus" ||
+                agent.agentType === "eventChannelMediator" ||
+                agent.agentType === "eventChannelMediatorPlus",
             );
             if (eventAsstAgent) {
               setAgentId(eventAsstAgent.id!);
@@ -502,6 +506,10 @@ function EventAssistantRoom() {
                   inputValue={chatInputValue}
                   onInputChange={setChatInputValue}
                   onSendMessage={sendMessage}
+                  controlledMode={controlledMode}
+                  onExitControlledMode={exitControlledMode}
+                  enterControlledMode={enterControlledMode}
+                  sendFeedbackRating={sendFeedbackRating}
                 />
               ) : (
                 <AssistantChatPanel

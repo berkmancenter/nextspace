@@ -132,7 +132,9 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
             .map((message, i) => {
               const isAssistant =
                 message.pseudonym === "Event Assistant" ||
-                message.pseudonym === "Event Assistant Plus";
+                message.pseudonym === "Event Assistant Plus" ||
+                message.pseudonym === "Event Channel Mediator" ||
+                message.pseudonym === "Event Channel Mediator Plus";
               const isCurrentUser = message.pseudonym === pseudonym;
 
               const parsed = parseMessageBody(message.body);
@@ -144,7 +146,9 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
               const displayName =
                 message.pseudonym === "Event Assistant Plus"
                   ? "Event Assistant"
-                  : message.pseudonym;
+                  : message.pseudonym === "Event Channel Mediator Plus"
+                    ? "Event Channel Mediator"
+                    : message.pseudonym;
 
               const hasPromptOptions =
                 message.prompt?.options &&
