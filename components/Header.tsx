@@ -56,6 +56,9 @@ export const Header = ({
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
+  // Check if current route starts with /admin
+  const isAdminRoute = router.pathname.startsWith('/admin');
+
   // Build pages based on authType
   let currentPages: Record<string, { icon: JSX.Element; url: string }>;
   
@@ -85,8 +88,16 @@ export const Header = ({
       },
     };
   } else {
-    // Guest users see login + feedback
-    currentPages = userPages;
+    // Guest users: show login button only on admin routes
+    currentPages = {
+      ...(isAdminRoute && {
+        "Log In": { icon: <LoginIcon />, url: "/login" },
+      }),
+      "Give Feedback": {
+        icon: <FeedbackOutlinedIcon />,
+        url: "https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform",
+      },
+    };
   }
 
   const toggleDrawer = (newOpen: boolean) => () => {
