@@ -109,11 +109,11 @@ describe("Events Page", () => {
       () =>
         new Promise((resolve, reject) => {
           // Never call resolve or reject to keep the promise pending
-        })
+        }),
     ); // Simulates a loading state that never resolves
 
     await act(async () => {
-      render(<EventsPage isAuthenticated={true} />);
+      render(<EventsPage authType={"user"} />);
     });
 
     // Check for skeleton elements (MUI Skeleton components)
@@ -149,7 +149,7 @@ describe("Events Page", () => {
     console.log("Request returns:", result);
 
     await act(async () => {
-      render(<EventsPage isAuthenticated={true} />);
+      render(<EventsPage authType={"user"} />);
     });
 
     await waitFor(
@@ -157,7 +157,7 @@ describe("Events Page", () => {
         expect(screen.getByText("Test Event 1")).toBeInTheDocument();
         expect(screen.getByText("Active Event")).toBeInTheDocument();
       },
-      { timeout: 3000 }
+      { timeout: 3000 },
     );
   });
 
@@ -178,7 +178,7 @@ describe("Events Page", () => {
     });
 
     await act(async () => {
-      render(<EventsPage isAuthenticated={true} />);
+      render(<EventsPage authType={"user"} />);
     });
 
     await waitFor(() => {
@@ -226,14 +226,14 @@ describe("Events Page", () => {
       .mockResolvedValueOnce(manyConversations[9]);
 
     await act(async () => {
-      render(<EventsPage isAuthenticated={true} />);
+      render(<EventsPage authType={"user"} />);
     });
 
     await waitFor(
       () => {
         expect(screen.getByText("Event 1")).toBeInTheDocument();
       },
-      { timeout: 3000 }
+      { timeout: 3000 },
     );
 
     console.log(screen.debug());
@@ -248,7 +248,7 @@ describe("Events Page", () => {
       () => {
         expect(screen.getByText("Event 7")).toBeInTheDocument();
       },
-      { timeout: 3000 }
+      { timeout: 3000 },
     );
   });
 
@@ -262,12 +262,12 @@ describe("Events Page", () => {
     (Request as jest.Mock).mockResolvedValue([]);
 
     await act(async () => {
-      render(<EventsPage isAuthenticated={true} />);
+      render(<EventsPage authType={"user"} />);
     });
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Currently you have no events scheduled/i)
+        screen.getByText(/Currently you have no events scheduled/i),
       ).toBeInTheDocument();
     });
   });

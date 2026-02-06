@@ -65,12 +65,12 @@ jest.mock("../../utils", () => ({
   GetChannelPasscode: jest.fn((channel: string, query: any) => {
     // Extract passcode from query.channel parameter
     if (!query.channel) return null;
-    
+
     const channels = Array.isArray(query.channel) ? query.channel : [query.channel];
     const matchingChannel = channels.find((c: string) => c.includes(channel));
-    
+
     if (matchingChannel) {
-      const parts = matchingChannel.split(',');
+      const parts = matchingChannel.split(",");
       return parts[1] || null;
     }
     return null;
@@ -91,26 +91,15 @@ jest.mock("../../utils/useSessionJoin", () => ({
 
 // Mock message components
 jest.mock("../../components/messages", () => ({
-  AssistantMessage: ({
-    message,
-    onPopulateFeedbackText,
-    onSendFeedbackRating,
-    messageType,
-  }: any) => {
-    const messageText =
-      typeof message.body === "string"
-        ? message.body
-        : message.body?.text || "";
+  AssistantMessage: ({ message, onPopulateFeedbackText, onSendFeedbackRating, messageType }: any) => {
+    const messageText = typeof message.body === "string" ? message.body : message.body?.text || "";
 
     return (
       <div data-testid="assistant-message">
         {messageText}
         {message.id && !messageType && (
           <div data-testid="message-feedback" data-message-id={message.id}>
-            <button
-              data-testid="rating-button-3"
-              onClick={() => onSendFeedbackRating?.(message.id, 3)}
-            >
+            <button data-testid="rating-button-3" onClick={() => onSendFeedbackRating?.(message.id, 3)}>
               3
             </button>
             <button
@@ -131,24 +120,15 @@ jest.mock("../../components/messages", () => ({
     );
   },
   SubmittedMessage: ({ message }: any) => {
-    const messageText =
-      typeof message.body === "string"
-        ? message.body
-        : message.body?.text || "";
+    const messageText = typeof message.body === "string" ? message.body : message.body?.text || "";
     return <div data-testid="submitted-message">{messageText}</div>;
   },
   ModeratorSubmittedMessage: ({ message }: any) => {
-    const messageText =
-      typeof message.body === "string"
-        ? message.body
-        : message.body?.text || "";
+    const messageText = typeof message.body === "string" ? message.body : message.body?.text || "";
     return <div data-testid="moderator-submitted-message">{messageText}</div>;
   },
   UserMessage: ({ message }: any) => {
-    const messageText =
-      typeof message.body === "string"
-        ? message.body
-        : message.body?.text || "";
+    const messageText = typeof message.body === "string" ? message.body : message.body?.text || "";
     return <div data-testid="user-message">{messageText}</div>;
   },
 }));
@@ -176,7 +156,7 @@ describe("EventAssistantRoom", () => {
     mockSocket.hasListeners.mockReturnValue(false);
     mockRouter.query = { conversationId: "test-conversation-id" };
     mockRouter.isReady = true;
-    
+
     // Default mock implementation
     mockUseSessionJoin.mockReturnValue({
       socket: mockSocket,
@@ -205,7 +185,7 @@ describe("EventAssistantRoom", () => {
 
     let container;
     await act(async () => {
-      const result = render(<EventAssistantRoom isAuthenticated={false} />);
+      const result = render(<EventAssistantRoom authType={"guest"} />);
       container = result.container;
     });
 
@@ -216,7 +196,7 @@ describe("EventAssistantRoom", () => {
 
   it("initializes socket connection on mount", async () => {
     await act(async () => {
-      render(<EventAssistantRoom isAuthenticated={false} />);
+      render(<EventAssistantRoom authType={"guest"} />);
     });
 
     await waitFor(() => {
@@ -226,7 +206,7 @@ describe("EventAssistantRoom", () => {
 
   it("sets up socket event listeners", async () => {
     await act(async () => {
-      render(<EventAssistantRoom isAuthenticated={false} />);
+      render(<EventAssistantRoom authType={"guest"} />);
     });
 
     // useSessionJoin handles error/connect/disconnect events internally
@@ -238,14 +218,11 @@ describe("EventAssistantRoom", () => {
 
   it("fetches conversation data when router is ready", async () => {
     await act(async () => {
-      render(<EventAssistantRoom isAuthenticated={false} />);
+      render(<EventAssistantRoom authType={"guest"} />);
     });
 
     await waitFor(() => {
-      expect(RetrieveData).toHaveBeenCalledWith(
-        "conversations/test-conversation-id",
-        "mock-access-token",
-      );
+      expect(RetrieveData).toHaveBeenCalledWith("conversations/test-conversation-id", "mock-access-token");
     });
   });
 
@@ -253,7 +230,7 @@ describe("EventAssistantRoom", () => {
     (RetrieveData as jest.Mock).mockResolvedValue(null);
 
     await act(async () => {
-      render(<EventAssistantRoom isAuthenticated={false} />);
+      render(<EventAssistantRoom authType={"guest"} />);
     });
 
     await waitFor(() => {
@@ -268,7 +245,7 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      render(<EventAssistantRoom isAuthenticated={false} />);
+      render(<EventAssistantRoom authType={"guest"} />);
     });
 
     await waitFor(() => {
@@ -280,22 +257,17 @@ describe("EventAssistantRoom", () => {
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-123", agentType: "regular" }],
     });
-
     (createConversationFromData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-123", agentType: "regular" }],
       type: { name: "eventAssistant" },
     });
 
     await act(async () => {
-      render(<EventAssistantRoom isAuthenticated={false} />);
+      render(<EventAssistantRoom authType={"guest"} />);
     });
 
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          "This conversation does not have an event assistant agent.",
-        ),
-      ).toBeInTheDocument();
+      expect(screen.getByText("This conversation does not have an event assistant agent.")).toBeInTheDocument();
     });
   });
 
@@ -309,7 +281,7 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      render(<EventAssistantRoom isAuthenticated={false} />);
+      render(<EventAssistantRoom authType={"guest"} />);
     });
 
     await waitFor(() => {
@@ -319,8 +291,18 @@ describe("EventAssistantRoom", () => {
 
   it("loads initial assistant messages on page load", async () => {
     const mockMessages = [
-      { id: "1", body: "Hello", pseudonym: "User", channels: ["direct-user-123-agent-123"] },
-      { id: "2", body: "Hi there!", pseudonym: "Event Assistant", channels: ["direct-user-123-agent-123"] },
+      {
+        id: "1",
+        body: "Hello",
+        pseudonym: "User",
+        channels: ["direct-user-123-agent-123"],
+      },
+      {
+        id: "2",
+        body: "Hi there!",
+        pseudonym: "Event Assistant",
+        channels: ["direct-user-123-agent-123"],
+      },
     ];
 
     (RetrieveData as jest.Mock)
@@ -328,20 +310,19 @@ describe("EventAssistantRoom", () => {
         agents: [{ id: "agent-123", agentType: "eventAssistant" }],
       })
       .mockResolvedValueOnce(mockMessages);
-
     (createConversationFromData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-123", agentType: "eventAssistant" }],
       type: { name: "eventAssistant" },
     });
 
     await act(async () => {
-      render(<EventAssistantRoom isAuthenticated={false} />);
+      render(<EventAssistantRoom authType={"guest"} />);
     });
 
     await waitFor(() => {
       expect(RetrieveData).toHaveBeenCalledWith(
         "messages/test-conversation-id?channel=direct-user-123-agent-123",
-        "mock-access-token"
+        "mock-access-token",
       );
     });
   });
@@ -350,14 +331,13 @@ describe("EventAssistantRoom", () => {
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-123", agentType: "eventAssistant" }],
     });
-
     (createConversationFromData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-123", agentType: "eventAssistant" }],
       type: { name: "eventAssistant" },
     });
 
     await act(async () => {
-      render(<EventAssistantRoom isAuthenticated={false} />);
+      render(<EventAssistantRoom authType={"guest"} />);
     });
 
     await waitFor(() => {
@@ -380,18 +360,16 @@ describe("EventAssistantRoom", () => {
       conversationId: "test-conversation-id",
       channel: ["transcript,transcript-pass", "chat,chat-pass"],
     };
-
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-123", agentType: "eventAssistant" }],
     });
-
     (createConversationFromData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-123", agentType: "eventAssistant" }],
       type: { name: "eventAssistant" },
     });
 
     await act(async () => {
-      render(<EventAssistantRoom isAuthenticated={false} />);
+      render(<EventAssistantRoom authType={"guest"} />);
     });
 
     await waitFor(() => {
@@ -429,7 +407,6 @@ describe("EventAssistantRoom", () => {
         isConnected: true,
         errorMessage: null,
       });
-
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
         if (path.startsWith("conversations/")) {
           return Promise.resolve({
@@ -446,13 +423,11 @@ describe("EventAssistantRoom", () => {
       });
 
       await act(async () => {
-        render(<EventAssistantRoom isAuthenticated={false} />);
+        render(<EventAssistantRoom authType={"guest"} />);
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByPlaceholderText("Enter your message here"),
-        ).toBeInTheDocument();
+        expect(screen.getByPlaceholderText("Enter your message here")).toBeInTheDocument();
       });
 
       // Wait for all promises to resolve (conversation data loading)
@@ -498,7 +473,6 @@ describe("EventAssistantRoom", () => {
         isConnected: true,
         errorMessage: null,
       });
-
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
         if (path.startsWith("conversations/")) {
           return Promise.resolve({
@@ -515,13 +489,11 @@ describe("EventAssistantRoom", () => {
       });
 
       await act(async () => {
-        render(<EventAssistantRoom isAuthenticated={false} />);
+        render(<EventAssistantRoom authType={"guest"} />);
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByPlaceholderText("Enter your message here"),
-        ).toBeInTheDocument();
+        expect(screen.getByPlaceholderText("Enter your message here")).toBeInTheDocument();
       });
 
       const user = userEvent.setup();
@@ -550,8 +522,18 @@ describe("EventAssistantRoom", () => {
     };
 
     const mockChatMessages = [
-      { id: "1", body: "Chat message 1", pseudonym: "User1", channels: ["chat"] },
-      { id: "2", body: "Chat message 2", pseudonym: "User2", channels: ["chat"] },
+      {
+        id: "1",
+        body: "Chat message 1",
+        pseudonym: "User1",
+        channels: ["chat"],
+      },
+      {
+        id: "2",
+        body: "Chat message 2",
+        pseudonym: "User2",
+        channels: ["chat"],
+      },
     ];
 
     (RetrieveData as jest.Mock)
@@ -560,21 +542,17 @@ describe("EventAssistantRoom", () => {
       })
       .mockResolvedValueOnce(mockChatMessages)
       .mockResolvedValueOnce([]);
-
     (createConversationFromData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-123", agentType: "eventAssistant" }],
       type: { name: "eventAssistant" },
     });
 
     await act(async () => {
-      render(<EventAssistantRoom isAuthenticated={false} />);
+      render(<EventAssistantRoom authType={"guest"} />);
     });
 
     await waitFor(() => {
-      expect(RetrieveData).toHaveBeenCalledWith(
-        "messages/test-conversation-id?channel=chat,chat-pass",
-        "mock-access-token"
-      );
+      expect(RetrieveData).toHaveBeenCalledWith("messages/test-conversation-id?channel=chat,chat-pass", "mock-access-token");
     });
   });
 });

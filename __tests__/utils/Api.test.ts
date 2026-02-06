@@ -1,10 +1,17 @@
-import { fetchWithTokenRefresh, RefreshToken, RetrieveData } from "../../utils/Api";
+import {
+  fetchWithTokenRefresh,
+  RefreshToken,
+  RetrieveData,
+} from "../../utils/Api";
 import { Api } from "../../utils/Helpers";
 
 // Mock Api
 const mockApiInstance = {
   SetTokens: jest.fn(),
-  GetTokens: jest.fn(() => ({ access: "mock-access", refresh: "mock-refresh" })),
+  GetTokens: jest.fn(() => ({
+    access: "mock-access",
+    refresh: "mock-refresh",
+  })),
   ClearTokens: jest.fn(),
   ClearAdminTokens: jest.fn(),
 };
@@ -36,7 +43,11 @@ describe("Token Refresh Functionality", () => {
     };
 
     it("should make successful request without token refresh", async () => {
-      const mockResponse = { ok: true, status: 200, json: async () => ({ data: "test" }) };
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: "test" }),
+      };
       (global.fetch as jest.Mock).mockResolvedValueOnce(mockResponse);
 
       const response = await fetchWithTokenRefresh(mockUrl, mockOptions);
@@ -47,11 +58,22 @@ describe("Token Refresh Functionality", () => {
     });
 
     it("should add Authorization header when useStoredTokens is true", async () => {
-      mockApiInstance.GetTokens.mockReturnValue({ access: "stored-token", refresh: "refresh-token" });
-      const mockResponse = { ok: true, status: 200, json: async () => ({ data: "test" }) };
+      mockApiInstance.GetTokens.mockReturnValue({
+        access: "stored-token",
+        refresh: "refresh-token",
+      });
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: "test" }),
+      };
       (global.fetch as jest.Mock).mockResolvedValueOnce(mockResponse);
 
-      await fetchWithTokenRefresh(mockUrl, { method: "GET", headers: {} }, true);
+      await fetchWithTokenRefresh(
+        mockUrl,
+        { method: "GET", headers: {} },
+        true,
+      );
 
       expect(global.fetch).toHaveBeenCalledWith(
         mockUrl,
@@ -59,13 +81,20 @@ describe("Token Refresh Functionality", () => {
           headers: expect.objectContaining({
             Authorization: "Bearer stored-token",
           }),
-        })
+        }),
       );
     });
 
     it("should not override existing Authorization header", async () => {
-      mockApiInstance.GetTokens.mockReturnValue({ access: "stored-token", refresh: "refresh-token" });
-      const mockResponse = { ok: true, status: 200, json: async () => ({ data: "test" }) };
+      mockApiInstance.GetTokens.mockReturnValue({
+        access: "stored-token",
+        refresh: "refresh-token",
+      });
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: "test" }),
+      };
       (global.fetch as jest.Mock).mockResolvedValueOnce(mockResponse);
 
       const optionsWithAuth = {
@@ -81,17 +110,24 @@ describe("Token Refresh Functionality", () => {
           headers: expect.objectContaining({
             Authorization: "Bearer custom-token",
           }),
-        })
+        }),
       );
     });
 
     it("should refresh token and retry on 401 response", async () => {
-      mockApiInstance.GetTokens.mockReturnValue({ access: "old-token", refresh: "refresh-token" });
+      mockApiInstance.GetTokens.mockReturnValue({
+        access: "old-token",
+        refresh: "refresh-token",
+      });
 
       // First request returns 401
       const mock401Response = { ok: false, status: 401 };
       // Second request after refresh succeeds
-      const mockSuccessResponse = { ok: true, status: 200, json: async () => ({ data: "success" }) };
+      const mockSuccessResponse = {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: "success" }),
+      };
 
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce(mock401Response) // Initial request
@@ -108,12 +144,18 @@ describe("Token Refresh Functionality", () => {
       const response = await fetchWithTokenRefresh(mockUrl, mockOptions, true);
 
       expect(global.fetch).toHaveBeenCalledTimes(4);
-      expect(mockApiInstance.SetTokens).toHaveBeenCalledWith("new-access-token", "new-refresh-token");
+      expect(mockApiInstance.SetTokens).toHaveBeenCalledWith(
+        "new-access-token",
+        "new-refresh-token",
+      );
       expect(response.ok).toBe(true);
     });
 
     it("should update session cookie after token refresh", async () => {
-      mockApiInstance.GetTokens.mockReturnValue({ access: "old-token", refresh: "refresh-token" });
+      mockApiInstance.GetTokens.mockReturnValue({
+        access: "old-token",
+        refresh: "refresh-token",
+      });
 
       const mock401Response = { ok: false, status: 401 };
       const mockSuccessResponse = { ok: true, status: 200 };
@@ -134,7 +176,7 @@ describe("Token Refresh Functionality", () => {
 
       // Check that PATCH /api/session was called
       const sessionUpdateCall = (global.fetch as jest.Mock).mock.calls.find(
-        call => call[0] === "/api/session"
+        (call) => call[0] === "/api/session",
       );
       expect(sessionUpdateCall).toBeDefined();
       expect(sessionUpdateCall[1].method).toBe("PATCH");
@@ -145,7 +187,10 @@ describe("Token Refresh Functionality", () => {
     });
 
     it("should not attempt refresh if no refresh token available", async () => {
-      mockApiInstance.GetTokens.mockReturnValue({ access: "token", refresh: null });
+      mockApiInstance.GetTokens.mockReturnValue({
+        access: "token",
+        refresh: "",
+      });
 
       const mock401Response = { ok: false, status: 401 };
       (global.fetch as jest.Mock).mockResolvedValueOnce(mock401Response);
@@ -157,7 +202,10 @@ describe("Token Refresh Functionality", () => {
     });
 
     it("should handle failed token refresh gracefully", async () => {
-      mockApiInstance.GetTokens.mockReturnValue({ access: "old-token", refresh: "refresh-token" });
+      mockApiInstance.GetTokens.mockReturnValue({
+        access: "old-token",
+        refresh: "refresh-token",
+      });
 
       const mock401Response = { ok: false, status: 401 };
       (global.fetch as jest.Mock)
@@ -195,7 +243,10 @@ describe("Token Refresh Functionality", () => {
     });
 
     it("should use stored tokens when no explicit token provided", async () => {
-      mockApiInstance.GetTokens.mockReturnValue({ access: "stored-token", refresh: "refresh-token" });
+      mockApiInstance.GetTokens.mockReturnValue({
+        access: "stored-token",
+        refresh: "refresh-token",
+      });
       const mockResponse = {
         ok: true,
         status: 200,
@@ -211,7 +262,7 @@ describe("Token Refresh Functionality", () => {
           headers: expect.objectContaining({
             Authorization: "Bearer stored-token",
           }),
-        })
+        }),
       );
     });
 
@@ -231,7 +282,7 @@ describe("Token Refresh Functionality", () => {
           headers: expect.objectContaining({
             Authorization: "Bearer explicit-token",
           }),
-        })
+        }),
       );
     });
 
@@ -278,7 +329,7 @@ describe("Token Refresh Functionality", () => {
         expect.objectContaining({
           method: "POST",
           body: JSON.stringify({ refreshToken: "old-refresh-token" }),
-        })
+        }),
       );
     });
 
@@ -302,12 +353,14 @@ describe("Token Refresh Functionality", () => {
       expect(mockApiInstance.ClearAdminTokens).toHaveBeenCalled();
       expect(global.fetch).toHaveBeenCalledWith(
         "/api/logout",
-        expect.objectContaining({ method: "POST" })
+        expect.objectContaining({ method: "POST" }),
       );
     });
 
     it("should handle network errors gracefully", async () => {
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Network error"));
+      (global.fetch as jest.Mock).mockRejectedValueOnce(
+        new Error("Network error"),
+      );
 
       const result = await RefreshToken("refresh-token");
 

@@ -118,7 +118,7 @@ describe("ModeratorScreen", () => {
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
     (io as jest.Mock).mockReturnValue(mockSocket);
     (RetrieveData as jest.Mock).mockResolvedValue(mockMessages);
-    
+
     // Default mock implementation for useSessionJoin
     mockUseSessionJoin.mockReturnValue({
       socket: mockSocket,
@@ -131,13 +131,13 @@ describe("ModeratorScreen", () => {
 
   it("renders the moderator screen with insight and metric messages", async () => {
     await act(async () => {
-      render(<ModeratorScreen isAuthenticated={true} />);
+      render(<ModeratorScreen authType={"user"} />);
     });
 
     await waitFor(() => {
       expect(screen.getByText("Test insight")).toBeInTheDocument();
       expect(
-        screen.getByText(/The audience is expressing/)
+        screen.getByText(/The audience is expressing/),
       ).toBeInTheDocument();
       expect(screen.getByText(/happiness/)).toBeInTheDocument();
     });
@@ -145,7 +145,7 @@ describe("ModeratorScreen", () => {
 
   it("renders Transcript when transcript passcode exists", async () => {
     await act(async () => {
-      render(<ModeratorScreen isAuthenticated />);
+      render(<ModeratorScreen authType={"user"} />);
     });
 
     expect(screen.getByTestId("transcript-component")).toBeInTheDocument();
@@ -158,7 +158,7 @@ describe("ModeratorScreen", () => {
     });
 
     await act(async () => {
-      render(<ModeratorScreen isAuthenticated={true} />);
+      render(<ModeratorScreen authType={"user"} />);
     });
 
     await waitFor(() => {
@@ -173,7 +173,7 @@ describe("ModeratorScreen", () => {
     });
 
     await act(async () => {
-      render(<ModeratorScreen isAuthenticated={true} />);
+      render(<ModeratorScreen authType={"user"} />);
     });
 
     await waitFor(() => {
@@ -183,20 +183,20 @@ describe("ModeratorScreen", () => {
 
   it("loads initial moderator messages on page load", async () => {
     await act(async () => {
-      render(<ModeratorScreen isAuthenticated={true} />);
+      render(<ModeratorScreen authType={"user"} />);
     });
 
     await waitFor(() => {
       expect(RetrieveData).toHaveBeenCalledWith(
         "messages/test-conversation?channel=moderator,mock-passcode",
-        "mock-token"
+        "mock-token",
       );
     });
   });
 
   it("emits conversation:join with moderator channel", async () => {
     await act(async () => {
-      render(<ModeratorScreen isAuthenticated={true} />);
+      render(<ModeratorScreen authType={"user"} />);
     });
 
     await waitFor(() => {

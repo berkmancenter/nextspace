@@ -5,7 +5,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 jest.mock("jose", () => {
   const mockEncrypt = jest.fn();
   const mockJwtDecrypt = jest.fn();
-  
+
   return {
     EncryptJWT: jest.fn().mockImplementation(() => ({
       setProtectedHeader: jest.fn().mockReturnThis(),
@@ -31,7 +31,11 @@ import { jwtDecrypt } from "jose";
 
 const SECRET = "test-secret-key-minimum-32-chars!!";
 process.env.SESSION_SECRET = SECRET;
-process.env.NODE_ENV = "test";
+Object.defineProperty(process.env, "NODE_ENV", {
+  value: "test",
+  writable: true,
+  configurable: true,
+});
 
 // Get the mocked functions
 const mockJwtDecrypt = jwtDecrypt as jest.MockedFunction<typeof jwtDecrypt>;
@@ -50,6 +54,11 @@ describe("/api/session", () => {
         sub: "testuser",
         exp: Math.floor(Date.now() / 1000) + 3600,
       },
+      protectedHeader: {
+        alg: "",
+        enc: "",
+      },
+      key: Uint8Array.from([]),
     });
   });
 
