@@ -922,7 +922,7 @@ describe("EventCreationForm Component", () => {
     });
   });
 
-  it("redirects to event view page after successful conversation creation", async () => {
+  it("displays event status after successful conversation creation", async () => {
     const user = userEvent.setup();
     const mockConversationData = {
       id: "new-conv-redirect",
@@ -961,10 +961,10 @@ describe("EventCreationForm Component", () => {
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith(
-        "/admin/event/view/new-conv-redirect"
-      );
+      expect(screen.getByText("Event Status")).toBeInTheDocument();
     });
+
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it("fetches configuration from backend on mount", async () => {

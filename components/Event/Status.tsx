@@ -83,6 +83,20 @@ export const EventStatus: React.FC<{
       </p>
 
       <div className="wrap-anywhere w-3/4 mt-5">
+        {conversationData.eventUrls.zoom && (
+          <>
+            <p className="mt-2">{conversationData.eventUrls.zoom.label}:</p>
+            <p className="mt-2">
+              <a
+                href={conversationData.eventUrls.zoom.url}
+                target="_blank"
+                className="text-medium-slate-blue"
+              >
+                {conversationData.eventUrls.zoom.url}
+              </a>
+            </p>
+          </>
+        )}
         {conversationData.eventUrls.moderator.length > 0 && (
           <>
             <p className="mt-2">The URLs for the moderator are:</p>
