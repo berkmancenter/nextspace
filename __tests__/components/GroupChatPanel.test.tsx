@@ -407,4 +407,197 @@ describe("GroupChatPanel", () => {
     // This is tested implicitly through the mocked MessageInput component
     expect(screen.getByTestId("message-input")).toBeInTheDocument();
   });
+
+  describe("Timestamp display", () => {
+    it("shows timestamp for the first message", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "First message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const { container } = render(
+        <GroupChatPanel {...baseProps} messages={messages} />
+      );
+
+      // Check timestamp is displayed
+      const timestamps = container.querySelectorAll(".text-gray-400");
+      expect(timestamps.length).toBe(1);
+    });
+
+    it("shows timestamp when minute changes", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "First message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "2",
+          pseudonym: "Bob",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "Second message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "bob-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const { container } = render(
+        <GroupChatPanel {...baseProps} messages={messages} />
+      );
+
+      // Should show two timestamps (one for each different minute)
+      const timestamps = container.querySelectorAll(".text-gray-400");
+      expect(timestamps.length).toBe(2);
+    });
+
+    it("shows timestamp when hour changes", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:59:00Z",
+          body: { text: "First message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "2",
+          pseudonym: "Bob",
+          createdAt: "2025-10-17T13:00:00Z",
+          body: { text: "Second message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "bob-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const { container } = render(
+        <GroupChatPanel {...baseProps} messages={messages} />
+      );
+
+      // Should show two timestamps (one for each different hour)
+      const timestamps = container.querySelectorAll(".text-gray-400");
+      expect(timestamps.length).toBe(2);
+    });
+
+    it("does not show timestamp when messages are in the same minute", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "First message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "2",
+          pseudonym: "Bob",
+          createdAt: "2025-10-17T12:00:30Z",
+          body: { text: "Second message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "bob-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const { container } = render(
+        <GroupChatPanel {...baseProps} messages={messages} />
+      );
+
+      // Should only show one timestamp (for the first message)
+      const timestamps = container.querySelectorAll(".text-gray-400");
+      expect(timestamps.length).toBe(1);
+    });
+
+    it("shows timestamp for Event Assistant messages when minute changes", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "First message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "2",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "Assistant response" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const { container } = render(
+        <GroupChatPanel {...baseProps} messages={messages} />
+      );
+
+      // Should show two timestamps (one for each different minute)
+      const timestamps = container.querySelectorAll(".text-gray-400");
+      expect(timestamps.length).toBe(2);
+    });
+  });
 });

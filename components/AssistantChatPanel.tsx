@@ -158,6 +158,29 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
               ) {
                 return (
                   <div key={`msg-${i}`} className="w-full">
+                    {/* Timestamp centered */}
+                    {(() => {
+                      if (i === 0) return true;
+                      const prevDate = new Date(messages[i - 1].createdAt!);
+                      const currDate = new Date(message.createdAt!);
+                      return (
+                        prevDate.getHours() !== currDate.getHours() ||
+                        prevDate.getMinutes() !== currDate.getMinutes()
+                      );
+                    })() ? (
+                      <div className="flex justify-center my-1">
+                        <span className="text-sm text-gray-400">
+                          {new Date(message.createdAt!).toLocaleTimeString(
+                            "en-US",
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            },
+                          )}
+                        </span>
+                      </div>
+                    ) : null}
+
                     <div
                       className={`flex gap-1.5 mb-1 ${
                         isCurrentUser ? "flex-row-reverse" : "flex-row"
@@ -208,9 +231,15 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
               return (
                 <div key={`msg-${i}`} className="w-full">
                   {/* Timestamp centered */}
-                  {i === 0 ||
-                  new Date(messages[i - 1].createdAt!).getHours() !==
-                    new Date(message.createdAt!).getHours() ? (
+                  {(() => {
+                    if (i === 0) return true;
+                    const prevDate = new Date(messages[i - 1].createdAt!);
+                    const currDate = new Date(message.createdAt!);
+                    return (
+                      prevDate.getHours() !== currDate.getHours() ||
+                      prevDate.getMinutes() !== currDate.getMinutes()
+                    );
+                  })() ? (
                     <div className="flex justify-center my-1">
                       <span className="text-sm text-gray-400">
                         {new Date(message.createdAt!).toLocaleTimeString(

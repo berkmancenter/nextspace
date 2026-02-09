@@ -224,9 +224,15 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
               return (
                 <div key={`msg-${i}`} className="w-full">
                   {/* Timestamp centered */}
-                  {i === 0 ||
-                  new Date(messages[i - 1].createdAt!).getHours() !==
-                    new Date(message.createdAt!).getHours() ? (
+                  {(() => {
+                    if (i === 0) return true;
+                    const prevDate = new Date(messages[i - 1].createdAt!);
+                    const currDate = new Date(message.createdAt!);
+                    return (
+                      prevDate.getHours() !== currDate.getHours() ||
+                      prevDate.getMinutes() !== currDate.getMinutes()
+                    );
+                  })() ? (
                     <div className="flex justify-center my-1">
                       <span className="text-sm text-gray-400">
                         {new Date(message.createdAt!).toLocaleTimeString(
