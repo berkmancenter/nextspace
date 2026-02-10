@@ -22,8 +22,8 @@ jest.mock("next/router", () => ({
 // Mock socket.io-client
 const mockSocket = {
   on: jest.fn(),
-  off: jest.fn(),
   once: jest.fn(),
+  off: jest.fn(),
   onAny: jest.fn(),
   offAny: jest.fn(),
   emit: jest.fn(),
@@ -66,7 +66,9 @@ jest.mock("../../utils", () => ({
     // Extract passcode from query.channel parameter
     if (!query.channel) return null;
 
-    const channels = Array.isArray(query.channel) ? query.channel : [query.channel];
+    const channels = Array.isArray(query.channel)
+      ? query.channel
+      : [query.channel];
     const matchingChannel = channels.find((c: string) => c.includes(channel));
 
     if (matchingChannel) {
@@ -91,15 +93,26 @@ jest.mock("../../utils/useSessionJoin", () => ({
 
 // Mock message components
 jest.mock("../../components/messages", () => ({
-  AssistantMessage: ({ message, onPopulateFeedbackText, onSendFeedbackRating, messageType }: any) => {
-    const messageText = typeof message.body === "string" ? message.body : message.body?.text || "";
+  AssistantMessage: ({
+    message,
+    onPopulateFeedbackText,
+    onSendFeedbackRating,
+    messageType,
+  }: any) => {
+    const messageText =
+      typeof message.body === "string"
+        ? message.body
+        : message.body?.text || "";
 
     return (
       <div data-testid="assistant-message">
         {messageText}
         {message.id && !messageType && (
           <div data-testid="message-feedback" data-message-id={message.id}>
-            <button data-testid="rating-button-3" onClick={() => onSendFeedbackRating?.(message.id, 3)}>
+            <button
+              data-testid="rating-button-3"
+              onClick={() => onSendFeedbackRating?.(message.id, 3)}
+            >
               3
             </button>
             <button
@@ -120,15 +133,24 @@ jest.mock("../../components/messages", () => ({
     );
   },
   SubmittedMessage: ({ message }: any) => {
-    const messageText = typeof message.body === "string" ? message.body : message.body?.text || "";
+    const messageText =
+      typeof message.body === "string"
+        ? message.body
+        : message.body?.text || "";
     return <div data-testid="submitted-message">{messageText}</div>;
   },
   ModeratorSubmittedMessage: ({ message }: any) => {
-    const messageText = typeof message.body === "string" ? message.body : message.body?.text || "";
+    const messageText =
+      typeof message.body === "string"
+        ? message.body
+        : message.body?.text || "";
     return <div data-testid="moderator-submitted-message">{messageText}</div>;
   },
   UserMessage: ({ message }: any) => {
-    const messageText = typeof message.body === "string" ? message.body : message.body?.text || "";
+    const messageText =
+      typeof message.body === "string"
+        ? message.body
+        : message.body?.text || "";
     return <div data-testid="user-message">{messageText}</div>;
   },
 }));
@@ -212,7 +234,10 @@ describe("EventAssistantRoom", () => {
     // useSessionJoin handles error/connect/disconnect events internally
     // The page component sets up message:new listener
     await waitFor(() => {
-      expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+      expect(mockSocket.on).toHaveBeenCalledWith(
+        "message:new",
+        expect.any(Function),
+      );
     });
   });
 
@@ -222,7 +247,10 @@ describe("EventAssistantRoom", () => {
     });
 
     await waitFor(() => {
-      expect(RetrieveData).toHaveBeenCalledWith("conversations/test-conversation-id", "mock-access-token");
+      expect(RetrieveData).toHaveBeenCalledWith(
+        "conversations/test-conversation-id",
+        "mock-access-token",
+      );
     });
   });
 
@@ -267,7 +295,11 @@ describe("EventAssistantRoom", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("This conversation does not have an event assistant agent.")).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "This conversation does not have an event assistant agent.",
+        ),
+      ).toBeInTheDocument();
     });
   });
 
@@ -427,7 +459,9 @@ describe("EventAssistantRoom", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText("Enter your message here")).toBeInTheDocument();
+        expect(
+          screen.getByPlaceholderText("Enter your message here"),
+        ).toBeInTheDocument();
       });
 
       // Wait for all promises to resolve (conversation data loading)
@@ -493,7 +527,9 @@ describe("EventAssistantRoom", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText("Enter your message here")).toBeInTheDocument();
+        expect(
+          screen.getByPlaceholderText("Enter your message here"),
+        ).toBeInTheDocument();
       });
 
       const user = userEvent.setup();
@@ -552,7 +588,10 @@ describe("EventAssistantRoom", () => {
     });
 
     await waitFor(() => {
-      expect(RetrieveData).toHaveBeenCalledWith("messages/test-conversation-id?channel=chat,chat-pass", "mock-access-token");
+      expect(RetrieveData).toHaveBeenCalledWith(
+        "messages/test-conversation-id?channel=chat,chat-pass",
+        "mock-access-token",
+      );
     });
   });
 });
