@@ -17,10 +17,7 @@ import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
 import { CheckAuthHeader, createConversationFromData } from "../utils/Helpers";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { AuthType } from "../types.internal";
-import {
-  trackConversationEvent,
-  setUserId,
-} from "../utils/analytics";
+import { trackConversationEvent, setUserId } from "../utils/analytics";
 import { Transcript } from "../components/";
 import { useSessionJoin } from "../utils/useSessionJoin";
 
@@ -105,10 +102,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
           if (activeTabRef.current !== "chat") {
             setUnseenChatCount((prev) => prev + 1);
           }
-        } else if (
-          !data.channels ||
-          !data.channels.includes("transcript")
-        ) {
+        } else if (!data.channels || !data.channels.includes("transcript")) {
           setAssistantMessages((prev) => [...prev, data]);
           // Increment counter if NOT viewing assistant tab
           if (activeTabRef.current !== "assistant") {
@@ -118,7 +112,9 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       }
       if (
         data.pseudonym === "Event Assistant" ||
-        data.pseudonym === "Event Assistant Plus"
+        data.pseudonym === "Event Assistant Plus" ||
+        data.pseudonym === "Event Channel Mediator" ||
+        data.pseudonym === "Event Channel Mediator Plus"
       )
         setWaitingForResponse(false);
     };
@@ -201,7 +197,9 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
         const eventAsstAgent = conversation.agents.find(
           (agent: components["schemas"]["Agent"]) =>
             agent.agentType === "eventAssistant" ||
-            agent.agentType === "eventAssistantPlus",
+            agent.agentType === "eventAssistantPlus" ||
+            agent.agentType === "eventChannelMediator" ||
+            agent.agentType === "eventChannelMediatorPlus",
         );
         if (eventAsstAgent) {
           setAgentId(eventAsstAgent.id!);
@@ -221,7 +219,13 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
 
   // Join conversation when socket, agentId, and userId are all available
   useEffect(() => {
-    if (!socket || !socket.auth || !agentId || !userId || !router.query.conversationId) {
+    if (
+      !socket ||
+      !socket.auth ||
+      !agentId ||
+      !userId ||
+      !router.query.conversationId
+    ) {
       return;
     }
 
@@ -252,7 +256,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
         channels,
       },
       () => console.log("Successfully joined conversation"),
-      (error) => console.error("Failed to join conversation:", error)
+      (error) => console.error("Failed to join conversation:", error),
     );
   }, [socket, agentId, userId, chatPasscode, router.query.conversationId]);
 
@@ -510,6 +514,10 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
                   inputValue={chatInputValue}
                   onInputChange={setChatInputValue}
                   onSendMessage={sendMessage}
+                  controlledMode={controlledMode}
+                  onExitControlledMode={exitControlledMode}
+                  enterControlledMode={enterControlledMode}
+                  sendFeedbackRating={sendFeedbackRating}
                 />
               ) : (
                 <AssistantChatPanel

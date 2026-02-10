@@ -3,7 +3,8 @@ import Linkify from "linkify-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { MessageInput } from "./MessageInput";
-import { PseudonymousMessage } from "../types.internal";
+import { MessageFeedback } from "./MessageFeedback";
+import { PseudonymousMessage, ControlledInputConfig } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { createMentionsEnhancer } from "./enhancers/mentionsEnhancer";
@@ -114,6 +115,10 @@ interface GroupChatPanelProps {
   inputValue?: string;
   onInputChange?: (value: string) => void;
   onSendMessage: (message: string) => void;
+  controlledMode?: ControlledInputConfig | null;
+  onExitControlledMode?: () => void;
+  enterControlledMode?: (config: ControlledInputConfig) => void;
+  sendFeedbackRating?: (messageId: string, rating: string) => void;
 }
 
 export const GroupChatPanel: FC<GroupChatPanelProps> = ({
@@ -123,11 +128,16 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   inputValue,
   onInputChange,
   onSendMessage,
+  controlledMode,
+  onExitControlledMode,
+  enterControlledMode,
+  sendFeedbackRating,
 }) => {
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(messages);
 
   // Extract unique contributors for mentions
   // Normalize "Event Assistant Plus" to "Event Assistant" for consistency
+  // Exclude Event Channel Mediator types from being mentionable
   const contributors = useMemo(
     () =>
       Array.from(
@@ -159,7 +169,9 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     const isCurrentUser = message.pseudonym === pseudonym;
     const isAssistant =
       message.pseudonym === "Event Assistant" ||
-      message.pseudonym === "Event Assistant Plus";
+      message.pseudonym === "Event Assistant Plus" ||
+      message.pseudonym === "Event Channel Mediator" ||
+      message.pseudonym === "Event Channel Mediator Plus";
 
     const style = isAssistant
       ? getAssistantAvatarStyle()
@@ -209,15 +221,19 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
               const isCurrentUser = message.pseudonym === pseudonym;
               const isAssistant =
                 message.pseudonym === "Event Assistant" ||
-                message.pseudonym === "Event Assistant Plus";
+                message.pseudonym === "Event Assistant Plus" ||
+                message.pseudonym === "Event Channel Mediator" ||
+                message.pseudonym === "Event Channel Mediator Plus";
 
               const style = isAssistant
                 ? getAssistantAvatarStyle()
                 : getAvatarStyle(message.pseudonym || "", isCurrentUser);
 
-              // Normalize EA Plus to EA
+              // Normalize Plus versions to base names
               const displayName =
-                message.pseudonym === "Event Assistant Plus"
+                message.pseudonym === "Event Assistant Plus" ||
+                message.pseudonym === "Event Channel Mediator Plus" ||
+                message.pseudonym === "Event Channel Mediator"
                   ? "Event Assistant"
                   : message.pseudonym;
 
@@ -291,6 +307,20 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                           ? renderAssistantMessage(parsed.text)
                           : renderMessageWithMentions(parsed.text)}
                       </div>
+
+                      {/* Feedback - rendered below the bubble for Event Assistant messages */}
+                      {isAssistant &&
+                        message.id &&
+                        enterControlledMode &&
+                        sendFeedbackRating && (
+                          <div className="mt-0" style={{ width: "85%" }}>
+                            <MessageFeedback
+                              messageId={message.id}
+                              onPopulateFeedbackText={enterControlledMode}
+                              onSendFeedbackRating={sendFeedbackRating}
+                            />
+                          </div>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -308,8 +338,8 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
           enhancers={enhancers}
           onSendMessage={onSendMessage}
           waitingForResponse={false}
-          controlledMode={null}
-          onExitControlledMode={() => {}}
+          controlledMode={controlledMode || null}
+          onExitControlledMode={onExitControlledMode || (() => {})}
           inputValue={inputValue}
           onInputChange={onInputChange}
         />
