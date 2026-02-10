@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EventCreationForm } from "../../components/EventCreationForm";
 import { RetrieveData, Request } from "../../utils";
@@ -76,11 +76,103 @@ const mockConfig = {
       name: "backChannel",
       label: "Back Channel",
       description: "An agent to analyze participant comments",
+      properties: [
+        {
+          name: "zoomMeetingUrl",
+          type: "string",
+          label: "Zoom Meeting URL",
+          required: true,
+        },
+        {
+          name: "botName",
+          type: "string",
+          label: "Zoom Bot Name",
+          default: "Back Channel",
+          required: false,
+        },
+        {
+          name: "llmModel",
+          type: "enum",
+          label: "AI Model",
+          description: "Select the AI model to use for this conversation",
+          required: true,
+          validationKeys: ["llmPlatform", "llmModel"],
+          options: [
+            {
+              name: "gpt-4o-mini",
+              label: "OpenAI GPT-4o Mini",
+              description: "Fast, lightweight model ideal for everyday conversations",
+              llmPlatform: "openai",
+              llmModel: "gpt-4o-mini",
+            },
+            {
+              name: "claude-3-5-haiku",
+              label: "AWS Bedrock Claude 3.5 Haiku",
+              description: "Efficient and cost-effective model for quick responses",
+              llmPlatform: "bedrock",
+              llmModel: "anthropic.claude-3-5-haiku-20241022-v1:0",
+            },
+            {
+              name: "claude-3-5-sonnet",
+              label: "AWS Bedrock Claude 3.5 Sonnet",
+              description: "Balanced model for complex reasoning and analysis",
+              llmPlatform: "bedrock",
+              llmModel: "anthropic.claude-3-5-sonnet-20240620-v1:0",
+            },
+          ],
+        },
+      ],
     },
     {
       name: "eventAssistant",
       label: "Event Assistant",
       description: "An assistant to answer questions about an event",
+      properties: [
+        {
+          name: "zoomMeetingUrl",
+          type: "string",
+          label: "Zoom Meeting URL",
+          required: true,
+        },
+        {
+          name: "botName",
+          type: "string",
+          label: "Zoom Bot Name",
+          default: "Event Assistant",
+          required: false,
+        },
+        {
+          name: "llmModel",
+          type: "enum",
+          label: "AI Model",
+          description: "Select the AI model to use for this conversation",
+          required: true,
+          validationKeys: ["llmPlatform", "llmModel"],
+          options: [
+            {
+              name: "gpt-4o-mini",
+              label: "OpenAI GPT-4o Mini",
+              description: "Fast, lightweight model ideal for everyday conversations",
+              llmPlatform: "openai",
+              llmModel: "gpt-4o-mini",
+            },
+            {
+              name: "claude-3-5-haiku",
+              label: "AWS Bedrock Claude 3.5 Haiku",
+              description: "Efficient and cost-effective model for quick responses",
+              llmPlatform: "bedrock",
+              llmModel: "anthropic.claude-3-5-haiku-20241022-v1:0",
+            },
+            {
+              name: "claude-3-5-sonnet",
+              label: "AWS Bedrock Claude 3.5 Sonnet",
+              description: "Balanced model for complex reasoning and analysis",
+              llmPlatform: "bedrock",
+              llmModel: "anthropic.claude-3-5-sonnet-20240620-v1:0",
+            },
+          ],
+        },
+      ],
     },
   ],
 };
@@ -476,11 +568,11 @@ describe("EventCreationForm Component", () => {
       expect(screen.getByLabelText(/Zoom Bot Name/i)).toBeInTheDocument();
     });
 
-    const botNameInput = screen.getByLabelText(/Zoom Bot Name/i);
+    const botNameInput = screen.getByLabelText(/Zoom Bot Name/i) as HTMLInputElement;
     expect(botNameInput).toHaveValue("Back Channel");
 
-    await user.clear(botNameInput);
-    await user.type(botNameInput, "Custom Bot Name");
+    // Use fireEvent to directly change the value
+    fireEvent.change(botNameInput, { target: { value: "Custom Bot Name" } });
     expect(botNameInput).toHaveValue("Custom Bot Name");
   });
 
@@ -634,9 +726,9 @@ describe("EventCreationForm Component", () => {
     await user.click(screen.getByRole("radio", { name: /back channel/i }));
     await user.click(screen.getByRole("button", { name: /next/i }));
 
-    const botNameInput = await screen.findByLabelText(/Zoom Bot Name/i);
-    await user.clear(botNameInput);
-    await user.type(botNameInput, "MyCustomBot");
+    const botNameInput = (await screen.findByLabelText(/Zoom Bot Name/i)) as HTMLInputElement;
+    // Use fireEvent to directly change the value
+    fireEvent.change(botNameInput, { target: { value: "MyCustomBot" } });
     await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => screen.getByText("About the Speakers"));

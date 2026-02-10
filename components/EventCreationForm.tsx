@@ -72,17 +72,19 @@ export const EventCreationForm: React.FC = ({}) => {
   const [conversationTypes, setConversationTypes] = useState<
     components["schemas"]["ConversationType"][] | null
   >(null);
-  const [selectedModel, setSelectedModel] = useState<string>("");
+
   const [zoomMeetingUrl, setZoomMeetingUrl] = useState<string>("");
   const [zoomMeetingUrlHasError, setZoomMeetingUrlHasError] =
     useState<boolean>(false);
   const [zoomMeetingTime, setZoomMeetingTime] = useState<string>("");
 
-  const [botName, setBotName] = useState<string | null>(null);
+  const [dynamicPropertyValues, setDynamicPropertyValues] = useState<
+    Record<string, any>
+  >({});
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [conversationData, setConversationData] = useState<Conversation | null>(
-    null
+    null,
   );
 
   const [formGroupsErrors, setFormGroupsErrors] = useState({
@@ -111,7 +113,58 @@ export const EventCreationForm: React.FC = ({}) => {
     if (selectedConvType) {
       const type = conversationTypes?.find((a) => a.name === selectedConvType);
       if (type) {
-        setBotName(type.label || type.name);
+        // Initialize dynamic property values with defaults
+        const initialValues: Record<string, any> = {};
+        type.properties?.forEach((prop) => {
+          if (prop.name !== "zoomMeetingUrl") {
+            if (prop.default !== undefined) {
+              initialValues[prop.name] = prop.default;
+            } else if (prop.type === "enum" && prop.options) {
+              // For enum types (single-choice like llmModel)
+              if (Array.isArray(prop.options) && prop.options.length > 0) {
+                const firstOption = prop.options[0];
+                if (prop.validationKeys) {
+                  // Extract values using validationKeys
+                  const defaultValue: Record<string, any> = {};
+                  prop.validationKeys.forEach((key) => {
+                    if (
+                      typeof firstOption === "object" &&
+                      firstOption !== null &&
+                      key in firstOption
+                    ) {
+                      defaultValue[key] = (firstOption as any)[key];
+                    }
+                  });
+                  initialValues[prop.name] = defaultValue;
+                } else {
+                  initialValues[prop.name] = firstOption;
+                }
+              }
+            } else if (prop.type === "object" && prop.schema) {
+              // For object types with schema (multi-item like interventionCategories)
+              const itemKey = prop.itemKey || "name";
+              const categoryDefaults: Record<string, any> = {};
+
+              prop.schema.forEach((schemaItem: any) => {
+                if (schemaItem[itemKey]) {
+                  // Build default object from the schema item's default* properties
+                  const itemValue: Record<string, any> = {};
+                  Object.keys(schemaItem).forEach((key) => {
+                    if (key.startsWith("default")) {
+                      const actualKey =
+                        key.replace("default", "").charAt(0).toLowerCase() +
+                        key.replace("default", "").slice(1);
+                      itemValue[actualKey] = schemaItem[key];
+                    }
+                  });
+                  categoryDefaults[schemaItem[itemKey]] = itemValue;
+                }
+              });
+              initialValues[prop.name] = categoryDefaults;
+            }
+          }
+        });
+        setDynamicPropertyValues(initialValues);
       }
     }
   }, [conversationTypes, selectedConvType]);
@@ -137,11 +190,6 @@ export const EventCreationForm: React.FC = ({}) => {
         setSupportedModels(supportedModels);
         setAvailablePlatforms(availablePlatforms);
         setConversationTypes(conversationTypes);
-
-        // Set default selected model
-        if (supportedModels && supportedModels.length > 0) {
-          setSelectedModel(supportedModels[0].name);
-        }
       } catch (error) {
         setFormError("Failed to load configuration.");
       }
@@ -221,7 +269,7 @@ export const EventCreationForm: React.FC = ({}) => {
   const updateModerator = (
     index: number,
     field: "name" | "bio",
-    value: string
+    value: string,
   ) => {
     const updated = [...moderators];
     updated[index][field] = value;
@@ -242,11 +290,349 @@ export const EventCreationForm: React.FC = ({}) => {
   const updateSpeaker = (
     index: number,
     field: "name" | "bio",
-    value: string
+    value: string,
   ) => {
     const updated = [...speakers];
     updated[index][field] = value;
     setSpeakers(updated);
+  };
+
+  // Helper function to render dynamic property fields
+  const renderDynamicPropertyField = (
+    prop: components["schemas"]["ConversationTypeProperty"],
+  ) => {
+    const value = dynamicPropertyValues[prop.name];
+
+    switch (prop.type) {
+      case "string":
+        return (
+          <TextField
+            key={prop.name}
+            name={prop.name}
+            label={prop.label}
+            value={value || prop.default || ""}
+            helperText={prop.description}
+            fullWidth
+            variant="outlined"
+            margin="normal"
+            required={prop.required}
+            onChange={(e) => {
+              setDynamicPropertyValues((prev) => ({
+                ...prev,
+                [prop.name]: e.target.value,
+              }));
+            }}
+          />
+        );
+
+      case "enum":
+        // Single-choice enum (like llmModel) - renders as radio buttons
+        if (prop.options && Array.isArray(prop.options)) {
+          return (
+            <FormControl
+              key={prop.name}
+              component="fieldset"
+              fullWidth
+              margin="normal"
+              required={prop.required}
+              sx={{
+                border: "1px solid rgba(0, 0, 0, 0.23)",
+                borderRadius: 1,
+                p: 2,
+                "&:focus-within": {
+                  borderColor: "primary.main",
+                  borderWidth: "2px",
+                },
+              }}
+            >
+              <FormLabel
+                component="legend"
+                sx={{
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  color: "rgba(0, 0, 0, 0.87)",
+                }}
+              >
+                {prop.label}
+              </FormLabel>
+              {prop.description && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mb: 1, display: "block" }}
+                >
+                  {prop.description}
+                </Typography>
+              )}
+              <RadioGroup
+                value={JSON.stringify(value || {})}
+                name={prop.name}
+                onChange={(e) => {
+                  try {
+                    const parsedValue = JSON.parse(e.target.value);
+                    setDynamicPropertyValues((prev) => ({
+                      ...prev,
+                      [prop.name]: parsedValue,
+                    }));
+                  } catch (err) {
+                    console.error("Failed to parse radio value:", err);
+                  }
+                }}
+                sx={{ mt: 1 }}
+              >
+                {prop.options.map((option, idx) => {
+                  // Create value object from validation keys
+                  const optionValue: Record<string, any> = {};
+                  if (prop.validationKeys) {
+                    prop.validationKeys.forEach((key) => {
+                      if (
+                        typeof option === "object" &&
+                        option !== null &&
+                        key in option
+                      ) {
+                        optionValue[key] = option[key];
+                      }
+                    });
+                  } else {
+                    // No validation keys, use the option as-is
+                    return (
+                      <div key={idx}>
+                        <FormControlLabel
+                          value={JSON.stringify(option)}
+                          control={<Radio />}
+                          label={
+                            typeof option === "object" && option !== null
+                              ? option.label ||
+                                option.name ||
+                                `Option ${idx + 1}`
+                              : String(option)
+                          }
+                        />
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={idx}>
+                      <FormControlLabel
+                        value={JSON.stringify(optionValue)}
+                        control={<Radio />}
+                        label={
+                          option.label || option.name || `Option ${idx + 1}`
+                        }
+                      />
+                      {option.description && (
+                        <div className="text-gray-600 text-sm ml-8 -mt-2">
+                          {option.description}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </RadioGroup>
+            </FormControl>
+          );
+        }
+        return null;
+
+      case "object":
+        // Multi-item object configuration (like interventionCategories)
+        if (prop.schema && Array.isArray(prop.schema)) {
+          const itemKey = prop.itemKey || "name";
+
+          return (
+            <Box key={prop.name} sx={{ mb: 3 }}>
+              <FormLabel
+                sx={{
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  color: "rgba(0, 0, 0, 0.87)",
+                  mb: 1,
+                  display: "block",
+                }}
+              >
+                {prop.label}
+              </FormLabel>
+              {prop.description && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mb: 2, display: "block" }}
+                >
+                  {prop.description}
+                </Typography>
+              )}
+              <Box sx={{ pl: 0 }}>
+                {prop.schema.map((schemaItem: any) => {
+                  const key = schemaItem[itemKey];
+
+                  // Get current value or use defaults from schema
+                  const itemValue =
+                    value?.[key] ||
+                    (() => {
+                      const defaults: Record<string, any> = {};
+                      Object.keys(schemaItem).forEach((k) => {
+                        if (k.startsWith("default")) {
+                          const actualKey =
+                            k.replace("default", "").charAt(0).toLowerCase() +
+                            k.replace("default", "").slice(1);
+                          defaults[actualKey] = schemaItem[k];
+                        }
+                      });
+                      return defaults;
+                    })();
+
+                  // Get all editable fields (exclude metadata like name, label, description)
+                  const editableFields = Object.keys(itemValue).filter(
+                    (fieldKey) =>
+                      ![
+                        "name",
+                        "label",
+                        "description",
+                        "interventions",
+                        "requiresPrivateMessages",
+                      ].includes(fieldKey),
+                  );
+
+                  return (
+                    <Box
+                      key={key}
+                      sx={{
+                        mb: 2,
+                        p: 2,
+                        border: "1px solid rgba(0, 0, 0, 0.12)",
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Box>
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ fontWeight: 600 }}
+                        >
+                          {schemaItem.label || schemaItem.name || key}
+                        </Typography>
+                        {schemaItem.description && (
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ display: "block", mb: 1 }}
+                          >
+                            {schemaItem.description}
+                          </Typography>
+                        )}
+                      </Box>
+
+                      {/* Render each editable field */}
+                      <Box sx={{ mt: 1 }}>
+                        {editableFields.map((fieldKey) => {
+                          const fieldValue = itemValue[fieldKey];
+
+                          // Render boolean fields as checkboxes
+                          if (typeof fieldValue === "boolean") {
+                            return (
+                              <FormControlLabel
+                                key={fieldKey}
+                                control={
+                                  <Checkbox
+                                    checked={fieldValue}
+                                    onChange={(e) => {
+                                      setDynamicPropertyValues((prev) => ({
+                                        ...prev,
+                                        [prop.name]: {
+                                          ...prev[prop.name],
+                                          [key]: {
+                                            ...itemValue,
+                                            [fieldKey]: e.target.checked,
+                                          },
+                                        },
+                                      }));
+                                    }}
+                                  />
+                                }
+                                label={
+                                  fieldKey.charAt(0).toUpperCase() +
+                                  fieldKey.slice(1)
+                                }
+                              />
+                            );
+                          }
+
+                          // Render numeric fields as number inputs
+                          if (typeof fieldValue === "number") {
+                            return (
+                              <TextField
+                                key={fieldKey}
+                                label={
+                                  fieldKey.charAt(0).toUpperCase() +
+                                  fieldKey.slice(1)
+                                }
+                                type="number"
+                                value={fieldValue}
+                                inputProps={{ min: 0, max: 10, step: 0.1 }}
+                                size="small"
+                                sx={{ mt: 1, width: "100%" }}
+                                onChange={(e) => {
+                                  const numValue = parseFloat(e.target.value);
+                                  setDynamicPropertyValues((prev) => ({
+                                    ...prev,
+                                    [prop.name]: {
+                                      ...prev[prop.name],
+                                      [key]: {
+                                        ...itemValue,
+                                        [fieldKey]: isNaN(numValue)
+                                          ? 0
+                                          : numValue,
+                                      },
+                                    },
+                                  }));
+                                }}
+                              />
+                            );
+                          }
+
+                          // Render string fields as text inputs
+                          if (typeof fieldValue === "string") {
+                            return (
+                              <TextField
+                                key={fieldKey}
+                                label={
+                                  fieldKey.charAt(0).toUpperCase() +
+                                  fieldKey.slice(1)
+                                }
+                                value={fieldValue}
+                                size="small"
+                                sx={{ mt: 1, width: "100%" }}
+                                onChange={(e) => {
+                                  setDynamicPropertyValues((prev) => ({
+                                    ...prev,
+                                    [prop.name]: {
+                                      ...prev[prop.name],
+                                      [key]: {
+                                        ...itemValue,
+                                        [fieldKey]: e.target.value,
+                                      },
+                                    },
+                                  }));
+                                }}
+                              />
+                            );
+                          }
+
+                          return null;
+                        })}
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Box>
+          );
+        }
+        return null;
+
+      default:
+        return null;
+    }
   };
 
   const handleNext = () => {
@@ -276,7 +662,7 @@ export const EventCreationForm: React.FC = ({}) => {
       ? moderators.filter((m) => m.name.trim() !== "" || m.bio.trim() !== "")
       : [];
     const validSpeakers = speakers.filter(
-      (s) => s.name.trim() !== "" || s.bio.trim() !== ""
+      (s) => s.name.trim() !== "" || s.bio.trim() !== "",
     );
 
     let body: any = {
@@ -290,16 +676,32 @@ export const EventCreationForm: React.FC = ({}) => {
       ...(validSpeakers.length > 0 && { presenters: validSpeakers }),
     };
 
-    const model = supportedModels!.find(
-      (model) => model.name === selectedModel
-    )!;
-    // TODO dynamically create form and set values based on the properties of each conversation type
-    // For now, we know both types have the same properties, so is hardcoded
-    const properties = {
+    // Dynamically build properties based on conversationType schema
+    const properties: Record<string, any> = {
       zoomMeetingUrl,
-      ...(botName && { botName }),
-      llmModel: { llmModel: model.llmModel, llmPlatform: model.llmPlatform },
     };
+
+    const selectedType = conversationTypes?.find(
+      (type) => type.name === selectedConvType,
+    );
+
+    if (selectedType?.properties) {
+      selectedType.properties.forEach((prop) => {
+        if (prop.name === "zoomMeetingUrl") {
+          // Already handled above
+          return;
+        }
+
+        const value = dynamicPropertyValues[prop.name];
+
+        // Only include the property if it has a value or if it's required
+        if (value !== undefined && value !== null && value !== "") {
+          properties[prop.name] = value;
+        } else if (prop.required && prop.default !== undefined) {
+          properties[prop.name] = prop.default;
+        }
+      });
+    }
 
     body = {
       ...body,
@@ -314,7 +716,7 @@ export const EventCreationForm: React.FC = ({}) => {
         }
         if ("error" in data) {
           setFormError(
-            data.message?.message || "Failed to create conversation."
+            data.message?.message || "Failed to create conversation.",
           );
           return;
         }
@@ -419,9 +821,9 @@ export const EventCreationForm: React.FC = ({}) => {
                     !formRef.current?.elements.namedItem("name") ||
                       !(
                         formRef.current.elements.namedItem(
-                          "name"
+                          "name",
                         ) as HTMLInputElement
-                      ).value
+                      ).value,
                   )
                 }
                 error={eventNameHasError}
@@ -451,7 +853,7 @@ export const EventCreationForm: React.FC = ({}) => {
                 onBlur={() =>
                   // Check format on unfocus
                   setZoomMeetingUrlHasError(
-                    !zoomMeetingUrl || zoomMeetingUrl.length < 10
+                    !zoomMeetingUrl || zoomMeetingUrl.length < 10,
                   )
                 }
                 error={zoomMeetingUrlHasError}
@@ -470,7 +872,7 @@ export const EventCreationForm: React.FC = ({}) => {
                   label="Meeting Day/Time"
                   onChange={(newValue) =>
                     setZoomMeetingTime(
-                      newValue?.isValid() ? newValue?.toISOString() : ""
+                      newValue?.isValid() ? newValue?.toISOString() : "",
                     )
                   }
                   slotProps={{
@@ -539,8 +941,8 @@ export const EventCreationForm: React.FC = ({}) => {
                             } else {
                               setSelectedPlatforms(
                                 selectedPlatforms.filter(
-                                  (item) => item !== platform.name
-                                )
+                                  (item) => item !== platform.name,
+                                ),
                               );
                             }
                           }}
@@ -624,63 +1026,14 @@ export const EventCreationForm: React.FC = ({}) => {
               <Typography variant="h5" component="h2" gutterBottom>
                 Agent Configuration
               </Typography>
-              <FormControl
-                component="fieldset"
-                fullWidth
-                margin="normal"
-                sx={{
-                  border: "1px solid rgba(0, 0, 0, 0.23)",
-                  borderRadius: 1,
-                  p: 2,
-                  "&:focus-within": {
-                    borderColor: "primary.main",
-                    borderWidth: "2px",
-                  },
-                }}
-              >
-                <FormLabel
-                  component="legend"
-                  sx={{
-                    fontSize: "0.875rem",
-                    fontWeight: 500,
-                    color: "rgba(0, 0, 0, 0.87)",
-                  }}
-                >
-                  Model that your agent will use
-                </FormLabel>
-                <RadioGroup
-                  value={selectedModel}
-                  name="selectedModel"
-                  onChange={(e) => {
-                    setSelectedModel(e.target.value);
-                  }}
-                  sx={{ mt: -1 }}
-                >
-                  {(supportedModels || []).map((option) => (
-                    <div key={option.name}>
-                      <FormControlLabel
-                        value={option.name}
-                        control={<Radio />}
-                        label={option.label}
-                      />
-                      <div className="text-gray-600 text-sm ml-8 -mt-2">
-                        {option.description}
-                      </div>
-                    </div>
-                  ))}
-                </RadioGroup>
-              </FormControl>
-              <TextField
-                name="zoomBotName"
-                label="Zoom Bot Name"
-                id="zoom-bot-name"
-                value={botName || ""}
-                helperText="Enter the display name for the bot as it will appear in Zoom."
-                fullWidth
-                variant="outlined"
-                margin="normal"
-                onChange={(e) => setBotName(e.target.value)}
-              />
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Configure your agent&apos;s behavior and settings
+              </Typography>
+
+              {conversationTypes
+                ?.find((type) => type.name === selectedConvType)
+                ?.properties?.filter((prop) => prop.name !== "zoomMeetingUrl")
+                .map((prop) => renderDynamicPropertyField(prop))}
             </Box>
           )}
 
