@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import { getUserTimezone } from "../../utils";
 import { CheckAuthHeader, getConversation } from "../../utils/Helpers";
-import { AuthType } from "../../types.internal";
+import { useSessionJoin } from "../../utils/useSessionJoin";
 
 import React from "react";
 import {
@@ -12,20 +12,37 @@ import {
   Divider,
   CircularProgress,
   Button,
+  Switch,
   Skeleton,
   IconButton,
   Tooltip,
-  Box,
+  Dialog,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import EventIcon from "@mui/icons-material/Event";
 import ComputerIcon from "@mui/icons-material/Computer";
+import DeleteIcon from "@mui/icons-material/Delete";
+import ReportProblem from "@mui/icons-material/ReportProblem";
 import { components } from "../../types";
-import { Conversation, ErrorMessage } from "../../types.internal";
+import { AuthType, Conversation, ErrorMessage } from "../../types.internal";
 import { Request } from "../../utils/Api";
+import { SendData } from "../../utils/Helpers";
 
-const EventCard = ({ event }: { event: Conversation }) => {
+const EventCard = ({
+  event,
+  onDelete,
+  currentUserId,
+}: {
+  event: Conversation;
+  onDelete: (id: string) => void;
+  currentUserId: string | null;
+}) => {
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Check if current user is the owner of this event
+  const isOwner = currentUserId && event.owner === currentUserId;
 
   const handleCopyLink = async (url: string) => {
     try {
@@ -36,185 +53,308 @@ const EventCard = ({ event }: { event: Conversation }) => {
       console.error("Failed to copy link:", err);
     }
   };
-  return (
-    <Card className="w-full shadow-sm rounded-xl border border-gray-200 hover:shadow-md transition-shadow">
-      <CardContent className="p-4">
-        {/* Header */}
-        <div className="flex justify-between items-start">
-          <div className="flex-1 pr-4">
-            <Typography
-              variant="h5"
-              className="font-semibold leading-snug line-clamp-2"
-            >
-              {event.name}
-            </Typography>
-          </div>
-        </div>
 
-        {/* Date and Platforms */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 text-sm text-gray-600 mt-3 mb-2">
-          <div className="flex-1 flex items-start gap-2">
-            <EventIcon
-              color={event.active ? "success" : "inherit"}
-              style={{ fontSize: "18px" }}
-              className="mt-0.5"
-            />
-            <div>
-              {event.scheduledTime
-                ? new Date(event.scheduledTime).toLocaleString("en-US", {
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                    hour12: true,
-                    timeZone: getUserTimezone(),
-                    timeZoneName: "short",
-                  })
-                : new Date(event.createdAt!).toLocaleString("en-US", {
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                    hour12: true,
-                    timeZone: getUserTimezone(),
-                    timeZoneName: "short",
-                  })}
-              {event.active && (
-                <span className="ml-2 text-green-600 font-medium">
-                  • In Progress
+  const handleDeleteClick = () => {
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    setIsDeleting(true);
+    try {
+      await SendData(`conversations/${event.id}`, {}, undefined, {
+        method: "DELETE",
+      });
+      setDeleteDialogOpen(false);
+      onDelete(event.id!);
+    } catch (err) {
+      console.error("Failed to delete event:", err);
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+  };
+
+  return (
+    <>
+      <Card className="w-full shadow-sm rounded-xl border border-gray-200 hover:shadow-md transition-shadow">
+        <CardContent className="p-4">
+          {/* Header */}
+          <div className="flex justify-between items-start">
+            <div className="flex-1 pr-4">
+              <Tooltip title={`ID: ${event.id}`} placement="bottom-start">
+                <Typography
+                  variant="h5"
+                  className="font-semibold leading-snug line-clamp-2"
+                >
+                  {event.name}
+                </Typography>
+              </Tooltip>
+              {isOwner && (
+                <span className="inline-block mt-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                  My Event
                 </span>
               )}
             </div>
+            {isOwner && (
+              <Tooltip title="Delete event">
+                <IconButton
+                  size="small"
+                  onClick={handleDeleteClick}
+                  className="text-gray-500 hover:text-red-600"
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
           </div>
 
-          {/* Platforms */}
-          {event.platformTypes && event.platformTypes.length > 0 && (
+          {/* Date and Platforms */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 text-sm text-gray-600 mt-3 mb-2">
             <div className="flex-1 flex items-start gap-2">
-              <ComputerIcon style={{ fontSize: "18px" }} className="mt-0.5" />
+              <EventIcon
+                color={event.active ? "success" : "inherit"}
+                style={{ fontSize: "18px" }}
+                className="mt-0.5"
+              />
               <div>
-                <span className="font-medium">Platforms:</span>{" "}
-                {event.platformTypes
-                  .map((platform) => platform.label || platform.name)
-                  .join(", ")}
+                {event.scheduledTime
+                  ? new Date(event.scheduledTime).toLocaleString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                      timeZone: getUserTimezone(),
+                      timeZoneName: "short",
+                    })
+                  : new Date(event.createdAt!).toLocaleString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                      timeZone: getUserTimezone(),
+                      timeZoneName: "short",
+                    })}
+                {event.active && (
+                  <span className="ml-2 text-green-600 font-medium">
+                    • In Progress
+                  </span>
+                )}
               </div>
             </div>
+
+            {/* Platforms */}
+            {event.platformTypes && event.platformTypes.length > 0 && (
+              <div className="flex-1 flex items-start gap-2">
+                <ComputerIcon style={{ fontSize: "18px" }} className="mt-0.5" />
+                <div>
+                  <span className="font-medium">Platforms:</span>{" "}
+                  {event.platformTypes
+                    .map((platform) => platform.label || platform.name)
+                    .join(", ")}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Divider className="my-3" />
+
+          {/* Agent info */}
+          {event.type && (
+            <div className="text-sm text-gray-700">
+              <span className="font-medium">Agent:</span> {event.type.label}
+            </div>
           )}
-        </div>
-
-        <Divider className="my-3" />
-
-        {/* Agent info */}
-        {event.type && (
-          <div className="text-sm text-gray-700">
-            <span className="font-medium">Agent:</span> {event.type.label}
-          </div>
-        )}
-        {event.eventUrls.zoom && (
-          <div className="text-sm text-gray-700 mt-1">
-            <span className="font-medium">Zoom Link:</span>{" "}
-            <a
-              href={event.eventUrls.zoom.url}
-              className="text-blue-600 hover:underline"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {event.eventUrls.zoom.label}
-            </a>
-            <Tooltip
-              title={
-                copiedLink === event.eventUrls.zoom.url
-                  ? "Copied!"
-                  : "Copy link"
-              }
-            >
-              <IconButton
-                size="small"
-                onClick={() => handleCopyLink(event.eventUrls.zoom!.url)}
-                className="p-0.5"
+          {event.eventUrls.zoom && (
+            <div className="text-sm text-gray-700 mt-1">
+              <span className="font-medium">Zoom Link:</span>{" "}
+              <a
+                href={event.eventUrls.zoom.url}
+                className="text-blue-600 hover:underline"
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                <ContentCopyIcon
-                  fontSize="small"
-                  className="text-gray-500"
-                  style={{ fontSize: "14px" }}
-                />
-              </IconButton>
-            </Tooltip>
-          </div>
-        )}
-        {/* Links */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:gap-2 text-sm mt-5">
-          {event.eventUrls.moderator &&
-            event.eventUrls.moderator.length > 0 && (
-              <div className="flex-1">
-                <div className="font-medium">Moderator Links</div>
-                {event.eventUrls.moderator?.map((link, i) => (
-                  <div key={i}>
-                    <a
-                      href={link.url}
-                      className="text-blue-600 hover:underline"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {link.label}
-                    </a>
-                    <Tooltip
-                      title={copiedLink === link.url ? "Copied!" : "Copy link"}
-                    >
-                      <IconButton
-                        size="small"
-                        onClick={() => handleCopyLink(link.url)}
-                        className="p-0.5"
+                {event.eventUrls.zoom.label}
+              </a>
+              <Tooltip
+                title={
+                  copiedLink === event.eventUrls.zoom.url
+                    ? "Copied!"
+                    : "Copy link"
+                }
+              >
+                <IconButton
+                  size="small"
+                  onClick={() => handleCopyLink(event.eventUrls.zoom!.url)}
+                  className="p-0.5"
+                >
+                  <ContentCopyIcon
+                    fontSize="small"
+                    className="text-gray-500"
+                    style={{ fontSize: "14px" }}
+                  />
+                </IconButton>
+              </Tooltip>
+            </div>
+          )}
+          {/* Links */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:gap-2 text-sm mt-5">
+            {event.eventUrls.moderator &&
+              event.eventUrls.moderator.length > 0 && (
+                <div className="flex-1">
+                  <div className="font-medium">Moderator Links</div>
+                  {event.eventUrls.moderator?.map((link, i) => (
+                    <div key={i}>
+                      <a
+                        href={link.url}
+                        className="text-blue-600 hover:underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
                       >
-                        <ContentCopyIcon
-                          fontSize="small"
-                          className="text-gray-500"
-                          style={{ fontSize: "14px" }}
-                        />
-                      </IconButton>
-                    </Tooltip>
-                  </div>
-                ))}
-              </div>
-            )}
+                        {link.label}
+                      </a>
+                      <Tooltip
+                        title={
+                          copiedLink === link.url ? "Copied!" : "Copy link"
+                        }
+                      >
+                        <IconButton
+                          size="small"
+                          onClick={() => handleCopyLink(link.url)}
+                          className="p-0.5"
+                        >
+                          <ContentCopyIcon
+                            fontSize="small"
+                            className="text-gray-500"
+                            style={{ fontSize: "14px" }}
+                          />
+                        </IconButton>
+                      </Tooltip>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-          {event.eventUrls.participant &&
-            event.eventUrls.participant.length > 0 && (
-              <div className="flex-1">
-                <div className="font-medium">Participant Links</div>
-                {event.eventUrls.participant.map((link, i) => (
-                  <div key={i}>
-                    <a
-                      href={link.url}
-                      className="text-blue-600 hover:underline"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {link.label}
-                    </a>
-                    <Tooltip
-                      title={copiedLink === link.url ? "Copied!" : "Copy link"}
-                    >
-                      <IconButton
-                        size="small"
-                        onClick={() => handleCopyLink(link.url)}
-                        className="p-0.5"
+            {event.eventUrls.participant &&
+              event.eventUrls.participant.length > 0 && (
+                <div className="flex-1">
+                  <div className="font-medium">Participant Links</div>
+                  {event.eventUrls.participant.map((link, i) => (
+                    <div key={i}>
+                      <a
+                        href={link.url}
+                        className="text-blue-600 hover:underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
                       >
-                        <ContentCopyIcon
-                          fontSize="small"
-                          className="text-gray-500"
-                          style={{ fontSize: "14px" }}
-                        />
-                      </IconButton>
-                    </Tooltip>
-                  </div>
-                ))}
-              </div>
-            )}
+                        {link.label}
+                      </a>
+                      <Tooltip
+                        title={
+                          copiedLink === link.url ? "Copied!" : "Copy link"
+                        }
+                      >
+                        <IconButton
+                          size="small"
+                          onClick={() => handleCopyLink(link.url)}
+                          className="p-0.5"
+                        >
+                          <ContentCopyIcon
+                            fontSize="small"
+                            className="text-gray-500"
+                            style={{ fontSize: "14px" }}
+                          />
+                        </IconButton>
+                      </Tooltip>
+                    </div>
+                  ))}
+                </div>
+              )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleDeleteCancel}
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: "16px",
+              padding: "32px 24px",
+              maxWidth: "440px",
+              textAlign: "center",
+            },
+          },
+        }}
+      >
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 rounded-full border-2 border-red-400 flex items-center justify-center">
+            <ReportProblem sx={{ fontSize: 40, color: "#f87171" }} />
+          </div>
+          <h2
+            id="delete-dialog-title"
+            className="text-2xl font-bold text-gray-900"
+          >
+            Delete event?
+          </h2>
+          <p
+            id="delete-dialog-description"
+            className="text-gray-600 text-base leading-relaxed max-w-sm"
+          >
+            This will permanently delete &quot;{event.name}&quot; and cannot be
+            undone.
+          </p>
+          <div className="flex flex-col gap-3 w-full mt-2">
+            <Button
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+              variant="contained"
+              sx={{
+                backgroundColor: "#b91c1c",
+                color: "white",
+                padding: "12px 24px",
+                borderRadius: "8px",
+                textTransform: "none",
+                fontSize: "16px",
+                fontWeight: 600,
+                "&:hover": {
+                  backgroundColor: "#991b1b",
+                },
+              }}
+              autoFocus
+            >
+              {isDeleting ? <CircularProgress size={20} /> : "Yes, Delete"}
+            </Button>
+            <Button
+              onClick={handleDeleteCancel}
+              disabled={isDeleting}
+              sx={{
+                color: "#4b5563",
+                textTransform: "none",
+                fontSize: "16px",
+                fontWeight: 500,
+                textDecoration: "underline",
+                "&:hover": {
+                  backgroundColor: "transparent",
+                  textDecoration: "underline",
+                },
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </Dialog>
+    </>
   );
 };
 
@@ -262,6 +402,10 @@ export const getServerSideProps = async (context: { req: any }) => {
 
 function EventScreen({ authType }: { authType: AuthType }) {
   const router = useRouter();
+
+  // Get userId from session
+  const { userId } = useSessionJoin();
+
   const [conversationsList, setConversationsList] =
     useState<components["schemas"]["Conversation"][]>();
   const [loadedConversations, setLoadedConversations] = useState<
@@ -271,54 +415,129 @@ function EventScreen({ authType }: { authType: AuthType }) {
   const [eventsShown, setEventsShown] = useState(6);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [includePast, setIncludePast] = useState(false);
+  const [myEventsOnly, setMyEventsOnly] = useState(false);
+  const allConversationsRef = useRef<
+    components["schemas"]["Conversation"][] | null
+  >(null);
 
   /**
-   * Filter conversations to only include those with scheduledTime in the future
+   * Filter conversations based on whether to include past events and owner
+   * @param includePast true to include all events, false for only active/future
+   * @param myEventsOnly true to show only events owned by current user
    */
-  const filterUpcomingConversations = (
+  const filterConversations = (
     conversations: components["schemas"]["Conversation"][],
+    includePast: boolean,
+    myEventsOnly: boolean = false,
   ) => {
     const now = new Date();
     return conversations.filter((conv) => {
-      if (!conv.scheduledTime) {
-        return conv.active;
+      // Filter by owner if myEventsOnly is enabled
+      if (myEventsOnly && conv.owner !== userId) {
+        return false;
       }
-      const scheduledDate = new Date(conv.scheduledTime);
-      return scheduledDate > now;
+
+      const scheduledTime = conv.scheduledTime
+        ? new Date(conv.scheduledTime)
+        : null;
+      const isPastEvent = scheduledTime ? scheduledTime <= now : false;
+
+      // Always show active events
+      if (conv.active) return true;
+
+      // Show future events
+      if (scheduledTime && scheduledTime > now) return true;
+
+      // Show past events only if includePast is true
+      if (isPastEvent && includePast) return true;
+
+      return false;
     });
   };
 
   /**
-   * Fetch detailed conversation data for specific conversations
-   * @param list Array of conversations to fetch details for
-   * @param indices Array of indices from conversationsList to fetch
+   * Handle deletion of an event
+   * @param id The conversation ID to delete
+   */
+  const handleDelete = async (id: string) => {
+    setLoadedConversations((prev) => prev.filter((conv) => conv.id !== id));
+
+    const newList = conversationsList?.filter((conv) => conv.id !== id) ?? [];
+    setConversationsList(newList);
+
+    if (allConversationsRef.current) {
+      allConversationsRef.current = allConversationsRef.current.filter(
+        (conv) => conv.id !== id,
+      );
+    }
+
+    // Load the next event to fill the gap if one exists
+    if (newList.length > eventsShown - 1) {
+      const nextIndex = await fetchDetailedConversations(
+        newList,
+        eventsShown - 1,
+        1,
+      );
+      setEventsShown(nextIndex);
+    }
+  };
+
+  /**
+   * Fetch detailed conversation data, skipping past nulls until target is met
+   * @param list Full sorted conversation list to fetch from
+   * @param startIndex Index to begin fetching from
+   * @param target Number of valid conversations to load
+   * @param replace If true, replace loadedConversations instead of appending
+   * @returns The next index to fetch from after this call
    */
   const fetchDetailedConversations = async (
     list: components["schemas"]["Conversation"][],
-    indices: number[],
-  ) => {
-    const detailedConversations = await Promise.all(
-      indices.map(async (index) => {
-        const conversationId = list[index].id;
-        return await getConversation(conversationId!);
-      }),
-    );
+    startIndex: number,
+    target: number,
+    replace: boolean = false,
+  ): Promise<number> => {
+    const allValid: Conversation[] = [];
+    let currentIndex = startIndex;
 
-    // Filter out null values from failed fetches
-    const validConversations = detailedConversations.filter(
-      (conv): conv is Conversation => conv !== null,
-    );
+    while (allValid.length < target && currentIndex < list.length) {
+      const batchSize = Math.min(
+        target - allValid.length,
+        list.length - currentIndex,
+      );
+      const batch = await Promise.all(
+        Array.from({ length: batchSize }, async (_, i) => {
+          const id = list[currentIndex + i].id;
+          try {
+            return await getConversation(id!);
+          } catch (err) {
+            console.error(`Failed to fetch conversation ${id}:`, err);
+            return null;
+          }
+        }),
+      );
+      batch.forEach((conv, i) => {
+        if (!conv) {
+          console.warn(
+            `Conversation ${list[currentIndex + i].id} returned null`,
+          );
+        }
+      });
+      allValid.push(
+        ...batch.filter((conv): conv is Conversation => conv !== null),
+      );
+      currentIndex += batchSize;
+    }
 
-    setLoadedConversations([
-      ...(loadedConversations || []),
-      ...validConversations,
-    ]);
+    setLoadedConversations((prev) => [...(replace ? [] : prev), ...allValid]);
+
+    return currentIndex;
   };
 
   useEffect(() => {
     async function fetchInitialConversations() {
       const data: components["schemas"]["Conversation"][] | ErrorMessage =
-        await Request("conversations/userConversations");
+        await Request("conversations");
 
       // If unauthorized, redirect to login
       if ("error" in data && data.message?.code === 401) {
@@ -334,10 +553,19 @@ function EventScreen({ authType }: { authType: AuthType }) {
         return;
       }
 
-      // Filter to only upcoming events
-      const upcomingConversations = filterUpcomingConversations(data);
-      // Sort conversations chronologically: use scheduledTime if available, otherwise use createdAt
-      const sortedConversations = upcomingConversations.sort((a, b) => {
+      // Store raw response for tab switching
+      allConversationsRef.current = data;
+
+      // Filter to only active/future events (not past)
+      const filtered = filterConversations(data, false, myEventsOnly);
+
+      // Sort: active events first, then all others by most recent
+      const sorted = [...filtered].sort((a, b) => {
+        // Pin active events to the top
+        if (a.active && !b.active) return -1;
+        if (!a.active && b.active) return 1;
+
+        // For non-active events (or both active), sort by most recent first
         const aTime = a.scheduledTime
           ? new Date(a.scheduledTime).getTime()
           : new Date(a.createdAt!).getTime();
@@ -345,13 +573,13 @@ function EventScreen({ authType }: { authType: AuthType }) {
           ? new Date(b.scheduledTime).getTime()
           : new Date(b.createdAt!).getTime();
 
-        return aTime - bTime;
+        return bTime - aTime; // Most recent first
       });
-      setConversationsList(sortedConversations);
+      setConversationsList(sorted);
 
       // Load first 6 details
-      const initialIndices = sortedConversations.slice(0, 6).map((_, i) => i);
-      await fetchDetailedConversations(sortedConversations, initialIndices);
+      const nextIndex = await fetchDetailedConversations(sorted, 0, 6);
+      setEventsShown(nextIndex);
       setIsInitialLoading(false);
     }
 
@@ -364,24 +592,112 @@ function EventScreen({ authType }: { authType: AuthType }) {
 
     setIsLoadingMore(true);
 
-    const nextIndices = conversationsList
-      .slice(eventsShown, eventsShown + 6)
-      .map((_, i) => i + eventsShown);
-
-    await fetchDetailedConversations(conversationsList, nextIndices);
-    setEventsShown((prev) => prev + 6);
+    const nextIndex = await fetchDetailedConversations(
+      conversationsList,
+      eventsShown,
+      6,
+    );
+    setEventsShown(nextIndex);
     setIsLoadingMore(false);
+  };
+
+  const handleToggle = async (include: boolean) => {
+    if (!allConversationsRef.current) return;
+    setIncludePast(include);
+    setIsInitialLoading(true);
+
+    // Filter based on whether to include past events
+    const filtered = filterConversations(allConversationsRef.current, include, myEventsOnly);
+
+    // Sort: active events first, then all others by most recent
+    const sorted = [...filtered].sort((a, b) => {
+      // Pin active events to the top
+      if (a.active && !b.active) return -1;
+      if (!a.active && b.active) return 1;
+
+      // For non-active events (or both active), sort by most recent first
+      const aTime = a.scheduledTime
+        ? new Date(a.scheduledTime).getTime()
+        : new Date(a.createdAt!).getTime();
+      const bTime = b.scheduledTime
+        ? new Date(b.scheduledTime).getTime()
+        : new Date(b.createdAt!).getTime();
+
+      return bTime - aTime; // Most recent first
+    });
+
+    setConversationsList(sorted);
+
+    const nextIndex = await fetchDetailedConversations(sorted, 0, 6, true);
+    setEventsShown(nextIndex);
+    setIsInitialLoading(false);
+  };
+
+  const handleMyEventsToggle = async (showOnlyMine: boolean) => {
+    if (!allConversationsRef.current) return;
+    setMyEventsOnly(showOnlyMine);
+    setIsInitialLoading(true);
+
+    // Filter based on owner and past events settings
+    const filtered = filterConversations(allConversationsRef.current, includePast, showOnlyMine);
+
+    // Sort: active events first, then all others by most recent
+    const sorted = [...filtered].sort((a, b) => {
+      // Pin active events to the top
+      if (a.active && !b.active) return -1;
+      if (!a.active && b.active) return 1;
+
+      // For non-active events (or both active), sort by most recent first
+      const aTime = a.scheduledTime
+        ? new Date(a.scheduledTime).getTime()
+        : new Date(a.createdAt!).getTime();
+      const bTime = b.scheduledTime
+        ? new Date(b.scheduledTime).getTime()
+        : new Date(b.createdAt!).getTime();
+
+      return bTime - aTime; // Most recent first
+    });
+
+    setConversationsList(sorted);
+
+    const nextIndex = await fetchDetailedConversations(sorted, 0, 6, true);
+    setEventsShown(nextIndex);
+    setIsInitialLoading(false);
   };
 
   return (
     <div className="flex flex-col items-center mt-12 mb-8">
       <Typography variant="h4" gutterBottom>
-        Upcoming Events
+        Events
       </Typography>
       {errorMessage ? (
         <Typography color="error">{errorMessage}</Typography>
       ) : (
         <div className="w-3/4 space-y-6">
+          <div className="flex justify-end gap-2">
+            <label className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-3 py-1 cursor-pointer">
+              <span className="text-xs text-gray-500 select-none">
+                My events only
+              </span>
+              <Switch
+                checked={myEventsOnly}
+                onChange={(e) => handleMyEventsToggle(e.target.checked)}
+                size="small"
+                sx={{ m: 0 }}
+              />
+            </label>
+            <label className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-3 py-1 cursor-pointer">
+              <span className="text-xs text-gray-500 select-none">
+                Include past events
+              </span>
+              <Switch
+                checked={includePast}
+                onChange={(e) => handleToggle(e.target.checked)}
+                size="small"
+                sx={{ m: 0 }}
+              />
+            </label>
+          </div>
           {isInitialLoading ? (
             // Show 6 skeleton cards while loading
             <>
@@ -392,31 +708,30 @@ function EventScreen({ authType }: { authType: AuthType }) {
           ) : (
             <>
               {loadedConversations.length === 0 && !isInitialLoading ? (
-                <Box
-                  display="flex"
-                  flexDirection="column"
-                  alignItems="center"
-                  justifyContent="center"
-                >
-                  <Typography
-                    variant="body1"
-                    className="text-gray-600 text-center"
-                  >
-                    Currently you have no events scheduled
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 flex flex-col items-center gap-3">
+                  <EventIcon
+                    className="text-gray-400"
+                    style={{ fontSize: "40px" }}
+                  />
+                  <Typography variant="body1" className="text-gray-500">
+                    {includePast ? "No events" : "No upcoming events"}
                   </Typography>
-                  <Box mt={6}>
-                    <Button
-                      variant="outlined"
-                      onClick={() => router.push("/admin/events/new")}
-                    >
-                      Create an event
-                    </Button>
-                  </Box>
-                </Box>
+                  <Button
+                    variant="outlined"
+                    onClick={() => router.push("/admin/events/new")}
+                  >
+                    Create an event
+                  </Button>
+                </div>
               ) : (
                 <>
                   {loadedConversations.map((event) => (
-                    <EventCard key={event.id} event={event} />
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      onDelete={handleDelete}
+                      currentUserId={userId}
+                    />
                   ))}
 
                   {conversationsList &&

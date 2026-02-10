@@ -232,4 +232,27 @@ describe("EventStatus", () => {
       screen.getByText("The event is currently active.")
     ).toBeInTheDocument();
   });
+
+  it("renders zoom link when provided in eventUrls", () => {
+    const conversationWithZoom = {
+      ...mockConversationData,
+      eventUrls: {
+        ...mockConversationData.eventUrls,
+        zoom: {
+          label: "Zoom Meeting",
+          url: "https://zoom.us/j/123456789",
+        },
+      },
+    };
+
+    render(<EventStatus conversationData={conversationWithZoom} />);
+
+    expect(screen.getByText("Zoom Meeting:")).toBeInTheDocument();
+    const zoomLink = screen.getByRole("link", {
+      name: /https:\/\/zoom\.us\/j\/123456789/i,
+    });
+    expect(zoomLink).toBeInTheDocument();
+    expect(zoomLink).toHaveAttribute("href", "https://zoom.us/j/123456789");
+    expect(zoomLink).toHaveAttribute("target", "_blank");
+  });
 });

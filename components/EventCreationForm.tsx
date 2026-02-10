@@ -722,9 +722,7 @@ export const EventCreationForm: React.FC = ({}) => {
         }
         createConversationFromData(data).then((conversation) => {
           setConversationData(conversation);
-
           setFormSubmitted(true);
-          router.push(`/admin/event/view/${data.id}`);
         });
       })
       .catch((error) => {
