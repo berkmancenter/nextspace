@@ -8,6 +8,10 @@ import { PseudonymousMessage, ControlledInputConfig } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { createMentionsEnhancer } from "./enhancers/mentionsEnhancer";
+import {
+  isAssistantPseudonym,
+  normalizeAssistantPseudonym,
+} from "../utils/Helpers";
 
 /**
  * Parsed message body structure
@@ -136,19 +140,13 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(messages);
 
   // Extract unique contributors for mentions
-  // Normalize "Event Assistant Plus" to "Event Assistant" for consistency
-  // Exclude Event Channel Mediator types from being mentionable
+  // Normalize "Event Assistant Plus" and "Mediators" to "Event Assistant" for consistency
   const contributors = useMemo(
     () =>
       Array.from(
         new Set(
           messages
-            .map((m) => {
-              if (m.pseudonym === "Event Assistant Plus") {
-                return "Event Assistant";
-              }
-              return m.pseudonym;
-            })
+            .map((m) => normalizeAssistantPseudonym(m.pseudonym))
             .filter(Boolean),
         ),
       ),
@@ -167,11 +165,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   // Helper to render avatar for chat mode
   const renderAvatar = (message: PseudonymousMessage) => {
     const isCurrentUser = message.pseudonym === pseudonym;
-    const isAssistant =
-      message.pseudonym === "Event Assistant" ||
-      message.pseudonym === "Event Assistant Plus" ||
-      message.pseudonym === "Event Channel Mediator" ||
-      message.pseudonym === "Event Channel Mediator Plus";
+    const isAssistant = isAssistantPseudonym(message.pseudonym);
 
     const style = isAssistant
       ? getAssistantAvatarStyle()
@@ -219,23 +213,14 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             .map((message, i) => {
               const parsed = parseMessageBody(message.body);
               const isCurrentUser = message.pseudonym === pseudonym;
-              const isAssistant =
-                message.pseudonym === "Event Assistant" ||
-                message.pseudonym === "Event Assistant Plus" ||
-                message.pseudonym === "Event Channel Mediator" ||
-                message.pseudonym === "Event Channel Mediator Plus";
+              const isAssistant = isAssistantPseudonym(message.pseudonym);
 
               const style = isAssistant
                 ? getAssistantAvatarStyle()
                 : getAvatarStyle(message.pseudonym || "", isCurrentUser);
 
               // Normalize Plus versions to base names
-              const displayName =
-                message.pseudonym === "Event Assistant Plus" ||
-                message.pseudonym === "Event Channel Mediator Plus" ||
-                message.pseudonym === "Event Channel Mediator"
-                  ? "Event Assistant"
-                  : message.pseudonym;
+              const displayName = normalizeAssistantPseudonym(message.pseudonym);
 
               return (
                 <div key={`msg-${i}`} className="w-full">

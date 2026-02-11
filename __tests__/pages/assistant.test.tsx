@@ -157,6 +157,7 @@ jest.mock("../../components/messages", () => ({
 
 // Mock CheckAuthHeader and createConversationFromData
 jest.mock("../../utils/Helpers", () => ({
+  ...jest.requireActual("../../utils/Helpers"),
   CheckAuthHeader: jest.fn(() => ({ props: {} })),
   createConversationFromData: jest.fn(),
 }));

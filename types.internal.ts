@@ -71,8 +71,6 @@ export interface HeaderProps extends BaseComponentProps {
  * Message type for pseudonymous messages used by specific agents.
  * Extends the base Message schema with additional properties.
  * @property {any} body - The body of the message.
- * @property {string[]} channels - The channels associated with the message.
- * @property {"Back Channel Insights Agent" | "Back Channel Metrics Agent" | "Event Assistant" | "Event Assistant Plus"} pseudonym - The pseudonym of the agent sending the message.
  */
 export type PseudonymousMessage = components["schemas"]["Message"] & {
   body: any;

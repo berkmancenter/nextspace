@@ -310,6 +310,54 @@ describe("GroupChatPanel", () => {
     expect(screen.queryByText("Event Assistant Plus")).not.toBeInTheDocument();
   });
 
+  it("normalizes 'Event Mediator' to 'Event Assistant'", () => {
+    const messages = [
+      {
+        id: "1",
+        pseudonym: "Event Mediator",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "Hello from Event Mediator" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "em-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      },
+    ];
+
+    render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+    expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+    expect(screen.queryByText("Event Mediator")).not.toBeInTheDocument();
+  });
+
+  it("normalizes 'Event Mediator Plus' to 'Event Assistant'", () => {
+    const messages = [
+      {
+        id: "1",
+        pseudonym: "Event Mediator Plus",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "Hello from Event Mediator Plus" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "em-plus-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      },
+    ];
+
+    render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+    expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+    expect(screen.queryByText("Event Mediator Plus")).not.toBeInTheDocument();
+  });
+
   it("applies assistant avatar and background color to Event Assistant messages", () => {
     const messages = [
       {
@@ -349,6 +397,64 @@ describe("GroupChatPanel", () => {
         channels: ["chat"],
         conversation: "conv-1",
         pseudonymId: "ea-plus-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      },
+    ];
+
+    const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+    // Check that the avatar has the purple background color (#DDD6FE)
+    const avatar = container.querySelector('.rounded-full');
+    expect(avatar).toHaveStyle({ backgroundColor: '#DDD6FE' });
+
+    // Check that the message bubble has the purple background color (#DDD6FE)
+    const messageBubble = container.querySelector('.rounded-2xl');
+    expect(messageBubble).toHaveStyle({ backgroundColor: '#DDD6FE' });
+  });
+
+  it("applies assistant avatar and background color to Event Mediator messages", () => {
+    const messages = [
+      {
+        id: "1",
+        pseudonym: "Event Mediator",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "Hello from Event Mediator" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "em-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      },
+    ];
+
+    const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+    // Check that the avatar has the purple background color (#DDD6FE)
+    const avatar = container.querySelector('.rounded-full');
+    expect(avatar).toHaveStyle({ backgroundColor: '#DDD6FE' });
+
+    // Check that the message bubble has the purple background color (#DDD6FE)
+    const messageBubble = container.querySelector('.rounded-2xl');
+    expect(messageBubble).toHaveStyle({ backgroundColor: '#DDD6FE' });
+  });
+
+  it("applies assistant avatar and background color to Event Mediator Plus messages", () => {
+    const messages = [
+      {
+        id: "1",
+        pseudonym: "Event Mediator Plus",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "Hello from Event Mediator Plus" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "em-plus-1",
         fromAgent: true,
         pause: false,
         visible: true,
