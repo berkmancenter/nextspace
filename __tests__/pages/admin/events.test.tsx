@@ -5,6 +5,10 @@ import EventsPage from "../../../pages/admin/events";
 import { Request } from "../../../utils";
 import { getConversation } from "../../../utils/Helpers";
 import { useSessionJoin } from "../../../utils/useSessionJoin";
+import {
+  generateAndDownloadUserMetricsReport,
+  generateAndDownloadDirectMessageResponsesReport,
+} from "../../../utils/eventReportGenerator";
 
 const conversationTypes1 = [
   { name: "Agent1", label: "Agent 1" },
@@ -82,6 +86,11 @@ jest.mock("../../../utils/Helpers", () => {
     getConversation: jest.fn(),
   };
 });
+
+jest.mock("../../../utils/eventReportGenerator", () => ({
+  generateAndDownloadUserMetricsReport: jest.fn(),
+  generateAndDownloadDirectMessageResponsesReport: jest.fn(),
+}));
 
 jest.mock("../../../utils/useSessionJoin", () => ({
   useSessionJoin: jest.fn(),
@@ -393,9 +402,12 @@ describe("Events Page - Event Ordering", () => {
       render(<EventsPage authType={"user"} />);
     });
 
-    await waitFor(() => {
-      expect(screen.queryByText("Active Past Event")).toBeInTheDocument();
-    }, { timeout: 3000 });
+    await waitFor(
+      () => {
+        expect(screen.queryByText("Active Past Event")).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
 
     // Get all event cards and check their order
     const eventHeadings = screen.getAllByRole("heading", { level: 5 });
@@ -629,5 +641,243 @@ describe("Events Page - Event Ownership", () => {
     const deleteButtons = screen.getAllByLabelText("Delete event");
     expect(deleteButtons).toHaveLength(1);
   });
-});
+  describe("Events Page - Download Reports", () => {
+    const mockUserId = "user-123";
 
+    beforeEach(() => {
+      jest.clearAllMocks();
+      (Request as jest.Mock).mockResolvedValue(mockConversations);
+      (useSessionJoin as jest.Mock).mockReturnValue({ userId: mockUserId });
+
+      // Mock successful report generation
+      (generateAndDownloadUserMetricsReport as jest.Mock).mockResolvedValue(
+        undefined,
+      );
+      (
+        generateAndDownloadDirectMessageResponsesReport as jest.Mock
+      ).mockResolvedValue(undefined);
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockConversations,
+      });
+    });
+
+    it("should display download button only for inactive events", async () => {
+      const inactiveEvent = {
+        ...mockConversations[0],
+        active: false,
+        owner: mockUserId,
+      };
+      const activeEvent = {
+        ...mockConversations[1],
+        active: true,
+        owner: mockUserId,
+      };
+
+      (Request as jest.Mock).mockResolvedValue([inactiveEvent, activeEvent]);
+      (getConversation as jest.Mock)
+        .mockResolvedValueOnce({
+          ...inactiveEvent,
+          platformTypes: availablePlatforms1,
+          type: { label: "Test Agent" },
+          eventUrls: { zoom: null, moderator: [], participant: [] },
+        })
+        .mockResolvedValueOnce({
+          ...activeEvent,
+          platformTypes: availablePlatforms2,
+          type: { label: "Test Agent" },
+          eventUrls: { zoom: null, moderator: [], participant: [] },
+        });
+
+      await act(async () => {
+        render(<EventsPage authType={"user"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Test Event 1")).toBeInTheDocument();
+      });
+
+      // Download button should appear for inactive event
+      const downloadButtons = screen.getAllByLabelText(
+        "Download user metrics report",
+      );
+      expect(downloadButtons).toHaveLength(1);
+    });
+
+    it("should download reports when download button is clicked", async () => {
+      const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+      const inactiveEvent = {
+        ...mockConversations[0],
+        active: false,
+        owner: mockUserId,
+        scheduledTime: futureDate.toISOString(),
+      };
+
+      (Request as jest.Mock).mockResolvedValue([inactiveEvent]);
+      (getConversation as jest.Mock).mockResolvedValueOnce({
+        ...inactiveEvent,
+        platformTypes: availablePlatforms1,
+        type: { label: "Test Agent" },
+        eventUrls: { zoom: null, moderator: [], participant: [] },
+      });
+
+      await act(async () => {
+        render(<EventsPage authType={"user"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Test Event 1")).toBeInTheDocument();
+      });
+
+      const downloadButton = screen.getByLabelText(
+        "Download user metrics report",
+      );
+      await userEvent.click(downloadButton);
+
+      await waitFor(() => {
+        expect(generateAndDownloadUserMetricsReport).toHaveBeenCalledWith(
+          inactiveEvent.id,
+          new Date(inactiveEvent.scheduledTime),
+        );
+        expect(
+          generateAndDownloadDirectMessageResponsesReport,
+        ).toHaveBeenCalledWith(inactiveEvent.id);
+      });
+    });
+
+    it("should use createdAt when scheduledTime is not available", async () => {
+      const createdDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago (past event)
+      const inactiveEvent = {
+        ...mockConversations[0],
+        active: false,
+        owner: mockUserId,
+        scheduledTime: null,
+        createdAt: createdDate.toISOString(),
+      };
+
+      (Request as jest.Mock).mockResolvedValue([inactiveEvent]);
+      (getConversation as jest.Mock).mockResolvedValueOnce({
+        ...inactiveEvent,
+        platformTypes: availablePlatforms1,
+        type: { label: "Test Agent" },
+        eventUrls: { zoom: null, moderator: [], participant: [] },
+      });
+
+      await act(async () => {
+        render(<EventsPage authType={"user"} />);
+      });
+
+      // Enable "Include past events" toggle to show the event
+      const includePastEventsSwitch = screen.getByRole("switch", {
+        name: /include past events/i,
+      });
+      await userEvent.click(includePastEventsSwitch);
+
+      await waitFor(() => {
+        expect(screen.getByText("Test Event 1")).toBeInTheDocument();
+      });
+
+      const downloadButton = screen.getByLabelText(
+        "Download user metrics report",
+      );
+      await userEvent.click(downloadButton);
+
+      await waitFor(() => {
+        expect(generateAndDownloadUserMetricsReport).toHaveBeenCalledWith(
+          inactiveEvent.id,
+          new Date(inactiveEvent.createdAt!),
+        );
+      });
+    });
+
+    it("should show loading state during report download", async () => {
+      const inactiveEvent = {
+        ...mockConversations[0],
+        active: false,
+        owner: mockUserId,
+      };
+
+      // Mock a slow report generation
+      (generateAndDownloadUserMetricsReport as jest.Mock).mockImplementation(
+        () => new Promise((resolve) => setTimeout(resolve, 1000)),
+      );
+
+      (Request as jest.Mock).mockResolvedValue([inactiveEvent]);
+      (getConversation as jest.Mock).mockResolvedValueOnce({
+        ...inactiveEvent,
+        platformTypes: availablePlatforms1,
+        type: { label: "Test Agent" },
+        eventUrls: { zoom: null, moderator: [], participant: [] },
+      });
+
+      await act(async () => {
+        render(<EventsPage authType={"user"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Test Event 1")).toBeInTheDocument();
+      });
+
+      const downloadButton = screen.getByLabelText(
+        "Download user metrics report",
+      );
+      await userEvent.click(downloadButton);
+
+      // Should show loading spinner
+      await waitFor(() => {
+        const buttons = screen.getAllByRole("button");
+        const downloadButtonElement = buttons.find(
+          (btn) =>
+            btn.getAttribute("aria-label") === "Download user metrics report",
+        );
+        expect(downloadButtonElement).toBeDisabled();
+      });
+    });
+
+    it("should handle report download errors gracefully", async () => {
+      const inactiveEvent = {
+        ...mockConversations[0],
+        active: false,
+        owner: mockUserId,
+      };
+
+      // Mock report generation failure
+      const alertMock = jest
+        .spyOn(window, "alert")
+        .mockImplementation(() => {});
+      (generateAndDownloadUserMetricsReport as jest.Mock).mockRejectedValue(
+        new Error("Network error"),
+      );
+
+      (Request as jest.Mock).mockResolvedValue([inactiveEvent]);
+      (getConversation as jest.Mock).mockResolvedValueOnce({
+        ...inactiveEvent,
+        platformTypes: availablePlatforms1,
+        type: { label: "Test Agent" },
+        eventUrls: { zoom: null, moderator: [], participant: [] },
+      });
+
+      await act(async () => {
+        render(<EventsPage authType={"user"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Test Event 1")).toBeInTheDocument();
+      });
+
+      const downloadButton = screen.getByLabelText(
+        "Download user metrics report",
+      );
+      await userEvent.click(downloadButton);
+
+      await waitFor(() => {
+        expect(alertMock).toHaveBeenCalledWith(
+          "Failed to generate report. Please try again.",
+        );
+      });
+
+      alertMock.mockRestore();
+    });
+  });
+});
