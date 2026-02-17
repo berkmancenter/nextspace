@@ -190,6 +190,16 @@ export function Transcript(props: {
     autoScrollDuration,
   ]);
 
+  // Recording indicator component
+  const RecordingIndicator = ({ size = "w-3 h-3" }: { size?: string }) => (
+    <div
+      className={`${size} rounded-full ${
+        transcriptActive ? "bg-red-500" : "bg-gray-400"
+      }`}
+      aria-label="Recording status indicator"
+    />
+  );
+
   // Handler for pausing transcript
   const handlePause = async () => {
     setShowPauseResumeConfirm(false);
@@ -544,12 +554,7 @@ export function Transcript(props: {
           <>
             <div className="flex items-center justify-between py-2">
               <div className="flex items-center gap-3">
-                <div
-                  className={`w-3 h-3 rounded-full ${
-                    transcriptActive ? "bg-red-500" : "bg-gray-400"
-                  }`}
-                  aria-label="Recording status indicator"
-                />
+                <RecordingIndicator />
                 <h2 className="text-xl font-semibold tracking-wide">
                   LIVE TRANSCRIPT
                 </h2>
@@ -637,27 +642,29 @@ export function Transcript(props: {
             )}
           </>
         ) : (
-          <>
-            <div className="flex-1 flex items-center justify-center lg:hidden">
+          <div className="flex items-center justify-between lg:justify-center w-full">
+            <div className="flex-1 flex items-center justify-center gap-2 lg:hidden">
+              <RecordingIndicator size="w-2 h-2" />
               <div className="text-xs font-semibold tracking-widest">
                 LIVE TRANSCRIPT
               </div>
             </div>
             <button
               onClick={handleToggle}
-              className="text-white hover:bg-white/10 rounded p-1 transition-colors mx-auto"
+              className="text-white hover:bg-white/10 rounded p-1 transition-colors lg:mx-auto"
               aria-label="Open transcript"
             >
               <ChevronLeft className="transition-transform rotate-270 lg:rotate-0" />
             </button>
-          </>
+          </div>
         )}
       </div>
 
       {/* Vertical text when collapsed (desktop only) */}
       {!isOpen && (
         <div className="hidden lg:flex flex-1 items-center justify-center">
-          <div className="transform -rotate-90 whitespace-nowrap text-xs font-semibold tracking-widest">
+          <div className="transform -rotate-90 whitespace-nowrap text-xs font-semibold tracking-widest flex items-center gap-2">
+            <RecordingIndicator size="w-2 h-2" />
             LIVE TRANSCRIPT
           </div>
         </div>
