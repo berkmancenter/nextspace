@@ -14,11 +14,7 @@ import {
 } from "../utils";
 import { components } from "../types";
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
-import {
-  CheckAuthHeader,
-  createConversationFromData,
-  isAssistantPseudonym,
-} from "../utils/Helpers";
+import { CheckAuthHeader, createConversationFromData } from "../utils/Helpers";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { AuthType } from "../types.internal";
 import { trackConversationEvent, setUserId } from "../utils/analytics";
@@ -114,7 +110,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
           }
         }
       }
-      if (isAssistantPseudonym(data.pseudonym)) {
+      if (data.fromAgent) {
         setWaitingForResponse(false);
       }
     };

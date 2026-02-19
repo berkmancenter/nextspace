@@ -13,10 +13,7 @@ import {
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
-import {
-  isAssistantPseudonym,
-  normalizeAssistantPseudonym,
-} from "../utils/Helpers";
+import { normalizeAssistantPseudonym } from "../utils/Helpers";
 
 /**
  * Parsed message body structure
@@ -134,7 +131,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
           {messages
             .filter((message) => !message.parentMessage)
             .map((message, i) => {
-              const isAssistant = isAssistantPseudonym(message.pseudonym);
+              const isAssistant = message.fromAgent;
               const isCurrentUser = message.pseudonym === pseudonym;
 
               const parsed = parseMessageBody(message.body);
@@ -143,7 +140,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                 ? getAssistantAvatarStyle()
                 : getAvatarStyle(message.pseudonym, isCurrentUser);
 
-              const displayName = normalizeAssistantPseudonym(message.pseudonym);
+              const displayName = normalizeAssistantPseudonym(message);
 
               const hasPromptOptions =
                 message.prompt?.options &&

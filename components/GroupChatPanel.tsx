@@ -8,10 +8,7 @@ import { PseudonymousMessage, ControlledInputConfig } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { createMentionsEnhancer } from "./enhancers/mentionsEnhancer";
-import {
-  isAssistantPseudonym,
-  normalizeAssistantPseudonym,
-} from "../utils/Helpers";
+import { normalizeAssistantPseudonym } from "../utils/Helpers";
 
 /**
  * Parsed message body structure
@@ -145,9 +142,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     () =>
       Array.from(
         new Set(
-          messages
-            .map((m) => normalizeAssistantPseudonym(m.pseudonym))
-            .filter(Boolean),
+          messages.map((m) => normalizeAssistantPseudonym(m)).filter(Boolean),
         ),
       ),
     [messages],
@@ -165,7 +160,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   // Helper to render avatar for chat mode
   const renderAvatar = (message: PseudonymousMessage) => {
     const isCurrentUser = message.pseudonym === pseudonym;
-    const isAssistant = isAssistantPseudonym(message.pseudonym);
+    const isAssistant = message.fromAgent;
 
     const style = isAssistant
       ? getAssistantAvatarStyle()
@@ -213,14 +208,14 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             .map((message, i) => {
               const parsed = parseMessageBody(message.body);
               const isCurrentUser = message.pseudonym === pseudonym;
-              const isAssistant = isAssistantPseudonym(message.pseudonym);
+              const isAssistant = message.fromAgent;
 
               const style = isAssistant
                 ? getAssistantAvatarStyle()
                 : getAvatarStyle(message.pseudonym || "", isCurrentUser);
 
               // Normalize Plus versions to base names
-              const displayName = normalizeAssistantPseudonym(message.pseudonym);
+              const displayName = normalizeAssistantPseudonym(message);
 
               return (
                 <div key={`msg-${i}`} className="w-full">

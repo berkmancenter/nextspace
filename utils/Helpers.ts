@@ -1,7 +1,12 @@
 import { ParsedUrlQuery } from "querystring";
 import { fetchWithTokenRefresh, RetrieveData, Request } from "./";
 import { components } from "../types";
-import { Conversation, EventUrl, EventUrls } from "../types.internal";
+import {
+  Conversation,
+  EventUrl,
+  EventUrls,
+  PseudonymousMessage,
+} from "../types.internal";
 
 /**
  * Structure to hold API tokens
@@ -376,31 +381,13 @@ export const CheckAuthHeader = (headers: Record<string, string>) => {
 };
 
 /**
- * Checks if a pseudonym is one of the Event Assistant variants
- * @param pseudonym - The pseudonym to check
- * @returns true if the pseudonym is an Event Assistant variant
- */
-export const isAssistantPseudonym = (
-  pseudonym: string | null | undefined,
-): boolean => {
-  if (!pseudonym) return false;
-  return (
-    pseudonym === "Event Assistant" ||
-    pseudonym === "Event Assistant Plus" ||
-    pseudonym === "Event Mediator" ||
-    pseudonym === "Event Mediator Plus" ||
-    pseudonym === "Engagement Agent"
-  );
-};
-
-/**
  * Normalizes Event Assistant variant pseudonyms to "Event Assistant"
- * @param pseudonym - The pseudonym to normalize
+ * @param message- The message from the pseudonym to normalize
  * @returns "Event Assistant" if the pseudonym is a variant, otherwise the original pseudonym
  */
 export const normalizeAssistantPseudonym = (
-  pseudonym: string | null | undefined,
+  message: PseudonymousMessage,
 ): string => {
-  if (!pseudonym) return "";
-  return isAssistantPseudonym(pseudonym) ? "Event Assistant" : pseudonym;
+  if (!message || !message.pseudonym) return "";
+  return message.fromAgent ? "Event Assistant" : message.pseudonym;
 };
