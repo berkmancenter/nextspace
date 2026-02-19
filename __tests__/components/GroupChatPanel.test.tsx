@@ -107,7 +107,7 @@ describe("GroupChatPanel", () => {
     ];
 
     const { container } = render(
-      <GroupChatPanel {...baseProps} messages={messages} />
+      <GroupChatPanel {...baseProps} messages={messages} />,
     );
 
     // Should NOT show animated SVG loading indicator in chat mode
@@ -134,11 +134,11 @@ describe("GroupChatPanel", () => {
     ];
 
     const { container } = render(
-      <GroupChatPanel {...baseProps} messages={messages} />
+      <GroupChatPanel {...baseProps} messages={messages} />,
     );
 
     // Check that mention has styling with font-semibold class
-    const mentionSpan = container.querySelector('.font-semibold');
+    const mentionSpan = container.querySelector(".font-semibold");
     expect(mentionSpan).toBeInTheDocument();
     expect(mentionSpan?.textContent).toContain("@Bob");
   });
@@ -197,7 +197,7 @@ describe("GroupChatPanel", () => {
 
   it("scrolls to bottom when new messages arrive", async () => {
     const { rerender, container } = render(
-      <GroupChatPanel {...baseProps} messages={[]} />
+      <GroupChatPanel {...baseProps} messages={[]} />,
     );
 
     // Get the scrollable messages container
@@ -358,6 +358,30 @@ describe("GroupChatPanel", () => {
     expect(screen.queryByText("Event Mediator Plus")).not.toBeInTheDocument();
   });
 
+  it("normalizes 'Engagement Agent' to 'Event Assistant'", () => {
+    const messages = [
+      {
+        id: "1",
+        pseudonym: "Engagement Agent",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "Hello" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "em-plus-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      },
+    ];
+
+    render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+    expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+    expect(screen.queryByText("Enagement Agent")).not.toBeInTheDocument();
+  });
+
   it("applies assistant avatar and background color to Event Assistant messages", () => {
     const messages = [
       {
@@ -376,15 +400,17 @@ describe("GroupChatPanel", () => {
       },
     ];
 
-    const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
+    const { container } = render(
+      <GroupChatPanel {...baseProps} messages={messages} />,
+    );
 
     // Check that the avatar has the purple background color (#DDD6FE)
-    const avatar = container.querySelector('.rounded-full');
-    expect(avatar).toHaveStyle({ backgroundColor: '#DDD6FE' });
+    const avatar = container.querySelector(".rounded-full");
+    expect(avatar).toHaveStyle({ backgroundColor: "#DDD6FE" });
 
     // Check that the message bubble has the purple background color (#DDD6FE)
-    const messageBubble = container.querySelector('.rounded-2xl');
-    expect(messageBubble).toHaveStyle({ backgroundColor: '#DDD6FE' });
+    const messageBubble = container.querySelector(".rounded-2xl");
+    expect(messageBubble).toHaveStyle({ backgroundColor: "#DDD6FE" });
   });
 
   it("applies assistant avatar and background color to Event Assistant Plus messages", () => {
@@ -405,15 +431,17 @@ describe("GroupChatPanel", () => {
       },
     ];
 
-    const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
+    const { container } = render(
+      <GroupChatPanel {...baseProps} messages={messages} />,
+    );
 
     // Check that the avatar has the purple background color (#DDD6FE)
-    const avatar = container.querySelector('.rounded-full');
-    expect(avatar).toHaveStyle({ backgroundColor: '#DDD6FE' });
+    const avatar = container.querySelector(".rounded-full");
+    expect(avatar).toHaveStyle({ backgroundColor: "#DDD6FE" });
 
     // Check that the message bubble has the purple background color (#DDD6FE)
-    const messageBubble = container.querySelector('.rounded-2xl');
-    expect(messageBubble).toHaveStyle({ backgroundColor: '#DDD6FE' });
+    const messageBubble = container.querySelector(".rounded-2xl");
+    expect(messageBubble).toHaveStyle({ backgroundColor: "#DDD6FE" });
   });
 
   it("applies assistant avatar and background color to Event Mediator messages", () => {
@@ -434,15 +462,17 @@ describe("GroupChatPanel", () => {
       },
     ];
 
-    const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
+    const { container } = render(
+      <GroupChatPanel {...baseProps} messages={messages} />,
+    );
 
     // Check that the avatar has the purple background color (#DDD6FE)
-    const avatar = container.querySelector('.rounded-full');
-    expect(avatar).toHaveStyle({ backgroundColor: '#DDD6FE' });
+    const avatar = container.querySelector(".rounded-full");
+    expect(avatar).toHaveStyle({ backgroundColor: "#DDD6FE" });
 
     // Check that the message bubble has the purple background color (#DDD6FE)
-    const messageBubble = container.querySelector('.rounded-2xl');
-    expect(messageBubble).toHaveStyle({ backgroundColor: '#DDD6FE' });
+    const messageBubble = container.querySelector(".rounded-2xl");
+    expect(messageBubble).toHaveStyle({ backgroundColor: "#DDD6FE" });
   });
 
   it("applies assistant avatar and background color to Event Mediator Plus messages", () => {
@@ -463,15 +493,17 @@ describe("GroupChatPanel", () => {
       },
     ];
 
-    const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
+    const { container } = render(
+      <GroupChatPanel {...baseProps} messages={messages} />,
+    );
 
     // Check that the avatar has the purple background color (#DDD6FE)
-    const avatar = container.querySelector('.rounded-full');
-    expect(avatar).toHaveStyle({ backgroundColor: '#DDD6FE' });
+    const avatar = container.querySelector(".rounded-full");
+    expect(avatar).toHaveStyle({ backgroundColor: "#DDD6FE" });
 
     // Check that the message bubble has the purple background color (#DDD6FE)
-    const messageBubble = container.querySelector('.rounded-2xl');
-    expect(messageBubble).toHaveStyle({ backgroundColor: '#DDD6FE' });
+    const messageBubble = container.querySelector(".rounded-2xl");
+    expect(messageBubble).toHaveStyle({ backgroundColor: "#DDD6FE" });
   });
 
   it("normalizes 'Event Assistant Plus' to 'Event Assistant' in contributors for mentions", () => {
@@ -534,7 +566,7 @@ describe("GroupChatPanel", () => {
       ];
 
       const { container } = render(
-        <GroupChatPanel {...baseProps} messages={messages} />
+        <GroupChatPanel {...baseProps} messages={messages} />,
       );
 
       // Check timestamp is displayed
@@ -575,7 +607,7 @@ describe("GroupChatPanel", () => {
       ];
 
       const { container } = render(
-        <GroupChatPanel {...baseProps} messages={messages} />
+        <GroupChatPanel {...baseProps} messages={messages} />,
       );
 
       // Should show two timestamps (one for each different minute)
@@ -616,7 +648,7 @@ describe("GroupChatPanel", () => {
       ];
 
       const { container } = render(
-        <GroupChatPanel {...baseProps} messages={messages} />
+        <GroupChatPanel {...baseProps} messages={messages} />,
       );
 
       // Should show two timestamps (one for each different hour)
@@ -657,7 +689,7 @@ describe("GroupChatPanel", () => {
       ];
 
       const { container } = render(
-        <GroupChatPanel {...baseProps} messages={messages} />
+        <GroupChatPanel {...baseProps} messages={messages} />,
       );
 
       // Should only show one timestamp (for the first message)
@@ -698,7 +730,7 @@ describe("GroupChatPanel", () => {
       ];
 
       const { container } = render(
-        <GroupChatPanel {...baseProps} messages={messages} />
+        <GroupChatPanel {...baseProps} messages={messages} />,
       );
 
       // Should show two timestamps (one for each different minute)

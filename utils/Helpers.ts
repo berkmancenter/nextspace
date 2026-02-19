@@ -110,7 +110,7 @@ export class Api {
 export const GetChannelPasscode = (
   channel: string,
   query: ParsedUrlQuery,
-  setErrorMessage: (err: string) => void
+  setErrorMessage: (err: string) => void,
 ) => {
   let hasChannel = false;
   let passcodeParam = null;
@@ -160,10 +160,10 @@ export const SendData = async (
   urlSuffix: string,
   payload: any,
   accessToken?: string,
-  fetchOptions?: RequestInit
+  fetchOptions?: RequestInit,
 ) => {
   const API_TOKENS = Api.get().GetTokens();
-  
+
   let options: RequestInit = fetchOptions || {
     method: "POST",
     headers: {
@@ -171,12 +171,12 @@ export const SendData = async (
     },
     body: JSON.stringify(payload),
   };
-  
+
   // Ensure headers is a mutable object
   if (!options.headers) {
     options.headers = {};
   }
-  
+
   // Add Authorization header; use provided accessToken if available
   (options.headers as Record<string, string>)["Authorization"] = accessToken
     ? `Bearer ${accessToken}`
@@ -186,7 +186,7 @@ export const SendData = async (
     const response = await fetchWithTokenRefresh(
       `${process.env.NEXT_PUBLIC_API_URL}/${urlSuffix}`,
       options,
-      !accessToken // Use stored tokens if no explicit accessToken provided
+      !accessToken, // Use stored tokens if no explicit accessToken provided
     );
 
     // TODO: Handle other status codes as needed
@@ -200,7 +200,10 @@ export const SendData = async (
     }
 
     // Handle responses with no content (204 or empty body)
-    if (response.status === 204 || response.headers.get("Content-Length") === "0") {
+    if (
+      response.status === 204 ||
+      response.headers.get("Content-Length") === "0"
+    ) {
       return { success: true };
     }
 
@@ -210,7 +213,6 @@ export const SendData = async (
     console.error("There was a problem with the send operation:", error);
   }
 };
-
 
 // Default easing class for animations
 export const DefaultEase = " ease-[cubic-bezier(0.075, 0.820, 0.165, 1.000)]";
@@ -223,11 +225,11 @@ export const DefaultEase = " ease-[cubic-bezier(0.075, 0.820, 0.165, 1.000)]";
  */
 async function getTypeForConversation(
   conversation: components["schemas"]["Conversation"],
-  conversationTypes: components["schemas"]["ConversationType"][]
+  conversationTypes: components["schemas"]["ConversationType"][],
 ): Promise<components["schemas"]["ConversationType"]> {
   if (conversation.conversationType) {
     const type = conversationTypes.find(
-      (type) => type.name === conversation.conversationType
+      (type) => type.name === conversation.conversationType,
     );
     if (type) return type;
   }
@@ -236,7 +238,7 @@ async function getTypeForConversation(
   // backChannel and eventAssistant conversation types match their agent names
   // (both backChannelInsights and backChannelMetrics contain 'backChannel', the type name)
   return conversationTypes.find((convType) =>
-    agentNames.some((agentName) => agentName.includes(convType.name))
+    agentNames.some((agentName) => agentName.includes(convType.name)),
   )!;
 }
 
@@ -246,7 +248,7 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
   const participant: EventUrl[] = [];
 
   const zoomAdapter = conversationData.adapters.find(
-    (adapter) => adapter.type === "zoom"
+    (adapter) => adapter.type === "zoom",
   );
   const zoom = zoomAdapter
     ? { label: "Zoom", url: zoomAdapter.config?.meetingUrl as string }
@@ -255,17 +257,17 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
   const convType = conversationData.type;
 
   const transcriptPasscode = conversationData.channels.find(
-    (channel) => channel.name === "transcript"
+    (channel) => channel.name === "transcript",
   )?.passcode;
   const hasTranscript = Boolean(transcriptPasscode);
 
   const chatPasscode = conversationData.channels.find(
-    (channel) => channel.name === "chat"
+    (channel) => channel.name === "chat",
   )?.passcode;
   const hasChat = Boolean(chatPasscode);
 
   const modPasscode = conversationData.channels.find(
-    (channel) => channel.name === "moderator"
+    (channel) => channel.name === "moderator",
   )?.passcode;
 
   const modUrl = modPasscode
@@ -278,7 +280,7 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
 
   if (convType && convType.name === "backChannel") {
     const participantPasscode = conversationData.channels.find(
-      (channel) => channel.name === "participant"
+      (channel) => channel.name === "participant",
     )?.passcode;
 
     if (participantPasscode) {
@@ -325,13 +327,13 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
 }
 
 export const getConversation = async (
-  id: string
+  id: string,
 ): Promise<Conversation | null> => {
   const response = await Request(`conversations/${id}`);
   if (response && "error" in response) {
     console.error(
       `Error fetching conversation data for ID ${id}:`,
-      response.message
+      response.message,
     );
     return null;
   }
@@ -339,7 +341,7 @@ export const getConversation = async (
 };
 
 export const createConversationFromData = async (
-  data: components["schemas"]["Conversation"]
+  data: components["schemas"]["Conversation"],
 ): Promise<Conversation> => {
   const { conversationTypes, availablePlatforms } = await Api.get().GetConfig();
 
@@ -354,7 +356,7 @@ export const createConversationFromData = async (
     type,
     eventUrls,
     platformTypes: availablePlatforms.filter((platform) =>
-      data.platforms?.some((p) => p === platform.name)
+      data.platforms?.some((p) => p === platform.name),
     ),
   };
 };
@@ -364,7 +366,8 @@ export const createConversationFromData = async (
  * @returns An object containing the authType property
  */
 export const CheckAuthHeader = (headers: Record<string, string>) => {
-  const authType = headers && headers["x-auth-type"] ? headers["x-auth-type"] : "guest";
+  const authType =
+    headers && headers["x-auth-type"] ? headers["x-auth-type"] : "guest";
   return {
     props: {
       authType,
@@ -377,13 +380,16 @@ export const CheckAuthHeader = (headers: Record<string, string>) => {
  * @param pseudonym - The pseudonym to check
  * @returns true if the pseudonym is an Event Assistant variant
  */
-export const isAssistantPseudonym = (pseudonym: string | null | undefined): boolean => {
+export const isAssistantPseudonym = (
+  pseudonym: string | null | undefined,
+): boolean => {
   if (!pseudonym) return false;
   return (
     pseudonym === "Event Assistant" ||
     pseudonym === "Event Assistant Plus" ||
     pseudonym === "Event Mediator" ||
-    pseudonym === "Event Mediator Plus"
+    pseudonym === "Event Mediator Plus" ||
+    pseudonym === "Engagement Agent"
   );
 };
 
@@ -392,7 +398,9 @@ export const isAssistantPseudonym = (pseudonym: string | null | undefined): bool
  * @param pseudonym - The pseudonym to normalize
  * @returns "Event Assistant" if the pseudonym is a variant, otherwise the original pseudonym
  */
-export const normalizeAssistantPseudonym = (pseudonym: string | null | undefined): string => {
+export const normalizeAssistantPseudonym = (
+  pseudonym: string | null | undefined,
+): string => {
   if (!pseudonym) return "";
   return isAssistantPseudonym(pseudonym) ? "Event Assistant" : pseudonym;
 };
