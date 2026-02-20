@@ -325,6 +325,29 @@ export const EventCreationForm: React.FC = ({}) => {
           />
         );
 
+      case "number":
+        return (
+          <TextField
+            key={prop.name}
+            name={prop.name}
+            label={prop.label}
+            type="number"
+            value={value ?? prop.default ?? ""}
+            helperText={prop.description}
+            fullWidth
+            variant="outlined"
+            margin="normal"
+            required={prop.required}
+            onChange={(e) => {
+              const numValue = parseFloat(e.target.value);
+              setDynamicPropertyValues((prev) => ({
+                ...prev,
+                [prop.name]: isNaN(numValue) ? 0 : numValue,
+              }));
+            }}
+          />
+        );
+
       case "enum":
         // Single-choice enum (like llmModel) - renders as radio buttons
         if (prop.options && Array.isArray(prop.options)) {
