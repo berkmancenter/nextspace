@@ -308,9 +308,17 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
       }${hasChat ? `&channel=chat,${chatPasscode}` : ""}`,
     };
     participant.push(eventAssistantUrl);
-  } else if (convType && convType.name === "eventAssistantPlus") {
+  } else if (
+    convType &&
+    (convType.name === "eventAssistantPlus" ||
+      convType.name === "eventAssistantPlusProactive")
+  ) {
+    const label =
+      convType.name === "eventAssistantPlus"
+        ? "Event Assistant Plus"
+        : "Event Assistant Plus Proactive";
     const eventAssistantPlusUrl = {
-      label: "Event Assistant Plus",
+      label,
       url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
         hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
       }${hasChat ? `&channel=chat,${chatPasscode}` : ""}`,
@@ -318,7 +326,7 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
     participant.push(eventAssistantPlusUrl);
     if (modPasscode) {
       moderator.push({
-        label: "Event Assistant Plus",
+        label,
         url: modUrl,
       });
     }
