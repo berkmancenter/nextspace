@@ -1,5 +1,76 @@
 # Changelog
 
+## [1.4.0](https://github.com/berkmancenter/nextspace/compare/v1.3.0...v1.4.0) (2026-02-21)
+
+
+### Features
+
+* add ability to delete event and show past events to admin events view ([6192e77](https://github.com/berkmancenter/nextspace/commit/6192e77f673411167a77d69bdc93ccc3a6d2a004))
+* add all events to events view, show and filter by current user ([5216e85](https://github.com/berkmancenter/nextspace/commit/5216e85137536ffbfda40417e24efc23306f8da1))
+* add analytics for scroll state in transcript. Improve duration tracking ([107b511](https://github.com/berkmancenter/nextspace/commit/107b511c6132e7b7f29e342b3165c046afe484c1))
+* add download transcript button to moderator view ([2b6a0c6](https://github.com/berkmancenter/nextspace/commit/2b6a0c6017883e02e1fa6da293d4a5a8353ea828))
+* add feedback to group chat messages, show eventMediator messages as from Event Assistant ([cafa82a](https://github.com/berkmancenter/nextspace/commit/cafa82aad7f154059caf06ce54b527729ecce919))
+* add group chat to the assistant page ([d60a861](https://github.com/berkmancenter/nextspace/commit/d60a86190bce031de79000a288fec4f398971afa))
+* add live transcript to assistant page ([29d4007](https://github.com/berkmancenter/nextspace/commit/29d400776bed95d44a10e4cfca69ed1dc2cfe27b))
+* add Matomo usage tracking ([b37084d](https://github.com/berkmancenter/nextspace/commit/b37084df4521e782e0273ae75e2953df8a44c429))
+* add message indicator badge to chat and EA tabs on assistant page ([37f5033](https://github.com/berkmancenter/nextspace/commit/37f503364464fb8a1502833c0e5316b9266c6b04))
+* add support for /mod command on assistant page when using EAP ([0e0248e](https://github.com/berkmancenter/nextspace/commit/0e0248efe11df9d29b44e20e48c40ea4cfe32525))
+* add support for Event Assistant Plus moderator submission messages ([b5595eb](https://github.com/berkmancenter/nextspace/commit/b5595eb351475483a387eac617b47ab833ab3f05))
+* add support for Event Assistant Plus moderator submission messages ([08e8fdc](https://github.com/berkmancenter/nextspace/commit/08e8fdc1901aa94ec59351989cf1d4ff89ba830f))
+* add transcript controls to moderator view, transcript status indicator to mod and participant ([4877261](https://github.com/berkmancenter/nextspace/commit/4877261327bd1a086e96e778672297ac32aea445))
+* add Zoom link to event status page and fix double rendering after event creation ([17ea230](https://github.com/berkmancenter/nextspace/commit/17ea23077e1fe38a1ab29a416e93cd53d9666e17))
+* distinguish group chat from assistant messages in analytics ([147ce1b](https://github.com/berkmancenter/nextspace/commit/147ce1b86b831e1ea4a4d270e6e4e4b0ba0df881))
+* download reports on past events from events view ([ef83189](https://github.com/berkmancenter/nextspace/commit/ef83189025dca9595bf2584f2781bf88a153b2ec))
+* dynamically populate fields for specifying conv type property values on event creation ([6b9dc17](https://github.com/berkmancenter/nextspace/commit/6b9dc1732b151ee4cb58c85f5c87725b0f2b20cd))
+* ensure all track events have an event name ([ec94078](https://github.com/berkmancenter/nextspace/commit/ec94078d311ebcc12fa8ca67791e18c38d5e123c))
+* ensure message input is focused when entering feedback mode ([60fe6f9](https://github.com/berkmancenter/nextspace/commit/60fe6f9c7a33174454e5ec0cdfd54c6d6d973b29))
+* feat: render markdown responses from agent propertly in assistant and group chats ([321a860](https://github.com/berkmancenter/nextspace/commit/321a86052d29bed2a5b4ac6c41ff9572a01c6ebd))
+* fix conversation_id tracking ([61b111d](https://github.com/berkmancenter/nextspace/commit/61b111d7a98528d32b8d632722448e35076a9132))
+* generate URLs for new Event Assistant Plus Proactive conv type ([ded096c](https://github.com/berkmancenter/nextspace/commit/ded096cbd67ef9f57538272032c8530b462a5c07))
+* gitignore tsconfig.tsbuildinfo file ([b18250d](https://github.com/berkmancenter/nextspace/commit/b18250d3925aae62c3a4b20c89c80ab1839144e1))
+* implement session persistence for guest users ([7b40dc1](https://github.com/berkmancenter/nextspace/commit/7b40dc16aa529e26c2df96ea4a0be29111391ea9))
+* include event name in moderator view, remove cloud icon ([810b922](https://github.com/berkmancenter/nextspace/commit/810b92280f6d419f38c58529aac7d1fed4717111))
+* make chat first and default active tab on assistant page ([692008f](https://github.com/berkmancenter/nextspace/commit/692008f64cb5a4f267afcc4d4fca0f1e9b70b8b6))
+* match Event Assistant panel styling to chat panel styling ([4e746ad](https://github.com/berkmancenter/nextspace/commit/4e746ad298dafc2bb0e1cf29e4de2b15a60f8c68))
+* merge ([78f4d2a](https://github.com/berkmancenter/nextspace/commit/78f4d2a3b1c7068a85d52625242b972167e0eca9))
+* normalize Event Assistant Plus to Event Assistant in the chat mention menu ([17f2b4d](https://github.com/berkmancenter/nextspace/commit/17f2b4dd960fbc4c100e66456723e4110ae62966))
+* reduce margins on message panel and ensure assistant messages not cut off on mobile ([b191a86](https://github.com/berkmancenter/nextspace/commit/b191a86bb5add0a6e46fc6c34e7a0868f2348a88))
+* reduce vertical space bw messages on assistant page and use new loading icon ([ee68cf7](https://github.com/berkmancenter/nextspace/commit/ee68cf77599affe9b1ab9416c5dc2efb5c0cc68e))
+* render links in group chat messages ([8a95fdf](https://github.com/berkmancenter/nextspace/commit/8a95fdf90005c1417e9c818f2ab77daa8c00e7cf))
+* set new feedback rating levels to "No", "Meh", "OK", "WOW!" ([d8af5e9](https://github.com/berkmancenter/nextspace/commit/d8af5e9a17d17a6f1c5fa90ea85f46204f0813f9))
+* show messages from Enagement Agent as from Event Assistant ([927647f](https://github.com/berkmancenter/nextspace/commit/927647fcf956b923aa5b4fcf094d609961ee276b))
+* show messages from Enagement Agent as from Event Assistant ([98a399a](https://github.com/berkmancenter/nextspace/commit/98a399a970250c60e141aa7dc015d0fa38c58792))
+* support setting numeric conversation properties on event creation ([3155a2a](https://github.com/berkmancenter/nextspace/commit/3155a2a6f52163352f793aca7c55aca36d77e10c))
+* track tab switching in assistant page for analytics ([20cb991](https://github.com/berkmancenter/nextspace/commit/20cb991d3e1ab99adc97a7eaed40ccc6e2ea1bed))
+* transcript expanded on initial page load ([444736f](https://github.com/berkmancenter/nextspace/commit/444736f2cd409df0c693168dd712af39c50230d4))
+* update "Say more" UI display to be more like an EA message ([f3b14bf](https://github.com/berkmancenter/nextspace/commit/f3b14bf615f9ab0241c8b4624a6beb8fbb32b194))
+* vertically stack transcript view on mobile ([f7fc12f](https://github.com/berkmancenter/nextspace/commit/f7fc12f9e76aa8b5cd8f6224da36796acb8eac5b))
+
+
+### Bug Fixes
+
+* assistant chat scrolling to bottom of entire page, pushing message input box up ([bd9571c](https://github.com/berkmancenter/nextspace/commit/bd9571c3d046d9e040ea96135cf79fb31e8aa990))
+* assistant page loading icon sometimes does not disappear ([d45e7e6](https://github.com/berkmancenter/nextspace/commit/d45e7e6fef094cef75c0681839217f4e1fab49d5))
+* enforce single type for conversation to match back end ([a898fef](https://github.com/berkmancenter/nextspace/commit/a898fef1b5ef0eed1d989971d87d5a1ac0ab64b2))
+* ensure assistant subscribes for messages before joining conversation ([4798b6b](https://github.com/berkmancenter/nextspace/commit/4798b6be735725860fe8b90e5a65cdc58da7e5f3))
+* fix collapsed transcript header alignment and add status indicator ([d26c748](https://github.com/berkmancenter/nextspace/commit/d26c748cacc4d437b21aa62a8a728bab81a1107e))
+* fix scroll position in transcript unless at bottom ([4aba105](https://github.com/berkmancenter/nextspace/commit/4aba105f90d5490fe3858ba6afb806f02a1d917d))
+* moderator page intermittently shows disconnected and/or does not display transcript updates ([40eaf94](https://github.com/berkmancenter/nextspace/commit/40eaf94c47093fcbcf0c97a5d1f275ccee2b2f76))
+* remove double scrollbar and fix wide gap between messages and input box on assistant page ([195c21e](https://github.com/berkmancenter/nextspace/commit/195c21edbbd63a5b908a27e859af859d5f173274))
+* remove double scrollbar and fix wide gap between messages and input box on assistant page ([3b75efd](https://github.com/berkmancenter/nextspace/commit/3b75efd216480132e6737c3b271053802cc76965))
+* remove duplicate conversation joins to prevent duplicate intro messages ([b607a6e](https://github.com/berkmancenter/nextspace/commit/b607a6e27c79747ac0d636db191a1d549775b402))
+* remove duplicate transcript close tracking event from merge ([b3d4097](https://github.com/berkmancenter/nextspace/commit/b3d40978bc79c47e14dddae37d1cbe4151934950))
+* rotate transcript collapse button to down instead of up ([196acee](https://github.com/berkmancenter/nextspace/commit/196aceefa14d350ad8c49b6e9ced777cbad039c3))
+* show eventMediator messages as from Event Assistant ([34e0a04](https://github.com/berkmancenter/nextspace/commit/34e0a04bbebe36de0107d4e1229df10b30017a70))
+* show timestamp on new minutes in chat and EA panels ([b69dfc3](https://github.com/berkmancenter/nextspace/commit/b69dfc3a52954b4231eb28375f239a612d3e57e2))
+* test compilation issue causing docs build failure ([1e03576](https://github.com/berkmancenter/nextspace/commit/1e03576452e2de5b66ac80f615c4af5e4207c493))
+* useMemo for page duration object to prevent re-renders and excess analytics events ([58689f1](https://github.com/berkmancenter/nextspace/commit/58689f1021f75b39b498ec538278bdc0bacd8795))
+
+
+### Performance Improvements
+
+* assistant page re-renders with every key stroke in input box ([ba21bc4](https://github.com/berkmancenter/nextspace/commit/ba21bc44168fe2554ad84bd8de899c946bef38c3))
+
 ## [1.3.0](https://github.com/berkmancenter/nextspace/compare/v1.2.1...v1.3.0) (2025-12-19)
 
 
