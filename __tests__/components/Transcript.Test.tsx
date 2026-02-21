@@ -10,6 +10,13 @@ import {
 jest.mock("../../utils", () => ({
   RetrieveData: jest.fn(),
   SendData: jest.fn(),
+  // Api is used by Transcript to get a fresh token for channel:join emits.
+  // Return a token matching baseProps.apiAccessToken so existing assertions hold.
+  Api: {
+    get: jest.fn(() => ({
+      GetTokens: jest.fn(() => ({ access: "token", refresh: "mock-refresh" })),
+    })),
+  },
 }));
 
 jest.mock("../../utils/analytics", () => ({
@@ -440,7 +447,11 @@ describe("Transcript", () => {
       expect.any(Function),
     );
 
-    const addedHandler = mockSocket.on.mock.calls[0][1];
+    // Find the message:new handler by event name (not by call index, since
+    // the "connect" re-join listener is also registered via socket.on now)
+    const addedHandler = mockSocket.on.mock.calls.find(
+      (call) => call[0] === "message:new",
+    )?.[1];
 
     unmount();
 
@@ -473,7 +484,11 @@ describe("Transcript", () => {
   it("removes old listener when socket changes", () => {
     const { rerender } = render(<Transcript {...baseProps} />);
 
-    const firstHandler = mockSocket.on.mock.calls[0][1];
+    // Find the message:new handler by event name (not by call index, since
+    // the "connect" re-join listener is also registered via socket.on now)
+    const firstHandler = mockSocket.on.mock.calls.find(
+      (call) => call[0] === "message:new",
+    )?.[1];
 
     // Verify first socket emitted channel:join
     expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {

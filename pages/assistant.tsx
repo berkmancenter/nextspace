@@ -61,6 +61,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     userId,
     isConnected,
     errorMessage: sessionError,
+    lastReconnectTime,
   } = useSessionJoin();
 
   // Combine session and local errors
@@ -213,19 +214,14 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     fetchConversationData();
   }, [socket, router]);
 
-  // Join conversation when socket, agentId, and userId are all available
+  // Join conversation when socket, agentId, and userId are all available.
+  // Also re-joins automatically on every socket reconnection so that messages
+  // continue flowing after a token refresh or transient network drop.
   useEffect(() => {
-    if (
-      !socket ||
-      !socket.auth ||
-      !agentId ||
-      !userId ||
-      !router.query.conversationId
-    ) {
+    if (!socket || !agentId || !userId || !router.query.conversationId) {
       return;
     }
 
-    console.log("Joining conversation");
     // Join channels - include both direct and chat if chatPasscode is available
     const channels: components["schemas"]["Channel"][] = [
       {
@@ -242,18 +238,32 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       });
     }
 
-    // Use emitWithTokenRefresh to handle token expiration
-    emitWithTokenRefresh(
-      socket,
-      "conversation:join",
-      {
-        conversationId: router.query.conversationId,
-        token: Api.get().GetTokens().access,
-        channels,
-      },
-      () => console.log("Successfully joined conversation"),
-      (error) => console.error("Failed to join conversation:", error),
-    );
+    const joinConversation = () => {
+      console.log("Joining conversation");
+      // Always read the current token so re-joins after a refresh use the
+      // new token rather than the one captured at socket-creation time.
+      emitWithTokenRefresh(
+        socket,
+        "conversation:join",
+        {
+          conversationId: router.query.conversationId,
+          token: Api.get().GetTokens().access,
+          channels,
+        },
+        () => console.log("Successfully joined conversation"),
+        (error) => console.error("Failed to join conversation:", error),
+      );
+    };
+
+    // Initial join
+    joinConversation();
+
+    // Re-join on every subsequent reconnection (e.g. after token refresh)
+    socket.on("connect", joinConversation);
+
+    return () => {
+      socket.off("connect", joinConversation);
+    };
   }, [socket, agentId, userId, chatPasscode, router.query.conversationId]);
 
   // Load initial chat messages when chatPasscode becomes available
@@ -300,6 +310,42 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
 
     fetchInitialAssistantMessages();
   }, [userId, agentId, router.query.conversationId]);
+
+  // Re-fetch all message history when the socket reconnects after a significant
+  // gap (user was on another tab/app for a while). Fills any messages missed
+  // while the client was disconnected.
+  useEffect(() => {
+    if (!lastReconnectTime || !router.query.conversationId) return;
+
+    console.log("Assistant re-fetching message history after gap-reconnect...");
+
+    if (chatPasscode) {
+      RetrieveData(
+        `messages/${router.query.conversationId}?channel=chat,${chatPasscode}`,
+        Api.get().GetTokens().access!,
+      )
+        .then((msgs) => {
+          if (Array.isArray(msgs)) setChatMessages(msgs);
+        })
+        .catch((err) =>
+          console.error("Error re-fetching chat messages:", err),
+        );
+    }
+
+    if (userId && agentId) {
+      const directChannelName = `direct-${userId}-${agentId}`;
+      RetrieveData(
+        `messages/${router.query.conversationId}?channel=${directChannelName}`,
+        Api.get().GetTokens().access!,
+      )
+        .then((msgs) => {
+          if (Array.isArray(msgs)) setAssistantMessages(msgs);
+        })
+        .catch((err) =>
+          console.error("Error re-fetching assistant messages:", err),
+        );
+    }
+  }, [lastReconnectTime]);
 
   async function sendMessage(
     message: string,
@@ -443,6 +489,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
                 conversationId={router.query.conversationId as string}
                 transcriptPasscode={transcriptPasscode}
                 apiAccessToken={Api.get().GetTokens().access!}
+                lastReconnectTime={lastReconnectTime}
               />
             </div>
           )}

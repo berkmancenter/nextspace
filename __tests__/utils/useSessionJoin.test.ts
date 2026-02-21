@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor, act } from "@testing-library/react";
 import { io } from "socket.io-client";
 
 // Mock socket.io-client
@@ -31,6 +31,12 @@ jest.mock("../../utils/Helpers", () => ({
   },
 }));
 
+// Mock tokenRefresh module
+const mockRefreshAccessToken = jest.fn();
+jest.mock("../../utils/tokenRefresh", () => ({
+  refreshAccessToken: (...args: any[]) => mockRefreshAccessToken(...args),
+}));
+
 // Import after mocking
 import { useSessionJoin } from "../../utils/useSessionJoin";
 import SessionManager from "../../utils/SessionManager";
@@ -44,21 +50,24 @@ describe("useSessionJoin", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+    jest.useFakeTimers();
+
     // Reset the mocked instance functions
     mockGetSessionInfo.mockReturnValue({
       userId: "test-user",
       username: "test-pseudonym",
     });
-    
+
     // Create mock socket
     mockSocket = {
       on: jest.fn(),
       off: jest.fn(),
       emit: jest.fn(),
+      connected: false,
+      connect: jest.fn(),
       auth: { token: "mock-token" },
     };
-    
+
     mockIo.mockReturnValue(mockSocket as any);
 
     // Setup Api mock
@@ -66,9 +75,17 @@ describe("useSessionJoin", () => {
     mockApi.get.mockReturnValue({
       GetTokens: mockGetTokens,
     } as any);
+
+    // Default: refreshAccessToken resolves to false (no-op)
+    mockRefreshAccessToken.mockResolvedValue(false);
+
+    // Mock document.addEventListener / removeEventListener
+    jest.spyOn(document, "addEventListener");
+    jest.spyOn(document, "removeEventListener");
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.clearAllMocks();
   });
 
@@ -102,7 +119,7 @@ describe("useSessionJoin", () => {
 
     // Rerender should not trigger another initialization
     rerender();
-    
+
     await waitFor(() => {
       expect(mockGetSessionInfo).toHaveBeenCalledTimes(1);
     });
@@ -156,13 +173,14 @@ describe("useSessionJoin", () => {
     });
   });
 
-  it("should register socket event handlers", async () => {
+  it("should register socket event handlers including connect_error", async () => {
     renderHook(() => useSessionJoin(false));
 
     await waitFor(() => {
       expect(mockSocket.on).toHaveBeenCalledWith("error", expect.any(Function));
       expect(mockSocket.on).toHaveBeenCalledWith("connect", expect.any(Function));
       expect(mockSocket.on).toHaveBeenCalledWith("disconnect", expect.any(Function));
+      expect(mockSocket.on).toHaveBeenCalledWith("connect_error", expect.any(Function));
     });
   });
 
@@ -181,7 +199,9 @@ describe("useSessionJoin", () => {
     });
 
     // Simulate connect event
-    connectHandler!();
+    act(() => {
+      connectHandler!();
+    });
 
     await waitFor(() => {
       expect(result.current.isConnected).toBe(true);
@@ -203,7 +223,9 @@ describe("useSessionJoin", () => {
     });
 
     // Simulate disconnect event
-    disconnectHandler!();
+    act(() => {
+      disconnectHandler!();
+    });
 
     await waitFor(() => {
       expect(result.current.isConnected).toBe(false);
@@ -246,12 +268,13 @@ describe("useSessionJoin", () => {
     expect(mockSocket.off).toHaveBeenCalledWith("error", expect.any(Function));
     expect(mockSocket.off).toHaveBeenCalledWith("connect", expect.any(Function));
     expect(mockSocket.off).toHaveBeenCalledWith("disconnect", expect.any(Function));
+    expect(mockSocket.off).toHaveBeenCalledWith("connect_error", expect.any(Function));
   });
 
   it("should handle socket error events", async () => {
     const consoleError = jest.spyOn(console, "error").mockImplementation();
     let errorHandler: Function;
-    
+
     mockSocket.on.mockImplementation((event: string, handler: Function) => {
       if (event === "error") {
         errorHandler = handler;
@@ -266,10 +289,12 @@ describe("useSessionJoin", () => {
 
     // Simulate socket error
     const socketError = "Socket connection failed";
-    errorHandler!(socketError);
+    act(() => {
+      errorHandler!(socketError);
+    });
 
     expect(consoleError).toHaveBeenCalledWith("Socket error:", socketError);
-    
+
     consoleError.mockRestore();
   });
 
@@ -279,6 +304,411 @@ describe("useSessionJoin", () => {
 
     await waitFor(() => {
       expect(result.current.socket).toBe(mockSocket);
+    });
+  });
+
+  it("should expose lastReconnectTime, starting as null", async () => {
+    const { result } = renderHook(() => useSessionJoin(false));
+
+    await waitFor(() => {
+      expect(result.current.socket).toBe(mockSocket);
+    });
+
+    expect(result.current.lastReconnectTime).toBeNull();
+  });
+
+  describe("gap-reconnect detection (lastReconnectTime)", () => {
+    it("should set lastReconnectTime when reconnecting after a long gap (>= 10s)", async () => {
+      let connectHandler: Function;
+      let disconnectHandler: Function;
+
+      mockSocket.on.mockImplementation((event: string, handler: Function) => {
+        if (event === "connect") connectHandler = handler;
+        if (event === "disconnect") disconnectHandler = handler;
+      });
+
+      const { result } = renderHook(() => useSessionJoin(false));
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith("connect", expect.any(Function));
+        expect(mockSocket.on).toHaveBeenCalledWith("disconnect", expect.any(Function));
+      });
+
+      // Simulate disconnect
+      act(() => {
+        disconnectHandler!();
+      });
+
+      // Advance time by 15 seconds (past the 10s threshold)
+      jest.advanceTimersByTime(15_000);
+
+      // Simulate reconnect
+      act(() => {
+        connectHandler!();
+      });
+
+      await waitFor(() => {
+        expect(result.current.lastReconnectTime).not.toBeNull();
+        expect(typeof result.current.lastReconnectTime).toBe("number");
+      });
+    });
+
+    it("should NOT set lastReconnectTime when reconnecting after a short gap (< 10s)", async () => {
+      let connectHandler: Function;
+      let disconnectHandler: Function;
+
+      mockSocket.on.mockImplementation((event: string, handler: Function) => {
+        if (event === "connect") connectHandler = handler;
+        if (event === "disconnect") disconnectHandler = handler;
+      });
+
+      const { result } = renderHook(() => useSessionJoin(false));
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith("connect", expect.any(Function));
+        expect(mockSocket.on).toHaveBeenCalledWith("disconnect", expect.any(Function));
+      });
+
+      // Simulate disconnect
+      act(() => {
+        disconnectHandler!();
+      });
+
+      // Advance time by only 3 seconds (below the 10s threshold)
+      jest.advanceTimersByTime(3_000);
+
+      // Simulate reconnect
+      act(() => {
+        connectHandler!();
+      });
+
+      await waitFor(() => {
+        expect(result.current.isConnected).toBe(true);
+      });
+
+      // lastReconnectTime should still be null since gap was short
+      expect(result.current.lastReconnectTime).toBeNull();
+    });
+
+    it("should NOT set lastReconnectTime on the initial connection (no prior disconnect)", async () => {
+      let connectHandler: Function;
+
+      mockSocket.on.mockImplementation((event: string, handler: Function) => {
+        if (event === "connect") connectHandler = handler;
+      });
+
+      const { result } = renderHook(() => useSessionJoin(false));
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith("connect", expect.any(Function));
+      });
+
+      // Simulate initial connect with no prior disconnect
+      act(() => {
+        connectHandler!();
+      });
+
+      await waitFor(() => {
+        expect(result.current.isConnected).toBe(true);
+      });
+
+      // No disconnect happened before, so lastReconnectTime should remain null
+      expect(result.current.lastReconnectTime).toBeNull();
+    });
+
+    it("should update lastReconnectTime on each new long-gap reconnect", async () => {
+      let connectHandler: Function;
+      let disconnectHandler: Function;
+
+      mockSocket.on.mockImplementation((event: string, handler: Function) => {
+        if (event === "connect") connectHandler = handler;
+        if (event === "disconnect") disconnectHandler = handler;
+      });
+
+      const { result } = renderHook(() => useSessionJoin(false));
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith("connect", expect.any(Function));
+      });
+
+      // First gap-reconnect
+      act(() => { disconnectHandler!(); });
+      jest.advanceTimersByTime(15_000);
+      act(() => { connectHandler!(); });
+
+      let firstReconnectTime: number | null = null;
+      await waitFor(() => {
+        expect(result.current.lastReconnectTime).not.toBeNull();
+        firstReconnectTime = result.current.lastReconnectTime;
+      });
+
+      // Second gap-reconnect
+      act(() => { disconnectHandler!(); });
+      jest.advanceTimersByTime(15_000);
+      act(() => { connectHandler!(); });
+
+      await waitFor(() => {
+        expect(result.current.lastReconnectTime).not.toEqual(firstReconnectTime);
+      });
+    });
+  });
+
+  describe("connect_error handling", () => {
+    it("should refresh token on auth-related connect_error", async () => {
+      mockRefreshAccessToken.mockResolvedValue(true);
+      mockGetTokens.mockReturnValue({ access: "new-token", refresh: "new-refresh" });
+
+      let connectErrorHandler: Function;
+      mockSocket.on.mockImplementation((event: string, handler: Function) => {
+        if (event === "connect_error") {
+          connectErrorHandler = handler;
+        }
+      });
+
+      renderHook(() => useSessionJoin(false));
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith("connect_error", expect.any(Function));
+      });
+
+      // Simulate an auth connect_error
+      await act(async () => {
+        await connectErrorHandler!(new Error("401 Unauthorized"));
+      });
+
+      expect(mockRefreshAccessToken).toHaveBeenCalledTimes(1);
+      // socket.auth should be updated with the new token
+      expect(mockSocket.auth).toEqual({ token: "new-token" });
+    });
+
+    it("should refresh token when connect_error message contains 'authentication'", async () => {
+      mockRefreshAccessToken.mockResolvedValue(true);
+      mockGetTokens.mockReturnValue({ access: "fresh-token", refresh: "fresh-refresh" });
+
+      let connectErrorHandler: Function;
+      mockSocket.on.mockImplementation((event: string, handler: Function) => {
+        if (event === "connect_error") {
+          connectErrorHandler = handler;
+        }
+      });
+
+      renderHook(() => useSessionJoin(false));
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith("connect_error", expect.any(Function));
+      });
+
+      await act(async () => {
+        await connectErrorHandler!(new Error("authentication failed"));
+      });
+
+      expect(mockRefreshAccessToken).toHaveBeenCalledTimes(1);
+      expect(mockSocket.auth).toEqual({ token: "fresh-token" });
+    });
+
+    it("should not refresh token on non-auth connect_error", async () => {
+      let connectErrorHandler: Function;
+      mockSocket.on.mockImplementation((event: string, handler: Function) => {
+        if (event === "connect_error") {
+          connectErrorHandler = handler;
+        }
+      });
+
+      renderHook(() => useSessionJoin(false));
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith("connect_error", expect.any(Function));
+      });
+
+      await act(async () => {
+        await connectErrorHandler!(new Error("Network timeout"));
+      });
+
+      expect(mockRefreshAccessToken).not.toHaveBeenCalled();
+    });
+
+    it("should not update socket.auth when token refresh fails", async () => {
+      mockRefreshAccessToken.mockResolvedValue(false);
+      const originalAuth = { token: "mock-token" };
+      mockSocket.auth = { ...originalAuth };
+
+      let connectErrorHandler: Function;
+      mockSocket.on.mockImplementation((event: string, handler: Function) => {
+        if (event === "connect_error") {
+          connectErrorHandler = handler;
+        }
+      });
+
+      renderHook(() => useSessionJoin(false));
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith("connect_error", expect.any(Function));
+      });
+
+      await act(async () => {
+        await connectErrorHandler!(new Error("401 Unauthorized"));
+      });
+
+      expect(mockRefreshAccessToken).toHaveBeenCalledTimes(1);
+      // auth should remain unchanged since refresh failed
+      expect(mockSocket.auth).toEqual(originalAuth);
+    });
+  });
+
+  describe("visibility change handling", () => {
+    it("should register visibilitychange event listener", async () => {
+      renderHook(() => useSessionJoin(false));
+
+      await waitFor(() => {
+        expect(document.addEventListener).toHaveBeenCalledWith(
+          "visibilitychange",
+          expect.any(Function)
+        );
+      });
+    });
+
+    it("should refresh token when tab becomes visible", async () => {
+      mockRefreshAccessToken.mockResolvedValue(true);
+      mockGetTokens.mockReturnValue({ access: "visible-token", refresh: "visible-refresh" });
+      mockSocket.connected = true;
+
+      let visibilityHandler: Function;
+      (document.addEventListener as jest.Mock).mockImplementation(
+        (event: string, handler: Function) => {
+          if (event === "visibilitychange") {
+            visibilityHandler = handler;
+          }
+        }
+      );
+
+      renderHook(() => useSessionJoin(false));
+
+      await waitFor(() => {
+        expect(document.addEventListener).toHaveBeenCalledWith(
+          "visibilitychange",
+          expect.any(Function)
+        );
+      });
+
+      // Simulate tab becoming visible
+      Object.defineProperty(document, "visibilityState", {
+        value: "visible",
+        writable: true,
+      });
+
+      await act(async () => {
+        await visibilityHandler!();
+      });
+
+      expect(mockRefreshAccessToken).toHaveBeenCalled();
+      expect(mockSocket.auth).toEqual({ token: "visible-token" });
+    });
+
+    it("should reconnect disconnected socket when tab becomes visible and token refreshes", async () => {
+      mockRefreshAccessToken.mockResolvedValue(true);
+      mockGetTokens.mockReturnValue({ access: "reconnect-token", refresh: "reconnect-refresh" });
+      mockSocket.connected = false; // Socket is disconnected
+
+      let visibilityHandler: Function;
+      (document.addEventListener as jest.Mock).mockImplementation(
+        (event: string, handler: Function) => {
+          if (event === "visibilitychange") {
+            visibilityHandler = handler;
+          }
+        }
+      );
+
+      renderHook(() => useSessionJoin(false));
+
+      await waitFor(() => {
+        expect(document.addEventListener).toHaveBeenCalledWith(
+          "visibilitychange",
+          expect.any(Function)
+        );
+      });
+
+      Object.defineProperty(document, "visibilityState", {
+        value: "visible",
+        writable: true,
+      });
+
+      await act(async () => {
+        await visibilityHandler!();
+      });
+
+      // Should call socket.connect() to reconnect with fresh token
+      expect(mockSocket.connect).toHaveBeenCalled();
+    });
+
+    it("should remove visibilitychange listener on unmount", async () => {
+      const { unmount } = renderHook(() => useSessionJoin(false));
+
+      await waitFor(() => {
+        expect(document.addEventListener).toHaveBeenCalledWith(
+          "visibilitychange",
+          expect.any(Function)
+        );
+      });
+
+      unmount();
+
+      expect(document.removeEventListener).toHaveBeenCalledWith(
+        "visibilitychange",
+        expect.any(Function)
+      );
+    });
+  });
+
+  describe("periodic token refresh", () => {
+    it("should set up a periodic token refresh interval", async () => {
+      const setIntervalSpy = jest.spyOn(global, "setInterval");
+
+      renderHook(() => useSessionJoin(false));
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalled();
+      });
+
+      // Should have set up an interval (25 minutes = 1,500,000 ms)
+      expect(setIntervalSpy).toHaveBeenCalledWith(
+        expect.any(Function),
+        25 * 60 * 1000
+      );
+    });
+
+    it("should refresh token on periodic interval tick", async () => {
+      mockRefreshAccessToken.mockResolvedValue(true);
+      mockGetTokens.mockReturnValue({ access: "periodic-token", refresh: "periodic-refresh" });
+      mockSocket.connected = true;
+
+      renderHook(() => useSessionJoin(false));
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalled();
+      });
+
+      // Advance timer by 25 minutes to trigger the periodic refresh
+      await act(async () => {
+        jest.advanceTimersByTime(25 * 60 * 1000);
+        // Allow async operations to complete
+        await Promise.resolve();
+      });
+
+      expect(mockRefreshAccessToken).toHaveBeenCalled();
+    });
+
+    it("should clear the interval on unmount", async () => {
+      const clearIntervalSpy = jest.spyOn(global, "clearInterval");
+
+      const { unmount } = renderHook(() => useSessionJoin(false));
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalled();
+      });
+
+      unmount();
+
+      expect(clearIntervalSpy).toHaveBeenCalled();
     });
   });
 });
