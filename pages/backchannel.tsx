@@ -87,25 +87,46 @@ function BackchannelRoom({ authType }: { authType: AuthType }) {
         );
 
         if (!participantPasscodeParam) return;
+        // Store passcode in state; the join effect below will handle the actual
+        // conversation:join (and re-join on every reconnection).
         setParticipantPasscode(participantPasscodeParam);
-
-        if (!socket) return;
-        // Use emitWithTokenRefresh to handle token expiration
-        emitWithTokenRefresh(
-          socket,
-          "conversation:join",
-          {
-            conversationId: router.query.conversationId,
-            token: Api.get().GetTokens().access,
-            threadId: router.query.threadId,
-          },
-          () => console.log("Successfully joined backchannel conversation"),
-          (error) => console.error("Error joining backchannel conversation:", error)
-        );
       }
     }
     fetchConversationData();
   }, [participantPasscode, socket, router]);
+
+  // Join the backchannel conversation once the passcode is known, and re-join
+  // on every socket reconnection (e.g. after a token refresh or network drop).
+  useEffect(() => {
+    if (!socket || !router.query.conversationId || !participantPasscode) return;
+
+    const joinBackchannel = () => {
+      // Always read the current token so re-joins after a refresh use the
+      // new token rather than the one captured at socket-creation time.
+      emitWithTokenRefresh(
+        socket,
+        "conversation:join",
+        {
+          conversationId: router.query.conversationId,
+          token: Api.get().GetTokens().access,
+          threadId: router.query.threadId,
+        },
+        () => console.log("Successfully joined backchannel conversation"),
+        (error) =>
+          console.error("Error joining backchannel conversation:", error),
+      );
+    };
+
+    // Initial join
+    joinBackchannel();
+
+    // Re-join on every subsequent reconnection (e.g. after token refresh)
+    socket.on("connect", joinBackchannel);
+
+    return () => {
+      socket.off("connect", joinBackchannel);
+    };
+  }, [socket, router.query.conversationId, router.query.threadId, participantPasscode]);
 
   function sendMessage(message: string, preset = false) {
     if (!participantPasscode) return;
