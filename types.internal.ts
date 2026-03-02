@@ -133,3 +133,15 @@ export interface ControlledInputConfig {
   icon: React.ReactNode;
   label: string;
 }
+
+/**
+ * Media item structure for multimodal messages
+ * @property {"image" | "audio" | "video"} type - The type of media
+ * @property {string} data - Base64 encoded media data
+ * @property {string} mimeType - MIME type of the media (e.g., "image/png", "audio/mp3")
+ */
+export interface MediaItem {
+  type: "image" | "audio" | "video";
+  data: string;
+  mimeType: string;
+}

@@ -10,7 +10,7 @@ import {
   SlashCommand,
   createSlashCommandEnhancer,
 } from "./enhancers/slashCommandEnhancer";
-import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
+import { ControlledInputConfig, MediaItem, PseudonymousMessage } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { normalizeAssistantPseudonym } from "../utils/Helpers";
@@ -20,11 +20,13 @@ import { normalizeAssistantPseudonym } from "../utils/Helpers";
  * @property {string} text - The actual text content of the message
  * @property {string} [type] - Optional type for styling (e.g., "moderator_submitted")
  * @property {string} [message] - Optional message ID reference
+ * @property {MediaItem[]} [media] - Optional array of media items (images, audio, video)
  */
 interface ParsedMessageBody {
   text: string;
   type?: string;
   message?: string;
+  media?: MediaItem[];
 }
 
 /**
@@ -40,6 +42,7 @@ const parseMessageBody = (body: string | object): ParsedMessageBody => {
       text: obj.text?.toString() || "",
       type: obj.type?.toString(),
       message: obj.message?.toString(),
+      media: Array.isArray(obj.media) ? obj.media : undefined,
     };
   }
 
@@ -296,6 +299,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                                   ...message,
                                   body: parsed.text,
                                 }}
+                                media={parsed.media}
                                 onPromptSelect={onPromptSelect}
                               />
                             </div>
@@ -314,6 +318,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                                   ...message,
                                   body: parsed.text,
                                 }}
+                                media={parsed.media}
                                 onPromptSelect={onPromptSelect}
                               />
                             </div>

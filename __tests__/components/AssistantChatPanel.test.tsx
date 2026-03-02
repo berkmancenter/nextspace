@@ -468,6 +468,341 @@ describe("AssistantChatPanel", () => {
     expect(screen.getByText("Object message")).toBeInTheDocument();
   });
 
+  describe("Visual message handling (media)", () => {
+    it("passes media prop to AssistantMessage component", () => {
+      // Need to update the mock to capture the media prop
+      const mockAssistantMessage = jest.fn(({ message, media }: any) => {
+        const messageText =
+          typeof message.body === "string"
+            ? message.body
+            : message.body?.text || "";
+        return (
+          <div data-testid="assistant-message" data-has-media={!!media}>
+            {messageText}
+          </div>
+        );
+      });
+
+      jest.mock("../../components/messages", () => ({
+        AssistantMessage: mockAssistantMessage,
+        SubmittedMessage: ({ message }: any) => {
+          const messageText =
+            typeof message.body === "string"
+              ? message.body
+              : message.body?.text || "";
+          return <div data-testid="submitted-message">{messageText}</div>;
+        },
+        ModeratorSubmittedMessage: ({ message }: any) => {
+          const messageText =
+            typeof message.body === "string"
+              ? message.body
+              : message.body?.text || "";
+          return <div data-testid="moderator-submitted-message">{messageText}</div>;
+        },
+      }));
+
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "Here's an image",
+            media: [
+              {
+                type: "image",
+                data: "base64data",
+                mimeType: "image/png",
+              },
+            ],
+          },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByText("Here's an image")).toBeInTheDocument();
+    });
+
+    it("parses media from message body object", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "Check this out",
+            media: [
+              {
+                type: "image",
+                data: "imagedata",
+                mimeType: "image/png",
+              },
+            ],
+          },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByText("Check this out")).toBeInTheDocument();
+      expect(screen.getByTestId("assistant-message")).toBeInTheDocument();
+    });
+
+    it("handles messages with multiple media items", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "Multiple images",
+            media: [
+              {
+                type: "image",
+                data: "image1",
+                mimeType: "image/png",
+              },
+              {
+                type: "image",
+                data: "image2",
+                mimeType: "image/jpeg",
+              },
+            ],
+          },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByText("Multiple images")).toBeInTheDocument();
+    });
+
+    it("handles messages without media", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "Just text",
+          },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByText("Just text")).toBeInTheDocument();
+    });
+
+    it("handles string body messages (no media)", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: "Simple string message",
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByText("Simple string message")).toBeInTheDocument();
+    });
+
+    it("parses empty media array correctly", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "No media",
+            media: [],
+          },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByText("No media")).toBeInTheDocument();
+    });
+
+    it("parses non-array media value gracefully", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "Invalid media",
+            media: "not-an-array",
+          },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByText("Invalid media")).toBeInTheDocument();
+    });
+
+    it("extracts text from object body with media", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "Text with media",
+            media: [
+              {
+                type: "image",
+                data: "data",
+                mimeType: "image/png",
+              },
+            ],
+          },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByText("Text with media")).toBeInTheDocument();
+    });
+
+    it("handles user messages with media in object body", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "test-user",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "User uploaded image",
+            media: [
+              {
+                type: "image",
+                data: "userimage",
+                mimeType: "image/png",
+              },
+            ],
+          },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "tu-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByText("User uploaded image")).toBeInTheDocument();
+    });
+
+    it("does not pass media to non-assistant messages", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "test-user",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "User message",
+            media: [
+              {
+                type: "image",
+                data: "data",
+                mimeType: "image/png",
+              },
+            ],
+          },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "tu-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const { container } = render(
+        <AssistantChatPanel {...baseProps} messages={messages} />
+      );
+
+      // User messages are rendered in a plain div without AssistantMessage component
+      expect(screen.getByText("User message")).toBeInTheDocument();
+      expect(screen.queryByTestId("assistant-message")).not.toBeInTheDocument();
+    });
+  });
+
   describe("Timestamp display", () => {
     it("shows timestamp for the first message", () => {
       const messages = [
