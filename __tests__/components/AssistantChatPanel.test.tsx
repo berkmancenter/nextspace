@@ -91,6 +91,7 @@ describe("AssistantChatPanel", () => {
     onPromptSelect: mockOnPromptSelect,
     enterControlledMode: mockEnterControlledMode,
     sendFeedbackRating: mockSendFeedbackRating,
+    userId: "test-user-id",
   };
 
   beforeEach(() => {

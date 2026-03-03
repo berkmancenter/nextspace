@@ -1,4 +1,4 @@
-import React, { FC, useMemo } from "react";
+import React, { FC, useEffect, useMemo, useState } from "react";
 import {
   AssistantMessage,
   SubmittedMessage,
@@ -10,10 +10,15 @@ import {
   SlashCommand,
   createSlashCommandEnhancer,
 } from "./enhancers/slashCommandEnhancer";
-import { ControlledInputConfig, MediaItem, PseudonymousMessage } from "../types.internal";
+import {
+  ControlledInputConfig,
+  MediaItem,
+  PseudonymousMessage,
+} from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { normalizeAssistantPseudonym } from "../utils/Helpers";
+import { PreferencesBanner, PreferenceOption } from "./PreferencesBanner";
 
 /**
  * Parsed message body structure
@@ -66,6 +71,11 @@ interface AssistantChatPanelProps {
   onPromptSelect: (prompt: string) => void;
   enterControlledMode: (config: ControlledInputConfig) => void;
   sendFeedbackRating: (messageId: string, rating: string) => void;
+  userId: string | null;
+  showPreferences?: boolean;
+  preferenceOptions?: PreferenceOption[];
+  onPreferencesSubmit?: (selectedValues: string[]) => void;
+  preferencesError?: string | null;
 }
 
 export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
@@ -82,8 +92,19 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   onPromptSelect,
   enterControlledMode,
   sendFeedbackRating,
+  userId,
+  showPreferences = false,
+  preferenceOptions = [],
+  onPreferencesSubmit,
+  preferencesError = null,
 }) => {
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(messages);
+  const [preferencesVisible, setPreferencesVisible] = useState(showPreferences);
+
+  // Sync local state with prop changes
+  useEffect(() => {
+    setPreferencesVisible(showPreferences);
+  }, [showPreferences]);
 
   // Create enhancers for assistant mode (slash commands only)
   const enhancers = useMemo(() => {
@@ -104,6 +125,15 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
       return false;
     })
     .map((msg) => (msg.body as any).message);
+
+  // Handle preferences submission - don't hide optimistically, let parent control visibility
+  const handlePreferencesSubmit = (selectedValues: string[]) => {
+    onPreferencesSubmit?.(selectedValues);
+  };
+
+  const handlePreferencesDismiss = () => {
+    setPreferencesVisible(false);
+  };
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
@@ -130,6 +160,18 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
               conversation is private.
             </p>
           </div>
+
+          {/* Preferences Banner */}
+          {preferencesVisible && preferenceOptions.length > 0 && (
+            <div className="w-full">
+              <PreferencesBanner
+                options={preferenceOptions}
+                onSubmit={handlePreferencesSubmit}
+                onDismiss={handlePreferencesDismiss}
+                error={preferencesError}
+              />
+            </div>
+          )}
 
           {messages
             .filter((message) => !message.parentMessage)

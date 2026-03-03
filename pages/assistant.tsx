@@ -50,6 +50,16 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
   const [eventName, setEventName] = useState<string>("");
   const [assistantInputValue, setAssistantInputValue] = useState<string>("");
   const [chatInputValue, setChatInputValue] = useState<string>("");
+  const [showPreferences, setShowPreferences] = useState<boolean>(true);
+  const [preferencesError, setPreferencesError] = useState<string | null>(null);
+
+  const preferenceOptions = [
+    {
+      value: "visualResponse",
+      label: "Visual Response",
+      description: "Answer my questions with images when appropriate",
+    },
+  ];
 
   // Ref to track active tab for socket handler
   const activeTabRef = useRef<"assistant" | "chat">("assistant");
@@ -278,6 +288,45 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     fetchInitialMessages();
   }, [chatPasscode, router.query.conversationId]);
 
+  // Check if user has existing preferences
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchUserPreferences = async () => {
+      try {
+        const preferences = await RetrieveData(
+          `users/user/${userId}/preferences`,
+          Api.get().GetTokens().access!,
+        );
+
+        if ("error" in preferences) {
+          console.error(
+            `Error retrieving preferences: ${preferences.message?.message}`,
+          );
+          setShowPreferences(true);
+          return;
+        }
+
+        // If preferences exist (non-empty object), don't show the banner
+        if (
+          preferences &&
+          typeof preferences === "object" &&
+          Object.keys(preferences).length > 0
+        ) {
+          setShowPreferences(false);
+        } else {
+          // Empty object means no preferences set yet
+          setShowPreferences(true);
+        }
+      } catch (error: any) {
+        console.error(`Error retrieving preferences: ${error.message}`);
+        setShowPreferences(true);
+      }
+    };
+
+    fetchUserPreferences();
+  }, [userId]);
+
   // Load initial assistant messages when userId and agentId become available
   useEffect(() => {
     if (!userId || !agentId || !router.query.conversationId) return;
@@ -410,6 +459,55 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     await sendMessage(value, true, parentMessageId, false, "reaction");
   };
 
+  const handlePreferencesSubmit = async (selectedValues: string[]) => {
+    if (!userId) return;
+
+    try {
+      setPreferencesError(null); // Clear any previous errors
+
+      // Create object with all preference keys and true/false based on selection
+      const preferencesObject = preferenceOptions.reduce(
+        (acc, option) => {
+          acc[option.value] = selectedValues.includes(option.value);
+          return acc;
+        },
+        {} as Record<string, boolean>,
+      );
+
+      // Save preferences to API
+      const response = await SendData(
+        `users/user/${userId}/preferences`,
+        preferencesObject,
+        undefined,
+        undefined,
+        "PUT",
+      );
+
+      if ("error" in response) {
+        const errorMsg =
+          response.message?.message ||
+          "Failed to save preferences. Please try again.";
+        setPreferencesError(errorMsg);
+        console.error(`Error setting preferences: ${errorMsg}`);
+        return;
+      }
+
+      // Track preferences submission
+      trackConversationEvent(
+        router.query.conversationId as string,
+        "assistant",
+        "preferences_submitted",
+        selectedValues.join(","),
+      );
+
+      setShowPreferences(false);
+      setPreferencesError(null);
+    } catch (error) {
+      console.error("Error saving preferences:", error);
+      setPreferencesError("Failed to save preferences. Please try again.");
+    }
+  };
+
   const handleTabSwitch = (tab: "assistant" | "chat") => {
     setActiveTab(tab);
     // Clear unseen count for the tab we're switching to
@@ -530,6 +628,11 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
                   onPromptSelect={handlePromptSelect}
                   enterControlledMode={enterControlledMode}
                   sendFeedbackRating={sendFeedbackRating}
+                  userId={userId}
+                  showPreferences={showPreferences}
+                  preferenceOptions={preferenceOptions}
+                  onPreferencesSubmit={handlePreferencesSubmit}
+                  preferencesError={preferencesError}
                 />
               )
             ) : (

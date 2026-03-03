@@ -595,4 +595,420 @@ describe("EventAssistantRoom", () => {
       );
     });
   });
+
+  describe("User Preferences", () => {
+    it("fetches user preferences on page load when userId is available", async () => {
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce([]); // Empty preferences
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "users/user/user-123/preferences",
+          "mock-access-token",
+        );
+      });
+    });
+
+    it("shows preferences banner when user has no preferences", async () => {
+      const user = userEvent.setup();
+
+      // Set up router with chat passcode so tabs are shown
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce([]) // Empty chat messages
+        .mockResolvedValueOnce({}) // Empty preferences object
+        .mockResolvedValueOnce([]); // Empty assistant messages
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+      });
+
+      // Click on the Event Assistant tab to show preferences
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+      });
+    });
+
+    it("hides preferences banner when user has existing preferences", async () => {
+      const user = userEvent.setup();
+
+      // Set up router with chat passcode so tabs are shown
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      // Use mockImplementation to return different values based on the path
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (path.includes("users/user/") && path.includes("/preferences")) {
+          return Promise.resolve({ visualResponse: true }); // Existing preferences
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]); // Empty messages
+        }
+        return Promise.resolve(null);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+      });
+
+      // Click on the Event Assistant tab
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText("Enter your message here")).toBeInTheDocument();
+      });
+
+      // Wait for preferences to be loaded and the banner to be hidden
+      await waitFor(
+        () => {
+          expect(
+            screen.queryByText("Set Your Preferences"),
+          ).not.toBeInTheDocument();
+        },
+        { timeout: 2000 }
+      );
+    });
+
+    it("shows preferences banner when preferences fetch returns error", async () => {
+      const user = userEvent.setup();
+
+      // Set up router with chat passcode so tabs are shown
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce([]) // Empty chat messages
+        .mockResolvedValueOnce({
+          error: true,
+          message: { message: "Failed to fetch preferences" },
+        })
+        .mockResolvedValueOnce([]); // Empty assistant messages
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+      });
+
+      // Click on the Event Assistant tab
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+      });
+    });
+
+    it("successfully saves preferences and hides banner", async () => {
+      const user = userEvent.setup();
+
+      // Set up router with chat passcode so tabs are shown
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce([]) // Empty chat messages
+        .mockResolvedValueOnce({}) // Empty preferences
+        .mockResolvedValueOnce([]); // Empty assistant messages
+
+      (SendData as jest.Mock).mockResolvedValue({ success: true });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+      });
+
+      // Click on the Event Assistant tab
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+      });
+
+      // Select a preference option
+      const checkbox = screen.getByRole("checkbox", {
+        name: /Visual Response/i,
+      });
+      await user.click(checkbox);
+
+      // Click save
+      const saveButton = screen.getByRole("button", {
+        name: /Save Preferences/i,
+      });
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          "users/user/user-123/preferences",
+          { visualResponse: true },
+          undefined,
+          undefined,
+          "PUT",
+        );
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByText("Set Your Preferences"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it("handles preference save errors gracefully", async () => {
+      const user = userEvent.setup();
+
+      // Set up router with chat passcode so tabs are shown
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce([]) // Empty chat messages
+        .mockResolvedValueOnce({}) // Empty preferences
+        .mockResolvedValueOnce([]); // Empty assistant messages
+
+      (SendData as jest.Mock).mockResolvedValue({
+        error: true,
+        message: { message: "Failed to save preferences" },
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+      });
+
+      // Click on the Event Assistant tab
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+      });
+
+      // Select a preference option
+      const checkbox = screen.getByRole("checkbox", {
+        name: /Visual Response/i,
+      });
+      await user.click(checkbox);
+
+      // Click save
+      const saveButton = screen.getByRole("button", {
+        name: /Save Preferences/i,
+      });
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Failed to save preferences")).toBeInTheDocument();
+      });
+
+      // Banner should still be visible
+      expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+    });
+
+    it("saves preferences with correct boolean values for selected and unselected options", async () => {
+      const user = userEvent.setup();
+
+      // Set up router with chat passcode so tabs are shown
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce([]) // Empty chat messages
+        .mockResolvedValueOnce({}) // Empty preferences
+        .mockResolvedValueOnce([]); // Empty assistant messages
+
+      (SendData as jest.Mock).mockResolvedValue({ success: true });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+      });
+
+      // Click on the Event Assistant tab
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+      });
+
+      // Select only visualResponse (not selecting other options if they exist)
+      const checkbox = screen.getByRole("checkbox", {
+        name: /Visual Response/i,
+      });
+      await user.click(checkbox);
+
+      // Click save
+      const saveButton = screen.getByRole("button", {
+        name: /Save Preferences/i,
+      });
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          "users/user/user-123/preferences",
+          { visualResponse: true },
+          undefined,
+          undefined,
+          "PUT",
+        );
+      });
+    });
+
+    it("handles preference save network error", async () => {
+      const user = userEvent.setup();
+
+      // Set up router with chat passcode so tabs are shown
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce([]) // Empty chat messages
+        .mockResolvedValueOnce({}) // Empty preferences
+        .mockResolvedValueOnce([]); // Empty assistant messages
+
+      (SendData as jest.Mock).mockRejectedValue(new Error("Network error"));
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+      });
+
+      // Click on the Event Assistant tab
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+      });
+
+      // Select a preference option
+      const checkbox = screen.getByRole("checkbox", {
+        name: /Visual Response/i,
+      });
+      await user.click(checkbox);
+
+      // Click save
+      const saveButton = screen.getByRole("button", {
+        name: /Save Preferences/i,
+      });
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Failed to save preferences. Please try again."),
+        ).toBeInTheDocument();
+      });
+    });
+  });
 });
