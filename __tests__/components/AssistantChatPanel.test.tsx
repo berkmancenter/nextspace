@@ -220,7 +220,7 @@ describe("AssistantChatPanel", () => {
     expect(screen.getByTestId("submitted-message")).toBeInTheDocument();
   });
 
-  it("filters out parent messages", () => {
+  it("shows reply messages for regular messages", () => {
     const messages = [
       {
         id: "1",
@@ -240,7 +240,7 @@ describe("AssistantChatPanel", () => {
         id: "2",
         pseudonym: "test-user",
         createdAt: "2025-10-17T12:01:00Z",
-        body: { text: "Child message" },
+        body: { text: "Reply message" },
         channels: ["user"],
         parentMessage: "1",
         conversation: "conv-1",
@@ -255,8 +255,61 @@ describe("AssistantChatPanel", () => {
 
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("Main message")).toBeInTheDocument();
-    expect(screen.queryByText("Child message")).not.toBeInTheDocument();
+    // Main message appears in the message list
+    const mainMessages = screen.getAllByText("Main message");
+    expect(mainMessages.length).toBeGreaterThan(0);
+
+    // Reply message is shown (not filtered out)
+    expect(screen.getByText("Reply message")).toBeInTheDocument();
+
+    // Reply context should show "In reply to:"
+    expect(screen.getByText(/In reply to:/)).toBeInTheDocument();
+  });
+
+  it("filters out replies to singleChoice prompts", () => {
+    const messages = [
+      {
+        id: "1",
+        pseudonym: "Event Assistant",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "Choose an option:" },
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "ea-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+        prompt: {
+          type: "singleChoice" as const,
+          options: [
+            { label: "Option A", value: "a" },
+            { label: "Option B", value: "b" },
+          ],
+        },
+      },
+      {
+        id: "2",
+        pseudonym: "test-user",
+        createdAt: "2025-10-17T12:01:00Z",
+        body: { text: "Option A" },
+        channels: ["user"],
+        parentMessage: "1",
+        conversation: "conv-1",
+        pseudonymId: "tu-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      },
+    ];
+
+    render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+    expect(screen.getByText("Choose an option:")).toBeInTheDocument();
+    expect(screen.queryByText("Option A")).not.toBeInTheDocument();
   });
 
   it("shows loading indicator when waiting for response", () => {

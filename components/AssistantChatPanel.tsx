@@ -135,6 +135,18 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     setPreferencesVisible(false);
   };
 
+  // Collect message IDs that have singleChoice prompts
+  const singleChoicePromptIds = new Set(
+    messages
+      .filter(
+        (msg) =>
+          msg.prompt?.type === "singleChoice" &&
+          msg.prompt?.options &&
+          msg.prompt.options.length > 0,
+      )
+      .map((msg) => msg.id),
+  );
+
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
       {/* Scrollable messages area */}
@@ -174,7 +186,11 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
           )}
 
           {messages
-            .filter((message) => !message.parentMessage)
+            .filter(
+              (message) =>
+                !message.parentMessage ||
+                !singleChoicePromptIds.has(message.parentMessage),
+            )
             .map((message, i) => {
               const isAssistant = message.fromAgent;
               const isCurrentUser = message.pseudonym === pseudonym;
@@ -328,6 +344,32 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                           </span>
                         )}
                       </div>
+
+                      {/* Reply context - shows parent message snippet */}
+                      {message.parentMessage &&
+                        (() => {
+                          const parentMsg = messages.find(
+                            (m) => m.id === message.parentMessage,
+                          );
+                          if (!parentMsg) return null;
+
+                          const parentParsed = parseMessageBody(parentMsg.body);
+                          const parentText = parentParsed.text;
+                          const truncatedText =
+                            parentText.length > 60
+                              ? parentText.substring(0, 60) + "..."
+                              : parentText;
+
+                          return (
+                            <div
+                              className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded"
+                              style={{ width: "85%" }}
+                            >
+                              <span className="font-medium">In reply to: </span>
+                              {truncatedText}
+                            </div>
+                          );
+                        })()}
 
                       {/* Message bubble */}
                       {isAssistant ? (

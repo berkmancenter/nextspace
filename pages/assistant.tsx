@@ -104,22 +104,21 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       if (process.env.NODE_ENV !== "production")
         console.log("New message:", data);
 
-      if (!data.parentMessage) {
-        // Route messages to appropriate array based on channel
-        if (data.channels && data.channels.includes("chat")) {
-          setChatMessages((prev) => [...prev, data]);
-          // Increment counter if NOT viewing chat tab
-          if (activeTabRef.current !== "chat") {
-            setUnseenChatCount((prev) => prev + 1);
-          }
-        } else if (!data.channels || !data.channels.includes("transcript")) {
-          setAssistantMessages((prev) => [...prev, data]);
-          // Increment counter if NOT viewing assistant tab
-          if (activeTabRef.current !== "assistant") {
-            setUnseenAssistantCount((prev) => prev + 1);
-          }
+      // Route messages to appropriate array based on channel
+      if (data.channels && data.channels.includes("chat")) {
+        setChatMessages((prev) => [...prev, data]);
+        // Increment counter if NOT viewing chat tab
+        if (activeTabRef.current !== "chat") {
+          setUnseenChatCount((prev) => prev + 1);
+        }
+      } else if (!data.channels || !data.channels.includes("transcript")) {
+        setAssistantMessages((prev) => [...prev, data]);
+        // Increment counter if NOT viewing assistant tab
+        if (activeTabRef.current !== "assistant") {
+          setUnseenAssistantCount((prev) => prev + 1);
         }
       }
+
       if (data.fromAgent) {
         setWaitingForResponse(false);
       }
@@ -266,6 +265,52 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     );
   }, [socket, agentId, userId, chatPasscode, router.query.conversationId]);
 
+  // Helper function to fetch replies for messages and insert them into the array
+  const fetchAndInsertReplies = async (
+    messages: PseudonymousMessage[],
+  ): Promise<PseudonymousMessage[]> => {
+    // Collect all messages with replies
+    const messagesWithReplies = messages.filter(
+      (msg) => msg.replyCount && msg.replyCount > 0,
+    );
+
+    if (messagesWithReplies.length === 0) {
+      return messages;
+    }
+
+    // Fetch all replies in parallel
+    const repliesPromises = messagesWithReplies.map(async (msg) => {
+      try {
+        const replies = await RetrieveData(
+          `messages/${msg.id}/replies`,
+          Api.get().GetTokens().access!,
+        );
+        if ("error" in replies) {
+          console.error(
+            `Error fetching replies for message ${msg.id}: ${replies.message?.message}`,
+          );
+          return [];
+        }
+        return Array.isArray(replies) ? replies : [];
+      } catch (error) {
+        console.error(`Error fetching replies for message ${msg.id}:`, error);
+        return [];
+      }
+    });
+
+    const allRepliesArrays = await Promise.all(repliesPromises);
+    const allReplies = allRepliesArrays.flat();
+
+    // Combine original messages with replies and sort by createdAt
+    const combinedMessages = [...messages, ...allReplies].sort((a, b) => {
+      const dateA = new Date(a.createdAt!).getTime();
+      const dateB = new Date(b.createdAt!).getTime();
+      return dateA - dateB;
+    });
+
+    return combinedMessages;
+  };
+
   // Load initial chat messages when chatPasscode becomes available
   useEffect(() => {
     if (!chatPasscode || !router.query.conversationId) return;
@@ -278,7 +323,8 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
         );
 
         if (Array.isArray(chatMessages)) {
-          setChatMessages(chatMessages);
+          const messagesWithReplies = await fetchAndInsertReplies(chatMessages);
+          setChatMessages(messagesWithReplies);
         }
       } catch (error) {
         console.error("Error fetching initial chat messages:", error);
@@ -340,7 +386,9 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
         );
 
         if (Array.isArray(assistantMessages)) {
-          setAssistantMessages(assistantMessages);
+          const messagesWithReplies =
+            await fetchAndInsertReplies(assistantMessages);
+          setAssistantMessages(messagesWithReplies);
         }
       } catch (error) {
         console.error("Error fetching initial assistant messages:", error);
