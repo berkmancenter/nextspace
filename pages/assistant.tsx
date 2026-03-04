@@ -119,7 +119,10 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
         }
       }
 
-      if (data.fromAgent) {
+      if (
+        data.fromAgent &&
+        (!data.channels || !data.channels.includes("chat"))
+      ) {
         setWaitingForResponse(false);
       }
     };
