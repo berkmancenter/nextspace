@@ -47,14 +47,57 @@ export async function ensureFreshToken(): Promise<string | null> {
 }
 
 /**
+ * In-flight refresh promise used to deduplicate concurrent refresh calls.
+ * If multiple callers invoke refreshAccessToken() simultaneously they all
+ * share the same request instead of each sending their own — which would
+ * invalidate the single-use refresh token and trigger a destructive race.
+ */
+let inflightRefresh: Promise<boolean> | null = null;
+
+/**
  * Attempts to refresh the access token using the refresh token.
  * Updates both in-memory tokens and the session cookie.
- * 
+ *
+ * Concurrent callers are automatically deduplicated: if a refresh is already
+ * in progress every additional caller awaits the same promise rather than
+ * issuing a second request that would invalidate the first one.
+ *
  * @returns True if refresh was successful, false otherwise
  */
 export async function refreshAccessToken(): Promise<boolean> {
+  if (inflightRefresh) {
+    return inflightRefresh;
+  }
+  inflightRefresh = _refreshAccessToken();
+  try {
+    return await inflightRefresh;
+  } finally {
+    inflightRefresh = null;
+  }
+}
+
+async function _refreshAccessToken(): Promise<boolean> {
   const apiI = Api.get();
-  const tokens = apiI.GetTokens();
+  let tokens = apiI.GetTokens();
+
+  // If the refresh token is missing from memory, attempt to restore it from
+  // the HttpOnly session cookie before giving up. This handles cases where the
+  // in-memory singleton was cleared (e.g. after a hot-reload or a prior failed
+  // race) but the cookie is still valid.
+  if (!tokens.refresh) {
+    try {
+      const cookieResponse = await fetch("/api/cookie");
+      if (cookieResponse.ok) {
+        const cookieData = await cookieResponse.json();
+        if (cookieData.tokens?.access && cookieData.tokens?.refresh) {
+          apiI.SetTokens(cookieData.tokens.access, cookieData.tokens.refresh);
+          tokens = apiI.GetTokens();
+        }
+      }
+    } catch (cookieError) {
+      console.error("Failed to restore tokens from cookie:", cookieError);
+    }
+  }
 
   if (!tokens.refresh) {
     console.error("No refresh token available");
