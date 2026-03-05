@@ -7,6 +7,7 @@ import { MessageFeedback } from "./MessageFeedback";
 import { PseudonymousMessage, ControlledInputConfig } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
+import { BotIcon } from "./BotIcon";
 import { createMentionsEnhancer } from "./enhancers/mentionsEnhancer";
 import { normalizeAssistantPseudonym } from "../utils/Helpers";
 
@@ -166,14 +167,16 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
       ? getAssistantAvatarStyle()
       : getAvatarStyle(message.pseudonym || "", isCurrentUser);
 
-    const Icon = style.icon;
-
     return (
       <div
-        className="w-8 h-8 rounded-full flex items-center justify-center text-xl flex-shrink-0"
+        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
         style={{ backgroundColor: style.avatarBg }}
       >
-        <Icon fontSize="inherit" />
+        {isAssistant ? (
+          <BotIcon size={22} color="#4b5563" />
+        ) : (
+          <style.icon fontSize="inherit" />
+        )}
       </div>
     );
   };

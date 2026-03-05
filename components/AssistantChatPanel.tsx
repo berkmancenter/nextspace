@@ -14,6 +14,7 @@ import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { normalizeAssistantPseudonym } from "../utils/Helpers";
+import { BotIcon } from "./BotIcon";
 
 /**
  * Parsed message body structure
@@ -182,32 +183,36 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                         isCurrentUser ? "flex-row-reverse" : "flex-row"
                       }`}
                     >
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-xl flex-shrink-0"
-                        style={{ backgroundColor: style.avatarBg }}
-                      >
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: style.avatarBg }}
+                    >
+                      {isAssistant ? (
+                        <BotIcon size={22} color="#4b5563" />
+                      ) : (
                         <style.icon fontSize="inherit" />
-                      </div>
+                      )}
+                    </div>
+                    <div
+                      className={`flex flex-col ${
+                        isCurrentUser ? "items-end" : "items-start"
+                      } flex-1 min-w-0`}
+                    >
                       <div
-                        className={`flex flex-col ${
-                          isCurrentUser ? "items-end" : "items-start"
-                        } flex-1 min-w-0`}
+                        className={`text-sm font-bold mb-1 ${
+                          isCurrentUser ? "text-right" : "text-left"
+                        }`}
                       >
-                        <div
-                          className={`text-sm font-bold mb-1 ${
-                            isCurrentUser ? "text-right" : "text-left"
-                          }`}
-                        >
-                          {displayName}
-                          {isCurrentUser && (
-                            <span className="text-gray-600 font-normal">
-                              {" "}
-                              (You)
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ width: "85%" }}>
-                          {messageType === "moderator_submitted" ? (
+                        {displayName}
+                        {isCurrentUser && (
+                          <span className="text-gray-600 font-normal">
+                            {" "}
+                            (You)
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ width: "85%" }}>
+                        {messageType === "moderator_submitted" ? (
                             <ModeratorSubmittedMessage
                               message={{
                                 ...message,
@@ -257,10 +262,14 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                   >
                     {/* Avatar */}
                     <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-xl flex-shrink-0"
+                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                       style={{ backgroundColor: style.avatarBg }}
                     >
-                      <style.icon fontSize="inherit" />
+                      {isAssistant ? (
+                        <BotIcon size={22} color="#4b5563" />
+                      ) : (
+                        <style.icon fontSize="inherit" />
+                      )}
                     </div>
 
                     {/* Message content */}
@@ -350,56 +359,11 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                         waitingForResponse &&
                         i === messages.length - 1 && (
                           <div className="flex items-center gap-1 mt-2 mb-1">
-                            <svg
-                              viewBox="0 -4 32 36"
-                              className="w-8 h-8 text-gray-600"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                            >
-                              {/* Bouncing antenna dot */}
-                              <circle
-                                cx="16"
-                                cy="5.5"
-                                r="2"
-                                className="animate-bounce"
-                                fill="currentColor"
-                              />
-                              {/* Antenna line */}
-                              <line x1="16" y1="7.5" x2="16" y2="10" />
-                              {/* Head */}
-                              <rect
-                                x="8"
-                                y="10"
-                                width="16"
-                                height="12"
-                                rx="6"
-                              />
-                              {/* Eyes */}
-                              <circle
-                                cx="12"
-                                cy="16"
-                                r="1.5"
-                                fill="currentColor"
-                              />
-                              <circle
-                                cx="20"
-                                cy="16"
-                                r="1.5"
-                                fill="currentColor"
-                              />
-                              {/* Smile */}
-                              <path
-                                d="M13 19 Q16 21 19 19"
-                                strokeLinecap="round"
-                                fill="none"
-                              />
-                              {/* Arms */}
-                              <line x1="8" y1="15" x2="4.5" y2="13" />
-                              <line x1="24" y1="15" x2="27.5" y2="13" />
-                              {/* Body/Base */}
-                              <rect x="13" y="22" width="6" height="5" rx="2" />
-                            </svg>
+                            <BotIcon
+                              size={32}
+                              color="#4b5563"
+                              bouncing={true}
+                            />
                             <span className="text-xs text-gray-500 italic">
                               thinking...
                             </span>

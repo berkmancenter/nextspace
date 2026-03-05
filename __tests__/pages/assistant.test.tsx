@@ -446,7 +446,7 @@ describe("EventAssistantRoom", () => {
             agents: [{ id: "agent-456", agentType: "eventAssistantPlus" }],
           });
         } else if (path.startsWith("messages/")) {
-          return Promise.resolve([]); // Return empty chat messages
+          return Promise.resolve([]);
         }
         return Promise.resolve(null);
       });
@@ -459,33 +459,28 @@ describe("EventAssistantRoom", () => {
         render(<EventAssistantRoom authType={"guest"} />);
       });
 
+      // Wait for conversation data to load (RetrieveData called for conversations/)
+      await waitFor(() => {
+        expect(createConversationFromData).toHaveBeenCalled();
+      });
+
+      const user = userEvent.setup();
+
+      // Switch to the Event Bot (assistant) tab — nav bar shows both desktop + mobile, use first
+      const assistantTabs = screen.getAllByLabelText("Event Bot");
+      await user.click(assistantTabs[0]);
+
+      // Wait for AssistantChatPanel input to be present
       await waitFor(() => {
         expect(
           screen.getByPlaceholderText("Enter your message here"),
         ).toBeInTheDocument();
       });
 
-      // Wait for all promises to resolve (conversation data loading)
-      await act(async () => {
-        await Promise.resolve(); // Let RetrieveData promise resolve
-        await Promise.resolve(); // Let createConversationFromData promise resolve
-      });
-
-      // Allow React to process state updates
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      });
-
-      const user = userEvent.setup();
-
-      // Click on the Event Assistant tab to switch from Chat (default) to Assistant
-      const assistantTab = screen.getByText("Event Assistant");
-      await user.click(assistantTab);
-
       const input = screen.getByPlaceholderText("Enter your message here");
-
       await user.type(input, "/");
 
+      // The slash command menu should appear with /mod option
       await waitFor(
         () => {
           expect(screen.getByText("/mod")).toBeInTheDocument();
@@ -535,8 +530,8 @@ describe("EventAssistantRoom", () => {
 
       const user = userEvent.setup();
 
-      // Click on the Event Assistant tab to switch from Chat (default) to Assistant
-      const assistantTab = screen.getByText("Event Assistant");
+      // Click on the Event Bot nav item to switch from Chat (default) to Assistant
+      const assistantTab = screen.getAllByLabelText("Event Bot")[0];
       await user.click(assistantTab);
 
       const input = screen.getByPlaceholderText("Enter your message here");

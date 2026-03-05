@@ -11,3 +11,7 @@ export { AssistantChatPanel } from "./AssistantChatPanel";
 export { GroupChatPanel } from "./GroupChatPanel";
 export { Transcript } from "./Transcript";
 export { AgentConfigForm } from "./AgentConfigForm";
+export { NavigationBar } from "./NavigationBar";
+export type { NavTab } from "./NavigationBar";
+export { BotIcon } from "./BotIcon";
+export { TranscriptIcon } from "./TranscriptIcon";
