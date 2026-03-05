@@ -223,6 +223,15 @@ export const SendData = async (
 export const DefaultEase = " ease-[cubic-bezier(0.075, 0.820, 0.165, 1.000)]";
 
 /**
+ * Centralized display name for the Event Assistant bot.
+ * Update this value to rename the bot throughout the app.
+ *
+ * Note! You could also use the `conversationBotName` property coming from the BE
+ * This BE value is used in the event configuration form for the default zoom bot name
+ */
+export const EVENT_ASSISTANT_NAME = "Berkie";
+
+/**
  * Returns the conversation type for a particular conversation. Will use the conversationType property if set,
  * othwerwise maps agents to conversation type for legacy conversations (e.g. multiple agents combined into a single type)
  * @param conversation
@@ -302,7 +311,7 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
     }
   } else if (convType && convType.name === "eventAssistant") {
     const eventAssistantUrl = {
-      label: "Event Assistant",
+      label: EVENT_ASSISTANT_NAME,
       url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
         hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
       }${hasChat ? `&channel=chat,${chatPasscode}` : ""}`,
@@ -315,8 +324,8 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
   ) {
     const label =
       convType.name === "eventAssistantPlus"
-        ? "Event Assistant Plus"
-        : "Event Assistant Plus Proactive";
+        ? `${EVENT_ASSISTANT_NAME} Plus`
+        : `${EVENT_ASSISTANT_NAME} Plus Proactive`;
     const eventAssistantPlusUrl = {
       label,
       url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
@@ -389,13 +398,13 @@ export const CheckAuthHeader = (headers: Record<string, string>) => {
 };
 
 /**
- * Normalizes Event Assistant variant pseudonyms to "Event Assistant"
+ * Normalizes Event Assistant variant pseudonyms to EVENT_ASSISTANT_NAME
  * @param message- The message from the pseudonym to normalize
- * @returns "Event Assistant" if the pseudonym is a variant, otherwise the original pseudonym
+ * @returns EVENT_ASSISTANT_NAME if the pseudonym is a variant, otherwise the original pseudonym
  */
 export const normalizeAssistantPseudonym = (
   message: PseudonymousMessage,
 ): string => {
   if (!message || !message.pseudonym) return "";
-  return message.fromAgent ? "Event Assistant" : message.pseudonym;
+  return message.fromAgent ? EVENT_ASSISTANT_NAME : message.pseudonym;
 };

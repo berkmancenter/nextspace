@@ -467,7 +467,7 @@ describe("EventAssistantRoom", () => {
       const user = userEvent.setup();
 
       // Switch to the Event Bot (assistant) tab — nav bar shows both desktop + mobile, use first
-      const assistantTabs = screen.getAllByLabelText("Event Bot");
+      const assistantTabs = screen.getAllByLabelText("Berkie");
       await user.click(assistantTabs[0]);
 
       // Wait for AssistantChatPanel input to be present
@@ -531,7 +531,7 @@ describe("EventAssistantRoom", () => {
       const user = userEvent.setup();
 
       // Click on the Event Bot nav item to switch from Chat (default) to Assistant
-      const assistantTab = screen.getAllByLabelText("Event Bot")[0];
+      const assistantTab = screen.getAllByLabelText("Berkie")[0];
       await user.click(assistantTab);
 
       const input = screen.getByPlaceholderText("Enter your message here");

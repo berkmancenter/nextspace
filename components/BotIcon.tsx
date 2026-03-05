@@ -29,7 +29,7 @@ export function BotIcon({
       fill="none"
       stroke={color}
       strokeWidth="1.5"
-      className={className || undefined}
+      className={`${bouncing ? "overflow-visible" : ""}${className ? ` ${className}` : ""}` || undefined}
       aria-hidden="true"
     >
       {/* Antenna dot — bounces independently when bouncing=true */}

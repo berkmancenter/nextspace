@@ -13,7 +13,7 @@ import {
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
-import { normalizeAssistantPseudonym } from "../utils/Helpers";
+import { normalizeAssistantPseudonym, EVENT_ASSISTANT_NAME } from "../utils/Helpers";
 import { BotIcon } from "./BotIcon";
 
 /**
@@ -124,7 +124,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
               &nbsp;
             </h2>
             <p className="text-sm text-gray-500 mt-0.5">
-              Ask the Event Assistant any questions about the event — this
+              Ask the {EVENT_ASSISTANT_NAME} any questions about the event — this
               conversation is private.
             </p>
           </div>
@@ -358,7 +358,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                       {!isAssistant &&
                         waitingForResponse &&
                         i === messages.length - 1 && (
-                          <div className="flex items-center gap-1 mt-2 mb-1">
+                          <div className="relative z-10 flex items-center gap-1 mt-2 mb-1">
                             <BotIcon
                               size={32}
                               color="#4b5563"

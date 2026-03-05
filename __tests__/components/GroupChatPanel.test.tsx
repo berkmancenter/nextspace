@@ -286,7 +286,7 @@ describe("GroupChatPanel", () => {
     expect(screen.getByText("Object message")).toBeInTheDocument();
   });
 
-  it("normalizes 'Event Assistant Plus' to 'Event Assistant'", () => {
+  it("normalizes 'Event Assistant Plus' to 'Berkie'", () => {
     const messages = [
       {
         id: "1",
@@ -306,11 +306,11 @@ describe("GroupChatPanel", () => {
 
     render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+    expect(screen.getByText("Berkie")).toBeInTheDocument();
     expect(screen.queryByText("Event Assistant Plus")).not.toBeInTheDocument();
   });
 
-  it("normalizes 'Event Mediator' to 'Event Assistant'", () => {
+  it("normalizes 'Event Mediator' to 'Berkie'", () => {
     const messages = [
       {
         id: "1",
@@ -330,11 +330,11 @@ describe("GroupChatPanel", () => {
 
     render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+    expect(screen.getByText("Berkie")).toBeInTheDocument();
     expect(screen.queryByText("Event Mediator")).not.toBeInTheDocument();
   });
 
-  it("normalizes 'Event Mediator Plus' to 'Event Assistant'", () => {
+  it("normalizes 'Event Mediator Plus' to 'Berkie'", () => {
     const messages = [
       {
         id: "1",
@@ -354,11 +354,11 @@ describe("GroupChatPanel", () => {
 
     render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+    expect(screen.getByText("Berkie")).toBeInTheDocument();
     expect(screen.queryByText("Event Mediator Plus")).not.toBeInTheDocument();
   });
 
-  it("normalizes 'Engagement Agent' to 'Event Assistant'", () => {
+  it("normalizes 'Engagement Agent' to 'Berkie'", () => {
     const messages = [
       {
         id: "1",
@@ -378,7 +378,7 @@ describe("GroupChatPanel", () => {
 
     render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+    expect(screen.getByText("Berkie")).toBeInTheDocument();
     expect(screen.queryByText("Enagement Agent")).not.toBeInTheDocument();
   });
 

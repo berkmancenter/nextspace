@@ -6,6 +6,7 @@ import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import GroupIcon from "@mui/icons-material/Group";
 import { BotIcon } from "./BotIcon";
 import { TranscriptIcon } from "./TranscriptIcon";
+import { EVENT_ASSISTANT_NAME } from "../utils/Helpers";
 
 export type NavTab = "assistant" | "chat" | "transcript";
 
@@ -48,7 +49,7 @@ export function NavigationBar({
     [
       {
         id: "assistant" as NavTab,
-        label: "Event Bot",
+        label: EVENT_ASSISTANT_NAME,
         ActiveIcon: null,
         InactiveIcon: null,
         show: true,
@@ -111,7 +112,9 @@ export function NavigationBar({
       <button
         onClick={() => onTabChange(id)}
         className={`flex flex-col items-center gap-1 transition-colors ${
-          fullWidth ? "justify-center flex-1 h-full gap-0.5" : "w-full px-1 py-3"
+          fullWidth
+            ? "justify-center flex-1 h-full gap-0.5"
+            : "w-full px-1 py-3"
         }`}
         style={{
           background: isActive ? "#D1C4E9" : "transparent",

@@ -1,7 +1,6 @@
 import React from "react";
-import { Api } from "../utils";
 import { EventProps } from "../types.internal";
-import { ExperimentCreationForm } from "./ExperimentCreationForm";
+// import { ExperimentCreationForm } from "./ExperimentCreationForm";
 import { EventCreationForm } from "./EventCreationForm";
 
 /**
@@ -15,13 +14,7 @@ import { EventCreationForm } from "./EventCreationForm";
 export const Event: React.FC<EventProps> = ({ experiment }) => {
   return (
     <div className="w-2/3">
-      {experiment ? (
-        <ExperimentCreationForm
-          token={Api.get().GetTokens().access as string}
-        />
-      ) : (
-        <EventCreationForm />
-      )}
+      <EventCreationForm />
     </div>
   );
 };

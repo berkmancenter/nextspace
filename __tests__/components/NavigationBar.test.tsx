@@ -21,7 +21,7 @@ describe("NavigationBar", () => {
     render(<NavigationBar {...baseProps} />);
 
     // Both desktop and mobile navs render, so use getAllByLabelText
-    expect(screen.getAllByLabelText("Event Bot").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("Group Chat").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("Transcript").length).toBeGreaterThan(0);
   });
@@ -30,7 +30,7 @@ describe("NavigationBar", () => {
     render(<NavigationBar {...baseProps} showChat={false} />);
 
     expect(screen.queryByLabelText("Group Chat")).not.toBeInTheDocument();
-    expect(screen.getAllByLabelText("Event Bot").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("Transcript").length).toBeGreaterThan(0);
   });
 
@@ -38,7 +38,7 @@ describe("NavigationBar", () => {
     render(<NavigationBar {...baseProps} showTranscript={false} />);
 
     expect(screen.queryByLabelText("Transcript")).not.toBeInTheDocument();
-    expect(screen.getAllByLabelText("Event Bot").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("Group Chat").length).toBeGreaterThan(0);
   });
 
@@ -47,7 +47,7 @@ describe("NavigationBar", () => {
       <NavigationBar {...baseProps} showChat={false} showTranscript={false} />,
     );
 
-    expect(screen.getAllByLabelText("Event Bot").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("Group Chat")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Transcript")).not.toBeInTheDocument();
   });
@@ -56,7 +56,7 @@ describe("NavigationBar", () => {
     render(<NavigationBar {...baseProps} activeTab="assistant" />);
 
     const activeBtns = screen
-      .getAllByLabelText("Event Bot")
+      .getAllByLabelText("Berkie")
       .filter((btn) => btn.getAttribute("aria-current") === "page");
     expect(activeBtns.length).toBeGreaterThan(0);
 
@@ -97,7 +97,7 @@ describe("NavigationBar", () => {
       <NavigationBar {...baseProps} activeTab="chat" onTabChange={onTabChange} />,
     );
 
-    const assistantBtns = screen.getAllByLabelText("Event Bot");
+    const assistantBtns = screen.getAllByLabelText("Berkie");
     await user.click(assistantBtns[0]);
 
     expect(onTabChange).toHaveBeenCalledWith("assistant");
@@ -125,7 +125,7 @@ describe("NavigationBar", () => {
     );
     // Should have labels for both desktop and mobile
     expect(boldLabels.length).toBeGreaterThan(0);
-    expect(boldLabels[0].textContent).toBe("Event Bot");
+    expect(boldLabels[0].textContent).toBe("Berkie");
   });
 
   it("renders both desktop nav and mobile nav", () => {
