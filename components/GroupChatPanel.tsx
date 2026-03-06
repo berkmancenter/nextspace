@@ -168,14 +168,13 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     [messages],
   );
 
-  // Create enhancers for chat mode (mentions only)
-  const enhancers = useMemo(() => {
-    const registered = [];
-    if (contributors.length > 0) {
-      registered.push(createMentionsEnhancer(contributors));
-    }
-    return registered;
-  }, [contributors]);
+  // Always register the mentions enhancer so the @ button is visible from the
+  // start. The enhancer's getItems() will simply return an empty list until
+  // contributors are known (i.e. until messages have loaded).
+  const enhancers = useMemo(
+    () => [createMentionsEnhancer(contributors)],
+    [contributors],
+  );
 
   // Helper to render avatar for chat mode
   const renderAvatar = (message: PseudonymousMessage) => {

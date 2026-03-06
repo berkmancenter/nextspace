@@ -398,6 +398,36 @@ export const CheckAuthHeader = (headers: Record<string, string>) => {
 };
 
 /**
+ * Resolves the bot display name for a conversation.
+ * Uses the first agent's `agentConfig.botName` if it is a non-empty string,
+ * otherwise falls back to `configBotName` (typically `config.conversationBotName`).
+ *
+ * Call this after loading conversation data so that every page that displays a
+ * bot name (NavigationBar, chat panels, etc.) derives the value the same way.
+ *
+ * @param conversation - The loaded conversation object
+ * @param configBotName - The fallback bot name from the platform config
+ * @returns The resolved bot name string
+ */
+export const resolveConversationBotName = (
+  conversation: { agents: components["schemas"]["Agent"][] },
+  configBotName: string,
+): string => {
+  const firstAgent = conversation.agents[0];
+  if (
+    firstAgent?.agentConfig &&
+    typeof firstAgent.agentConfig === "object" &&
+    typeof (firstAgent.agentConfig as Record<string, unknown>).botName ===
+      "string" &&
+    (firstAgent.agentConfig as Record<string, unknown>).botName !== ""
+  ) {
+    return (firstAgent.agentConfig as Record<string, unknown>)
+      .botName as string;
+  }
+  return configBotName;
+};
+
+/**
  * Normalizes Event Assistant variant pseudonyms to the configured bot name.
  * @param message - The message from the pseudonym to normalize
  * @param botName - The display name for the bot, from `conversationBotName` in config

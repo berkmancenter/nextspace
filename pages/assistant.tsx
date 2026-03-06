@@ -13,7 +13,7 @@ import {
 } from "../utils";
 import { components } from "../types";
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
-import { CheckAuthHeader, createConversationFromData } from "../utils/Helpers";
+import { CheckAuthHeader, createConversationFromData, resolveConversationBotName } from "../utils/Helpers";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { AuthType } from "../types.internal";
 import { trackConversationEvent, setUserId } from "../utils/analytics";
@@ -169,6 +169,10 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
         const conversation = await createConversationFromData(conversationData);
         setConversationType(conversation.type.name);
         if (conversation.name) setEventName(conversation.name);
+
+        // Override botName from the first agent's agentConfig if available,
+        // falling back to config.conversationBotName
+        setBotName(resolveConversationBotName(conversation, config.conversationBotName));
 
         // Get transcript and chat passcodes if channel query param exists
         if (router.query.channel) {
