@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
-import { Badge } from "@mui/material";
 
 import { AssistantChatPanel } from "../components/AssistantChatPanel";
 import { GroupChatPanel } from "../components/GroupChatPanel";
@@ -14,12 +13,13 @@ import {
 } from "../utils";
 import { components } from "../types";
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
-import { CheckAuthHeader, createConversationFromData } from "../utils/Helpers";
+import { CheckAuthHeader, createConversationFromData, resolveConversationBotName } from "../utils/Helpers";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { AuthType } from "../types.internal";
 import { trackConversationEvent, setUserId } from "../utils/analytics";
 import { Transcript } from "../components/";
 import { useSessionJoin } from "../utils/useSessionJoin";
+import { NavigationBar, NavTab } from "../components/NavigationBar";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -34,7 +34,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
   const [localError, setLocalError] = useState<string | null>(null);
   const [waitingForResponse, setWaitingForResponse] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"assistant" | "chat">("chat");
+  const [activeTab, setActiveTab] = useState<NavTab>("chat");
   const [unseenAssistantCount, setUnseenAssistantCount] = useState<number>(0);
   const [unseenChatCount, setUnseenChatCount] = useState<number>(0);
   const [assistantMessages, setAssistantMessages] = useState<
@@ -48,6 +48,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>("");
   const [chatPasscode, setChatPasscode] = useState<string>("");
   const [eventName, setEventName] = useState<string>("");
+  const [botName, setBotName] = useState<string>("Berkie");
   const [assistantInputValue, setAssistantInputValue] = useState<string>("");
   const [chatInputValue, setChatInputValue] = useState<string>("");
   const [showPreferences, setShowPreferences] = useState<boolean>(true);
@@ -62,7 +63,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
   ];
 
   // Ref to track active tab for socket handler
-  const activeTabRef = useRef<"assistant" | "chat">("assistant");
+  const activeTabRef = useRef<NavTab>("assistant");
 
   // Use custom hook for session joining
   const {
@@ -164,6 +165,9 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
 
     async function fetchConversationData() {
       try {
+        const config = await Api.get().GetConfig();
+        setBotName(config.conversationBotName);
+
         const conversationData = await RetrieveData(
           `conversations/${router.query.conversationId}`,
           Api.get().GetTokens().access!,
@@ -184,6 +188,10 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
         const conversation = await createConversationFromData(conversationData);
         setConversationType(conversation.type.name);
         if (conversation.name) setEventName(conversation.name);
+
+        // Override botName from the first agent's agentConfig if available,
+        // falling back to config.conversationBotName
+        setBotName(resolveConversationBotName(conversation, config.conversationBotName));
 
         // Get transcript and chat passcodes if channel query param exists
         if (router.query.channel) {
@@ -418,9 +426,24 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     if (!Api.get().GetTokens() || !message) return;
 
     // Use different channel based on active tab
+    // When in transcript view, default to assistant channel for sending
+    const effectiveTab = activeTab === "transcript" ? "assistant" : activeTab;
+
+    // Check if a chat message @mentions the bot — if so, also route to the
+    // bot's direct channel so the agent actually receives and responds to it.
+    const mentionsBotInChat =
+      effectiveTab === "chat" &&
+      agentId &&
+      new RegExp(`@${botName}\\b`, "i").test(message);
+
     let channels =
-      activeTab === "chat"
-        ? [{ name: "chat", passcode: chatPasscode }]
+      effectiveTab === "chat"
+        ? mentionsBotInChat
+          ? [
+              { name: "chat", passcode: chatPasscode },
+              { name: `direct-${userId}-${agentId}` },
+            ]
+          : [{ name: "chat", passcode: chatPasscode }]
         : [{ name: `direct-${userId}-${agentId}` }];
 
     // Prepend prefix if in controlled mode
@@ -451,7 +474,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       } else {
         trackConversationEvent(
           conversationId,
-          activeTab,
+          effectiveTab,
           "message_sent",
           messageSource,
         );
@@ -460,7 +483,11 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
 
     // Only set waitingForResponse for assistant mode regular messages, not controlled mode messages
     // (controlled mode messages like feedback don't generate responses, and chat mode has no assistant)
-    if (shouldWaitForResponse && !controlledMode && activeTab === "assistant") {
+    if (
+      shouldWaitForResponse &&
+      !controlledMode &&
+      effectiveTab === "assistant"
+    ) {
       setWaitingForResponse(true);
     }
 
@@ -566,14 +593,15 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     }
   };
 
-  const handleTabSwitch = (tab: "assistant" | "chat") => {
+  const handleTabChange = (tab: NavTab) => {
     setActiveTab(tab);
     // Clear unseen count for the tab we're switching to
     if (tab === "assistant") {
       setUnseenAssistantCount(0);
-    } else {
+    } else if (tab === "chat") {
       setUnseenChatCount(0);
     }
+    // Track tab switch analytics (transcript treated as a nav destination)
     trackConversationEvent(
       router.query.conversationId as string,
       "assistant",
@@ -583,141 +611,124 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-96px)] overflow-hidden">
+    // On mobile we add bottom padding so the fixed nav bar doesn't cover content
+    <div className="flex flex-row h-[calc(100vh-96px)] overflow-hidden pb-[60px] lg:pb-0">
       {errorMessage ? (
-        <div className="text-medium-slate-blue text-lg font-bold mx-9">
+        <div className="text-medium-slate-blue text-lg font-bold mx-9 mt-6">
           {errorMessage}
         </div>
       ) : (
         <>
-          {/* Transcript view on top for mobile, right side for desktop - only render if enabled */}
-          {transcriptPasscode && (
-            <div className="lg:order-2">
-              <Transcript
-                category="assistant"
-                socket={socket}
-                conversationId={router.query.conversationId as string}
-                transcriptPasscode={transcriptPasscode}
-                apiAccessToken={Api.get().GetTokens().access!}
-              />
-            </div>
-          )}
+          {/* ── Navigation Bar (left sidebar on desktop, bottom bar on mobile) ── */}
+          <NavigationBar
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            unseenAssistantCount={unseenAssistantCount}
+            unseenChatCount={unseenChatCount}
+            showChat={!!chatPasscode}
+            showTranscript={!!transcriptPasscode}
+            botName={botName}
+          />
 
-          {/* Main assistant chat view below transcript on mobile, left side on desktop */}
-          <div className="flex-1 flex flex-col relative overflow-hidden lg:order-1">
-            {/* Tab navigation - only show if chat passcode is available */}
-            {chatPasscode && (
-              <div className="flex border-b border-gray-300 pl-2 pr-2 md:px-8 pt-6 gap-8">
-                <button
-                  onClick={() => handleTabSwitch("chat")}
-                  className={`pb-3 text-sm font-bold uppercase border-b-4 transition-colors ${
-                    activeTab === "chat"
-                      ? "text-gray-800"
-                      : "border-transparent text-gray-400 hover:text-gray-600"
-                  }`}
-                  style={
-                    activeTab === "chat"
-                      ? { borderBottomColor: "#200434" }
-                      : undefined
-                  }
-                >
-                  <Badge
-                    color="secondary"
-                    variant="dot"
-                    invisible={unseenChatCount === 0 || activeTab === "chat"}
-                    sx={{ "& .MuiBadge-badge": { right: -4, top: 8 } }}
-                  >
-                    <span style={{ paddingRight: "8px" }}>Chat</span>
-                  </Badge>
-                </button>
-                <button
-                  onClick={() => handleTabSwitch("assistant")}
-                  className={`pb-3 text-sm font-bold uppercase border-b-4 transition-colors ${
-                    activeTab === "assistant"
-                      ? "text-gray-800"
-                      : "border-transparent text-gray-400 hover:text-gray-600"
-                  }`}
-                  style={
-                    activeTab === "assistant"
-                      ? { borderBottomColor: "#200434" }
-                      : undefined
-                  }
-                >
-                  <Badge
-                    color="secondary"
-                    variant="dot"
-                    invisible={
-                      unseenAssistantCount === 0 || activeTab === "assistant"
-                    }
-                    sx={{ "& .MuiBadge-badge": { right: -4, top: 8 } }}
-                  >
-                    <span style={{ paddingRight: "8px" }}>Event Assistant</span>
-                  </Badge>
-                </button>
+          {/* ── Main content area ── */}
+          <div className="flex-1 flex flex-row overflow-hidden">
+            {/* Transcript full-screen view when transcript tab is active */}
+            {activeTab === "transcript" && transcriptPasscode ? (
+              <div className="flex-1 overflow-hidden">
+                <Transcript
+                  category="assistant"
+                  socket={socket}
+                  conversationId={router.query.conversationId as string}
+                  transcriptPasscode={transcriptPasscode}
+                  apiAccessToken={Api.get().GetTokens().access!}
+                  hideToggle={true}
+                />
               </div>
-            )}
-
-            {isConnected ? (
-              activeTab === "chat" ? (
-                <GroupChatPanel
-                  messages={chatMessages}
-                  pseudonym={pseudonym}
-                  eventName={eventName}
-                  inputValue={chatInputValue}
-                  onInputChange={setChatInputValue}
-                  onSendMessage={sendMessage}
-                  controlledMode={controlledMode}
-                  onExitControlledMode={exitControlledMode}
-                  enterControlledMode={enterControlledMode}
-                  sendFeedbackRating={sendFeedbackRating}
-                />
-              ) : (
-                <AssistantChatPanel
-                  messages={assistantMessages}
-                  pseudonym={pseudonym}
-                  waitingForResponse={waitingForResponse}
-                  controlledMode={controlledMode}
-                  slashCommands={slashCommands}
-                  eventName={eventName}
-                  inputValue={assistantInputValue}
-                  onInputChange={setAssistantInputValue}
-                  onSendMessage={sendMessage}
-                  onExitControlledMode={exitControlledMode}
-                  onPromptSelect={handlePromptSelect}
-                  enterControlledMode={enterControlledMode}
-                  sendFeedbackRating={sendFeedbackRating}
-                  userId={userId}
-                  showPreferences={showPreferences}
-                  preferenceOptions={preferenceOptions}
-                  onPreferencesSubmit={handlePreferencesSubmit}
-                  preferencesError={preferencesError}
-                />
-              )
             ) : (
-              <svg
-                className="mx-auto w-12 h-5"
-                viewBox="0 0 40 10"
-                fill="currentColor"
-              >
-                <circle
-                  className="animate-bounce fill-sky-400"
-                  cx="5"
-                  cy="5"
-                  r="4"
-                />
-                <circle
-                  className="animate-bounce [animation-delay:-0.2s] fill-medium-slate-blue"
-                  cx="20"
-                  cy="5"
-                  r="4"
-                />
-                <circle
-                  className="animate-bounce [animation-delay:-0.4s] fill-purple-500"
-                  cx="35"
-                  cy="5"
-                  r="4"
-                />
-              </svg>
+              <>
+                {/* Chat / Assistant panel */}
+                <div className="flex-1 flex flex-col relative overflow-hidden">
+                  {isConnected ? (
+                    activeTab === "chat" ? (
+                      <GroupChatPanel
+                        messages={chatMessages}
+                        pseudonym={pseudonym}
+                        eventName={eventName}
+                        botName={botName}
+                        inputValue={chatInputValue}
+                        onInputChange={setChatInputValue}
+                        onSendMessage={sendMessage}
+                        controlledMode={controlledMode}
+                        onExitControlledMode={exitControlledMode}
+                        enterControlledMode={enterControlledMode}
+                        sendFeedbackRating={sendFeedbackRating}
+                      />
+                    ) : (
+                      <AssistantChatPanel
+                        messages={assistantMessages}
+                        pseudonym={pseudonym}
+                        waitingForResponse={waitingForResponse}
+                        controlledMode={controlledMode}
+                        slashCommands={slashCommands}
+                        eventName={eventName}
+                        botName={botName}
+                        inputValue={assistantInputValue}
+                        onInputChange={setAssistantInputValue}
+                        onSendMessage={sendMessage}
+                        onExitControlledMode={exitControlledMode}
+                        onPromptSelect={handlePromptSelect}
+                        enterControlledMode={enterControlledMode}
+                        sendFeedbackRating={sendFeedbackRating}
+                        userId={userId}
+                        showPreferences={showPreferences}
+                        preferenceOptions={preferenceOptions}
+                        onPreferencesSubmit={handlePreferencesSubmit}
+                        preferencesError={preferencesError}
+                      />
+                    )
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <svg
+                        className="mx-auto w-12 h-5"
+                        viewBox="0 0 40 10"
+                        fill="currentColor"
+                      >
+                        <circle
+                          className="animate-bounce fill-sky-400"
+                          cx="5"
+                          cy="5"
+                          r="4"
+                        />
+                        <circle
+                          className="animate-bounce [animation-delay:-0.2s] fill-medium-slate-blue"
+                          cx="20"
+                          cy="5"
+                          r="4"
+                        />
+                        <circle
+                          className="animate-bounce [animation-delay:-0.4s] fill-purple-500"
+                          cx="35"
+                          cy="5"
+                          r="4"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+
+                {/* Transcript sidebar — still accessible on Chat and Event Bot views */}
+                {transcriptPasscode && (
+                  <div className="lg:order-2 hidden lg:block">
+                    <Transcript
+                      category="assistant"
+                      socket={socket}
+                      conversationId={router.query.conversationId as string}
+                      transcriptPasscode={transcriptPasscode}
+                      apiAccessToken={Api.get().GetTokens().access!}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
         </>

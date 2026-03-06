@@ -1210,6 +1210,34 @@ describe("Transcript", () => {
     });
   });
 
+  describe("hideToggle prop", () => {
+    it("hides the open/close toggle button when hideToggle is true", async () => {
+      render(<Transcript {...baseProps} hideToggle={true} />);
+
+      await waitFor(() => {
+        expect(screen.queryByRole("button", { name: /transcript/i })).not.toBeInTheDocument();
+      });
+    });
+
+    it("shows the open/close toggle button when hideToggle is false (default)", async () => {
+      render(<Transcript {...baseProps} />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: /Close transcript/i }),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("uses full width container when hideToggle is true", async () => {
+      const { container } = render(<Transcript {...baseProps} hideToggle={true} />);
+
+      const transcriptContainer = container.firstChild as HTMLElement;
+      expect(transcriptContainer.className).toContain("h-full");
+      expect(transcriptContainer.className).toContain("w-full");
+    });
+  });
+
   // New tests for scroll analytics functionality
   describe("Analytics Tracking", () => {
     beforeEach(() => {

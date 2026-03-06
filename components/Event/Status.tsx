@@ -71,8 +71,8 @@ export const EventStatus: React.FC<{
           conversationData.platformTypes?.length
             ? ` in ${formatList(
                 conversationData.platformTypes.map(
-                  (platformType) => platformType.label || platformType.name
-                )
+                  (platformType) => platformType.label || platformType.name,
+                ),
               )}`
             : ""
         }.`}
@@ -99,11 +99,9 @@ export const EventStatus: React.FC<{
         )}
         {conversationData.eventUrls.moderator.length > 0 && (
           <>
-            <p className="mt-2">The URLs for the moderator are:</p>
+            <p className="mt-2">The URL for the moderator is:</p>
             {conversationData.eventUrls.moderator.map((urlObj, index) => (
               <p key={index} className="mt-2">
-                {urlObj.label}:
-                <br />
                 <a
                   href={urlObj.url}
                   target="_blank"
@@ -117,11 +115,9 @@ export const EventStatus: React.FC<{
         )}
         {conversationData.eventUrls.participant.length > 0 && (
           <>
-            <p className="mt-2">The URLs for the participant are:</p>
+            <p className="mt-2">The URL for the participants is:</p>
             {conversationData.eventUrls.participant.map((urlObj, index) => (
               <p key={index} className="mt-2">
-                {urlObj.label}:
-                <br />
                 <a
                   href={urlObj.url}
                   target="_blank"

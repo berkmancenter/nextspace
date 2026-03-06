@@ -38,6 +38,7 @@ export class Api {
     conversationTypes: components["schemas"]["ConversationType"][];
     availablePlatforms: components["schemas"]["PlatformConfig"][];
     supportedModels: components["schemas"]["LlmModelDetails"][];
+    conversationBotName: string;
   } | null = null;
 
   SetTokens(access: string, refresh: string) {
@@ -85,6 +86,7 @@ export class Api {
         conversationTypes: config.conversationTypes,
         availablePlatforms: config.availablePlatforms,
         supportedModels: config.supportedModels,
+        conversationBotName: config.conversationBotName ?? "Berkie",
       };
     }
     return this.configCache;
@@ -248,7 +250,10 @@ async function getTypeForConversation(
   )!;
 }
 
-function generateEventUrls(conversationData: Conversation): EventUrls {
+function generateEventUrls(
+  conversationData: Conversation,
+  botName: string,
+): EventUrls {
   const urlPrefix = `${window.location.protocol}//${window.location.host}`;
   const moderator: EventUrl[] = [];
   const participant: EventUrl[] = [];
@@ -303,7 +308,7 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
     }
   } else if (convType && convType.name === "eventAssistant") {
     const eventAssistantUrl = {
-      label: "Event Assistant",
+      label: botName,
       url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
         hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
       }${hasChat ? `&channel=chat,${chatPasscode}` : ""}`,
@@ -316,8 +321,8 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
   ) {
     const label =
       convType.name === "eventAssistantPlus"
-        ? "Event Assistant Plus"
-        : "Event Assistant Plus Proactive";
+        ? `${botName} Plus`
+        : `${botName} Plus Proactive`;
     const eventAssistantPlusUrl = {
       label,
       url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
@@ -357,13 +362,17 @@ export const getConversation = async (
 export const createConversationFromData = async (
   data: components["schemas"]["Conversation"],
 ): Promise<Conversation> => {
-  const { conversationTypes, availablePlatforms } = await Api.get().GetConfig();
+  const { conversationTypes, availablePlatforms, conversationBotName } =
+    await Api.get().GetConfig();
 
   const type = await getTypeForConversation(data, conversationTypes);
-  const eventUrls = generateEventUrls({
-    ...data,
-    type,
-  } as Conversation);
+  const eventUrls = generateEventUrls(
+    {
+      ...data,
+      type,
+    } as Conversation,
+    conversationBotName,
+  );
 
   return {
     ...data,
@@ -390,13 +399,45 @@ export const CheckAuthHeader = (headers: Record<string, string>) => {
 };
 
 /**
- * Normalizes Event Assistant variant pseudonyms to "Event Assistant"
- * @param message- The message from the pseudonym to normalize
- * @returns "Event Assistant" if the pseudonym is a variant, otherwise the original pseudonym
+ * Resolves the bot display name for a conversation.
+ * Uses the first agent's `agentConfig.botName` if it is a non-empty string,
+ * otherwise falls back to `configBotName` (typically `config.conversationBotName`).
+ *
+ * Call this after loading conversation data so that every page that displays a
+ * bot name (NavigationBar, chat panels, etc.) derives the value the same way.
+ *
+ * @param conversation - The loaded conversation object
+ * @param configBotName - The fallback bot name from the platform config
+ * @returns The resolved bot name string
+ */
+export const resolveConversationBotName = (
+  conversation: { agents: components["schemas"]["Agent"][] },
+  configBotName: string,
+): string => {
+  const firstAgent = conversation.agents[0];
+  if (
+    firstAgent?.agentConfig &&
+    typeof firstAgent.agentConfig === "object" &&
+    typeof (firstAgent.agentConfig as Record<string, unknown>).botName ===
+      "string" &&
+    (firstAgent.agentConfig as Record<string, unknown>).botName !== ""
+  ) {
+    return (firstAgent.agentConfig as Record<string, unknown>)
+      .botName as string;
+  }
+  return configBotName;
+};
+
+/**
+ * Normalizes Event Assistant variant pseudonyms to the configured bot name.
+ * @param message - The message from the pseudonym to normalize
+ * @param botName - The display name for the bot, from `conversationBotName` in config
+ * @returns botName if the message is from an agent, otherwise the original pseudonym
  */
 export const normalizeAssistantPseudonym = (
   message: PseudonymousMessage,
+  botName: string,
 ): string => {
   if (!message || !message.pseudonym) return "";
-  return message.fromAgent ? "Event Assistant" : message.pseudonym;
+  return message.fromAgent ? botName : message.pseudonym;
 };

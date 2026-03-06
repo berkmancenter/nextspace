@@ -347,6 +347,59 @@ describe("MessageInput Component", () => {
       expect(screen.queryByText("/mod")).not.toBeInTheDocument();
     });
 
+    it("selects slash command when Tab is pressed", async () => {
+      const user = userEvent.setup();
+      render(
+        <MessageInput {...defaultProps} />
+      );
+
+      const input = screen.getByPlaceholderText(
+        "Enter your message here"
+      ) as HTMLInputElement;
+      await user.type(input, "/");
+
+      await waitFor(() => {
+        expect(screen.getByText("/mod")).toBeInTheDocument();
+      });
+
+      // Press Tab to select the highlighted command
+      await user.keyboard("{Tab}");
+
+      await waitFor(() => {
+        expect(input.value).toBe("/mod ");
+        expect(screen.queryByText("/mod")).not.toBeInTheDocument();
+      });
+
+      // Message should not have been sent yet
+      expect(mockOnSendMessage).not.toHaveBeenCalled();
+    });
+
+    it("sends message with a single Enter after Tab completes a command", async () => {
+      const user = userEvent.setup();
+      render(
+        <MessageInput {...defaultProps} />
+      );
+
+      const input = screen.getByPlaceholderText(
+        "Enter your message here"
+      ) as HTMLInputElement;
+
+      // Type slash, Tab-complete to "/mod ", then add text and send with one Enter
+      await user.type(input, "/");
+      await waitFor(() => expect(screen.getByText("/mod")).toBeInTheDocument());
+
+      await user.keyboard("{Tab}");
+      await waitFor(() => expect(input.value).toBe("/mod "));
+
+      await user.type(input, "my question");
+      await user.keyboard("{Enter}");
+
+      await waitFor(() => {
+        expect(mockOnSendMessage).toHaveBeenCalledTimes(1);
+        expect(mockOnSendMessage).toHaveBeenCalledWith("/mod my question");
+      });
+    });
+
     it("does not send message when Enter selects a slash command", async () => {
       const user = userEvent.setup();
       render(

@@ -18,6 +18,7 @@ import {
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { normalizeAssistantPseudonym } from "../utils/Helpers";
+import { BotIcon } from "./BotIcon";
 import { PreferencesBanner, PreferenceOption } from "./PreferencesBanner";
 
 /**
@@ -64,6 +65,7 @@ interface AssistantChatPanelProps {
   controlledMode: ControlledInputConfig | null;
   slashCommands: SlashCommand[];
   eventName?: string;
+  botName: string;
   inputValue?: string;
   onInputChange?: (value: string) => void;
   onSendMessage: (message: string) => void;
@@ -85,6 +87,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   controlledMode,
   slashCommands,
   eventName,
+  botName,
   inputValue,
   onInputChange,
   onSendMessage,
@@ -168,8 +171,8 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
               &nbsp;
             </h2>
             <p className="text-sm text-gray-500 mt-0.5">
-              Ask the Event Assistant any questions about the event — this
-              conversation is private.
+              Ask {botName} any questions about the event — this conversation is
+              private.
             </p>
           </div>
 
@@ -201,7 +204,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                 ? getAssistantAvatarStyle()
                 : getAvatarStyle(message.pseudonym, isCurrentUser);
 
-              const displayName = normalizeAssistantPseudonym(message);
+              const displayName = normalizeAssistantPseudonym(message, botName);
 
               const hasPromptOptions =
                 message.prompt?.options &&
@@ -244,10 +247,14 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                       }`}
                     >
                       <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-xl flex-shrink-0"
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: style.avatarBg }}
                       >
-                        <style.icon fontSize="inherit" />
+                        {isAssistant ? (
+                          <BotIcon size={22} color="#4b5563" />
+                        ) : (
+                          <style.icon fontSize="inherit" />
+                        )}
                       </div>
                       <div
                         className={`flex flex-col ${
@@ -318,10 +325,14 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                   >
                     {/* Avatar */}
                     <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-xl flex-shrink-0"
+                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                       style={{ backgroundColor: style.avatarBg }}
                     >
-                      <style.icon fontSize="inherit" />
+                      {isAssistant ? (
+                        <BotIcon size={22} color="#4b5563" />
+                      ) : (
+                        <style.icon fontSize="inherit" />
+                      )}
                     </div>
 
                     {/* Message content */}
@@ -438,57 +449,12 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                       {!isAssistant &&
                         waitingForResponse &&
                         i === messages.length - 1 && (
-                          <div className="flex items-center gap-1 mt-2 mb-1">
-                            <svg
-                              viewBox="0 -4 32 36"
-                              className="w-8 h-8 text-gray-600"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                            >
-                              {/* Bouncing antenna dot */}
-                              <circle
-                                cx="16"
-                                cy="5.5"
-                                r="2"
-                                className="animate-bounce"
-                                fill="currentColor"
-                              />
-                              {/* Antenna line */}
-                              <line x1="16" y1="7.5" x2="16" y2="10" />
-                              {/* Head */}
-                              <rect
-                                x="8"
-                                y="10"
-                                width="16"
-                                height="12"
-                                rx="6"
-                              />
-                              {/* Eyes */}
-                              <circle
-                                cx="12"
-                                cy="16"
-                                r="1.5"
-                                fill="currentColor"
-                              />
-                              <circle
-                                cx="20"
-                                cy="16"
-                                r="1.5"
-                                fill="currentColor"
-                              />
-                              {/* Smile */}
-                              <path
-                                d="M13 19 Q16 21 19 19"
-                                strokeLinecap="round"
-                                fill="none"
-                              />
-                              {/* Arms */}
-                              <line x1="8" y1="15" x2="4.5" y2="13" />
-                              <line x1="24" y1="15" x2="27.5" y2="13" />
-                              {/* Body/Base */}
-                              <rect x="13" y="22" width="6" height="5" rx="2" />
-                            </svg>
+                          <div className="relative z-10 flex items-center gap-1 mt-2 mb-1">
+                            <BotIcon
+                              size={32}
+                              color="#4b5563"
+                              bouncing={true}
+                            />
                             <span className="text-xs text-gray-500 italic">
                               thinking...
                             </span>

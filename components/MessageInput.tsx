@@ -185,9 +185,15 @@ export const MessageInput: FC<MessageInputProps> = ({
                 }
               : null
           );
-        } else if (e.key === "Enter") {
+        } else if (e.key === "Enter" || e.key === "Tab") {
           e.preventDefault();
-          enterUsedForCommandRef.current = true;
+          // Only suppress the subsequent Enter keyup when Enter itself was used
+          // for selection. When Tab is used, no Enter keyup follows, so the flag
+          // must stay false — otherwise the next Enter press to send the message
+          // gets eaten.
+          if (e.key === "Enter") {
+            enterUsedForCommandRef.current = true;
+          }
           handleEnhancerSelect(
             activeEnhancer.items[activeEnhancer.selectedIndex]
           );

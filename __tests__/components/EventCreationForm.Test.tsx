@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EventCreationForm } from "../../components/EventCreationForm";
 import { RetrieveData, Request } from "../../utils";
@@ -86,7 +92,7 @@ const mockConfig = {
         {
           name: "botName",
           type: "string",
-          label: "Zoom Bot Name",
+          label: "Bot Name",
           default: "Back Channel",
           required: false,
         },
@@ -101,14 +107,16 @@ const mockConfig = {
             {
               name: "gpt-4o-mini",
               label: "OpenAI GPT-4o Mini",
-              description: "Fast, lightweight model ideal for everyday conversations",
+              description:
+                "Fast, lightweight model ideal for everyday conversations",
               llmPlatform: "openai",
               llmModel: "gpt-4o-mini",
             },
             {
               name: "claude-3-5-haiku",
               label: "AWS Bedrock Claude 3.5 Haiku",
-              description: "Efficient and cost-effective model for quick responses",
+              description:
+                "Efficient and cost-effective model for quick responses",
               llmPlatform: "bedrock",
               llmModel: "anthropic.claude-3-5-haiku-20241022-v1:0",
             },
@@ -137,8 +145,8 @@ const mockConfig = {
         {
           name: "botName",
           type: "string",
-          label: "Zoom Bot Name",
-          default: "Event Assistant",
+          label: "Bot Name",
+          default: "Berkie",
           required: false,
         },
         {
@@ -152,14 +160,16 @@ const mockConfig = {
             {
               name: "gpt-4o-mini",
               label: "OpenAI GPT-4o Mini",
-              description: "Fast, lightweight model ideal for everyday conversations",
+              description:
+                "Fast, lightweight model ideal for everyday conversations",
               llmPlatform: "openai",
               llmModel: "gpt-4o-mini",
             },
             {
               name: "claude-3-5-haiku",
               label: "AWS Bedrock Claude 3.5 Haiku",
-              description: "Efficient and cost-effective model for quick responses",
+              description:
+                "Efficient and cost-effective model for quick responses",
               llmPlatform: "bedrock",
               llmModel: "anthropic.claude-3-5-haiku-20241022-v1:0",
             },
@@ -227,7 +237,7 @@ describe("EventCreationForm Component", () => {
     // Fill Step 1
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
 
     const nextButton = screen.getByRole("button", { name: /next/i });
@@ -236,7 +246,7 @@ describe("EventCreationForm Component", () => {
     // Should now be on Step 2
     await waitFor(() => {
       expect(
-        screen.getByText("Where do you want your audience to interact?")
+        screen.getByText("Where do you want your audience to interact?"),
       ).toBeInTheDocument();
     });
   });
@@ -250,7 +260,7 @@ describe("EventCreationForm Component", () => {
     // Fill Step 1 and navigate
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
     const nextButton = screen.getByRole("button", { name: /next/i });
     await user.click(nextButton);
@@ -270,7 +280,7 @@ describe("EventCreationForm Component", () => {
     // Navigate to Step 2
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
 
@@ -302,7 +312,7 @@ describe("EventCreationForm Component", () => {
     // Navigate to Step 2
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
 
@@ -315,7 +325,7 @@ describe("EventCreationForm Component", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("At least one platform must be selected")
+        screen.getByText("At least one platform must be selected"),
       ).toBeInTheDocument();
     });
   });
@@ -329,7 +339,7 @@ describe("EventCreationForm Component", () => {
     // Fill Step 1 and navigate
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
 
@@ -345,7 +355,7 @@ describe("EventCreationForm Component", () => {
     await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Zoom Bot Name/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Bot Name/i)).toBeInTheDocument();
     });
   });
 
@@ -358,16 +368,16 @@ describe("EventCreationForm Component", () => {
     // Navigate to Step 2
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => {
       expect(
-        screen.getByText(/An agent to analyze participant comments/i)
+        screen.getByText(/An agent to analyze participant comments/i),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/An assistant to answer questions about an event/i)
+        screen.getByText(/An assistant to answer questions about an event/i),
       ).toBeInTheDocument();
     });
   });
@@ -381,7 +391,7 @@ describe("EventCreationForm Component", () => {
     // Navigate to Step 3
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
 
@@ -396,15 +406,15 @@ describe("EventCreationForm Component", () => {
     await waitFor(() => {
       expect(screen.getByText(/OpenAI GPT-4o Mini/i)).toBeInTheDocument();
       expect(
-        screen.getByText(/AWS Bedrock Claude 3.5 Haiku/i)
+        screen.getByText(/AWS Bedrock Claude 3.5 Haiku/i),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/AWS Bedrock Claude 3.5 Sonnet/i)
+        screen.getByText(/AWS Bedrock Claude 3.5 Sonnet/i),
       ).toBeInTheDocument();
       expect(
         screen.getByText(
-          /Fast, lightweight model ideal for everyday conversations/i
-        )
+          /Fast, lightweight model ideal for everyday conversations/i,
+        ),
       ).toBeInTheDocument();
     });
   });
@@ -418,7 +428,7 @@ describe("EventCreationForm Component", () => {
     // Navigate through all steps
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
 
@@ -431,7 +441,7 @@ describe("EventCreationForm Component", () => {
     await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Zoom Bot Name/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Bot Name/i)).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole("button", { name: /next/i }));
@@ -451,14 +461,14 @@ describe("EventCreationForm Component", () => {
     // Navigate to Step 4
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
     await waitFor(() => screen.getByText("Nextspace"));
     await user.click(screen.getByRole("checkbox", { name: /zoom/i }));
     await user.click(screen.getByRole("radio", { name: /back channel/i }));
     await user.click(screen.getByRole("button", { name: /next/i }));
-    await waitFor(() => screen.getByLabelText(/Zoom Bot Name/i));
+    await waitFor(() => screen.getByLabelText(/Bot Name/i));
     await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => {
@@ -492,14 +502,14 @@ describe("EventCreationForm Component", () => {
     // Navigate to Step 4
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
     await waitFor(() => screen.getByText("Nextspace"));
     await user.click(screen.getByRole("checkbox", { name: /zoom/i }));
     await user.click(screen.getByRole("radio", { name: /back channel/i }));
     await user.click(screen.getByRole("button", { name: /next/i }));
-    await waitFor(() => screen.getByLabelText(/Zoom Bot Name/i));
+    await waitFor(() => screen.getByLabelText(/Bot Name/i));
     await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => {
@@ -527,7 +537,7 @@ describe("EventCreationForm Component", () => {
     // Navigate to Step 2
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
 
@@ -547,7 +557,7 @@ describe("EventCreationForm Component", () => {
     expect(screen.getByRole("button", { name: /back/i })).toBeDisabled();
   });
 
-  it("allows custom zoom bot name configuration on Step 3", async () => {
+  it("allows custom bot name configuration on Step 3", async () => {
     const user = userEvent.setup();
     await act(async () => {
       render(<EventCreationForm />);
@@ -556,7 +566,7 @@ describe("EventCreationForm Component", () => {
     // Navigate to Step 3
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
     await waitFor(() => screen.getByText("Nextspace"));
@@ -565,10 +575,10 @@ describe("EventCreationForm Component", () => {
     await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Zoom Bot Name/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Bot Name/i)).toBeInTheDocument();
     });
 
-    const botNameInput = screen.getByLabelText(/Zoom Bot Name/i) as HTMLInputElement;
+    const botNameInput = screen.getByLabelText(/Bot Name/i) as HTMLInputElement;
     expect(botNameInput).toHaveValue("Back Channel");
 
     // Use fireEvent to directly change the value
@@ -595,7 +605,7 @@ describe("EventCreationForm Component", () => {
     // Complete all steps
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
 
@@ -604,7 +614,7 @@ describe("EventCreationForm Component", () => {
     await user.click(screen.getByRole("radio", { name: /back channel/i }));
     await user.click(screen.getByRole("button", { name: /next/i }));
 
-    await waitFor(() => screen.getByLabelText(/Zoom Bot Name/i));
+    await waitFor(() => screen.getByLabelText(/Bot Name/i));
     await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => screen.getByText("About the Speakers"));
@@ -630,7 +640,7 @@ describe("EventCreationForm Component", () => {
               llmModel: "gpt-4o-mini",
             },
           }),
-        })
+        }),
       );
     });
   });
@@ -654,7 +664,7 @@ describe("EventCreationForm Component", () => {
     // Complete all steps
     await fillEventDetails(
       "Test Event Assistant",
-      "https://huitstage.zoom.us/j/9876543210"
+      "https://huitstage.zoom.us/j/9876543210",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
 
@@ -693,7 +703,7 @@ describe("EventCreationForm Component", () => {
           }),
           topicId: process.env.NEXT_PUBLIC_DEFAULT_TOPIC_ID,
           scheduledTime: expect.any(String),
-        })
+        }),
       );
     });
   });
@@ -717,7 +727,7 @@ describe("EventCreationForm Component", () => {
     // Complete all steps with custom bot name
     await fillEventDetails(
       "Custom Bot Event",
-      "https://huitstage.zoom.us/j/5555555555"
+      "https://huitstage.zoom.us/j/5555555555",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
 
@@ -726,7 +736,9 @@ describe("EventCreationForm Component", () => {
     await user.click(screen.getByRole("radio", { name: /back channel/i }));
     await user.click(screen.getByRole("button", { name: /next/i }));
 
-    const botNameInput = (await screen.findByLabelText(/Zoom Bot Name/i)) as HTMLInputElement;
+    const botNameInput = (await screen.findByLabelText(
+      /Bot Name/i,
+    )) as HTMLInputElement;
     // Use fireEvent to directly change the value
     fireEvent.change(botNameInput, { target: { value: "MyCustomBot" } });
     await user.click(screen.getByRole("button", { name: /next/i }));
@@ -746,7 +758,7 @@ describe("EventCreationForm Component", () => {
             zoomMeetingUrl: "https://huitstage.zoom.us/j/5555555555",
             botName: "MyCustomBot",
           }),
-        })
+        }),
       );
     });
   });
@@ -770,7 +782,7 @@ describe("EventCreationForm Component", () => {
     // Complete all steps
     await fillEventDetails(
       "Event with Speakers",
-      "https://huitstage.zoom.us/j/1111111111"
+      "https://huitstage.zoom.us/j/1111111111",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
 
@@ -779,7 +791,7 @@ describe("EventCreationForm Component", () => {
     await user.click(screen.getByRole("radio", { name: /back channel/i }));
     await user.click(screen.getByRole("button", { name: /next/i }));
 
-    await waitFor(() => screen.getByLabelText(/Zoom Bot Name/i));
+    await waitFor(() => screen.getByLabelText(/Bot Name/i));
     await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => screen.getByText("About the Speakers"));
@@ -816,7 +828,7 @@ describe("EventCreationForm Component", () => {
         expect.objectContaining({
           presenters: [{ name: "John Doe", bio: "Expert speaker" }],
           moderators: [{ name: "Jane Smith", bio: "Experienced moderator" }],
-        })
+        }),
       );
     });
   });
@@ -830,7 +842,7 @@ describe("EventCreationForm Component", () => {
     // Fill in event name we will then clear and zoom URL
     await fillEventDetails(
       "Scheduled Event To Clear",
-      "https://huitstage.zoom.us/j/1111111111"
+      "https://huitstage.zoom.us/j/1111111111",
     );
 
     const nameInput = screen.getByLabelText(/Event Name/i);
@@ -853,7 +865,7 @@ describe("EventCreationForm Component", () => {
     // Fill in event and zoom URL we will then clear
     await fillEventDetails(
       "Scheduled Event",
-      "https://huitstage.zoom.us/j/1111111111"
+      "https://huitstage.zoom.us/j/1111111111",
     );
 
     const urlInput = screen.getByLabelText(/Zoom Meeting URL/i);
@@ -863,7 +875,7 @@ describe("EventCreationForm Component", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Zoom Meeting URL is required")
+        screen.getByText("Zoom Meeting URL is required"),
       ).toBeInTheDocument();
     });
   });
@@ -877,7 +889,7 @@ describe("EventCreationForm Component", () => {
 
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
 
     // Navigate to Step 3 without selecting platform
@@ -886,7 +898,7 @@ describe("EventCreationForm Component", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("At least one platform must be selected")
+        screen.getByText("At least one platform must be selected"),
       ).toBeInTheDocument();
     });
   });
@@ -900,7 +912,7 @@ describe("EventCreationForm Component", () => {
 
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
 
     // Navigate to Step 3 without selecting platform
@@ -909,7 +921,7 @@ describe("EventCreationForm Component", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("At least one platform must be selected")
+        screen.getByText("At least one platform must be selected"),
       ).toBeInTheDocument();
     });
 
@@ -920,7 +932,7 @@ describe("EventCreationForm Component", () => {
 
     await waitFor(() => {
       expect(
-        screen.queryByText("At least one platform must be selected")
+        screen.queryByText("At least one platform must be selected"),
       ).not.toBeInTheDocument();
     });
   });
@@ -934,7 +946,7 @@ describe("EventCreationForm Component", () => {
 
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
 
     await user.click(screen.getByRole("button", { name: /next/i }));
@@ -953,7 +965,7 @@ describe("EventCreationForm Component", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("At least one platform must be selected")
+        screen.getByText("At least one platform must be selected"),
       ).toBeInTheDocument();
     });
 
@@ -971,7 +983,7 @@ describe("EventCreationForm Component", () => {
     // Complete all steps
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
 
@@ -980,7 +992,7 @@ describe("EventCreationForm Component", () => {
     await user.click(screen.getByRole("radio", { name: /back channel/i }));
     await user.click(screen.getByRole("button", { name: /next/i }));
 
-    await waitFor(() => screen.getByLabelText(/Zoom Bot Name/i));
+    await waitFor(() => screen.getByLabelText(/Bot Name/i));
     await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => screen.getByText("About the Speakers"));
@@ -992,7 +1004,7 @@ describe("EventCreationForm Component", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Failed to send data.*Network error/)
+        screen.getByText(/Failed to send data.*Network error/),
       ).toBeInTheDocument();
     });
   });
@@ -1009,7 +1021,7 @@ describe("EventCreationForm Component", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Failed to load configuration.")
+        screen.getByText("Failed to load configuration."),
       ).toBeInTheDocument();
     });
   });
@@ -1033,7 +1045,7 @@ describe("EventCreationForm Component", () => {
     // Complete all steps
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
 
@@ -1042,7 +1054,7 @@ describe("EventCreationForm Component", () => {
     await user.click(screen.getByRole("radio", { name: /back channel/i }));
     await user.click(screen.getByRole("button", { name: /next/i }));
 
-    await waitFor(() => screen.getByLabelText(/Zoom Bot Name/i));
+    await waitFor(() => screen.getByLabelText(/Bot Name/i));
     await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => screen.getByText("About the Speakers"));
@@ -1091,7 +1103,7 @@ describe("EventCreationForm Component", () => {
     // Navigate to Step 3 where model selection is shown
     await fillEventDetails(
       "Test Event",
-      "https://huitstage.zoom.us/j/1234567890"
+      "https://huitstage.zoom.us/j/1234567890",
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
 

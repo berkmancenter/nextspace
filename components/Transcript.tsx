@@ -29,6 +29,8 @@ export function Transcript(props: {
   apiAccessToken: string;
   category?: string;
   showControls?: boolean;
+  /** When true, hides the open/close toggle and fills the available container width */
+  hideToggle?: boolean;
 }) {
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
   const [isOpen, setIsOpen] = useState<boolean>(true);
@@ -539,9 +541,11 @@ export function Transcript(props: {
   return (
     <div
       className={`bg-[#200434] text-white transition-all duration-300 ease-in-out flex flex-col ${
-        isOpen
-          ? "h-[40vh] lg:h-full lg:w-[33vw]"
-          : "flex-shrink-0 lg:h-full lg:w-16"
+        props.hideToggle
+          ? "h-full w-full"
+          : isOpen
+            ? "h-[40vh] lg:h-full lg:w-[33vw]"
+            : "flex-shrink-0 lg:h-full lg:w-16"
       }`}
     >
       {/* Header with toggle */}
@@ -559,13 +563,15 @@ export function Transcript(props: {
                   LIVE TRANSCRIPT
                 </h2>
               </div>
-              <button
-                onClick={handleToggle}
-                className="text-white hover:bg-white/10 rounded p-1 transition-colors"
-                aria-label="Close transcript"
-              >
-                <ChevronRight className="transition-transform -rotate-270 lg:rotate-0" />
-              </button>
+              {!props.hideToggle && (
+                <button
+                  onClick={handleToggle}
+                  className="text-white hover:bg-white/10 rounded p-1 transition-colors"
+                  aria-label="Close transcript"
+                >
+                  <ChevronRight className="transition-transform -rotate-270 lg:rotate-0" />
+                </button>
+              )}
             </div>
             {props.showControls && (
               <>

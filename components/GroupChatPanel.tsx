@@ -7,8 +7,10 @@ import { MessageFeedback } from "./MessageFeedback";
 import { PseudonymousMessage, ControlledInputConfig, MediaItem } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
+import { BotIcon } from "./BotIcon";
 import { createMentionsEnhancer } from "./enhancers/mentionsEnhancer";
 import { normalizeAssistantPseudonym } from "../utils/Helpers";
+import { MENTION_DISPLAY_REGEX } from "../utils/mentionRegex";
 
 /**
  * Parsed message body structure
@@ -48,12 +50,28 @@ const parseMessageBody = (body: string | object): ParsedMessageBody => {
 };
 
 /**
- * Parse message text and highlight @mentions with linkification
- * Handles two-word pseudonyms (e.g., @John Doe) and converts URLs to clickable links
+ * Parse message text and highlight @mentions with linkification.
+ * When a contributors list is provided the regex matches only known handles
+ * (longest first, so "Bob Smith" is preferred over "Bob").
+ * Falls back to the generic greedy display regex when no list is available.
  */
-const renderMessageWithMentions = (text: string): React.ReactNode => {
-  // Split by @mention pattern - matches @word or @word word
-  const parts = text.split(/(@\w+(?:\s+\w+)?)/g);
+const renderMessageWithMentions = (
+  text: string,
+  contributors?: string[],
+): React.ReactNode => {
+  let splitPattern: RegExp;
+
+  if (contributors && contributors.length > 0) {
+    // Sort longest-first so multi-word handles are tried before shorter ones
+    const escaped = [...contributors]
+      .sort((a, b) => b.length - a.length)
+      .map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    splitPattern = new RegExp(`(@(?:${escaped.join("|")}))`, "gi");
+  } else {
+    splitPattern = new RegExp(`(${MENTION_DISPLAY_REGEX.source})`, "g");
+  }
+
+  const parts = text.split(splitPattern);
 
   return parts.map((part, index) => {
     // Check if this part is a mention
@@ -116,6 +134,7 @@ interface GroupChatPanelProps {
   messages: PseudonymousMessage[];
   pseudonym: string | null;
   eventName?: string;
+  botName?: string;
   inputValue?: string;
   onInputChange?: (value: string) => void;
   onSendMessage: (message: string) => void;
@@ -129,6 +148,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   messages,
   pseudonym,
   eventName,
+  botName = "Berkie",
   inputValue,
   onInputChange,
   onSendMessage,
@@ -145,20 +165,19 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     () =>
       Array.from(
         new Set(
-          messages.map((m) => normalizeAssistantPseudonym(m)).filter(Boolean),
+          messages.map((m) => normalizeAssistantPseudonym(m, botName)).filter(Boolean),
         ),
       ),
     [messages],
   );
 
-  // Create enhancers for chat mode (mentions only)
-  const enhancers = useMemo(() => {
-    const registered = [];
-    if (contributors.length > 0) {
-      registered.push(createMentionsEnhancer(contributors));
-    }
-    return registered;
-  }, [contributors]);
+  // Always register the mentions enhancer so the @ button is visible from the
+  // start. The enhancer's getItems() will simply return an empty list until
+  // contributors are known (i.e. until messages have loaded).
+  const enhancers = useMemo(
+    () => [createMentionsEnhancer(contributors)],
+    [contributors],
+  );
 
   // Helper to render avatar for chat mode
   const renderAvatar = (message: PseudonymousMessage) => {
@@ -169,14 +188,16 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
       ? getAssistantAvatarStyle()
       : getAvatarStyle(message.pseudonym || "", isCurrentUser);
 
-    const Icon = style.icon;
-
     return (
       <div
-        className="w-8 h-8 rounded-full flex items-center justify-center text-xl flex-shrink-0"
+        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
         style={{ backgroundColor: style.avatarBg }}
       >
-        <Icon fontSize="inherit" />
+        {isAssistant ? (
+          <BotIcon size={22} color="#4b5563" />
+        ) : (
+          <style.icon fontSize="inherit" />
+        )}
       </div>
     );
   };
@@ -217,8 +238,8 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                 ? getAssistantAvatarStyle()
                 : getAvatarStyle(message.pseudonym || "", isCurrentUser);
 
-              // Normalize Plus versions to base names
-              const displayName = normalizeAssistantPseudonym(message);
+              // Normalize Plus versions to bot name
+              const displayName = normalizeAssistantPseudonym(message, botName);
 
               return (
                 <div key={`msg-${i}`} className="w-full">
@@ -288,7 +309,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                       >
                         {isAssistant
                           ? renderAssistantMessage(parsed.text)
-                          : renderMessageWithMentions(parsed.text)}
+                          : renderMessageWithMentions(parsed.text, contributors)}
 
                         {/* Render media items */}
                         {parsed.media && parsed.media.length > 0 && (
