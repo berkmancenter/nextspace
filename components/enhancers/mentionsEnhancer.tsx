@@ -5,6 +5,7 @@ import {
   InputChangeRequest,
 } from "../../types/inputEnhancer";
 import { MentionItem } from "../MentionMenu";
+import { MENTION_TRIGGER_REGEX } from "../../utils/mentionRegex";
 
 /**
  * Creates a mentions enhancer
@@ -24,9 +25,9 @@ export const createMentionsEnhancer = (
       const after = value.slice(cursor);
 
       // Check if there's an @ at or before cursor position
-      if (before.match(/@(\w*)$/)) {
+      if (before.match(MENTION_TRIGGER_REGEX)) {
         // Remove the @ token
-        const newBefore = before.replace(/@(\w*)$/, "");
+        const newBefore = before.replace(MENTION_TRIGGER_REGEX, "");
         return { value: newBefore + after, cursorPos: newBefore.length };
       } else {
         // Add @
@@ -37,11 +38,13 @@ export const createMentionsEnhancer = (
 
   detectTrigger: (value, cursorPos): TriggerMatch | null => {
     const textBefore = value.slice(0, cursorPos);
-    const match = textBefore.match(/@(\w*)$/);
+    // Match @ followed by optional word chars and spaces (to support multi-word handles),
+    // but do not allow a trailing space (that would indicate the mention is complete)
+    const match = textBefore.match(MENTION_TRIGGER_REGEX);
 
     if (match) {
       return {
-        query: match[1],
+        query: match[1] ?? "",
         replaceStart: cursorPos - match[0].length,
         replaceEnd: cursorPos,
       };
@@ -58,7 +61,7 @@ export const createMentionsEnhancer = (
   onSelect: (item, value, cursor): InputChangeRequest => {
     const before = value.slice(0, cursor);
     const after = value.slice(cursor);
-    const newBefore = before.replace(/@(\w*)$/, `@${item.pseudonym} `);
+    const newBefore = before.replace(MENTION_TRIGGER_REGEX, `@${item.pseudonym} `);
 
     return {
       value: newBefore + after,

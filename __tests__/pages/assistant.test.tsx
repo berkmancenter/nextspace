@@ -548,6 +548,91 @@ describe("EventAssistantRoom", () => {
     });
   });
 
+  describe("Bot @mention routing in chat tab", () => {
+    const chatSetup = async () => {
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,chat-pass",
+      };
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        }
+        return Promise.resolve([]);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+        name: "My Event",
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+      await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
+    };
+
+    it("sends chat-only message to the chat channel", async () => {
+      await chatSetup();
+
+      // Chat tab is the default — find the input and type a plain message
+      const user = userEvent.setup();
+      const input = screen.getByPlaceholderText("Enter your message here");
+      await user.type(input, "hello everyone{Enter}");
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          "messages",
+          expect.objectContaining({
+            channels: [{ name: "chat", passcode: "chat-pass" }],
+          }),
+        );
+      });
+    });
+
+    it("sends message to BOTH chat and direct channel when @mentioning the bot", async () => {
+      await chatSetup();
+
+      const user = userEvent.setup();
+      const input = screen.getByPlaceholderText("Enter your message here");
+      await user.type(input, "@Berkie what is the agenda?{Enter}");
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          "messages",
+          expect.objectContaining({
+            channels: expect.arrayContaining([
+              { name: "chat", passcode: "chat-pass" },
+              { name: "direct-user-123-agent-123" },
+            ]),
+          }),
+        );
+      });
+    });
+
+    it("is case-insensitive when matching the bot @mention", async () => {
+      await chatSetup();
+
+      const user = userEvent.setup();
+      const input = screen.getByPlaceholderText("Enter your message here");
+      await user.type(input, "@berkie question{Enter}");
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          "messages",
+          expect.objectContaining({
+            channels: expect.arrayContaining([
+              { name: "chat", passcode: "chat-pass" },
+              { name: "direct-user-123-agent-123" },
+            ]),
+          }),
+        );
+      });
+    });
+  });
+
   it("loads initial chat messages when chatPasscode becomes available", async () => {
     mockRouter.query = {
       conversationId: "test-conversation-id",

@@ -10,6 +10,7 @@ import { useAutoScroll } from "../hooks/useAutoScroll";
 import { BotIcon } from "./BotIcon";
 import { createMentionsEnhancer } from "./enhancers/mentionsEnhancer";
 import { normalizeAssistantPseudonym } from "../utils/Helpers";
+import { MENTION_DISPLAY_REGEX } from "../utils/mentionRegex";
 
 /**
  * Parsed message body structure
@@ -46,12 +47,28 @@ const parseMessageBody = (body: string | object): ParsedMessageBody => {
 };
 
 /**
- * Parse message text and highlight @mentions with linkification
- * Handles two-word pseudonyms (e.g., @John Doe) and converts URLs to clickable links
+ * Parse message text and highlight @mentions with linkification.
+ * When a contributors list is provided the regex matches only known handles
+ * (longest first, so "Bob Smith" is preferred over "Bob").
+ * Falls back to the generic greedy display regex when no list is available.
  */
-const renderMessageWithMentions = (text: string): React.ReactNode => {
-  // Split by @mention pattern - matches @word or @word word
-  const parts = text.split(/(@\w+(?:\s+\w+)?)/g);
+const renderMessageWithMentions = (
+  text: string,
+  contributors?: string[],
+): React.ReactNode => {
+  let splitPattern: RegExp;
+
+  if (contributors && contributors.length > 0) {
+    // Sort longest-first so multi-word handles are tried before shorter ones
+    const escaped = [...contributors]
+      .sort((a, b) => b.length - a.length)
+      .map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    splitPattern = new RegExp(`(@(?:${escaped.join("|")}))`, "gi");
+  } else {
+    splitPattern = new RegExp(`(${MENTION_DISPLAY_REGEX.source})`, "g");
+  }
+
+  const parts = text.split(splitPattern);
 
   return parts.map((part, index) => {
     // Check if this part is a mention
@@ -290,7 +307,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                       >
                         {isAssistant
                           ? renderAssistantMessage(parsed.text)
-                          : renderMessageWithMentions(parsed.text)}
+                          : renderMessageWithMentions(parsed.text, contributors)}
                       </div>
 
                       {/* Feedback - rendered below the bubble for Event Assistant messages */}

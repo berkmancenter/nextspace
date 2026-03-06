@@ -115,7 +115,9 @@ describe("GroupChatPanel", () => {
     expect(loadingIndicator).not.toBeInTheDocument();
   });
 
-  it("highlights @mentions in messages", () => {
+  it("highlights single-word @mentions in messages", () => {
+    // Both sender ("Alice") and mentioned user ("Bob") must be known contributors.
+    // Contributors are derived from message senders, so include a message from Bob.
     const messages = [
       {
         id: "1",
@@ -131,6 +133,20 @@ describe("GroupChatPanel", () => {
         upVotes: [],
         downVotes: [],
       },
+      {
+        id: "2",
+        pseudonym: "Bob",
+        createdAt: "2025-10-17T12:01:00Z",
+        body: { text: "Hi Alice!" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "bob-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      },
     ];
 
     const { container } = render(
@@ -138,9 +154,102 @@ describe("GroupChatPanel", () => {
     );
 
     // Check that mention has styling with font-semibold class
+    const mentionSpans = container.querySelectorAll(".font-semibold");
+    const bobMention = Array.from(mentionSpans).find((el) =>
+      el.textContent?.includes("@Bob"),
+    );
+    expect(bobMention).toBeInTheDocument();
+    expect(bobMention?.textContent).toContain("@Bob");
+  });
+
+  it("highlights multi-word @mentions using the contributors list", () => {
+    // "Bob Smith" is a known contributor — the mention should stop exactly at
+    // the end of the handle and not consume the following words.
+    const messages = [
+      {
+        id: "1",
+        pseudonym: "Bob Smith",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "Hey @Bob Smith, how are you?" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "bob-smith-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      },
+    ];
+
+    const { container } = render(
+      <GroupChatPanel {...baseProps} messages={messages} />,
+    );
+
     const mentionSpan = container.querySelector(".font-semibold");
     expect(mentionSpan).toBeInTheDocument();
-    expect(mentionSpan?.textContent).toContain("@Bob");
+    // Should be exactly "@Bob Smith" — the comma and following text are NOT included
+    expect(mentionSpan?.textContent).toBe("@Bob Smith");
+  });
+
+  it("does not over-capture words following the handle", () => {
+    // Without the contributors list the greedy regex would capture
+    // "@Bob Smith please respond". With contributors it should stop at "@Bob Smith".
+    const messages = [
+      {
+        id: "1",
+        pseudonym: "Bob Smith",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "@Bob Smith please respond" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "bob-smith-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      },
+    ];
+
+    const { container } = render(
+      <GroupChatPanel {...baseProps} messages={messages} />,
+    );
+
+    const mentionSpan = container.querySelector(".font-semibold");
+    expect(mentionSpan).toBeInTheDocument();
+    expect(mentionSpan?.textContent).toBe("@Bob Smith");
+    // The remaining text should NOT be highlighted
+    const nonMentionText = container.querySelector(".font-semibold + *");
+    expect(container.textContent).toContain("please respond");
+  });
+
+  it("highlights three-word @mentions from the contributors list", () => {
+    const messages = [
+      {
+        id: "1",
+        pseudonym: "Charlie Brown Jr",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "Hello @Charlie Brown Jr please respond" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "charlie-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      },
+    ];
+
+    const { container } = render(
+      <GroupChatPanel {...baseProps} messages={messages} />,
+    );
+
+    const mentionSpan = container.querySelector(".font-semibold");
+    expect(mentionSpan).toBeInTheDocument();
+    expect(mentionSpan?.textContent).toBe("@Charlie Brown Jr");
+    expect(container.textContent).toContain("please respond");
   });
 
   it("filters out parent messages", () => {
