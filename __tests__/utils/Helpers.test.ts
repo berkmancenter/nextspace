@@ -7,87 +7,69 @@ describe("resolveConversationBotName", () => {
   const fallback = "Berkie";
 
   it("returns configBotName when agents array is empty", () => {
-    expect(resolveConversationBotName({ agents: [] }, fallback)).toBe("Berkie");
+    expect(resolveConversationBotName({ agents: [] as any }, fallback)).toBe("Berkie");
   });
 
   it("returns configBotName when first agent has no agentConfig", () => {
-    const conversation = {
-      agents: [{ id: "a1", agentType: "eventAssistant" }],
-    };
-    expect(resolveConversationBotName(conversation, fallback)).toBe("Berkie");
+    const agents = [{ id: "a1", agentType: "eventAssistant" }] as any;
+    expect(resolveConversationBotName({ agents }, fallback)).toBe("Berkie");
   });
 
   it("returns configBotName when agentConfig exists but has no botName key", () => {
-    const conversation = {
-      agents: [{ id: "a1", agentType: "eventAssistant", agentConfig: { llmModel: "gpt-4" } }],
-    };
-    expect(resolveConversationBotName(conversation, fallback)).toBe("Berkie");
+    const agents = [{ id: "a1", agentType: "eventAssistant", agentConfig: { llmModel: "gpt-4" } }] as any;
+    expect(resolveConversationBotName({ agents }, fallback)).toBe("Berkie");
   });
 
   it("returns agentConfig.botName when it is a non-empty string", () => {
-    const conversation = {
-      agents: [
-        { id: "a1", agentType: "eventAssistant", agentConfig: { botName: "EventBot" } },
-      ],
-    };
-    expect(resolveConversationBotName(conversation, fallback)).toBe("EventBot");
+    const agents = [
+      { id: "a1", agentType: "eventAssistant", agentConfig: { botName: "EventBot" } },
+    ] as any;
+    expect(resolveConversationBotName({ agents }, fallback)).toBe("EventBot");
   });
 
   it("returns configBotName when agentConfig.botName is an empty string", () => {
-    const conversation = {
-      agents: [
-        { id: "a1", agentType: "eventAssistant", agentConfig: { botName: "" } },
-      ],
-    };
-    expect(resolveConversationBotName(conversation, fallback)).toBe("Berkie");
+    const agents = [
+      { id: "a1", agentType: "eventAssistant", agentConfig: { botName: "" } },
+    ] as any;
+    expect(resolveConversationBotName({ agents }, fallback)).toBe("Berkie");
   });
 
   it("returns configBotName when agentConfig.botName is a number", () => {
-    const conversation = {
-      agents: [
-        { id: "a1", agentType: "eventAssistant", agentConfig: { botName: 42 } },
-      ],
-    };
-    expect(resolveConversationBotName(conversation, fallback)).toBe("Berkie");
+    const agents = [
+      { id: "a1", agentType: "eventAssistant", agentConfig: { botName: 42 } },
+    ] as any;
+    expect(resolveConversationBotName({ agents }, fallback)).toBe("Berkie");
   });
 
   it("returns configBotName when agentConfig.botName is null", () => {
-    const conversation = {
-      agents: [
-        { id: "a1", agentType: "eventAssistant", agentConfig: { botName: null } },
-      ],
-    };
-    expect(resolveConversationBotName(conversation, fallback)).toBe("Berkie");
+    const agents = [
+      { id: "a1", agentType: "eventAssistant", agentConfig: { botName: null } },
+    ] as any;
+    expect(resolveConversationBotName({ agents }, fallback)).toBe("Berkie");
   });
 
   it("returns configBotName when agentConfig.botName is boolean", () => {
-    const conversation = {
-      agents: [
-        { id: "a1", agentType: "eventAssistant", agentConfig: { botName: true } },
-      ],
-    };
-    expect(resolveConversationBotName(conversation, fallback)).toBe("Berkie");
+    const agents = [
+      { id: "a1", agentType: "eventAssistant", agentConfig: { botName: true } },
+    ] as any;
+    expect(resolveConversationBotName({ agents }, fallback)).toBe("Berkie");
   });
 
   it("uses the first agent only, ignoring subsequent agents", () => {
-    const conversation = {
-      agents: [
-        { id: "a1", agentType: "eventAssistant", agentConfig: {} },
-        { id: "a2", agentType: "eventAssistant", agentConfig: { botName: "SecondBot" } },
-      ],
-    };
+    const agents = [
+      { id: "a1", agentType: "eventAssistant", agentConfig: {} },
+      { id: "a2", agentType: "eventAssistant", agentConfig: { botName: "SecondBot" } },
+    ] as any;
     // First agent has no botName → falls back to config
-    expect(resolveConversationBotName(conversation, fallback)).toBe("Berkie");
+    expect(resolveConversationBotName({ agents }, fallback)).toBe("Berkie");
   });
 
   it("uses the first agent's botName when both agents have botName", () => {
-    const conversation = {
-      agents: [
-        { id: "a1", agentType: "eventAssistant", agentConfig: { botName: "FirstBot" } },
-        { id: "a2", agentType: "eventAssistant", agentConfig: { botName: "SecondBot" } },
-      ],
-    };
-    expect(resolveConversationBotName(conversation, fallback)).toBe("FirstBot");
+    const agents = [
+      { id: "a1", agentType: "eventAssistant", agentConfig: { botName: "FirstBot" } },
+      { id: "a2", agentType: "eventAssistant", agentConfig: { botName: "SecondBot" } },
+    ] as any;
+    expect(resolveConversationBotName({ agents }, fallback)).toBe("FirstBot");
   });
 });
 
