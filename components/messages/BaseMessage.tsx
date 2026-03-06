@@ -1,7 +1,8 @@
 import { Box } from "@mui/material";
-import { FC } from "react";
+import { FC, useMemo } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { MarkmapView } from "../MarkmapView";
 
 /**
  * Props for BaseMessage component
@@ -43,6 +44,34 @@ export const MessageContent: FC<MessageContentProps> = ({
   const isFeedbackMessage = text.startsWith("/feedback");
   const displayText = isFeedbackMessage ? "User feedback received." : text;
 
+  const markdownComponents = useMemo(
+    () => ({
+      a: ({ node, ...props }: any) => (
+        <a
+          {...props}
+          className="text-medium-slate-blue"
+          target="_blank"
+          rel="noopener noreferrer"
+        />
+      ),
+      code: ({ node, className, children, ...props }: any) => {
+        const lang = /language-(\w+)/.exec(className || "")?.[1];
+        const content = String(children);
+        const hasMarkmapFrontMatter =
+          /^---\s*\n[\s\S]*?\bmarkmap\s*:[\s\S]*?\n---/.test(content);
+        if (lang === "markmap" || hasMarkmapFrontMatter) {
+          return <MarkmapView markdown={content} />;
+        }
+        return (
+          <code className={className} {...props}>
+            {children}
+          </code>
+        );
+      },
+    }),
+    []
+  );
+
   if (isFeedbackMessage || isFeedback) {
     return (
       <Box className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -53,19 +82,7 @@ export const MessageContent: FC<MessageContentProps> = ({
 
   return (
     <div className="markdown-content">
-      <Markdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          a: ({ node, ...props }) => (
-            <a
-              {...props}
-              className="text-medium-slate-blue"
-              target="_blank"
-              rel="noopener noreferrer"
-            />
-          ),
-        }}
-      >
+      <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
         {displayText}
       </Markdown>
     </div>
