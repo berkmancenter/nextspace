@@ -1,4 +1,4 @@
-import React, { FC, useMemo } from "react";
+import React, { FC, useEffect, useMemo, useState } from "react";
 import {
   AssistantMessage,
   SubmittedMessage,
@@ -10,21 +10,28 @@ import {
   SlashCommand,
   createSlashCommandEnhancer,
 } from "./enhancers/slashCommandEnhancer";
-import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
+import {
+  ControlledInputConfig,
+  MediaItem,
+  PseudonymousMessage,
+} from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { normalizeAssistantPseudonym } from "../utils/Helpers";
+import { PreferencesBanner, PreferenceOption } from "./PreferencesBanner";
 
 /**
  * Parsed message body structure
  * @property {string} text - The actual text content of the message
  * @property {string} [type] - Optional type for styling (e.g., "moderator_submitted")
  * @property {string} [message] - Optional message ID reference
+ * @property {MediaItem[]} [media] - Optional array of media items (images, audio, video)
  */
 interface ParsedMessageBody {
   text: string;
   type?: string;
   message?: string;
+  media?: MediaItem[];
 }
 
 /**
@@ -40,6 +47,7 @@ const parseMessageBody = (body: string | object): ParsedMessageBody => {
       text: obj.text?.toString() || "",
       type: obj.type?.toString(),
       message: obj.message?.toString(),
+      media: Array.isArray(obj.media) ? obj.media : undefined,
     };
   }
 
@@ -63,6 +71,11 @@ interface AssistantChatPanelProps {
   onPromptSelect: (prompt: string) => void;
   enterControlledMode: (config: ControlledInputConfig) => void;
   sendFeedbackRating: (messageId: string, rating: string) => void;
+  userId: string | null;
+  showPreferences?: boolean;
+  preferenceOptions?: PreferenceOption[];
+  onPreferencesSubmit?: (selectedValues: string[]) => void;
+  preferencesError?: string | null;
 }
 
 export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
@@ -79,8 +92,19 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   onPromptSelect,
   enterControlledMode,
   sendFeedbackRating,
+  userId,
+  showPreferences = false,
+  preferenceOptions = [],
+  onPreferencesSubmit,
+  preferencesError = null,
 }) => {
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(messages);
+  const [preferencesVisible, setPreferencesVisible] = useState(showPreferences);
+
+  // Sync local state with prop changes
+  useEffect(() => {
+    setPreferencesVisible(showPreferences);
+  }, [showPreferences]);
 
   // Create enhancers for assistant mode (slash commands only)
   const enhancers = useMemo(() => {
@@ -101,6 +125,27 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
       return false;
     })
     .map((msg) => (msg.body as any).message);
+
+  // Handle preferences submission - don't hide optimistically, let parent control visibility
+  const handlePreferencesSubmit = (selectedValues: string[]) => {
+    onPreferencesSubmit?.(selectedValues);
+  };
+
+  const handlePreferencesDismiss = () => {
+    setPreferencesVisible(false);
+  };
+
+  // Collect message IDs that have singleChoice prompts
+  const singleChoicePromptIds = new Set(
+    messages
+      .filter(
+        (msg) =>
+          msg.prompt?.type === "singleChoice" &&
+          msg.prompt?.options &&
+          msg.prompt.options.length > 0,
+      )
+      .map((msg) => msg.id),
+  );
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
@@ -128,8 +173,24 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
             </p>
           </div>
 
+          {/* Preferences Banner */}
+          {preferencesVisible && preferenceOptions.length > 0 && (
+            <div className="w-full">
+              <PreferencesBanner
+                options={preferenceOptions}
+                onSubmit={handlePreferencesSubmit}
+                onDismiss={handlePreferencesDismiss}
+                error={preferencesError}
+              />
+            </div>
+          )}
+
           {messages
-            .filter((message) => !message.parentMessage)
+            .filter(
+              (message) =>
+                !message.parentMessage ||
+                !singleChoicePromptIds.has(message.parentMessage),
+            )
             .map((message, i) => {
               const isAssistant = message.fromAgent;
               const isCurrentUser = message.pseudonym === pseudonym;
@@ -284,6 +345,32 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                         )}
                       </div>
 
+                      {/* Reply context - shows parent message snippet */}
+                      {message.parentMessage &&
+                        (() => {
+                          const parentMsg = messages.find(
+                            (m) => m.id === message.parentMessage,
+                          );
+                          if (!parentMsg) return null;
+
+                          const parentParsed = parseMessageBody(parentMsg.body);
+                          const parentText = parentParsed.text;
+                          const truncatedText =
+                            parentText.length > 60
+                              ? parentText.substring(0, 60) + "..."
+                              : parentText;
+
+                          return (
+                            <div
+                              className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded"
+                              style={{ width: "85%" }}
+                            >
+                              <span className="font-medium">In reply to: </span>
+                              {truncatedText}
+                            </div>
+                          );
+                        })()}
+
                       {/* Message bubble */}
                       {isAssistant ? (
                         <>
@@ -296,6 +383,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                                   ...message,
                                   body: parsed.text,
                                 }}
+                                media={parsed.media}
                                 onPromptSelect={onPromptSelect}
                               />
                             </div>
@@ -314,6 +402,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                                   ...message,
                                   body: parsed.text,
                                 }}
+                                media={parsed.media}
                                 onPromptSelect={onPromptSelect}
                               />
                             </div>

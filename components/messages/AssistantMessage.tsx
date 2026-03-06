@@ -2,15 +2,17 @@ import { FC, useState } from "react";
 import { Box, Button, alpha } from "@mui/material";
 import { Check } from "@mui/icons-material";
 import { BaseMessage, MessageContent } from "./BaseMessage";
-import { MessageProps } from "../../types.internal";
+import { MessageProps, MediaItem } from "../../types.internal";
 
 export interface AssistantMessageProps extends MessageProps {
   onPromptSelect?: (value: string, parentMessageId?: string) => void;
+  media?: MediaItem[];
 }
 
 export const AssistantMessage: FC<AssistantMessageProps> = ({
   message,
   onPromptSelect,
+  media,
 }) => {
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
 
@@ -34,6 +36,36 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
   return (
     <BaseMessage className={className}>
       <MessageContent text={message.body as string} />
+
+      {/* Render media items */}
+      {media && media.length > 0 && (
+        <Box
+          marginTop="1rem"
+          display="flex"
+          flexDirection="column"
+          gap="0.5rem"
+        >
+          {media.map((item, index) => {
+            if (item.type === "image") {
+              return (
+                <img
+                  key={`media-${index}`}
+                  src={`data:${item.mimeType};base64,${item.data}`}
+                  alt="Visual response"
+                  style={{
+                    maxWidth: "100%",
+                    height: "auto",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                  }}
+                />
+              );
+            }
+            // Future: handle audio, video types here
+            return null;
+          })}
+        </Box>
+      )}
 
       {hasPromptOptions && (
         <Box display="flex" flexWrap="wrap" gap="0.5rem" marginTop="1rem">
@@ -93,7 +125,6 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
           ))}
         </Box>
       )}
-
     </BaseMessage>
   );
 };

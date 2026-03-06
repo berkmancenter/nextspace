@@ -23,10 +23,15 @@ import EventIcon from "@mui/icons-material/Event";
 import ComputerIcon from "@mui/icons-material/Computer";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ReportProblem from "@mui/icons-material/ReportProblem";
+import DownloadIcon from "@mui/icons-material/Download";
 import { components } from "../../types";
 import { AuthType, Conversation, ErrorMessage } from "../../types.internal";
-import { Request } from "../../utils/Api";
 import { SendData } from "../../utils/Helpers";
+import { Request } from "../../utils";
+import {
+  generateAndDownloadUserMetricsReport,
+  generateAndDownloadDirectMessageResponsesReport,
+} from "../../utils/eventReportGenerator";
 
 const EventCard = ({
   event,
@@ -40,6 +45,7 @@ const EventCard = ({
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Check if current user is the owner of this event
   const isOwner = currentUserId && event.owner === currentUserId;
@@ -76,6 +82,27 @@ const EventCard = ({
     setDeleteDialogOpen(false);
   };
 
+  const handleDownloadReport = async () => {
+    setIsDownloading(true);
+    try {
+      // Use the scheduled time or created time for the report date
+      const reportDate = event.scheduledTime
+        ? new Date(event.scheduledTime)
+        : new Date(event.createdAt!);
+
+      // Download first report: userMetrics
+      await generateAndDownloadUserMetricsReport(event.id!, reportDate);
+
+      // Download second report: directMessageResponses
+      await generateAndDownloadDirectMessageResponsesReport(event.id!);
+    } catch (err) {
+      console.error("Failed to generate report:", err);
+      alert("Failed to generate report. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <>
       <Card className="w-full shadow-sm rounded-xl border border-gray-200 hover:shadow-md transition-shadow">
@@ -97,17 +124,35 @@ const EventCard = ({
                 </span>
               )}
             </div>
-            {isOwner && (
-              <Tooltip title="Delete event">
-                <IconButton
-                  size="small"
-                  onClick={handleDeleteClick}
-                  className="text-gray-500 hover:text-red-600"
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
+            <div className="flex gap-1">
+              {!event.active && (
+                <Tooltip title="Download user metrics report">
+                  <IconButton
+                    size="small"
+                    onClick={handleDownloadReport}
+                    disabled={isDownloading}
+                    className="text-gray-500 hover:text-blue-600"
+                  >
+                    {isDownloading ? (
+                      <CircularProgress size={20} />
+                    ) : (
+                      <DownloadIcon fontSize="small" />
+                    )}
+                  </IconButton>
+                </Tooltip>
+              )}
+              {isOwner && (
+                <Tooltip title="Delete event">
+                  <IconButton
+                    size="small"
+                    onClick={handleDeleteClick}
+                    className="text-gray-500 hover:text-red-600"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </div>
           </div>
 
           {/* Date and Platforms */}
@@ -452,6 +497,9 @@ function EventScreen({ authType }: { authType: AuthType }) {
       // Show past events only if includePast is true
       if (isPastEvent && includePast) return true;
 
+      // Show inactive events without scheduledTime (treat as past events)
+      if (!scheduledTime && includePast) return true;
+
       return false;
     });
   };
@@ -607,7 +655,11 @@ function EventScreen({ authType }: { authType: AuthType }) {
     setIsInitialLoading(true);
 
     // Filter based on whether to include past events
-    const filtered = filterConversations(allConversationsRef.current, include, myEventsOnly);
+    const filtered = filterConversations(
+      allConversationsRef.current,
+      include,
+      myEventsOnly,
+    );
 
     // Sort: active events first, then all others by most recent
     const sorted = [...filtered].sort((a, b) => {
@@ -639,7 +691,11 @@ function EventScreen({ authType }: { authType: AuthType }) {
     setIsInitialLoading(true);
 
     // Filter based on owner and past events settings
-    const filtered = filterConversations(allConversationsRef.current, includePast, showOnlyMine);
+    const filtered = filterConversations(
+      allConversationsRef.current,
+      includePast,
+      showOnlyMine,
+    );
 
     // Sort: active events first, then all others by most recent
     const sorted = [...filtered].sort((a, b) => {
