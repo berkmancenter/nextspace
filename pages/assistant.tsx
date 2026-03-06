@@ -85,6 +85,13 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       value: "/mod ",
       conversationTypes: ["eventAssistantPlus", "eventAssistantPlusProactive"],
     },
+    {
+      command: "mindmap",
+      description:
+        "Create a visual mind map of the key topics discussed in the event",
+      value: "/mindmap ",
+      conversationTypes: ["eventAssistantPlus", "eventAssistantPlusProactive"],
+    },
   ];
 
   // Filter commands based on current conversation type

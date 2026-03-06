@@ -36,6 +36,8 @@
     "dotenv": "17.2.3",
     "jose": "6.1.1",
     "linkify-react": "^4.3.2",
+    "markmap-lib": "^0.18.12",
+    "markmap-view": "^0.18.12",
     "motion": "^12.12.1",
     "next": "^15.5.7",
     "react": "^19.1.0",
