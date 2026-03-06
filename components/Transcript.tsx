@@ -11,7 +11,7 @@ import {
 import { Dialog, Button } from "@mui/material";
 import { Socket } from "socket.io-client";
 import { PseudonymousMessage } from "../types.internal";
-import { RetrieveData, SendData } from "../utils";
+import { Api, RetrieveData, SendData } from "../utils";
 import { trackFeatureUsage, trackConversationEvent } from "../utils/analytics";
 import { useVisibilityAwareDuration } from "../hooks/useVisibilityAwareDuration";
 
@@ -26,11 +26,17 @@ export function Transcript(props: {
   socket: Socket | null;
   conversationId: string;
   transcriptPasscode?: string;
-  apiAccessToken: string;
   category?: string;
   showControls?: boolean;
   /** When true, hides the open/close toggle and fills the available container width */
   hideToggle?: boolean;
+  /**
+   * Pass the `lastReconnectTime` value from `useSessionJoin`. When this
+   * changes to a non-null value the transcript will re-fetch its message
+   * history from the REST API to fill any gap that occurred while the socket
+   * was disconnected.
+   */
+  lastReconnectTime?: number | null;
 }) {
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
   const [isOpen, setIsOpen] = useState<boolean>(true);
@@ -210,7 +216,7 @@ export function Transcript(props: {
       const response = await SendData(
         `transcript/${props.conversationId}/pause`,
         {},
-        props.apiAccessToken,
+        Api.get().getAccessToken(),
       );
       if (response && response.error) {
         setError(response.message || "Failed to pause transcript");
@@ -229,7 +235,7 @@ export function Transcript(props: {
       const response = await SendData(
         `transcript/${props.conversationId}/resume`,
         {},
-        props.apiAccessToken,
+        Api.get().getAccessToken(),
       );
       if (response && response.error) {
         setError(response.message || "Failed to resume transcript");
@@ -248,7 +254,7 @@ export function Transcript(props: {
       const response = await SendData(
         `transcript/${props.conversationId}`,
         {},
-        props.apiAccessToken,
+        Api.get().getAccessToken(),
         { method: "DELETE" },
       );
       if (response && response.error) {
@@ -267,7 +273,7 @@ export function Transcript(props: {
       // Fetch the formatted transcript text
       const textContent = await RetrieveData(
         `transcript/${props.conversationId}`,
-        props.apiAccessToken,
+        Api.get().getAccessToken(),
         "text",
       );
 
@@ -341,62 +347,81 @@ export function Transcript(props: {
     }
   }, [messages]);
 
-  // Fetch initial conversation state and messages
+  // Fetch conversation state and messages. Extracted so it can be called both
+  // on initial mount and when a gap-reconnect signals missed messages.
+  const fetchTranscriptData = async () => {
+    if (
+      !props.conversationId ||
+      !Api.get().getAccessToken() ||
+      !props.transcriptPasscode
+    )
+      return;
+
+    try {
+      const conversationResponse: any = await RetrieveData(
+        `conversations/${props.conversationId}`,
+        Api.get().getAccessToken(),
+      );
+
+      if (conversationResponse && !("error" in conversationResponse)) {
+        setTranscriptActive(
+          conversationResponse.transcript?.status === "active",
+        );
+      }
+
+      const transcriptMessages = await RetrieveData(
+        `messages/${props.conversationId}?channel=transcript,${props.transcriptPasscode}`,
+        Api.get().getAccessToken(),
+      );
+
+      if (Array.isArray(transcriptMessages)) {
+        const reversedMessages = transcriptMessages.reverse();
+        setMessages(reversedMessages);
+
+        if (props.focusTimeRange) {
+          setTimeout(() => {
+            applyFocusAndScroll(reversedMessages);
+          }, 0);
+        } else if (isOpen) {
+          scrollToBottom();
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching transcript data:", error);
+    }
+  };
+
+  // Fetch initial conversation state and messages on mount
   useEffect(() => {
     if (
       !props.conversationId ||
-      !props.apiAccessToken ||
+      !Api.get().getAccessToken() ||
       !props.transcriptPasscode
     )
       return;
 
     const fetchInitialData = async () => {
-      try {
-        // Fetch conversation details to get initial transcript status
-        const conversationResponse: any = await RetrieveData(
-          `conversations/${props.conversationId}`,
-          props.apiAccessToken,
-        );
+      await fetchTranscriptData();
 
-        if (conversationResponse && !("error" in conversationResponse)) {
-          setTranscriptActive(
-            conversationResponse.transcript?.status === "active",
-          );
+      // Start tracking durations on initial load (transcript starts open at bottom)
+      if (isOpen) {
+        transcriptOpenDuration.start();
+        if (!isInManualScrollMode) {
+          autoScrollDuration.start();
         }
-
-        // Fetch messages
-        const transcriptMessages = await RetrieveData(
-          `messages/${props.conversationId}?channel=transcript,${props.transcriptPasscode}`,
-          props.apiAccessToken,
-        );
-
-        if (Array.isArray(transcriptMessages)) {
-          const reversedMessages = transcriptMessages.reverse();
-          setMessages(reversedMessages);
-
-          if (props.focusTimeRange) {
-            setTimeout(() => {
-              applyFocusAndScroll(reversedMessages);
-            }, 0);
-          } else if (isOpen) {
-            scrollToBottom();
-          }
-
-          // Start tracking durations on initial load (transcript starts open at bottom)
-          if (isOpen) {
-            transcriptOpenDuration.start();
-            if (!isInManualScrollMode) {
-              autoScrollDuration.start();
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching initial data:", error);
       }
     };
 
     fetchInitialData();
-  }, [props.conversationId, props.apiAccessToken, props.transcriptPasscode]);
+  }, [props.conversationId, props.transcriptPasscode]);
+
+  // Re-fetch message history when the socket reconnects after a significant gap
+  // to fill any messages that arrived while the client was disconnected.
+  useEffect(() => {
+    if (!props.lastReconnectTime) return;
+    console.log("Transcript re-fetching history after gap-reconnect...");
+    fetchTranscriptData();
+  }, [props.lastReconnectTime]);
 
   // Effect: Add scroll event listener
   useEffect(() => {
@@ -440,7 +465,7 @@ export function Transcript(props: {
 
   // Subscribe to transcript channel
   useEffect(() => {
-    if (!props.socket || !props.conversationId || !props.apiAccessToken) return;
+    if (!props.socket || !props.conversationId || !Api.get().getAccessToken()) return;
 
     const channel = {
       name: "transcript",
@@ -449,9 +474,12 @@ export function Transcript(props: {
 
     const joinChannel = () => {
       try {
+        // Always use the freshest available token so re-joins after token
+        // refresh succeed rather than failing with an expired token.
+        const freshToken = Api.get().getAccessToken();
         props.socket!.emit("channel:join", {
           conversationId: props.conversationId,
-          token: props.apiAccessToken,
+          token: freshToken,
           channel,
         });
 
@@ -466,13 +494,13 @@ export function Transcript(props: {
       }
     };
 
-    // Join immediately if already connected, or wait for connect event
+    // Join immediately if already connected
     if (props.socket.connected) {
       joinChannel();
-    } else {
-      console.log("Socket not connected, waiting for connect event");
-      props.socket.once("connect", joinChannel);
     }
+    // Re-join on every (re)connect — covers both initial connection when the
+    // socket isn't ready yet and subsequent reconnections after token refresh.
+    props.socket.on("connect", joinChannel);
 
     const messageHandler = (data: PseudonymousMessage) => {
       if (data.channels && data.channels.includes("transcript")) {
@@ -526,6 +554,7 @@ export function Transcript(props: {
     props.socket.onAny(catchAllHandler);
 
     return () => {
+      // Use off (not once) to remove the persistent reconnect listener
       props.socket?.off("connect", joinChannel);
       props.socket?.off("message:new", messageHandler);
       props.socket?.off("transcript:status", transcriptStatusHandler);
@@ -534,7 +563,6 @@ export function Transcript(props: {
   }, [
     props.socket,
     props.conversationId,
-    props.apiAccessToken,
     props.transcriptPasscode,
   ]);
 

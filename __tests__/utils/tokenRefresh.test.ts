@@ -25,6 +25,7 @@ describe("tokenRefresh utilities", () => {
     // Setup mock Api instance
     mockApi = {
       GetTokens: jest.fn(),
+      getAccessToken: jest.fn(() => mockApi.GetTokens()?.access ?? ""),
       SetTokens: jest.fn(),
     };
     (Api.get as jest.Mock).mockReturnValue(mockApi);
@@ -97,16 +98,99 @@ describe("tokenRefresh utilities", () => {
   });
 
   describe("refreshAccessToken", () => {
-    it("should return false if no refresh token available", async () => {
+    it("should return false if no refresh token available and cookie has no refresh token", async () => {
       mockApi.GetTokens.mockReturnValue({
         access: "some-access-token",
         refresh: null,
+      });
+
+      // Cookie also has no refresh token
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ tokens: { access: "some-access-token", refresh: null } }),
       });
 
       const result = await refreshAccessToken();
 
       expect(result).toBe(false);
       expect(RefreshToken).not.toHaveBeenCalled();
+    });
+
+    it("should fall back to cookie if in-memory refresh token is missing", async () => {
+      // No refresh token in memory
+      mockApi.GetTokens
+        .mockReturnValueOnce({ access: "old-access", refresh: null })
+        // After SetTokens is called, return restored tokens
+        .mockReturnValue({ access: "cookie-access", refresh: "cookie-refresh" });
+
+      const newTokens = {
+        access: { token: "refreshed-access" },
+        refresh: { token: "refreshed-refresh" },
+      };
+
+      // Cookie fetch returns a valid refresh token
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          tokens: { access: "cookie-access", refresh: "cookie-refresh" },
+        }),
+      });
+
+      (RefreshToken as jest.Mock).mockResolvedValueOnce(newTokens);
+
+      // Session PATCH after successful refresh
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ message: "Success" }),
+      });
+
+      const result = await refreshAccessToken();
+
+      expect(result).toBe(true);
+      // Should have restored tokens from cookie
+      expect(mockApi.SetTokens).toHaveBeenCalledWith("cookie-access", "cookie-refresh");
+      // Should have used the restored refresh token for the actual refresh call
+      expect(RefreshToken).toHaveBeenCalledWith("cookie-refresh");
+    });
+
+    it("should deduplicate concurrent refresh calls", async () => {
+      const currentTokens = {
+        access: "old-access-token",
+        refresh: "old-refresh-token",
+      };
+      const newTokens = {
+        access: { token: "new-access-token" },
+        refresh: { token: "new-refresh-token" },
+      };
+
+      mockApi.GetTokens.mockReturnValue(currentTokens);
+
+      // RefreshToken resolves after a short delay to allow concurrency
+      (RefreshToken as jest.Mock).mockImplementationOnce(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(newTokens), 20)
+          )
+      );
+
+      // Session PATCH
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ message: "Success" }),
+      });
+
+      // Fire three concurrent refresh calls
+      const [r1, r2, r3] = await Promise.all([
+        refreshAccessToken(),
+        refreshAccessToken(),
+        refreshAccessToken(),
+      ]);
+
+      expect(r1).toBe(true);
+      expect(r2).toBe(true);
+      expect(r3).toBe(true);
+      // The actual network call must only happen once
+      expect(RefreshToken).toHaveBeenCalledTimes(1);
     });
 
     it("should refresh tokens successfully", async () => {

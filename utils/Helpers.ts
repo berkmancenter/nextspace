@@ -50,6 +50,14 @@ export class Api {
   GetTokens() {
     return this.API_TOKENS;
   }
+  /**
+   * Returns the current access token. Always call this at point-of-use so
+   * you get the live value from the singleton rather than a value captured
+   * at render/effect time that may have gone stale after a token refresh.
+   */
+  getAccessToken(): string {
+    return this.API_TOKENS.access ?? "";
+  }
   SetAdminTokens(access: string, refresh: string) {
     this.ADMIN_TOKENS = {
       access,
