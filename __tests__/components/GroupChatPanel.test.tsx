@@ -546,6 +546,501 @@ describe("GroupChatPanel", () => {
     expect(screen.getByTestId("message-input")).toBeInTheDocument();
   });
 
+  describe("Visual message handling (media)", () => {
+    it("renders single image in message body", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "Check out this image",
+            media: [
+              {
+                type: "image",
+                data: "base64imagedata",
+                mimeType: "image/png",
+              },
+            ],
+          },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByText("Check out this image")).toBeInTheDocument();
+      const image = screen.getByAltText("Visual response");
+      expect(image).toHaveAttribute(
+        "src",
+        "data:image/png;base64,base64imagedata"
+      );
+    });
+
+    it("renders multiple images in message body", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "Multiple images",
+            media: [
+              {
+                type: "image",
+                data: "image1data",
+                mimeType: "image/png",
+              },
+              {
+                type: "image",
+                data: "image2data",
+                mimeType: "image/jpeg",
+              },
+              {
+                type: "image",
+                data: "image3data",
+                mimeType: "image/gif",
+              },
+            ],
+          },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      const images = screen.getAllByAltText("Visual response");
+      expect(images).toHaveLength(3);
+      expect(images[0]).toHaveAttribute(
+        "src",
+        "data:image/png;base64,image1data"
+      );
+      expect(images[1]).toHaveAttribute(
+        "src",
+        "data:image/jpeg;base64,image2data"
+      );
+      expect(images[2]).toHaveAttribute(
+        "src",
+        "data:image/gif;base64,image3data"
+      );
+    });
+
+    it("applies correct styling to media images", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "Styled image",
+            media: [
+              {
+                type: "image",
+                data: "styledimage",
+                mimeType: "image/png",
+              },
+            ],
+          },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      const image = screen.getByAltText("Visual response");
+      expect(image).toHaveStyle({
+        maxWidth: "100%",
+        height: "auto",
+        borderRadius: "8px",
+        border: "1px solid rgba(0, 0, 0, 0.1)",
+      });
+    });
+
+    it("does not render media when media array is empty", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "No media here",
+            media: [],
+          },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByText("No media here")).toBeInTheDocument();
+      expect(screen.queryByAltText("Visual response")).not.toBeInTheDocument();
+    });
+
+    it("does not render media when media is not an array", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "Invalid media",
+            media: "not-an-array",
+          },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByText("Invalid media")).toBeInTheDocument();
+      expect(screen.queryByAltText("Visual response")).not.toBeInTheDocument();
+    });
+
+    it("only renders image type media, ignoring audio and video", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "Mixed media",
+            media: [
+              {
+                type: "image",
+                data: "imagedata",
+                mimeType: "image/png",
+              },
+              {
+                type: "audio",
+                data: "audiodata",
+                mimeType: "audio/mp3",
+              },
+              {
+                type: "video",
+                data: "videodata",
+                mimeType: "video/mp4",
+              },
+            ],
+          },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      // Only the image should be rendered
+      const images = screen.getAllByAltText("Visual response");
+      expect(images).toHaveLength(1);
+      expect(images[0]).toHaveAttribute(
+        "src",
+        "data:image/png;base64,imagedata"
+      );
+    });
+
+    it("renders assistant message with media", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "Here's the visualization",
+            media: [
+              {
+                type: "image",
+                data: "visualization",
+                mimeType: "image/png",
+              },
+            ],
+          },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByText("Here's the visualization")).toBeInTheDocument();
+      expect(screen.getByAltText("Visual response")).toBeInTheDocument();
+    });
+
+    it("renders multiple messages with different media", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "First image",
+            media: [
+              {
+                type: "image",
+                data: "image1",
+                mimeType: "image/png",
+              },
+            ],
+          },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "2",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: {
+            text: "Second image",
+            media: [
+              {
+                type: "image",
+                data: "image2",
+                mimeType: "image/jpeg",
+              },
+            ],
+          },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByText("First image")).toBeInTheDocument();
+      expect(screen.getByText("Second image")).toBeInTheDocument();
+
+      const images = screen.getAllByAltText("Visual response");
+      expect(images).toHaveLength(2);
+    });
+
+    it("renders message without media alongside messages with media", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Just text" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "2",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: {
+            text: "Text with image",
+            media: [
+              {
+                type: "image",
+                data: "imagedata",
+                mimeType: "image/png",
+              },
+            ],
+          },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByText("Just text")).toBeInTheDocument();
+      expect(screen.getByText("Text with image")).toBeInTheDocument();
+
+      const images = screen.getAllByAltText("Visual response");
+      expect(images).toHaveLength(1);
+    });
+
+    it("handles different image MIME types correctly", () => {
+      const mimeTypes = [
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "image/webp",
+        "image/svg+xml",
+      ];
+
+      mimeTypes.forEach((mimeType, index) => {
+        const messages = [
+          {
+            id: `${index}`,
+            pseudonym: "Alice",
+            createdAt: "2025-10-17T12:00:00Z",
+            body: {
+              text: `Image ${index}`,
+              media: [
+                {
+                  type: "image",
+                  data: "testdata",
+                  mimeType,
+                },
+              ],
+            },
+            channels: ["chat"],
+            conversation: "conv-1",
+            pseudonymId: "alice-1",
+            fromAgent: false,
+            pause: false,
+            visible: true,
+            upVotes: [],
+            downVotes: [],
+          },
+        ];
+
+        const { unmount } = render(
+          <GroupChatPanel {...baseProps} messages={messages} />
+        );
+
+        const image = screen.getByAltText("Visual response");
+        expect(image).toHaveAttribute("src", `data:${mimeType};base64,testdata`);
+
+        unmount();
+      });
+    });
+
+    it("handles messages with very long base64 data", () => {
+      const longBase64 = "a".repeat(10000);
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "Large image",
+            media: [
+              {
+                type: "image",
+                data: longBase64,
+                mimeType: "image/png",
+              },
+            ],
+          },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      const image = screen.getByAltText("Visual response");
+      expect(image).toHaveAttribute(
+        "src",
+        `data:image/png;base64,${longBase64}`
+      );
+    });
+
+    it("handles malformed media objects gracefully", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: {
+            text: "Malformed media",
+            media: [
+              {
+                type: "image",
+                // Missing data and mimeType
+              },
+            ],
+          },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const { container } = render(
+        <GroupChatPanel {...baseProps} messages={messages} />
+      );
+
+      expect(screen.getByText("Malformed media")).toBeInTheDocument();
+      // Should not crash
+      expect(container).toBeInTheDocument();
+    });
+  });
+
   describe("Timestamp display", () => {
     it("shows timestamp for the first message", () => {
       const messages = [

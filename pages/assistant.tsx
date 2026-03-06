@@ -50,6 +50,16 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
   const [eventName, setEventName] = useState<string>("");
   const [assistantInputValue, setAssistantInputValue] = useState<string>("");
   const [chatInputValue, setChatInputValue] = useState<string>("");
+  const [showPreferences, setShowPreferences] = useState<boolean>(true);
+  const [preferencesError, setPreferencesError] = useState<string | null>(null);
+
+  const preferenceOptions = [
+    {
+      value: "visualResponse",
+      label: "Visual Response",
+      description: "Answer my questions with images when appropriate",
+    },
+  ];
 
   // Ref to track active tab for socket handler
   const activeTabRef = useRef<"assistant" | "chat">("assistant");
@@ -94,23 +104,25 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       if (process.env.NODE_ENV !== "production")
         console.log("New message:", data);
 
-      if (!data.parentMessage) {
-        // Route messages to appropriate array based on channel
-        if (data.channels && data.channels.includes("chat")) {
-          setChatMessages((prev) => [...prev, data]);
-          // Increment counter if NOT viewing chat tab
-          if (activeTabRef.current !== "chat") {
-            setUnseenChatCount((prev) => prev + 1);
-          }
-        } else if (!data.channels || !data.channels.includes("transcript")) {
-          setAssistantMessages((prev) => [...prev, data]);
-          // Increment counter if NOT viewing assistant tab
-          if (activeTabRef.current !== "assistant") {
-            setUnseenAssistantCount((prev) => prev + 1);
-          }
+      // Route messages to appropriate array based on channel
+      if (data.channels && data.channels.includes("chat")) {
+        setChatMessages((prev) => [...prev, data]);
+        // Increment counter if NOT viewing chat tab
+        if (activeTabRef.current !== "chat") {
+          setUnseenChatCount((prev) => prev + 1);
+        }
+      } else if (!data.channels || !data.channels.includes("transcript")) {
+        setAssistantMessages((prev) => [...prev, data]);
+        // Increment counter if NOT viewing assistant tab
+        if (activeTabRef.current !== "assistant") {
+          setUnseenAssistantCount((prev) => prev + 1);
         }
       }
-      if (data.fromAgent) {
+
+      if (
+        data.fromAgent &&
+        (!data.channels || !data.channels.includes("chat"))
+      ) {
         setWaitingForResponse(false);
       }
     };
@@ -256,6 +268,52 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     );
   }, [socket, agentId, userId, chatPasscode, router.query.conversationId]);
 
+  // Helper function to fetch replies for messages and insert them into the array
+  const fetchAndInsertReplies = async (
+    messages: PseudonymousMessage[],
+  ): Promise<PseudonymousMessage[]> => {
+    // Collect all messages with replies
+    const messagesWithReplies = messages.filter(
+      (msg) => msg.replyCount && msg.replyCount > 0,
+    );
+
+    if (messagesWithReplies.length === 0) {
+      return messages;
+    }
+
+    // Fetch all replies in parallel
+    const repliesPromises = messagesWithReplies.map(async (msg) => {
+      try {
+        const replies = await RetrieveData(
+          `messages/${msg.id}/replies`,
+          Api.get().GetTokens().access!,
+        );
+        if ("error" in replies) {
+          console.error(
+            `Error fetching replies for message ${msg.id}: ${replies.message?.message}`,
+          );
+          return [];
+        }
+        return Array.isArray(replies) ? replies : [];
+      } catch (error) {
+        console.error(`Error fetching replies for message ${msg.id}:`, error);
+        return [];
+      }
+    });
+
+    const allRepliesArrays = await Promise.all(repliesPromises);
+    const allReplies = allRepliesArrays.flat();
+
+    // Combine original messages with replies and sort by createdAt
+    const combinedMessages = [...messages, ...allReplies].sort((a, b) => {
+      const dateA = new Date(a.createdAt!).getTime();
+      const dateB = new Date(b.createdAt!).getTime();
+      return dateA - dateB;
+    });
+
+    return combinedMessages;
+  };
+
   // Load initial chat messages when chatPasscode becomes available
   useEffect(() => {
     if (!chatPasscode || !router.query.conversationId) return;
@@ -268,7 +326,8 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
         );
 
         if (Array.isArray(chatMessages)) {
-          setChatMessages(chatMessages);
+          const messagesWithReplies = await fetchAndInsertReplies(chatMessages);
+          setChatMessages(messagesWithReplies);
         }
       } catch (error) {
         console.error("Error fetching initial chat messages:", error);
@@ -277,6 +336,45 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
 
     fetchInitialMessages();
   }, [chatPasscode, router.query.conversationId]);
+
+  // Check if user has existing preferences
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchUserPreferences = async () => {
+      try {
+        const preferences = await RetrieveData(
+          `users/user/${userId}/preferences`,
+          Api.get().GetTokens().access!,
+        );
+
+        if ("error" in preferences) {
+          console.error(
+            `Error retrieving preferences: ${preferences.message?.message}`,
+          );
+          setShowPreferences(true);
+          return;
+        }
+
+        // If preferences exist (non-empty object), don't show the banner
+        if (
+          preferences &&
+          typeof preferences === "object" &&
+          Object.keys(preferences).length > 0
+        ) {
+          setShowPreferences(false);
+        } else {
+          // Empty object means no preferences set yet
+          setShowPreferences(true);
+        }
+      } catch (error: any) {
+        console.error(`Error retrieving preferences: ${error.message}`);
+        setShowPreferences(true);
+      }
+    };
+
+    fetchUserPreferences();
+  }, [userId]);
 
   // Load initial assistant messages when userId and agentId become available
   useEffect(() => {
@@ -291,7 +389,9 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
         );
 
         if (Array.isArray(assistantMessages)) {
-          setAssistantMessages(assistantMessages);
+          const messagesWithReplies =
+            await fetchAndInsertReplies(assistantMessages);
+          setAssistantMessages(messagesWithReplies);
         }
       } catch (error) {
         console.error("Error fetching initial assistant messages:", error);
@@ -408,6 +508,55 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     parentMessageId?: string,
   ) => {
     await sendMessage(value, true, parentMessageId, false, "reaction");
+  };
+
+  const handlePreferencesSubmit = async (selectedValues: string[]) => {
+    if (!userId) return;
+
+    try {
+      setPreferencesError(null); // Clear any previous errors
+
+      // Create object with all preference keys and true/false based on selection
+      const preferencesObject = preferenceOptions.reduce(
+        (acc, option) => {
+          acc[option.value] = selectedValues.includes(option.value);
+          return acc;
+        },
+        {} as Record<string, boolean>,
+      );
+
+      // Save preferences to API
+      const response = await SendData(
+        `users/user/${userId}/preferences`,
+        preferencesObject,
+        undefined,
+        undefined,
+        "PUT",
+      );
+
+      if ("error" in response) {
+        const errorMsg =
+          response.message?.message ||
+          "Failed to save preferences. Please try again.";
+        setPreferencesError(errorMsg);
+        console.error(`Error setting preferences: ${errorMsg}`);
+        return;
+      }
+
+      // Track preferences submission
+      trackConversationEvent(
+        router.query.conversationId as string,
+        "assistant",
+        "preferences_submitted",
+        selectedValues.join(","),
+      );
+
+      setShowPreferences(false);
+      setPreferencesError(null);
+    } catch (error) {
+      console.error("Error saving preferences:", error);
+      setPreferencesError("Failed to save preferences. Please try again.");
+    }
   };
 
   const handleTabSwitch = (tab: "assistant" | "chat") => {
@@ -530,6 +679,11 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
                   onPromptSelect={handlePromptSelect}
                   enterControlledMode={enterControlledMode}
                   sendFeedbackRating={sendFeedbackRating}
+                  userId={userId}
+                  showPreferences={showPreferences}
+                  preferenceOptions={preferenceOptions}
+                  onPreferencesSubmit={handlePreferencesSubmit}
+                  preferencesError={preferencesError}
                 />
               )
             ) : (

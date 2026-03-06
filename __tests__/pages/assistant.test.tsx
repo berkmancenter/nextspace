@@ -595,4 +595,869 @@ describe("EventAssistantRoom", () => {
       );
     });
   });
+
+  describe("Message Replies", () => {
+    it("fetches and inserts replies for assistant messages with replyCount", async () => {
+      const mockMessages = [
+        {
+          id: "msg-1",
+          body: "Original message",
+          pseudonym: "User",
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T10:00:00Z",
+          replyCount: 2,
+        },
+      ];
+
+      const mockReplies = [
+        {
+          id: "reply-1",
+          body: "First reply",
+          pseudonym: "User",
+          parentMessage: "msg-1",
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T10:01:00Z",
+        },
+        {
+          id: "reply-2",
+          body: "Second reply",
+          pseudonym: "Event Assistant",
+          parentMessage: "msg-1",
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T10:02:00Z",
+        },
+      ];
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (path.includes("/preferences")) {
+          return Promise.resolve({ visualResponse: true });
+        } else if (path.includes("?channel=direct-")) {
+          return Promise.resolve(mockMessages);
+        } else if (path === "messages/msg-1/replies") {
+          return Promise.resolve(mockReplies);
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "messages/test-conversation-id?channel=direct-user-123-agent-123",
+          "mock-access-token",
+        );
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "messages/msg-1/replies",
+          "mock-access-token",
+        );
+      });
+    });
+
+    it("fetches and inserts replies for chat messages with replyCount", async () => {
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,chat-pass",
+      };
+
+      const mockChatMessages = [
+        {
+          id: "chat-msg-1",
+          body: "Chat message with replies",
+          pseudonym: "User1",
+          channels: ["chat"],
+          createdAt: "2024-01-01T10:00:00Z",
+          replyCount: 1,
+        },
+      ];
+
+      const mockChatReplies = [
+        {
+          id: "chat-reply-1",
+          body: "Chat reply",
+          pseudonym: "User2",
+          parentMessage: "chat-msg-1",
+          channels: ["chat"],
+          createdAt: "2024-01-01T10:01:00Z",
+        },
+      ];
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (path.includes("/preferences")) {
+          return Promise.resolve({ visualResponse: true });
+        } else if (path.includes("?channel=chat")) {
+          return Promise.resolve(mockChatMessages);
+        } else if (path === "messages/chat-msg-1/replies") {
+          return Promise.resolve(mockChatReplies);
+        } else if (path.includes("?channel=direct-")) {
+          return Promise.resolve([]);
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "messages/test-conversation-id?channel=chat,chat-pass",
+          "mock-access-token",
+        );
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "messages/chat-msg-1/replies",
+          "mock-access-token",
+        );
+      });
+    });
+
+    it("sorts messages chronologically after inserting replies", async () => {
+      const mockMessages = [
+        {
+          id: "msg-1",
+          body: "First message",
+          pseudonym: "User",
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T10:00:00Z",
+          replyCount: 1,
+        },
+        {
+          id: "msg-2",
+          body: "Third message",
+          pseudonym: "User",
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T10:05:00Z",
+          replyCount: 0,
+        },
+      ];
+
+      const mockReplies = [
+        {
+          id: "reply-1",
+          body: "Second message (reply to first)",
+          pseudonym: "Event Assistant",
+          parentMessage: "msg-1",
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T10:02:00Z",
+        },
+      ];
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (path.includes("/preferences")) {
+          return Promise.resolve({ visualResponse: true });
+        } else if (path.includes("?channel=direct-")) {
+          return Promise.resolve(mockMessages);
+        } else if (path === "messages/msg-1/replies") {
+          return Promise.resolve(mockReplies);
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      // Verify replies are fetched for the message with replyCount
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "messages/msg-1/replies",
+          "mock-access-token",
+        );
+      });
+
+      // Verify the initial messages query was made
+      expect(RetrieveData).toHaveBeenCalledWith(
+        "messages/test-conversation-id?channel=direct-user-123-agent-123",
+        "mock-access-token",
+      );
+    });
+
+    it("handles multiple messages with replies", async () => {
+      const mockMessages = [
+        {
+          id: "msg-1",
+          body: "Message 1",
+          pseudonym: "User",
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T10:00:00Z",
+          replyCount: 2,
+        },
+        {
+          id: "msg-2",
+          body: "Message 2",
+          pseudonym: "User",
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T10:03:00Z",
+          replyCount: 1,
+        },
+      ];
+
+      const mockRepliesMsg1 = [
+        {
+          id: "reply-1",
+          body: "Reply to msg 1",
+          pseudonym: "Event Assistant",
+          parentMessage: "msg-1",
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T10:01:00Z",
+        },
+        {
+          id: "reply-2",
+          body: "Another reply to msg 1",
+          pseudonym: "Event Assistant",
+          parentMessage: "msg-1",
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T10:02:00Z",
+        },
+      ];
+
+      const mockRepliesMsg2 = [
+        {
+          id: "reply-3",
+          body: "Reply to msg 2",
+          pseudonym: "Event Assistant",
+          parentMessage: "msg-2",
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T10:04:00Z",
+        },
+      ];
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (path.includes("/preferences")) {
+          return Promise.resolve({ visualResponse: true });
+        } else if (path.includes("?channel=direct-")) {
+          return Promise.resolve(mockMessages);
+        } else if (path === "messages/msg-1/replies") {
+          return Promise.resolve(mockRepliesMsg1);
+        } else if (path === "messages/msg-2/replies") {
+          return Promise.resolve(mockRepliesMsg2);
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "messages/msg-1/replies",
+          "mock-access-token",
+        );
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "messages/msg-2/replies",
+          "mock-access-token",
+        );
+      });
+    });
+
+    it("handles error when fetching replies gracefully", async () => {
+      const mockMessages = [
+        {
+          id: "msg-1",
+          body: "Message with failing reply fetch",
+          pseudonym: "User",
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T10:00:00Z",
+          replyCount: 1,
+        },
+      ];
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (path.includes("/preferences")) {
+          return Promise.resolve({ visualResponse: true });
+        } else if (path.includes("?channel=direct-")) {
+          return Promise.resolve(mockMessages);
+        } else if (path === "messages/msg-1/replies") {
+          return Promise.reject(new Error("Failed to fetch replies"));
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      // Capture console.error to verify error is logged
+      const consoleErrorSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      // Verify replies endpoint was called
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "messages/msg-1/replies",
+          "mock-access-token",
+        );
+      });
+
+      // Wait a bit for error handling to complete
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+
+      // Verify error was logged
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Error fetching replies for message msg-1:",
+        expect.any(Error),
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it("does not fetch replies when replyCount is 0", async () => {
+      const mockMessages = [
+        {
+          id: "msg-1",
+          body: "Message without replies",
+          pseudonym: "User",
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T10:00:00Z",
+          replyCount: 0,
+        },
+      ];
+
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce({ visualResponse: true }) // User preferences
+        .mockResolvedValueOnce(mockMessages);
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "messages/test-conversation-id?channel=direct-user-123-agent-123",
+          "mock-access-token",
+        );
+      });
+
+      // Should NOT call the replies endpoint
+      expect(RetrieveData).not.toHaveBeenCalledWith(
+        "messages/msg-1/replies",
+        "mock-access-token",
+      );
+    });
+
+    it("does not fetch replies when replyCount is undefined", async () => {
+      const mockMessages = [
+        {
+          id: "msg-1",
+          body: "Message without replyCount field",
+          pseudonym: "User",
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T10:00:00Z",
+          // replyCount is undefined
+        },
+      ];
+
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce({ visualResponse: true }) // User preferences
+        .mockResolvedValueOnce(mockMessages);
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "messages/test-conversation-id?channel=direct-user-123-agent-123",
+          "mock-access-token",
+        );
+      });
+
+      // Should NOT call the replies endpoint
+      expect(RetrieveData).not.toHaveBeenCalledWith(
+        "messages/msg-1/replies",
+        "mock-access-token",
+      );
+    });
+  });
+
+  describe("User Preferences", () => {
+    it("fetches user preferences on page load when userId is available", async () => {
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce([]); // Empty preferences
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "users/user/user-123/preferences",
+          "mock-access-token",
+        );
+      });
+    });
+
+    it("shows preferences banner when user has no preferences", async () => {
+      const user = userEvent.setup();
+
+      // Set up router with chat passcode so tabs are shown
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce([]) // Empty chat messages
+        .mockResolvedValueOnce({}) // Empty preferences object
+        .mockResolvedValueOnce([]); // Empty assistant messages
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+      });
+
+      // Click on the Event Assistant tab to show preferences
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+      });
+    });
+
+    it("hides preferences banner when user has existing preferences", async () => {
+      const user = userEvent.setup();
+
+      // Set up router with chat passcode so tabs are shown
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      // Use mockImplementation to return different values based on the path
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (path.includes("users/user/") && path.includes("/preferences")) {
+          return Promise.resolve({ visualResponse: true }); // Existing preferences
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]); // Empty messages
+        }
+        return Promise.resolve(null);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+      });
+
+      // Click on the Event Assistant tab
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText("Enter your message here")).toBeInTheDocument();
+      });
+
+      // Wait for preferences to be loaded and the banner to be hidden
+      await waitFor(
+        () => {
+          expect(
+            screen.queryByText("Set Your Preferences"),
+          ).not.toBeInTheDocument();
+        },
+        { timeout: 2000 }
+      );
+    });
+
+    it("shows preferences banner when preferences fetch returns error", async () => {
+      const user = userEvent.setup();
+
+      // Set up router with chat passcode so tabs are shown
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce([]) // Empty chat messages
+        .mockResolvedValueOnce({
+          error: true,
+          message: { message: "Failed to fetch preferences" },
+        })
+        .mockResolvedValueOnce([]); // Empty assistant messages
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+      });
+
+      // Click on the Event Assistant tab
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+      });
+    });
+
+    it("successfully saves preferences and hides banner", async () => {
+      const user = userEvent.setup();
+
+      // Set up router with chat passcode so tabs are shown
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce([]) // Empty chat messages
+        .mockResolvedValueOnce({}) // Empty preferences
+        .mockResolvedValueOnce([]); // Empty assistant messages
+
+      (SendData as jest.Mock).mockResolvedValue({ success: true });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+      });
+
+      // Click on the Event Assistant tab
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+      });
+
+      // Select a preference option
+      const checkbox = screen.getByRole("checkbox", {
+        name: /Visual Response/i,
+      });
+      await user.click(checkbox);
+
+      // Click save
+      const saveButton = screen.getByRole("button", {
+        name: /Save Preferences/i,
+      });
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          "users/user/user-123/preferences",
+          { visualResponse: true },
+          undefined,
+          undefined,
+          "PUT",
+        );
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByText("Set Your Preferences"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it("handles preference save errors gracefully", async () => {
+      const user = userEvent.setup();
+
+      // Set up router with chat passcode so tabs are shown
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce([]) // Empty chat messages
+        .mockResolvedValueOnce({}) // Empty preferences
+        .mockResolvedValueOnce([]); // Empty assistant messages
+
+      (SendData as jest.Mock).mockResolvedValue({
+        error: true,
+        message: { message: "Failed to save preferences" },
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+      });
+
+      // Click on the Event Assistant tab
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+      });
+
+      // Select a preference option
+      const checkbox = screen.getByRole("checkbox", {
+        name: /Visual Response/i,
+      });
+      await user.click(checkbox);
+
+      // Click save
+      const saveButton = screen.getByRole("button", {
+        name: /Save Preferences/i,
+      });
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Failed to save preferences")).toBeInTheDocument();
+      });
+
+      // Banner should still be visible
+      expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+    });
+
+    it("saves preferences with correct boolean values for selected and unselected options", async () => {
+      const user = userEvent.setup();
+
+      // Set up router with chat passcode so tabs are shown
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce([]) // Empty chat messages
+        .mockResolvedValueOnce({}) // Empty preferences
+        .mockResolvedValueOnce([]); // Empty assistant messages
+
+      (SendData as jest.Mock).mockResolvedValue({ success: true });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+      });
+
+      // Click on the Event Assistant tab
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+      });
+
+      // Select only visualResponse (not selecting other options if they exist)
+      const checkbox = screen.getByRole("checkbox", {
+        name: /Visual Response/i,
+      });
+      await user.click(checkbox);
+
+      // Click save
+      const saveButton = screen.getByRole("button", {
+        name: /Save Preferences/i,
+      });
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          "users/user/user-123/preferences",
+          { visualResponse: true },
+          undefined,
+          undefined,
+          "PUT",
+        );
+      });
+    });
+
+    it("handles preference save network error", async () => {
+      const user = userEvent.setup();
+
+      // Set up router with chat passcode so tabs are shown
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      (RetrieveData as jest.Mock)
+        .mockResolvedValueOnce({
+          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        })
+        .mockResolvedValueOnce([]) // Empty chat messages
+        .mockResolvedValueOnce({}) // Empty preferences
+        .mockResolvedValueOnce([]); // Empty assistant messages
+
+      (SendData as jest.Mock).mockRejectedValue(new Error("Network error"));
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+      });
+
+      // Click on the Event Assistant tab
+      const assistantTab = screen.getByText("Event Assistant");
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+      });
+
+      // Select a preference option
+      const checkbox = screen.getByRole("checkbox", {
+        name: /Visual Response/i,
+      });
+      await user.click(checkbox);
+
+      // Click save
+      const saveButton = screen.getByRole("button", {
+        name: /Save Preferences/i,
+      });
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Failed to save preferences. Please try again."),
+        ).toBeInTheDocument();
+      });
+    });
+  });
 });
