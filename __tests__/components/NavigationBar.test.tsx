@@ -10,6 +10,7 @@ const baseProps = {
   unseenChatCount: 0,
   showChat: true,
   showTranscript: true,
+  botName: "Berkie",
 };
 
 describe("NavigationBar", () => {

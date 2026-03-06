@@ -48,6 +48,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>("");
   const [chatPasscode, setChatPasscode] = useState<string>("");
   const [eventName, setEventName] = useState<string>("");
+  const [botName, setBotName] = useState<string>("Berkie");
   const [assistantInputValue, setAssistantInputValue] = useState<string>("");
   const [chatInputValue, setChatInputValue] = useState<string>("");
 
@@ -145,6 +146,9 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
 
     async function fetchConversationData() {
       try {
+        const config = await Api.get().GetConfig();
+        setBotName(config.conversationBotName);
+
         const conversationData = await RetrieveData(
           `conversations/${router.query.conversationId}`,
           Api.get().GetTokens().access!,
@@ -450,6 +454,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
             unseenChatCount={unseenChatCount}
             showChat={!!chatPasscode}
             showTranscript={!!transcriptPasscode}
+            botName={botName}
           />
 
           {/* ── Main content area ── */}
@@ -476,6 +481,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
                         messages={chatMessages}
                         pseudonym={pseudonym}
                         eventName={eventName}
+                        botName={botName}
                         inputValue={chatInputValue}
                         onInputChange={setChatInputValue}
                         onSendMessage={sendMessage}
@@ -492,6 +498,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
                         controlledMode={controlledMode}
                         slashCommands={slashCommands}
                         eventName={eventName}
+                        botName={botName}
                         inputValue={assistantInputValue}
                         onInputChange={setAssistantInputValue}
                         onSendMessage={sendMessage}

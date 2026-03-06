@@ -13,7 +13,7 @@ import {
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
-import { normalizeAssistantPseudonym, EVENT_ASSISTANT_NAME } from "../utils/Helpers";
+import { normalizeAssistantPseudonym } from "../utils/Helpers";
 import { BotIcon } from "./BotIcon";
 
 /**
@@ -57,6 +57,7 @@ interface AssistantChatPanelProps {
   controlledMode: ControlledInputConfig | null;
   slashCommands: SlashCommand[];
   eventName?: string;
+  botName: string;
   inputValue?: string;
   onInputChange?: (value: string) => void;
   onSendMessage: (message: string) => void;
@@ -73,6 +74,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   controlledMode,
   slashCommands,
   eventName,
+  botName,
   inputValue,
   onInputChange,
   onSendMessage,
@@ -124,8 +126,8 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
               &nbsp;
             </h2>
             <p className="text-sm text-gray-500 mt-0.5">
-              Ask the {EVENT_ASSISTANT_NAME} any questions about the event — this
-              conversation is private.
+              Ask {botName} any questions about the event — this conversation is
+              private.
             </p>
           </div>
 
@@ -141,7 +143,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                 ? getAssistantAvatarStyle()
                 : getAvatarStyle(message.pseudonym, isCurrentUser);
 
-              const displayName = normalizeAssistantPseudonym(message);
+              const displayName = normalizeAssistantPseudonym(message, botName);
 
               const hasPromptOptions =
                 message.prompt?.options &&
@@ -183,36 +185,36 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                         isCurrentUser ? "flex-row-reverse" : "flex-row"
                       }`}
                     >
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: style.avatarBg }}
-                    >
-                      {isAssistant ? (
-                        <BotIcon size={22} color="#4b5563" />
-                      ) : (
-                        <style.icon fontSize="inherit" />
-                      )}
-                    </div>
-                    <div
-                      className={`flex flex-col ${
-                        isCurrentUser ? "items-end" : "items-start"
-                      } flex-1 min-w-0`}
-                    >
                       <div
-                        className={`text-sm font-bold mb-1 ${
-                          isCurrentUser ? "text-right" : "text-left"
-                        }`}
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: style.avatarBg }}
                       >
-                        {displayName}
-                        {isCurrentUser && (
-                          <span className="text-gray-600 font-normal">
-                            {" "}
-                            (You)
-                          </span>
+                        {isAssistant ? (
+                          <BotIcon size={22} color="#4b5563" />
+                        ) : (
+                          <style.icon fontSize="inherit" />
                         )}
                       </div>
-                      <div style={{ width: "85%" }}>
-                        {messageType === "moderator_submitted" ? (
+                      <div
+                        className={`flex flex-col ${
+                          isCurrentUser ? "items-end" : "items-start"
+                        } flex-1 min-w-0`}
+                      >
+                        <div
+                          className={`text-sm font-bold mb-1 ${
+                            isCurrentUser ? "text-right" : "text-left"
+                          }`}
+                        >
+                          {displayName}
+                          {isCurrentUser && (
+                            <span className="text-gray-600 font-normal">
+                              {" "}
+                              (You)
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ width: "85%" }}>
+                          {messageType === "moderator_submitted" ? (
                             <ModeratorSubmittedMessage
                               message={{
                                 ...message,

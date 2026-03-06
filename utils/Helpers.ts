@@ -38,6 +38,7 @@ export class Api {
     conversationTypes: components["schemas"]["ConversationType"][];
     availablePlatforms: components["schemas"]["PlatformConfig"][];
     supportedModels: components["schemas"]["LlmModelDetails"][];
+    conversationBotName: string;
   } | null = null;
 
   SetTokens(access: string, refresh: string) {
@@ -85,6 +86,7 @@ export class Api {
         conversationTypes: config.conversationTypes,
         availablePlatforms: config.availablePlatforms,
         supportedModels: config.supportedModels,
+        conversationBotName: config.conversationBotName ?? "Berkie",
       };
     }
     return this.configCache;
@@ -223,15 +225,6 @@ export const SendData = async (
 export const DefaultEase = " ease-[cubic-bezier(0.075, 0.820, 0.165, 1.000)]";
 
 /**
- * Centralized display name for the Event Assistant bot.
- * Update this value to rename the bot throughout the app.
- *
- * Note! You could also use the `conversationBotName` property coming from the BE
- * This BE value is used in the event configuration form for the default zoom bot name
- */
-export const EVENT_ASSISTANT_NAME = "Berkie";
-
-/**
  * Returns the conversation type for a particular conversation. Will use the conversationType property if set,
  * othwerwise maps agents to conversation type for legacy conversations (e.g. multiple agents combined into a single type)
  * @param conversation
@@ -256,7 +249,10 @@ async function getTypeForConversation(
   )!;
 }
 
-function generateEventUrls(conversationData: Conversation): EventUrls {
+function generateEventUrls(
+  conversationData: Conversation,
+  botName: string,
+): EventUrls {
   const urlPrefix = `${window.location.protocol}//${window.location.host}`;
   const moderator: EventUrl[] = [];
   const participant: EventUrl[] = [];
@@ -311,7 +307,7 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
     }
   } else if (convType && convType.name === "eventAssistant") {
     const eventAssistantUrl = {
-      label: EVENT_ASSISTANT_NAME,
+      label: botName,
       url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
         hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
       }${hasChat ? `&channel=chat,${chatPasscode}` : ""}`,
@@ -324,8 +320,8 @@ function generateEventUrls(conversationData: Conversation): EventUrls {
   ) {
     const label =
       convType.name === "eventAssistantPlus"
-        ? `${EVENT_ASSISTANT_NAME} Plus`
-        : `${EVENT_ASSISTANT_NAME} Plus Proactive`;
+        ? `${botName} Plus`
+        : `${botName} Plus Proactive`;
     const eventAssistantPlusUrl = {
       label,
       url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
@@ -365,13 +361,17 @@ export const getConversation = async (
 export const createConversationFromData = async (
   data: components["schemas"]["Conversation"],
 ): Promise<Conversation> => {
-  const { conversationTypes, availablePlatforms } = await Api.get().GetConfig();
+  const { conversationTypes, availablePlatforms, conversationBotName } =
+    await Api.get().GetConfig();
 
   const type = await getTypeForConversation(data, conversationTypes);
-  const eventUrls = generateEventUrls({
-    ...data,
-    type,
-  } as Conversation);
+  const eventUrls = generateEventUrls(
+    {
+      ...data,
+      type,
+    } as Conversation,
+    conversationBotName,
+  );
 
   return {
     ...data,
@@ -398,13 +398,15 @@ export const CheckAuthHeader = (headers: Record<string, string>) => {
 };
 
 /**
- * Normalizes Event Assistant variant pseudonyms to EVENT_ASSISTANT_NAME
- * @param message- The message from the pseudonym to normalize
- * @returns EVENT_ASSISTANT_NAME if the pseudonym is a variant, otherwise the original pseudonym
+ * Normalizes Event Assistant variant pseudonyms to the configured bot name.
+ * @param message - The message from the pseudonym to normalize
+ * @param botName - The display name for the bot, from `conversationBotName` in config
+ * @returns botName if the message is from an agent, otherwise the original pseudonym
  */
 export const normalizeAssistantPseudonym = (
   message: PseudonymousMessage,
+  botName: string,
 ): string => {
   if (!message || !message.pseudonym) return "";
-  return message.fromAgent ? EVENT_ASSISTANT_NAME : message.pseudonym;
+  return message.fromAgent ? botName : message.pseudonym;
 };

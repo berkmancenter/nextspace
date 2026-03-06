@@ -114,6 +114,7 @@ interface GroupChatPanelProps {
   messages: PseudonymousMessage[];
   pseudonym: string | null;
   eventName?: string;
+  botName?: string;
   inputValue?: string;
   onInputChange?: (value: string) => void;
   onSendMessage: (message: string) => void;
@@ -127,6 +128,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   messages,
   pseudonym,
   eventName,
+  botName = "Berkie",
   inputValue,
   onInputChange,
   onSendMessage,
@@ -143,7 +145,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     () =>
       Array.from(
         new Set(
-          messages.map((m) => normalizeAssistantPseudonym(m)).filter(Boolean),
+          messages.map((m) => normalizeAssistantPseudonym(m, botName)).filter(Boolean),
         ),
       ),
     [messages],
@@ -217,8 +219,8 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                 ? getAssistantAvatarStyle()
                 : getAvatarStyle(message.pseudonym || "", isCurrentUser);
 
-              // Normalize Plus versions to base names
-              const displayName = normalizeAssistantPseudonym(message);
+              // Normalize Plus versions to bot name
+              const displayName = normalizeAssistantPseudonym(message, botName);
 
               return (
                 <div key={`msg-${i}`} className="w-full">

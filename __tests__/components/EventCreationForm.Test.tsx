@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { EventCreationForm } from "../../components/EventCreationForm";
 import { RetrieveData, Request } from "../../utils";
-import { Api, EVENT_ASSISTANT_NAME } from "../../utils/Helpers";
+import { Api } from "../../utils/Helpers";
 import "@testing-library/jest-dom";
 
 // Mock next/router
@@ -138,7 +138,7 @@ const mockConfig = {
           name: "botName",
           type: "string",
           label: "Zoom Bot Name",
-          default: EVENT_ASSISTANT_NAME,
+          default: "Berkie",
           required: false,
         },
         {

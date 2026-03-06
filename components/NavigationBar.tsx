@@ -6,8 +6,6 @@ import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import GroupIcon from "@mui/icons-material/Group";
 import { BotIcon } from "./BotIcon";
 import { TranscriptIcon } from "./TranscriptIcon";
-import { EVENT_ASSISTANT_NAME } from "../utils/Helpers";
-
 export type NavTab = "assistant" | "chat" | "transcript";
 
 interface NavItem {
@@ -25,6 +23,7 @@ interface NavigationBarProps {
   unseenChatCount: number;
   showChat: boolean;
   showTranscript: boolean;
+  botName: string;
 }
 
 /**
@@ -44,12 +43,13 @@ export function NavigationBar({
   unseenChatCount,
   showChat,
   showTranscript,
+  botName,
 }: NavigationBarProps) {
   const navItems: NavItem[] = (
     [
       {
         id: "assistant" as NavTab,
-        label: EVENT_ASSISTANT_NAME,
+        label: botName,
         ActiveIcon: null,
         InactiveIcon: null,
         show: true,
