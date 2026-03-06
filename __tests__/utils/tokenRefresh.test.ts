@@ -25,6 +25,7 @@ describe("tokenRefresh utilities", () => {
     // Setup mock Api instance
     mockApi = {
       GetTokens: jest.fn(),
+      getAccessToken: jest.fn(() => mockApi.GetTokens()?.access ?? ""),
       SetTokens: jest.fn(),
     };
     (Api.get as jest.Mock).mockReturnValue(mockApi);

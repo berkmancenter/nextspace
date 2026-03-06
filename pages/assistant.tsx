@@ -150,7 +150,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
   }, [pseudonym]);
 
   useEffect(() => {
-    if (!Api.get().GetTokens().access || !router.isReady) return;
+    if (!Api.get().getAccessToken() || !router.isReady) return;
     if (!router.query.conversationId) {
       setLocalError("Please provide a Conversation ID.");
       return;
@@ -160,7 +160,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       try {
         const conversationData = await RetrieveData(
           `conversations/${router.query.conversationId}`,
-          Api.get().GetTokens().access!,
+          Api.get().getAccessToken(),
         );
 
         if (!conversationData) {
@@ -259,7 +259,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
         "conversation:join",
         {
           conversationId: router.query.conversationId,
-          token: Api.get().GetTokens().access,
+          token: Api.get().getAccessToken(),
           channels,
         },
         () => console.log("Successfully joined conversation"),
@@ -296,7 +296,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       try {
         const replies = await RetrieveData(
           `messages/${msg.id}/replies`,
-          Api.get().GetTokens().access!,
+          Api.get().getAccessToken(),
         );
         if ("error" in replies) {
           console.error(
@@ -332,7 +332,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       try {
         const chatMessages = await RetrieveData(
           `messages/${router.query.conversationId}?channel=chat,${chatPasscode}`,
-          Api.get().GetTokens().access!,
+          Api.get().getAccessToken(),
         );
 
         if (Array.isArray(chatMessages)) {
@@ -355,7 +355,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       try {
         const preferences = await RetrieveData(
           `users/user/${userId}/preferences`,
-          Api.get().GetTokens().access!,
+          Api.get().getAccessToken(),
         );
 
         if ("error" in preferences) {
@@ -395,7 +395,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
         const directChannelName = `direct-${userId}-${agentId}`;
         const assistantMessages = await RetrieveData(
           `messages/${router.query.conversationId}?channel=${directChannelName}`,
-          Api.get().GetTokens().access!,
+          Api.get().getAccessToken(),
         );
 
         if (Array.isArray(assistantMessages)) {
@@ -422,7 +422,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     if (chatPasscode) {
       RetrieveData(
         `messages/${router.query.conversationId}?channel=chat,${chatPasscode}`,
-        Api.get().GetTokens().access!,
+        Api.get().getAccessToken(),
       )
         .then((msgs) => {
           if (Array.isArray(msgs)) setChatMessages(msgs);
@@ -436,7 +436,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       const directChannelName = `direct-${userId}-${agentId}`;
       RetrieveData(
         `messages/${router.query.conversationId}?channel=${directChannelName}`,
-        Api.get().GetTokens().access!,
+        Api.get().getAccessToken(),
       )
         .then((msgs) => {
           if (Array.isArray(msgs)) setAssistantMessages(msgs);
@@ -637,7 +637,6 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
                 socket={socket}
                 conversationId={router.query.conversationId as string}
                 transcriptPasscode={transcriptPasscode}
-                apiAccessToken={Api.get().GetTokens().access!}
                 lastReconnectTime={lastReconnectTime}
               />
             </div>

@@ -58,10 +58,8 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
   // Combine session and local errors
   const errorMessage = sessionError || localError;
 
-  const apiAccessToken = Api.get().GetTokens().access;
-
   useEffect(() => {
-    if (!router.isReady || !socket || !apiAccessToken) return;
+    if (!router.isReady || !socket || !Api.get().getAccessToken()) return;
 
     const messageHandler = (data: PseudonymousMessage) => {
       console.log("New message:", data);
@@ -78,7 +76,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
     socket.on("message:new", messageHandler);
 
     async function fetchConversationData() {
-      if (!router.isReady || !apiAccessToken) return;
+      if (!router.isReady || !Api.get().getAccessToken()) return;
       if (
         !router.query.conversationId ||
         !router.query.channel ||
@@ -115,7 +113,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
       // Fetch conversation details
       const conversationResponse: any = await RetrieveData(
         `conversations/${router.query.conversationId}`,
-        apiAccessToken,
+        Api.get().getAccessToken(),
       );
 
       if (conversationResponse && !("error" in conversationResponse)) {
@@ -126,7 +124,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
       const conversationMessagesResponse: PseudonymousMessage[] | ErrorMessage =
         await RetrieveData(
           `messages/${router.query.conversationId}${moderatorChannelsQuery}`,
-          apiAccessToken,
+          Api.get().getAccessToken(),
         );
 
       if (
@@ -159,7 +157,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
     return () => {
       socket?.off("message:new", messageHandler);
     };
-  }, [router, socket, apiAccessToken]);
+  }, [router, socket]);
 
   // Re-fetch moderator message history when the socket reconnects after a
   // significant gap (user was on another tab/app for a while).
@@ -170,7 +168,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
     console.log("Moderator re-fetching message history after gap-reconnect...");
     RetrieveData(
       `messages/${router.query.conversationId}?channel=moderator,${modPasscode}`,
-      apiAccessToken!,
+      Api.get().getAccessToken(),
     )
       .then((msgs) => {
         if (Array.isArray(msgs)) {
@@ -202,7 +200,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
         "conversation:join",
         {
           conversationId: router.query.conversationId,
-          token: Api.get().GetTokens().access,
+          token: Api.get().getAccessToken(),
           channel: { name: "moderator", passcode: modPasscode },
         },
         () => console.log("Successfully joined moderator conversation"),
@@ -288,7 +286,6 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
                 socket={socket}
                 conversationId={router.query.conversationId as string}
                 transcriptPasscode={transcriptPasscode}
-                apiAccessToken={apiAccessToken!}
                 showControls={true}
                 lastReconnectTime={lastReconnectTime}
               />

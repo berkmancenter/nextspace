@@ -26,7 +26,6 @@ export function Transcript(props: {
   socket: Socket | null;
   conversationId: string;
   transcriptPasscode?: string;
-  apiAccessToken: string;
   category?: string;
   showControls?: boolean;
   /**
@@ -215,7 +214,7 @@ export function Transcript(props: {
       const response = await SendData(
         `transcript/${props.conversationId}/pause`,
         {},
-        props.apiAccessToken,
+        Api.get().getAccessToken(),
       );
       if (response && response.error) {
         setError(response.message || "Failed to pause transcript");
@@ -234,7 +233,7 @@ export function Transcript(props: {
       const response = await SendData(
         `transcript/${props.conversationId}/resume`,
         {},
-        props.apiAccessToken,
+        Api.get().getAccessToken(),
       );
       if (response && response.error) {
         setError(response.message || "Failed to resume transcript");
@@ -253,7 +252,7 @@ export function Transcript(props: {
       const response = await SendData(
         `transcript/${props.conversationId}`,
         {},
-        props.apiAccessToken,
+        Api.get().getAccessToken(),
         { method: "DELETE" },
       );
       if (response && response.error) {
@@ -272,7 +271,7 @@ export function Transcript(props: {
       // Fetch the formatted transcript text
       const textContent = await RetrieveData(
         `transcript/${props.conversationId}`,
-        props.apiAccessToken,
+        Api.get().getAccessToken(),
         "text",
       );
 
@@ -351,7 +350,7 @@ export function Transcript(props: {
   const fetchTranscriptData = async () => {
     if (
       !props.conversationId ||
-      !props.apiAccessToken ||
+      !Api.get().getAccessToken() ||
       !props.transcriptPasscode
     )
       return;
@@ -359,7 +358,7 @@ export function Transcript(props: {
     try {
       const conversationResponse: any = await RetrieveData(
         `conversations/${props.conversationId}`,
-        props.apiAccessToken,
+        Api.get().getAccessToken(),
       );
 
       if (conversationResponse && !("error" in conversationResponse)) {
@@ -370,7 +369,7 @@ export function Transcript(props: {
 
       const transcriptMessages = await RetrieveData(
         `messages/${props.conversationId}?channel=transcript,${props.transcriptPasscode}`,
-        props.apiAccessToken,
+        Api.get().getAccessToken(),
       );
 
       if (Array.isArray(transcriptMessages)) {
@@ -394,7 +393,7 @@ export function Transcript(props: {
   useEffect(() => {
     if (
       !props.conversationId ||
-      !props.apiAccessToken ||
+      !Api.get().getAccessToken() ||
       !props.transcriptPasscode
     )
       return;
@@ -412,7 +411,7 @@ export function Transcript(props: {
     };
 
     fetchInitialData();
-  }, [props.conversationId, props.apiAccessToken, props.transcriptPasscode]);
+  }, [props.conversationId,  props.transcriptPasscode]);
 
   // Re-fetch message history when the socket reconnects after a significant gap
   // to fill any messages that arrived while the client was disconnected.
@@ -464,7 +463,7 @@ export function Transcript(props: {
 
   // Subscribe to transcript channel
   useEffect(() => {
-    if (!props.socket || !props.conversationId || !props.apiAccessToken) return;
+    if (!props.socket || !props.conversationId || !Api.get().getAccessToken()) return;
 
     const channel = {
       name: "transcript",
@@ -476,7 +475,7 @@ export function Transcript(props: {
         // Always use the freshest available token so re-joins after token
         // refresh succeed rather than failing with an expired token.
         const freshToken =
-          Api.get().GetTokens().access || props.apiAccessToken;
+          Api.get().getAccessToken();
         props.socket!.emit("channel:join", {
           conversationId: props.conversationId,
           token: freshToken,
@@ -563,7 +562,6 @@ export function Transcript(props: {
   }, [
     props.socket,
     props.conversationId,
-    props.apiAccessToken,
     props.transcriptPasscode,
   ]);
 

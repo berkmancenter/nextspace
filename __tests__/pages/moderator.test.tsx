@@ -23,6 +23,7 @@ jest.mock("../../utils", () => ({
     get: jest.fn().mockReturnValue({
       SetTokens: jest.fn(),
       GetTokens: jest.fn().mockReturnValue({ access: "mock-token" }),
+      getAccessToken: jest.fn().mockReturnValue("mock-token"),
     }),
   },
   GetChannelPasscode: jest.fn().mockReturnValue("mock-passcode"),
@@ -205,6 +206,93 @@ describe("ModeratorScreen", () => {
         token: "mock-token",
         channel: { name: "moderator", passcode: "mock-passcode" },
       });
+    });
+  });
+
+  it("uses the current token from Api singleton for RetrieveData, not a stale captured value", async () => {
+    // Simulate token rotation: the singleton returns a new token after the
+    // component has already mounted. The page must read the singleton on every
+    // call rather than capturing the value at render time.
+    const mockGetTokens = jest.fn()
+      .mockReturnValueOnce({ access: "initial-token" }) // first read (useEffect guard)
+      .mockReturnValue({ access: "rotated-token" });    // all subsequent reads
+
+    const { Api: MockApi } = require("../../utils");
+    MockApi.get.mockReturnValue({
+      SetTokens: jest.fn(),
+      GetTokens: mockGetTokens,
+      getAccessToken: jest.fn(() => mockGetTokens()?.access ?? ""),
+    });
+
+    await act(async () => {
+      render(<ModeratorScreen authType={"user"} />);
+    });
+
+    await waitFor(() => {
+      // RetrieveData should be called with the current token from the singleton
+      // at call time, not a value frozen at render time.
+      const retrieveDataCalls = (RetrieveData as jest.Mock).mock.calls;
+      expect(retrieveDataCalls.length).toBeGreaterThan(0);
+      // Every RetrieveData call should use whatever the singleton returns at
+      // that moment — if the token was captured at render the old value
+      // ("initial-token") would appear here instead.
+      retrieveDataCalls.forEach(([_url, token]) => {
+        expect(token).not.toBe("initial-token");
+        expect(token).toBe("rotated-token");
+      });
+    });
+  });
+
+  it("uses fresh token from Api singleton when re-fetching after gap-reconnect", async () => {
+    const mockGetTokens = jest.fn().mockReturnValue({ access: "fresh-token-after-reconnect" });
+    const { Api: MockApi } = require("../../utils");
+    MockApi.get.mockReturnValue({
+      SetTokens: jest.fn(),
+      GetTokens: mockGetTokens,
+      getAccessToken: jest.fn(() => mockGetTokens()?.access ?? ""),
+    });
+
+    // Expose lastReconnectTime as a controllable value
+    let triggerReconnect: (time: number) => void;
+    const lastReconnectTimeRef = { current: null as number | null };
+
+    mockUseSessionJoin.mockImplementation(() => ({
+      socket: mockSocket,
+      pseudonym: "ModeratorUser",
+      userId: "moderator-123",
+      isConnected: true,
+      errorMessage: null,
+      lastReconnectTime: lastReconnectTimeRef.current,
+    }));
+
+    const { rerender } = await act(async () =>
+      render(<ModeratorScreen authType={"user"} />)
+    );
+
+    // Simulate a gap-reconnect by re-rendering with a non-null lastReconnectTime
+    lastReconnectTimeRef.current = Date.now();
+    mockUseSessionJoin.mockReturnValue({
+      socket: mockSocket,
+      pseudonym: "ModeratorUser",
+      userId: "moderator-123",
+      isConnected: true,
+      errorMessage: null,
+      lastReconnectTime: lastReconnectTimeRef.current,
+    });
+
+    await act(async () => {
+      rerender(<ModeratorScreen authType={"user"} />);
+    });
+
+    await waitFor(() => {
+      const retrieveDataCalls = (RetrieveData as jest.Mock).mock.calls;
+      // At least one call should be the gap-reconnect re-fetch for moderator messages
+      const reconnectFetch = retrieveDataCalls.find(([url]) =>
+        url.includes("messages/test-conversation") && url.includes("moderator")
+      );
+      expect(reconnectFetch).toBeDefined();
+      // It must use the current token from the singleton, not a stale string
+      expect(reconnectFetch![1]).toBe("fresh-token-after-reconnect");
     });
   });
 });

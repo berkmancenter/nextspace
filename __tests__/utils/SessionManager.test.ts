@@ -5,6 +5,7 @@ import { Api } from "../../utils/Helpers";
 const mockApiInstance = {
   SetTokens: jest.fn(),
   GetTokens: jest.fn(() => ({ access: null, refresh: null })),
+  getAccessToken: jest.fn(() => ""),
   ClearTokens: jest.fn(),
   ClearAdminTokens: jest.fn(),
 };

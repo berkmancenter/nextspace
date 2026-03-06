@@ -185,7 +185,7 @@ export async function emitWithTokenRefresh(
       
       if (refreshed) {
         // Retry with new token
-        const newToken = Api.get().GetTokens().access;
+        const newToken = Api.get().getAccessToken();
         if ('token' in dataWithFreshToken) {
           dataWithFreshToken.token = newToken;
         }

@@ -27,6 +27,7 @@ jest.mock("../../utils/Helpers", () => ({
   Api: {
     get: jest.fn(() => ({
       GetTokens: jest.fn(() => ({ access: "mock-token", refresh: "mock-refresh" })),
+      getAccessToken: jest.fn(() => "mock-token"),
     })),
   },
 }));
@@ -74,6 +75,7 @@ describe("useSessionJoin", () => {
     mockGetTokens = jest.fn(() => ({ access: "mock-token", refresh: "mock-refresh" }));
     mockApi.get.mockReturnValue({
       GetTokens: mockGetTokens,
+      getAccessToken: jest.fn(() => mockGetTokens()?.access ?? ""),
     } as any);
 
     // Default: refreshAccessToken resolves to false (no-op)

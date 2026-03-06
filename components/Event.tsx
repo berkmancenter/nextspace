@@ -17,7 +17,7 @@ export const Event: React.FC<EventProps> = ({ experiment }) => {
     <div className="w-2/3">
       {experiment ? (
         <ExperimentCreationForm
-          token={Api.get().GetTokens().access as string}
+          token={Api.get().getAccessToken() as string}
         />
       ) : (
         <EventCreationForm />

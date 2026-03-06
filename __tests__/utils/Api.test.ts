@@ -12,6 +12,7 @@ const mockApiInstance = {
     access: "mock-access",
     refresh: "mock-refresh",
   })),
+  getAccessToken: jest.fn(() => mockApiInstance.GetTokens().access ?? ""),
   ClearTokens: jest.fn(),
   ClearAdminTokens: jest.fn(),
 };

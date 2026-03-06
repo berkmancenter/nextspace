@@ -10,11 +10,11 @@ import {
 jest.mock("../../utils", () => ({
   RetrieveData: jest.fn(),
   SendData: jest.fn(),
-  // Api is used by Transcript to get a fresh token for channel:join emits.
-  // Return a token matching baseProps.apiAccessToken so existing assertions hold.
+  // Api is used by Transcript to get a fresh token for all API calls and socket emits.
   Api: {
     get: jest.fn(() => ({
       GetTokens: jest.fn(() => ({ access: "token", refresh: "mock-refresh" })),
+      getAccessToken: jest.fn(() => "token"),
     })),
   },
 }));
@@ -55,7 +55,6 @@ describe("Transcript", () => {
     socket: mockSocket as any,
     conversationId: "conversation-1",
     transcriptPasscode: "passcode",
-    apiAccessToken: "token",
   };
 
   const transcriptMessages = [
@@ -434,7 +433,7 @@ describe("Transcript", () => {
     // Verify subscription was initiated
     expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {
       conversationId: baseProps.conversationId,
-      token: baseProps.apiAccessToken,
+      token: "token",
       channel: {
         name: "transcript",
         passcode: baseProps.transcriptPasscode,
@@ -467,7 +466,7 @@ describe("Transcript", () => {
     // Should emit channel:join
     expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {
       conversationId: baseProps.conversationId,
-      token: baseProps.apiAccessToken,
+      token: "token",
       channel: {
         name: "transcript",
         passcode: baseProps.transcriptPasscode,
@@ -493,7 +492,7 @@ describe("Transcript", () => {
     // Verify first socket emitted channel:join
     expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {
       conversationId: baseProps.conversationId,
-      token: baseProps.apiAccessToken,
+      token: "token",
       channel: {
         name: "transcript",
         passcode: baseProps.transcriptPasscode,
@@ -522,7 +521,7 @@ describe("Transcript", () => {
     // New socket should emit channel:join
     expect(newMockSocket.emit).toHaveBeenCalledWith("channel:join", {
       conversationId: baseProps.conversationId,
-      token: baseProps.apiAccessToken,
+      token: "token",
       channel: {
         name: "transcript",
         passcode: baseProps.transcriptPasscode,
@@ -840,7 +839,7 @@ describe("Transcript", () => {
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
           `transcript/${baseProps.conversationId}`,
-          baseProps.apiAccessToken,
+          "token",
           "text",
         );
         expect(mockCreateObjectURL).toHaveBeenCalled();
@@ -992,7 +991,7 @@ describe("Transcript", () => {
         expect(SendData).toHaveBeenCalledWith(
           `transcript/${baseProps.conversationId}/pause`,
           {},
-          baseProps.apiAccessToken,
+          "token",
         );
       });
     });
@@ -1032,7 +1031,7 @@ describe("Transcript", () => {
         expect(SendData).toHaveBeenCalledWith(
           `transcript/${baseProps.conversationId}/resume`,
           {},
-          baseProps.apiAccessToken,
+          "token",
         );
       });
     });
@@ -1072,7 +1071,7 @@ describe("Transcript", () => {
         expect(SendData).toHaveBeenCalledWith(
           `transcript/${baseProps.conversationId}`,
           {},
-          baseProps.apiAccessToken,
+          "token",
           { method: "DELETE" },
         );
       });

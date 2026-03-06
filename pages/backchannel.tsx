@@ -108,7 +108,7 @@ function BackchannelRoom({ authType }: { authType: AuthType }) {
         "conversation:join",
         {
           conversationId: router.query.conversationId,
-          token: Api.get().GetTokens().access,
+          token: Api.get().getAccessToken(),
           threadId: router.query.threadId,
         },
         () => console.log("Successfully joined backchannel conversation"),

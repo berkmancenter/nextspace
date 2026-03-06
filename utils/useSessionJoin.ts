@@ -148,7 +148,7 @@ export function useSessionJoin(
         console.log("Socket auth error detected, refreshing token...");
         const refreshed = await refreshAccessToken();
         if (refreshed) {
-          const newToken = Api.get().GetTokens().access;
+          const newToken = Api.get().getAccessToken();
           if (newToken) {
             // Update socket.auth so the next automatic reconnection attempt
             // uses the refreshed token
@@ -190,7 +190,7 @@ export function useSessionJoin(
     const refreshSocketToken = async () => {
       const refreshed = await refreshAccessToken();
       if (refreshed) {
-        const newToken = Api.get().GetTokens().access;
+        const newToken = Api.get().getAccessToken();
         if (newToken) {
           // Always update socket.auth with the latest token
           (socket as any).auth = { token: newToken };
