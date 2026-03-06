@@ -4,7 +4,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { MessageInput } from "./MessageInput";
 import { MessageFeedback } from "./MessageFeedback";
-import { PseudonymousMessage, ControlledInputConfig } from "../types.internal";
+import { PseudonymousMessage, ControlledInputConfig, MediaItem } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { BotIcon } from "./BotIcon";
@@ -17,11 +17,13 @@ import { MENTION_DISPLAY_REGEX } from "../utils/mentionRegex";
  * @property {string} text - The actual text content of the message
  * @property {string} [type] - Optional type for styling (e.g., "moderator_submitted")
  * @property {string} [message] - Optional message ID reference
+ * @property {MediaItem[]} [media] - Optional array of media items (images, audio, video)
  */
 interface ParsedMessageBody {
   text: string;
   type?: string;
   message?: string;
+  media?: MediaItem[];
 }
 
 /**
@@ -37,6 +39,7 @@ const parseMessageBody = (body: string | object): ParsedMessageBody => {
       text: obj.text?.toString() || "",
       type: obj.type?.toString(),
       message: obj.message?.toString(),
+      media: Array.isArray(obj.media) ? obj.media : undefined,
     };
   }
 
@@ -307,6 +310,31 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                         {isAssistant
                           ? renderAssistantMessage(parsed.text)
                           : renderMessageWithMentions(parsed.text, contributors)}
+
+                        {/* Render media items */}
+                        {parsed.media && parsed.media.length > 0 && (
+                          <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                            {parsed.media.map((item, index) => {
+                              if (item.type === 'image') {
+                                return (
+                                  <img
+                                    key={`media-${index}`}
+                                    src={`data:${item.mimeType};base64,${item.data}`}
+                                    alt="Visual response"
+                                    style={{
+                                      maxWidth: "100%",
+                                      height: "auto",
+                                      borderRadius: "8px",
+                                      border: "1px solid rgba(0, 0, 0, 0.1)",
+                                    }}
+                                  />
+                                );
+                              }
+                              // Future: handle audio, video types here
+                              return null;
+                            })}
+                          </div>
+                        )}
                       </div>
 
                       {/* Feedback - rendered below the bubble for Event Assistant messages */}

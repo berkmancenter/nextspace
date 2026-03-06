@@ -4,6 +4,14 @@ import {
   BaseMessage,
   MessageContent,
 } from "../../../components/messages/BaseMessage";
+import { MarkmapView } from "../../../components/MarkmapView";
+
+// Mock MarkmapView component
+jest.mock("../../../components/MarkmapView", () => ({
+  MarkmapView: jest.fn(({ markdown }: { markdown: string }) => (
+    <div data-testid="markmap-view">{markdown}</div>
+  )),
+}));
 
 describe("BaseMessage Component", () => {
   it("renders children with default classes", () => {
@@ -90,5 +98,133 @@ describe("MessageContent Component", () => {
     const { container } = render(<MessageContent text="Some text" />);
 
     expect(container.querySelector(".markdown-content")).toBeInTheDocument();
+  });
+
+  describe("Markmap code blocks", () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it("renders MarkmapView for code blocks with language markmap", () => {
+      const markmapText = "Text with ```markmap\n# Root\n## Child\n```";
+      render(<MessageContent text={markmapText} />);
+
+      expect(screen.getByTestId("markmap-view")).toBeInTheDocument();
+      expect(MarkmapView).toHaveBeenCalled();
+    });
+
+    it("renders MarkmapView for code blocks with markmap frontmatter", () => {
+      const frontmatterText =
+        "```\n---\nmarkmap: true\n---\n# Root\n## Child\n```";
+      render(<MessageContent text={frontmatterText} />);
+
+      expect(screen.getByTestId("markmap-view")).toBeInTheDocument();
+      expect(MarkmapView).toHaveBeenCalled();
+    });
+
+    it("renders MarkmapView with frontmatter containing other fields", () => {
+      const complexFrontmatter =
+        "```\n---\ntitle: My Map\nmarkmap: enabled\nother: field\n---\n# Content\n```";
+      render(<MessageContent text={complexFrontmatter} />);
+
+      expect(screen.getByTestId("markmap-view")).toBeInTheDocument();
+      expect(MarkmapView).toHaveBeenCalled();
+    });
+
+    it("does not render MarkmapView for regular code blocks", () => {
+      const regularCode = "```javascript\nconst x = 1;\n```";
+      render(<MessageContent text={regularCode} />);
+
+      expect(screen.queryByTestId("markmap-view")).not.toBeInTheDocument();
+      expect(MarkmapView).not.toHaveBeenCalled();
+    });
+
+    it("does not render MarkmapView for code blocks without markmap language or frontmatter", () => {
+      const pythonCode = "```python\nprint('hello')\n```";
+      render(<MessageContent text={pythonCode} />);
+
+      expect(screen.queryByTestId("markmap-view")).not.toBeInTheDocument();
+      expect(MarkmapView).not.toHaveBeenCalled();
+    });
+
+    it("passes the correct markdown content to MarkmapView with language", () => {
+      const markmapContent = "# Root\n## Child 1\n## Child 2";
+      const markmapText = `\`\`\`markmap\n${markmapContent}\n\`\`\``;
+      render(<MessageContent text={markmapText} />);
+
+      // Check that MarkmapView was called with content (may have trailing newline)
+      expect(MarkmapView).toHaveBeenCalled();
+      const callArgs = (MarkmapView as unknown as jest.Mock).mock.calls[0][0];
+      expect(callArgs.markdown.trim()).toBe(markmapContent);
+    });
+
+    it("passes the full content including frontmatter to MarkmapView", () => {
+      const fullContent = "---\nmarkmap: true\n---\n# Root\n## Child";
+      const markmapText = `\`\`\`\n${fullContent}\n\`\`\``;
+      render(<MessageContent text={markmapText} />);
+
+      // Check that MarkmapView was called with content (may have trailing newline)
+      expect(MarkmapView).toHaveBeenCalled();
+      const callArgs = (MarkmapView as unknown as jest.Mock).mock.calls[0][0];
+      expect(callArgs.markdown.trim()).toBe(fullContent);
+    });
+
+    it("handles multiple code blocks with mixed types", () => {
+      const mixedText = `
+Regular text
+\`\`\`javascript
+const x = 1;
+\`\`\`
+
+More text
+
+\`\`\`markmap
+# Markmap
+## Section
+\`\`\`
+
+End text
+`;
+      render(<MessageContent text={mixedText} />);
+
+      // Should render MarkmapView for the markmap block
+      expect(screen.getByTestId("markmap-view")).toBeInTheDocument();
+      expect(MarkmapView).toHaveBeenCalledTimes(1);
+    });
+
+    it("renders MarkmapView for each markmap code block in multiple markmap blocks", () => {
+      const multipleMarkmaps = `
+\`\`\`markmap
+# First Map
+\`\`\`
+
+\`\`\`markmap
+# Second Map
+\`\`\`
+`;
+      render(<MessageContent text={multipleMarkmaps} />);
+
+      // Should render MarkmapView twice
+      expect(screen.getAllByTestId("markmap-view")).toHaveLength(2);
+      expect(MarkmapView).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not render MarkmapView for inline code", () => {
+      const inlineCode = "This is `inline code` not a block";
+      render(<MessageContent text={inlineCode} />);
+
+      expect(screen.queryByTestId("markmap-view")).not.toBeInTheDocument();
+      expect(MarkmapView).not.toHaveBeenCalled();
+    });
+
+    it("handles empty markmap code blocks", () => {
+      const emptyMarkmap = "```markmap\n\n```";
+      render(<MessageContent text={emptyMarkmap} />);
+
+      expect(screen.getByTestId("markmap-view")).toBeInTheDocument();
+      expect(MarkmapView).toHaveBeenCalled();
+      const callArgs = (MarkmapView as unknown as jest.Mock).mock.calls[0][0];
+      expect(callArgs.markdown.trim()).toBe("");
+    });
   });
 });

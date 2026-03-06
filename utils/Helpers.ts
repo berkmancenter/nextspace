@@ -156,7 +156,7 @@ export const GetChannelPasscode = (
 };
 
 /**
- * Sends a POST request to the API
+ * Sends data to the API
  * @param urlSuffix - The endpoint suffix to send data to.
  * @param payload - The data payload to send in the request body.
  * @param accessToken - Optional access token to use for authorization.
@@ -168,11 +168,12 @@ export const SendData = async (
   payload: any,
   accessToken?: string,
   fetchOptions?: RequestInit,
+  method: string = "POST",
 ) => {
   const API_TOKENS = Api.get().GetTokens();
 
   let options: RequestInit = fetchOptions || {
-    method: "POST",
+    method,
     headers: {
       "Content-Type": "application/json",
     },
