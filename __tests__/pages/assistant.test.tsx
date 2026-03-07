@@ -58,6 +58,7 @@ jest.mock("../../utils", () => ({
   Api: {
     get: jest.fn(() => ({
       GetTokens: jest.fn(() => ({ access: "mock-access-token" })),
+      getAccessToken: jest.fn(() => "mock-access-token"),
     })),
   },
   RetrieveData: jest.fn(),

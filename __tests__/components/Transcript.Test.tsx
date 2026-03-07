@@ -10,6 +10,13 @@ import {
 jest.mock("../../utils", () => ({
   RetrieveData: jest.fn(),
   SendData: jest.fn(),
+  // Api is used by Transcript to get a fresh token for all API calls and socket emits.
+  Api: {
+    get: jest.fn(() => ({
+      GetTokens: jest.fn(() => ({ access: "token", refresh: "mock-refresh" })),
+      getAccessToken: jest.fn(() => "token"),
+    })),
+  },
 }));
 
 jest.mock("../../utils/analytics", () => ({
@@ -48,7 +55,6 @@ describe("Transcript", () => {
     socket: mockSocket as any,
     conversationId: "conversation-1",
     transcriptPasscode: "passcode",
-    apiAccessToken: "token",
   };
 
   const transcriptMessages = [
@@ -427,7 +433,7 @@ describe("Transcript", () => {
     // Verify subscription was initiated
     expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {
       conversationId: baseProps.conversationId,
-      token: baseProps.apiAccessToken,
+      token: "token",
       channel: {
         name: "transcript",
         passcode: baseProps.transcriptPasscode,
@@ -440,7 +446,11 @@ describe("Transcript", () => {
       expect.any(Function),
     );
 
-    const addedHandler = mockSocket.on.mock.calls[0][1];
+    // Find the message:new handler by event name (not by call index, since
+    // the "connect" re-join listener is also registered via socket.on now)
+    const addedHandler = mockSocket.on.mock.calls.find(
+      (call) => call[0] === "message:new",
+    )?.[1];
 
     unmount();
 
@@ -456,7 +466,7 @@ describe("Transcript", () => {
     // Should emit channel:join
     expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {
       conversationId: baseProps.conversationId,
-      token: baseProps.apiAccessToken,
+      token: "token",
       channel: {
         name: "transcript",
         passcode: baseProps.transcriptPasscode,
@@ -473,12 +483,16 @@ describe("Transcript", () => {
   it("removes old listener when socket changes", () => {
     const { rerender } = render(<Transcript {...baseProps} />);
 
-    const firstHandler = mockSocket.on.mock.calls[0][1];
+    // Find the message:new handler by event name (not by call index, since
+    // the "connect" re-join listener is also registered via socket.on now)
+    const firstHandler = mockSocket.on.mock.calls.find(
+      (call) => call[0] === "message:new",
+    )?.[1];
 
     // Verify first socket emitted channel:join
     expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {
       conversationId: baseProps.conversationId,
-      token: baseProps.apiAccessToken,
+      token: "token",
       channel: {
         name: "transcript",
         passcode: baseProps.transcriptPasscode,
@@ -507,7 +521,7 @@ describe("Transcript", () => {
     // New socket should emit channel:join
     expect(newMockSocket.emit).toHaveBeenCalledWith("channel:join", {
       conversationId: baseProps.conversationId,
-      token: baseProps.apiAccessToken,
+      token: "token",
       channel: {
         name: "transcript",
         passcode: baseProps.transcriptPasscode,
@@ -825,7 +839,7 @@ describe("Transcript", () => {
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
           `transcript/${baseProps.conversationId}`,
-          baseProps.apiAccessToken,
+          "token",
           "text",
         );
         expect(mockCreateObjectURL).toHaveBeenCalled();
@@ -977,7 +991,7 @@ describe("Transcript", () => {
         expect(SendData).toHaveBeenCalledWith(
           `transcript/${baseProps.conversationId}/pause`,
           {},
-          baseProps.apiAccessToken,
+          "token",
         );
       });
     });
@@ -1017,7 +1031,7 @@ describe("Transcript", () => {
         expect(SendData).toHaveBeenCalledWith(
           `transcript/${baseProps.conversationId}/resume`,
           {},
-          baseProps.apiAccessToken,
+          "token",
         );
       });
     });
@@ -1057,7 +1071,7 @@ describe("Transcript", () => {
         expect(SendData).toHaveBeenCalledWith(
           `transcript/${baseProps.conversationId}`,
           {},
-          baseProps.apiAccessToken,
+          "token",
           { method: "DELETE" },
         );
       });

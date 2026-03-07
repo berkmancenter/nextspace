@@ -30,6 +30,7 @@ jest.mock("../../utils/Helpers", () => ({
     get: jest.fn(() => ({
       SetTokens: jest.fn(),
       GetTokens: jest.fn(() => ({ access: "mock-token", refresh: "refresh" })),
+      getAccessToken: jest.fn(() => "mock-token"),
       ClearTokens: jest.fn(),
       ClearAdminTokens: jest.fn(),
     })),

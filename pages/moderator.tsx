@@ -39,6 +39,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
   const [conversationName, setConversationName] = useState<string>("");
 
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>("");
+  const [modPasscode, setModPasscode] = useState<string>("");
   const [messageFocusTimeRange, setMessageFocusTimeRange] = useState<{
     start: Date;
     end: Date;
@@ -51,15 +52,14 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
     socket,
     isConnected,
     errorMessage: sessionError,
+    lastReconnectTime,
   } = useSessionJoin();
 
   // Combine session and local errors
   const errorMessage = sessionError || localError;
 
-  const apiAccessToken = Api.get().GetTokens().access;
-
   useEffect(() => {
-    if (!router.isReady || !socket || !apiAccessToken) return;
+    if (!router.isReady || !socket || !Api.get().getAccessToken()) return;
 
     const messageHandler = (data: PseudonymousMessage) => {
       console.log("New message:", data);
@@ -76,7 +76,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
     socket.on("message:new", messageHandler);
 
     async function fetchConversationData() {
-      if (!router.isReady || !apiAccessToken) return;
+      if (!router.isReady || !Api.get().getAccessToken()) return;
       if (
         !router.query.conversationId ||
         !router.query.channel ||
@@ -103,12 +103,17 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
         setTranscriptPasscode(transcriptPasscodeParam);
       }
 
+      // Store mod passcode so the join effect can use it (and re-use it on reconnect)
+      if (modPasscodeParam) {
+        setModPasscode(modPasscodeParam);
+      }
+
       let moderatorChannelsQuery = `?channel=moderator,${modPasscodeParam}`;
 
       // Fetch conversation details
       const conversationResponse: any = await RetrieveData(
         `conversations/${router.query.conversationId}`,
-        apiAccessToken,
+        Api.get().getAccessToken(),
       );
 
       if (conversationResponse && !("error" in conversationResponse)) {
@@ -119,7 +124,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
       const conversationMessagesResponse: PseudonymousMessage[] | ErrorMessage =
         await RetrieveData(
           `messages/${router.query.conversationId}${moderatorChannelsQuery}`,
-          apiAccessToken,
+          Api.get().getAccessToken(),
         );
 
       if (
@@ -142,24 +147,8 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
         );
       }
 
-      if (!socket) return;
-
-      try {
-        // Use emitWithTokenRefresh to handle token expiration
-        emitWithTokenRefresh(
-          socket,
-          "conversation:join",
-          {
-            conversationId: router.query.conversationId,
-            token: apiAccessToken,
-            channel: { name: "moderator", passcode: modPasscodeParam },
-          },
-          () => console.log("Successfully joined moderator conversation"),
-          (error) => console.error("Error sending conversation:join message:", error)
-        );
-      } catch (error) {
-        console.error("Error sending conversation:join message:", error);
-      }
+      // Conversation join is handled by the dedicated useEffect below,
+      // which also re-joins on every socket reconnection.
     }
 
     fetchConversationData();
@@ -168,7 +157,68 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
     return () => {
       socket?.off("message:new", messageHandler);
     };
-  }, [router, socket, apiAccessToken]);
+  }, [router, socket]);
+
+  // Re-fetch moderator message history when the socket reconnects after a
+  // significant gap (user was on another tab/app for a while).
+  useEffect(() => {
+    if (!lastReconnectTime || !router.query.conversationId || !modPasscode)
+      return;
+
+    console.log("Moderator re-fetching message history after gap-reconnect...");
+    RetrieveData(
+      `messages/${router.query.conversationId}?channel=moderator,${modPasscode}`,
+      Api.get().getAccessToken(),
+    )
+      .then((msgs) => {
+        if (Array.isArray(msgs)) {
+          setMessages(
+            (msgs as PseudonymousMessage[]).filter(
+              (message) =>
+                message.channels![0] === "moderator" &&
+                (message.body.hasOwnProperty("insights") ||
+                  message.body.hasOwnProperty("metrics")),
+            ),
+          );
+        }
+      })
+      .catch((err) =>
+        console.error("Error re-fetching moderator messages:", err),
+      );
+  }, [lastReconnectTime]);
+
+  // Join the moderator channel once the passcode is known, and re-join on
+  // every socket reconnection (e.g. after a token refresh or network drop).
+  useEffect(() => {
+    if (!socket || !router.query.conversationId || !modPasscode) return;
+
+    const joinModerator = () => {
+      // Always read the current token so re-joins after a refresh use the
+      // new token rather than the one captured at socket-creation time.
+      emitWithTokenRefresh(
+        socket,
+        "conversation:join",
+        {
+          conversationId: router.query.conversationId,
+          token: Api.get().getAccessToken(),
+          channel: { name: "moderator", passcode: modPasscode },
+        },
+        () => console.log("Successfully joined moderator conversation"),
+        (error) =>
+          console.error("Error sending conversation:join message:", error),
+      );
+    };
+
+    // Initial join
+    joinModerator();
+
+    // Re-join on every subsequent reconnection (e.g. after token refresh)
+    socket.on("connect", joinModerator);
+
+    return () => {
+      socket.off("connect", joinModerator);
+    };
+  }, [socket, router.query.conversationId, modPasscode]);
 
   const renderMessageBody = (message: PseudonymousMessage) => {
     if (message.pseudonym === "Back Channel Insights Agent") {
@@ -236,8 +286,8 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
                 socket={socket}
                 conversationId={router.query.conversationId as string}
                 transcriptPasscode={transcriptPasscode}
-                apiAccessToken={apiAccessToken!}
                 showControls={true}
+                lastReconnectTime={lastReconnectTime}
               />
             </div>
           )}
