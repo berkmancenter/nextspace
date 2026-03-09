@@ -13,7 +13,11 @@ import {
 } from "../utils";
 import { components } from "../types";
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
-import { CheckAuthHeader, createConversationFromData, resolveConversationBotName } from "../utils/Helpers";
+import {
+  CheckAuthHeader,
+  createConversationFromData,
+  resolveConversationBotName,
+} from "../utils/Helpers";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { AuthType } from "../types.internal";
 import { trackConversationEvent, setUserId } from "../utils/analytics";
@@ -192,7 +196,9 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
 
         // Override botName from the first agent's agentConfig if available,
         // falling back to config.conversationBotName
-        setBotName(resolveConversationBotName(conversation, config.conversationBotName));
+        setBotName(
+          resolveConversationBotName(conversation, config.conversationBotName),
+        );
 
         // Get transcript and chat passcodes if channel query param exists
         if (router.query.channel) {
@@ -442,9 +448,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
         .then((msgs) => {
           if (Array.isArray(msgs)) setChatMessages(msgs);
         })
-        .catch((err) =>
-          console.error("Error re-fetching chat messages:", err),
-        );
+        .catch((err) => console.error("Error re-fetching chat messages:", err));
     }
 
     if (userId && agentId) {

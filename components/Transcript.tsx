@@ -465,7 +465,8 @@ export function Transcript(props: {
 
   // Subscribe to transcript channel
   useEffect(() => {
-    if (!props.socket || !props.conversationId || !Api.get().getAccessToken()) return;
+    if (!props.socket || !props.conversationId || !Api.get().getAccessToken())
+      return;
 
     const channel = {
       name: "transcript",
@@ -560,11 +561,7 @@ export function Transcript(props: {
       props.socket?.off("transcript:status", transcriptStatusHandler);
       props.socket?.offAny(catchAllHandler);
     };
-  }, [
-    props.socket,
-    props.conversationId,
-    props.transcriptPasscode,
-  ]);
+  }, [props.socket, props.conversationId, props.transcriptPasscode]);
 
   return (
     <div

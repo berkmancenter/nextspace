@@ -4,8 +4,6 @@ import userEvent from "@testing-library/user-event";
 import EventAssistantRoom from "../../pages/assistant";
 import { RetrieveData, SendData } from "../../utils";
 import { createConversationFromData } from "../../utils/Helpers";
-import { io } from "socket.io-client";
-import { useSessionJoin } from "../../utils/useSessionJoin";
 
 // Mock next/router
 const mockPush = jest.fn();
@@ -58,7 +56,9 @@ jest.mock("../../utils", () => ({
   Api: {
     get: jest.fn(() => ({
       GetTokens: jest.fn(() => ({ access: "mock-access-token" })),
-      GetConfig: jest.fn(() => Promise.resolve({ conversationBotName: "Berkie" })),
+      GetConfig: jest.fn(() =>
+        Promise.resolve({ conversationBotName: "Berkie" }),
+      ),
       getAccessToken: jest.fn(() => "mock-access-token"),
     })),
   },
@@ -572,7 +572,9 @@ describe("EventAssistantRoom", () => {
       await act(async () => {
         render(<EventAssistantRoom authType={"guest"} />);
       });
-      await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(createConversationFromData).toHaveBeenCalled(),
+      );
     };
 
     it("sends chat-only message to the chat channel", async () => {
@@ -637,7 +639,9 @@ describe("EventAssistantRoom", () => {
   describe("botName resolution", () => {
     it("uses config.conversationBotName when agent has no agentConfig.botName", async () => {
       (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: "agent-123", agentType: "eventAssistant", agentConfig: {} }],
+        agents: [
+          { id: "agent-123", agentType: "eventAssistant", agentConfig: {} },
+        ],
         type: { name: "eventAssistant" },
       });
 
@@ -1258,7 +1262,10 @@ describe("EventAssistantRoom", () => {
           return Promise.resolve({
             agents: [{ id: "agent-123", agentType: "eventAssistant" }],
           });
-        } else if (path.includes("users/user/") && path.includes("/preferences")) {
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
           return Promise.resolve({}); // Empty preferences object
         } else if (path.startsWith("messages/")) {
           return Promise.resolve([]); // Empty messages
@@ -1303,7 +1310,10 @@ describe("EventAssistantRoom", () => {
           return Promise.resolve({
             agents: [{ id: "agent-123", agentType: "eventAssistant" }],
           });
-        } else if (path.includes("users/user/") && path.includes("/preferences")) {
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
           return Promise.resolve({ visualResponse: true }); // Existing preferences
         } else if (path.startsWith("messages/")) {
           return Promise.resolve([]); // Empty messages
@@ -1329,7 +1339,9 @@ describe("EventAssistantRoom", () => {
       await user.click(assistantTab);
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText("Enter your message here")).toBeInTheDocument();
+        expect(
+          screen.getByPlaceholderText("Enter your message here"),
+        ).toBeInTheDocument();
       });
 
       // Wait for preferences to be loaded and the banner to be hidden
@@ -1339,7 +1351,7 @@ describe("EventAssistantRoom", () => {
             screen.queryByText("Set Your Preferences"),
           ).not.toBeInTheDocument();
         },
-        { timeout: 2000 }
+        { timeout: 2000 },
       );
     });
 
@@ -1357,7 +1369,10 @@ describe("EventAssistantRoom", () => {
           return Promise.resolve({
             agents: [{ id: "agent-123", agentType: "eventAssistant" }],
           });
-        } else if (path.includes("users/user/") && path.includes("/preferences")) {
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
           return Promise.resolve({
             error: true,
             message: { message: "Failed to fetch preferences" },
@@ -1404,7 +1419,10 @@ describe("EventAssistantRoom", () => {
           return Promise.resolve({
             agents: [{ id: "agent-123", agentType: "eventAssistant" }],
           });
-        } else if (path.includes("users/user/") && path.includes("/preferences")) {
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
           return Promise.resolve({}); // Empty preferences
         } else if (path.startsWith("messages/")) {
           return Promise.resolve([]); // Empty messages
@@ -1478,7 +1496,10 @@ describe("EventAssistantRoom", () => {
           return Promise.resolve({
             agents: [{ id: "agent-123", agentType: "eventAssistant" }],
           });
-        } else if (path.includes("users/user/") && path.includes("/preferences")) {
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
           return Promise.resolve({}); // Empty preferences
         } else if (path.startsWith("messages/")) {
           return Promise.resolve([]); // Empty messages
@@ -1525,7 +1546,9 @@ describe("EventAssistantRoom", () => {
       await user.click(saveButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Failed to save preferences")).toBeInTheDocument();
+        expect(
+          screen.getByText("Failed to save preferences"),
+        ).toBeInTheDocument();
       });
 
       // Banner should still be visible
@@ -1546,7 +1569,10 @@ describe("EventAssistantRoom", () => {
           return Promise.resolve({
             agents: [{ id: "agent-123", agentType: "eventAssistant" }],
           });
-        } else if (path.includes("users/user/") && path.includes("/preferences")) {
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
           return Promise.resolve({}); // Empty preferences
         } else if (path.startsWith("messages/")) {
           return Promise.resolve([]); // Empty messages
@@ -1614,7 +1640,10 @@ describe("EventAssistantRoom", () => {
           return Promise.resolve({
             agents: [{ id: "agent-123", agentType: "eventAssistant" }],
           });
-        } else if (path.includes("users/user/") && path.includes("/preferences")) {
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
           return Promise.resolve({}); // Empty preferences
         } else if (path.startsWith("messages/")) {
           return Promise.resolve([]); // Empty messages
