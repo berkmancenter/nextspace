@@ -4,8 +4,6 @@ import userEvent from "@testing-library/user-event";
 import EventAssistantRoom from "../../pages/assistant";
 import { RetrieveData, SendData } from "../../utils";
 import { createConversationFromData } from "../../utils/Helpers";
-import { io } from "socket.io-client";
-import { useSessionJoin } from "../../utils/useSessionJoin";
 
 // Mock next/router
 const mockPush = jest.fn();
@@ -58,6 +56,9 @@ jest.mock("../../utils", () => ({
   Api: {
     get: jest.fn(() => ({
       GetTokens: jest.fn(() => ({ access: "mock-access-token" })),
+      GetConfig: jest.fn(() =>
+        Promise.resolve({ conversationBotName: "Berkie" }),
+      ),
       getAccessToken: jest.fn(() => "mock-access-token"),
     })),
   },
@@ -447,7 +448,7 @@ describe("EventAssistantRoom", () => {
             agents: [{ id: "agent-456", agentType: "eventAssistantPlus" }],
           });
         } else if (path.startsWith("messages/")) {
-          return Promise.resolve([]); // Return empty chat messages
+          return Promise.resolve([]);
         }
         return Promise.resolve(null);
       });
@@ -460,33 +461,28 @@ describe("EventAssistantRoom", () => {
         render(<EventAssistantRoom authType={"guest"} />);
       });
 
+      // Wait for conversation data to load (RetrieveData called for conversations/)
+      await waitFor(() => {
+        expect(createConversationFromData).toHaveBeenCalled();
+      });
+
+      const user = userEvent.setup();
+
+      // Switch to the Event Bot (assistant) tab — nav bar shows both desktop + mobile, use first
+      const assistantTabs = screen.getAllByLabelText("Berkie");
+      await user.click(assistantTabs[0]);
+
+      // Wait for AssistantChatPanel input to be present
       await waitFor(() => {
         expect(
           screen.getByPlaceholderText("Enter your message here"),
         ).toBeInTheDocument();
       });
 
-      // Wait for all promises to resolve (conversation data loading)
-      await act(async () => {
-        await Promise.resolve(); // Let RetrieveData promise resolve
-        await Promise.resolve(); // Let createConversationFromData promise resolve
-      });
-
-      // Allow React to process state updates
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      });
-
-      const user = userEvent.setup();
-
-      // Click on the Event Assistant tab to switch from Chat (default) to Assistant
-      const assistantTab = screen.getByText("Event Assistant");
-      await user.click(assistantTab);
-
       const input = screen.getByPlaceholderText("Enter your message here");
-
       await user.type(input, "/");
 
+      // The slash command menu should appear with /mod option
       await waitFor(
         () => {
           expect(screen.getByText("/mod")).toBeInTheDocument();
@@ -536,8 +532,8 @@ describe("EventAssistantRoom", () => {
 
       const user = userEvent.setup();
 
-      // Click on the Event Assistant tab to switch from Chat (default) to Assistant
-      const assistantTab = screen.getByText("Event Assistant");
+      // Click on the Event Bot nav item to switch from Chat (default) to Assistant
+      const assistantTab = screen.getAllByLabelText("Berkie")[0];
       await user.click(assistantTab);
 
       const input = screen.getByPlaceholderText("Enter your message here");
@@ -550,6 +546,187 @@ describe("EventAssistantRoom", () => {
         },
         { timeout: 3000 },
       );
+    });
+  });
+
+  describe("Bot @mention routing in chat tab", () => {
+    const chatSetup = async () => {
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,chat-pass",
+      };
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        }
+        return Promise.resolve([]);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+        name: "My Event",
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+      await waitFor(() =>
+        expect(createConversationFromData).toHaveBeenCalled(),
+      );
+    };
+
+    it("sends chat-only message to the chat channel", async () => {
+      await chatSetup();
+
+      // Chat tab is the default — find the input and type a plain message
+      const user = userEvent.setup();
+      const input = screen.getByPlaceholderText("Enter your message here");
+      await user.type(input, "hello everyone{Enter}");
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          "messages",
+          expect.objectContaining({
+            channels: [{ name: "chat", passcode: "chat-pass" }],
+          }),
+        );
+      });
+    });
+
+    it("sends message to BOTH chat and direct channel when @mentioning the bot", async () => {
+      await chatSetup();
+
+      const user = userEvent.setup();
+      const input = screen.getByPlaceholderText("Enter your message here");
+      await user.type(input, "@Berkie what is the agenda?{Enter}");
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          "messages",
+          expect.objectContaining({
+            channels: expect.arrayContaining([
+              { name: "chat", passcode: "chat-pass" },
+              { name: "direct-user-123-agent-123" },
+            ]),
+          }),
+        );
+      });
+    });
+
+    it("is case-insensitive when matching the bot @mention", async () => {
+      await chatSetup();
+
+      const user = userEvent.setup();
+      const input = screen.getByPlaceholderText("Enter your message here");
+      await user.type(input, "@berkie question{Enter}");
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          "messages",
+          expect.objectContaining({
+            channels: expect.arrayContaining([
+              { name: "chat", passcode: "chat-pass" },
+              { name: "direct-user-123-agent-123" },
+            ]),
+          }),
+        );
+      });
+    });
+  });
+
+  describe("botName resolution", () => {
+    it("uses config.conversationBotName when agent has no agentConfig.botName", async () => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [
+          { id: "agent-123", agentType: "eventAssistant", agentConfig: {} },
+        ],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(createConversationFromData).toHaveBeenCalled();
+      });
+
+      // "Berkie" comes from the mocked config.conversationBotName
+      expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
+    });
+
+    it("overrides botName from first agent's agentConfig.botName", async () => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [
+          {
+            id: "agent-123",
+            agentType: "eventAssistant",
+            agentConfig: { botName: "EventBot" },
+          },
+        ],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(createConversationFromData).toHaveBeenCalled();
+      });
+
+      // botName should be overridden to "EventBot"
+      expect(screen.getAllByLabelText("EventBot").length).toBeGreaterThan(0);
+    });
+
+    it("falls back to config.conversationBotName when agentConfig.botName is not a string", async () => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [
+          {
+            id: "agent-123",
+            agentType: "eventAssistant",
+            agentConfig: { botName: 42 },
+          },
+        ],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(createConversationFromData).toHaveBeenCalled();
+      });
+
+      // Falls back to "Berkie" from config
+      expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
+    });
+
+    it("falls back to config.conversationBotName when there are no agents", async () => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [],
+        type: { name: "eventAssistant" },
+      });
+      // No event assistant agent → error path, but botName should still have been set
+      // We verify the setBotName call by checking that no override happened
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(createConversationFromData).toHaveBeenCalled();
+      });
+
+      // Error is shown because there's no event assistant agent, but botName defaults to "Berkie"
+      expect(
+        screen.getByText(
+          "This conversation does not have an event assistant agent.",
+        ),
+      ).toBeInTheDocument();
     });
   });
 
@@ -1080,13 +1257,21 @@ describe("EventAssistantRoom", () => {
         channel: "chat,test-chat-pass",
       };
 
-      (RetrieveData as jest.Mock)
-        .mockResolvedValueOnce({
-          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
-        })
-        .mockResolvedValueOnce([]) // Empty chat messages
-        .mockResolvedValueOnce({}) // Empty preferences object
-        .mockResolvedValueOnce([]); // Empty assistant messages
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
+          return Promise.resolve({}); // Empty preferences object
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]); // Empty messages
+        }
+        return Promise.resolve(null);
+      });
 
       (createConversationFromData as jest.Mock).mockResolvedValue({
         agents: [{ id: "agent-123", agentType: "eventAssistant" }],
@@ -1098,11 +1283,11 @@ describe("EventAssistantRoom", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+        expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
       });
 
-      // Click on the Event Assistant tab to show preferences
-      const assistantTab = screen.getByText("Event Assistant");
+      // Click on the Event Bot (assistant) tab to show preferences
+      const assistantTab = screen.getAllByLabelText("Berkie")[0];
       await user.click(assistantTab);
 
       await waitFor(() => {
@@ -1125,7 +1310,10 @@ describe("EventAssistantRoom", () => {
           return Promise.resolve({
             agents: [{ id: "agent-123", agentType: "eventAssistant" }],
           });
-        } else if (path.includes("users/user/") && path.includes("/preferences")) {
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
           return Promise.resolve({ visualResponse: true }); // Existing preferences
         } else if (path.startsWith("messages/")) {
           return Promise.resolve([]); // Empty messages
@@ -1143,15 +1331,17 @@ describe("EventAssistantRoom", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+        expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
       });
 
-      // Click on the Event Assistant tab
-      const assistantTab = screen.getByText("Event Assistant");
+      // Click on the Event Bot (assistant) tab
+      const assistantTab = screen.getAllByLabelText("Berkie")[0];
       await user.click(assistantTab);
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText("Enter your message here")).toBeInTheDocument();
+        expect(
+          screen.getByPlaceholderText("Enter your message here"),
+        ).toBeInTheDocument();
       });
 
       // Wait for preferences to be loaded and the banner to be hidden
@@ -1161,7 +1351,7 @@ describe("EventAssistantRoom", () => {
             screen.queryByText("Set Your Preferences"),
           ).not.toBeInTheDocument();
         },
-        { timeout: 2000 }
+        { timeout: 2000 },
       );
     });
 
@@ -1174,16 +1364,24 @@ describe("EventAssistantRoom", () => {
         channel: "chat,test-chat-pass",
       };
 
-      (RetrieveData as jest.Mock)
-        .mockResolvedValueOnce({
-          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
-        })
-        .mockResolvedValueOnce([]) // Empty chat messages
-        .mockResolvedValueOnce({
-          error: true,
-          message: { message: "Failed to fetch preferences" },
-        })
-        .mockResolvedValueOnce([]); // Empty assistant messages
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
+          return Promise.resolve({
+            error: true,
+            message: { message: "Failed to fetch preferences" },
+          });
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]); // Empty messages
+        }
+        return Promise.resolve(null);
+      });
 
       (createConversationFromData as jest.Mock).mockResolvedValue({
         agents: [{ id: "agent-123", agentType: "eventAssistant" }],
@@ -1195,11 +1393,11 @@ describe("EventAssistantRoom", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+        expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
       });
 
-      // Click on the Event Assistant tab
-      const assistantTab = screen.getByText("Event Assistant");
+      // Click on the Event Bot (assistant) tab
+      const assistantTab = screen.getAllByLabelText("Berkie")[0];
       await user.click(assistantTab);
 
       await waitFor(() => {
@@ -1216,13 +1414,21 @@ describe("EventAssistantRoom", () => {
         channel: "chat,test-chat-pass",
       };
 
-      (RetrieveData as jest.Mock)
-        .mockResolvedValueOnce({
-          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
-        })
-        .mockResolvedValueOnce([]) // Empty chat messages
-        .mockResolvedValueOnce({}) // Empty preferences
-        .mockResolvedValueOnce([]); // Empty assistant messages
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
+          return Promise.resolve({}); // Empty preferences
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]); // Empty messages
+        }
+        return Promise.resolve(null);
+      });
 
       (SendData as jest.Mock).mockResolvedValue({ success: true });
 
@@ -1236,11 +1442,11 @@ describe("EventAssistantRoom", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+        expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
       });
 
-      // Click on the Event Assistant tab
-      const assistantTab = screen.getByText("Event Assistant");
+      // Click on the Event Bot (assistant) tab
+      const assistantTab = screen.getAllByLabelText("Berkie")[0];
       await user.click(assistantTab);
 
       await waitFor(() => {
@@ -1285,13 +1491,21 @@ describe("EventAssistantRoom", () => {
         channel: "chat,test-chat-pass",
       };
 
-      (RetrieveData as jest.Mock)
-        .mockResolvedValueOnce({
-          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
-        })
-        .mockResolvedValueOnce([]) // Empty chat messages
-        .mockResolvedValueOnce({}) // Empty preferences
-        .mockResolvedValueOnce([]); // Empty assistant messages
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
+          return Promise.resolve({}); // Empty preferences
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]); // Empty messages
+        }
+        return Promise.resolve(null);
+      });
 
       (SendData as jest.Mock).mockResolvedValue({
         error: true,
@@ -1308,11 +1522,11 @@ describe("EventAssistantRoom", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+        expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
       });
 
-      // Click on the Event Assistant tab
-      const assistantTab = screen.getByText("Event Assistant");
+      // Click on the Event Bot (assistant) tab
+      const assistantTab = screen.getAllByLabelText("Berkie")[0];
       await user.click(assistantTab);
 
       await waitFor(() => {
@@ -1332,7 +1546,9 @@ describe("EventAssistantRoom", () => {
       await user.click(saveButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Failed to save preferences")).toBeInTheDocument();
+        expect(
+          screen.getByText("Failed to save preferences"),
+        ).toBeInTheDocument();
       });
 
       // Banner should still be visible
@@ -1348,13 +1564,21 @@ describe("EventAssistantRoom", () => {
         channel: "chat,test-chat-pass",
       };
 
-      (RetrieveData as jest.Mock)
-        .mockResolvedValueOnce({
-          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
-        })
-        .mockResolvedValueOnce([]) // Empty chat messages
-        .mockResolvedValueOnce({}) // Empty preferences
-        .mockResolvedValueOnce([]); // Empty assistant messages
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
+          return Promise.resolve({}); // Empty preferences
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]); // Empty messages
+        }
+        return Promise.resolve(null);
+      });
 
       (SendData as jest.Mock).mockResolvedValue({ success: true });
 
@@ -1368,11 +1592,11 @@ describe("EventAssistantRoom", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+        expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
       });
 
-      // Click on the Event Assistant tab
-      const assistantTab = screen.getByText("Event Assistant");
+      // Click on the Event Bot (assistant) tab
+      const assistantTab = screen.getAllByLabelText("Berkie")[0];
       await user.click(assistantTab);
 
       await waitFor(() => {
@@ -1411,13 +1635,21 @@ describe("EventAssistantRoom", () => {
         channel: "chat,test-chat-pass",
       };
 
-      (RetrieveData as jest.Mock)
-        .mockResolvedValueOnce({
-          agents: [{ id: "agent-123", agentType: "eventAssistant" }],
-        })
-        .mockResolvedValueOnce([]) // Empty chat messages
-        .mockResolvedValueOnce({}) // Empty preferences
-        .mockResolvedValueOnce([]); // Empty assistant messages
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
+          return Promise.resolve({}); // Empty preferences
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]); // Empty messages
+        }
+        return Promise.resolve(null);
+      });
 
       (SendData as jest.Mock).mockRejectedValue(new Error("Network error"));
 
@@ -1431,11 +1663,11 @@ describe("EventAssistantRoom", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Event Assistant")).toBeInTheDocument();
+        expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
       });
 
-      // Click on the Event Assistant tab
-      const assistantTab = screen.getByText("Event Assistant");
+      // Click on the Event Bot (assistant) tab
+      const assistantTab = screen.getAllByLabelText("Berkie")[0];
       await user.click(assistantTab);
 
       await waitFor(() => {

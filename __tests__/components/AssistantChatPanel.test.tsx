@@ -86,6 +86,7 @@ describe("AssistantChatPanel", () => {
     controlledMode: null,
     slashCommands: [],
     eventName: "Tech Summit",
+    botName: "Berkie",
     onSendMessage: mockOnSendMessage,
     onExitControlledMode: mockOnExitControlledMode,
     onPromptSelect: mockOnPromptSelect,

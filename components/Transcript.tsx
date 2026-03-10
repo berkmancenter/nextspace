@@ -28,6 +28,8 @@ export function Transcript(props: {
   transcriptPasscode?: string;
   category?: string;
   showControls?: boolean;
+  /** When true, hides the open/close toggle and fills the available container width */
+  hideToggle?: boolean;
   /**
    * Pass the `lastReconnectTime` value from `useSessionJoin`. When this
    * changes to a non-null value the transcript will re-fetch its message
@@ -411,7 +413,7 @@ export function Transcript(props: {
     };
 
     fetchInitialData();
-  }, [props.conversationId,  props.transcriptPasscode]);
+  }, [props.conversationId, props.transcriptPasscode]);
 
   // Re-fetch message history when the socket reconnects after a significant gap
   // to fill any messages that arrived while the client was disconnected.
@@ -463,7 +465,8 @@ export function Transcript(props: {
 
   // Subscribe to transcript channel
   useEffect(() => {
-    if (!props.socket || !props.conversationId || !Api.get().getAccessToken()) return;
+    if (!props.socket || !props.conversationId || !Api.get().getAccessToken())
+      return;
 
     const channel = {
       name: "transcript",
@@ -474,8 +477,7 @@ export function Transcript(props: {
       try {
         // Always use the freshest available token so re-joins after token
         // refresh succeed rather than failing with an expired token.
-        const freshToken =
-          Api.get().getAccessToken();
+        const freshToken = Api.get().getAccessToken();
         props.socket!.emit("channel:join", {
           conversationId: props.conversationId,
           token: freshToken,
@@ -559,18 +561,16 @@ export function Transcript(props: {
       props.socket?.off("transcript:status", transcriptStatusHandler);
       props.socket?.offAny(catchAllHandler);
     };
-  }, [
-    props.socket,
-    props.conversationId,
-    props.transcriptPasscode,
-  ]);
+  }, [props.socket, props.conversationId, props.transcriptPasscode]);
 
   return (
     <div
       className={`bg-[#200434] text-white transition-all duration-300 ease-in-out flex flex-col ${
-        isOpen
-          ? "h-[40vh] lg:h-full lg:w-[33vw]"
-          : "flex-shrink-0 lg:h-full lg:w-16"
+        props.hideToggle
+          ? "h-full w-full"
+          : isOpen
+            ? "h-[40vh] lg:h-full lg:w-[33vw]"
+            : "flex-shrink-0 lg:h-full lg:w-16"
       }`}
     >
       {/* Header with toggle */}
@@ -588,13 +588,15 @@ export function Transcript(props: {
                   LIVE TRANSCRIPT
                 </h2>
               </div>
-              <button
-                onClick={handleToggle}
-                className="text-white hover:bg-white/10 rounded p-1 transition-colors"
-                aria-label="Close transcript"
-              >
-                <ChevronRight className="transition-transform -rotate-270 lg:rotate-0" />
-              </button>
+              {!props.hideToggle && (
+                <button
+                  onClick={handleToggle}
+                  className="text-white hover:bg-white/10 rounded p-1 transition-colors"
+                  aria-label="Close transcript"
+                >
+                  <ChevronRight className="transition-transform -rotate-270 lg:rotate-0" />
+                </button>
+              )}
             </div>
             {props.showControls && (
               <>

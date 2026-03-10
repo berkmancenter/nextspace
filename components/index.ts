@@ -1,6 +1,5 @@
 export { Event } from "./Event";
 export { EventCreationForm } from "./EventCreationForm";
-export { ExperimentCreationForm } from "./ExperimentCreationForm";
 export { EventStatus } from "./Event/Status";
 export { Header } from "./Header";
 export { Layout } from "./Layout";
@@ -10,4 +9,7 @@ export { MessageInput } from "./MessageInput";
 export { AssistantChatPanel } from "./AssistantChatPanel";
 export { GroupChatPanel } from "./GroupChatPanel";
 export { Transcript } from "./Transcript";
-export { AgentConfigForm } from "./AgentConfigForm";
+export { NavigationBar } from "./NavigationBar";
+export type { NavTab } from "./NavigationBar";
+export { BotIcon } from "./BotIcon";
+export { TranscriptIcon } from "./TranscriptIcon";
