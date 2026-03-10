@@ -6,6 +6,52 @@
 import { Api } from "./Helpers";
 
 /**
+ * In-flight refresh promise used to deduplicate concurrent 401 responses.
+ * When multiple requests all receive a 401 simultaneously they all share
+ * the same refresh request rather than each sending their own — which
+ * would invalidate the single-use refresh token and trigger a destructive
+ * race condition that clears the session.
+ */
+let _inflightFetchRefresh: Promise<boolean> | null = null;
+
+/**
+ * Performs the actual token refresh HTTP call and updates tokens in memory
+ * and in the session cookie. Used internally by fetchWithTokenRefresh.
+ */
+async function _doFetchRefresh(apiI: ReturnType<typeof Api.get>): Promise<boolean> {
+  const currentTokens = apiI.GetTokens();
+  if (!currentTokens.refresh) return false;
+
+  try {
+    const tokensResponse = await RefreshToken(currentTokens.refresh);
+
+    if (tokensResponse?.access?.token && tokensResponse?.refresh?.token) {
+      // Update tokens in memory
+      apiI.SetTokens(tokensResponse.access.token, tokensResponse.refresh.token);
+
+      // Update session cookie with new tokens
+      await fetch("/api/session", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          accessToken: tokensResponse.access.token,
+          refreshToken: tokensResponse.refresh.token,
+        }),
+      });
+
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error("Token refresh error:", error);
+    return false;
+  }
+}
+
+/**
  * Wrapper for fetch that automatically handles token refresh on 401 responses.
  * @param url - The URL to fetch
  * @param options - Fetch options
@@ -38,28 +84,24 @@ export const fetchWithTokenRefresh = async (
   if (response.status === 401 && API_TOKENS.refresh) {
     console.log("Token expired, refreshing...");
 
-    const tokensResponse = await RefreshToken(API_TOKENS.refresh);
-
-    if (tokensResponse?.access?.token && tokensResponse?.refresh?.token) {
-      // Update tokens in memory
-      apiI.SetTokens(tokensResponse.access.token, tokensResponse.refresh.token);
-      API_TOKENS = apiI.GetTokens();
-
-      // Update session cookie with new tokens
-      await fetch("/api/session", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          accessToken: tokensResponse.access.token,
-          refreshToken: tokensResponse.refresh.token,
-        }),
+    // Deduplicate concurrent refresh calls — only one HTTP request is made
+    // even when multiple callers all receive a 401 simultaneously.  Without
+    // this guard each concurrent caller would send its own refresh request;
+    // the second request would use the now-invalidated refresh token, receive
+    // a 401, and trigger a logout that destroys the whole session.
+    if (!_inflightFetchRefresh) {
+      _inflightFetchRefresh = _doFetchRefresh(apiI).finally(() => {
+        _inflightFetchRefresh = null;
       });
+    }
 
-      // Retry with new token
+    const refreshed = await _inflightFetchRefresh;
+
+    if (refreshed) {
+      // Retry with the freshly-issued access token
+      const newToken = apiI.getAccessToken();
       const headers = new Headers(options.headers);
-      headers.set("Authorization", `Bearer ${tokensResponse.access.token}`);
+      headers.set("Authorization", `Bearer ${newToken}`);
       response = await fetch(url, { ...options, headers });
     }
   }

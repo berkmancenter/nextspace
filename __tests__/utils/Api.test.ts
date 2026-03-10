@@ -223,6 +223,92 @@ describe("Token Refresh Functionality", () => {
       expect(response.status).toBe(401);
       expect(mockApiInstance.SetTokens).not.toHaveBeenCalled();
     });
+
+    it("should deduplicate concurrent 401 refresh calls — only one refresh request sent", async () => {
+      mockApiInstance.GetTokens.mockReturnValue({
+        access: "old-token",
+        refresh: "refresh-token",
+      });
+
+      // Track how many times the refresh-tokens endpoint is hit
+      let refreshCallCount = 0;
+
+      (global.fetch as jest.Mock).mockImplementation((url: string) => {
+        if (
+          typeof url === "string" &&
+          url.includes("/auth/refresh-tokens")
+        ) {
+          refreshCallCount++;
+          // Delay the refresh response so concurrent callers all reach the
+          // deduplication gate before the promise settles.
+          return new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  ok: true,
+                  status: 200,
+                  json: async () => ({
+                    access: { token: "new-access-token" },
+                    refresh: { token: "new-refresh-token" },
+                  }),
+                }),
+              30,
+            ),
+          );
+        }
+        if (url === "/api/session") {
+          return Promise.resolve({ ok: true, status: 200 });
+        }
+        // All other URLs (the actual API calls) return 401 on first round,
+        // then 200 after the token is refreshed.
+        return Promise.resolve({
+          ok: false,
+          status: 401,
+        });
+      });
+
+      // After refresh, retries should succeed
+      mockApiInstance.getAccessToken.mockReturnValue("new-access-token");
+
+      // Patch fetch so the *retry* requests (with new token) return 200
+      const originalImpl = (global.fetch as jest.Mock).getMockImplementation();
+      (global.fetch as jest.Mock).mockImplementation(
+        (url: string, options?: RequestInit) => {
+          const authHeader =
+            options?.headers instanceof Headers
+              ? options.headers.get("Authorization")
+              : (options?.headers as Record<string, string>)?.["Authorization"];
+
+          // Retry requests carry the new token — return success
+          if (authHeader === "Bearer new-access-token") {
+            return Promise.resolve({ ok: true, status: 200 });
+          }
+          return originalImpl!(url, options);
+        },
+      );
+
+      // Fire three concurrent fetchWithTokenRefresh calls
+      const [r1, r2, r3] = await Promise.all([
+        fetchWithTokenRefresh(mockUrl, mockOptions, true),
+        fetchWithTokenRefresh(mockUrl, mockOptions, true),
+        fetchWithTokenRefresh(mockUrl, mockOptions, true),
+      ]);
+
+      // All three calls should ultimately succeed
+      expect(r1.status).toBe(200);
+      expect(r2.status).toBe(200);
+      expect(r3.status).toBe(200);
+
+      // The critical assertion: only ONE refresh-tokens HTTP call was made
+      expect(refreshCallCount).toBe(1);
+
+      // Tokens should have been updated exactly once
+      expect(mockApiInstance.SetTokens).toHaveBeenCalledTimes(1);
+      expect(mockApiInstance.SetTokens).toHaveBeenCalledWith(
+        "new-access-token",
+        "new-refresh-token",
+      );
+    });
   });
 
   describe("RetrieveData with Token Refresh", () => {
