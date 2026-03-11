@@ -1,4 +1,5 @@
-import React, { FC, useEffect, useMemo, useState } from "react";
+import React, { FC, useCallback, useEffect, useMemo, useState } from "react";
+import { useTheme, useMediaQuery } from "@mui/material";
 import {
   AssistantMessage,
   SubmittedMessage,
@@ -20,6 +21,7 @@ import { useAutoScroll } from "../hooks/useAutoScroll";
 import { normalizeAssistantPseudonym } from "../utils/Helpers";
 import { BotIcon } from "./BotIcon";
 import { PreferencesBanner, PreferenceOption } from "./PreferencesBanner";
+import { MediaLightbox } from "./MediaLightbox";
 
 /**
  * Parsed message body structure
@@ -103,11 +105,49 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
 }) => {
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(messages);
   const [preferencesVisible, setPreferencesVisible] = useState(showPreferences);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  // Lightbox state for images and mindmaps
+  const [lightboxState, setLightboxState] = useState<{
+    isOpen: boolean;
+    mediaType: "image" | "mindmap";
+    mediaSrc: string;
+    mimeType?: string;
+  }>({
+    isOpen: false,
+    mediaType: "image",
+    mediaSrc: "",
+    mimeType: undefined,
+  });
 
   // Sync local state with prop changes
   useEffect(() => {
     setPreferencesVisible(showPreferences);
   }, [showPreferences]);
+
+  // Lightbox handlers
+  const handleImageClick = useCallback((src: string, mimeType: string) => {
+    setLightboxState({
+      isOpen: true,
+      mediaType: "image",
+      mediaSrc: src,
+      mimeType,
+    });
+  }, []);
+
+  const handleMarkmapClick = useCallback((markdown: string) => {
+    setLightboxState({
+      isOpen: true,
+      mediaType: "mindmap",
+      mediaSrc: markdown,
+      mimeType: undefined,
+    });
+  }, []);
+
+  const handleLightboxClose = useCallback(() => {
+    setLightboxState((prev) => ({ ...prev, isOpen: false }));
+  }, []);
 
   // Create enhancers for assistant mode (slash commands only)
   const enhancers = useMemo(() => {
@@ -396,6 +436,8 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                                 }}
                                 media={parsed.media}
                                 onPromptSelect={onPromptSelect}
+                                onImageClick={handleImageClick}
+                                onMarkmapClick={handleMarkmapClick}
                               />
                             </div>
                           ) : (
@@ -415,6 +457,8 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                                 }}
                                 media={parsed.media}
                                 onPromptSelect={onPromptSelect}
+                                onImageClick={handleImageClick}
+                                onMarkmapClick={handleMarkmapClick}
                               />
                             </div>
                           )}
@@ -483,6 +527,16 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
           onInputChange={onInputChange}
         />
       </div>
+
+      {/* Media Lightbox */}
+      <MediaLightbox
+        open={lightboxState.isOpen}
+        onClose={handleLightboxClose}
+        mediaType={lightboxState.mediaType}
+        mediaSrc={lightboxState.mediaSrc}
+        mimeType={lightboxState.mimeType}
+        isMobile={isMobile}
+      />
     </div>
   );
 };

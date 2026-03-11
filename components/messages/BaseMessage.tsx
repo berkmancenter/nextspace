@@ -32,6 +32,7 @@ export const BaseMessage: FC<BaseMessageProps> = ({
 interface MessageContentProps {
   text: string;
   isFeedback?: boolean;
+  onMarkmapClick?: (markdown: string) => void;
 }
 
 /**
@@ -40,6 +41,7 @@ interface MessageContentProps {
 export const MessageContent: FC<MessageContentProps> = ({
   text,
   isFeedback = false,
+  onMarkmapClick,
 }) => {
   const isFeedbackMessage = text.startsWith("/feedback");
   const displayText = isFeedbackMessage ? "User feedback received." : text;
@@ -60,7 +62,12 @@ export const MessageContent: FC<MessageContentProps> = ({
         const hasMarkmapFrontMatter =
           /^---\s*\n[\s\S]*?\bmarkmap\s*:[\s\S]*?\n---/.test(content);
         if (lang === "markmap" || hasMarkmapFrontMatter) {
-          return <MarkmapView markdown={content} />;
+          return (
+            <MarkmapView
+              markdown={content}
+              onClick={() => onMarkmapClick?.(content)}
+            />
+          );
         }
         return (
           <code className={className} {...props}>
@@ -69,7 +76,7 @@ export const MessageContent: FC<MessageContentProps> = ({
         );
       },
     }),
-    []
+    [onMarkmapClick]
   );
 
   if (isFeedbackMessage || isFeedback) {

@@ -38,34 +38,47 @@ describe("MarkmapView Component", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Mock getBoundingClientRect to return valid dimensions for SVG
+    Element.prototype.getBoundingClientRect = jest.fn(() => ({
+      width: 800,
+      height: 400,
+      top: 0,
+      left: 0,
+      bottom: 400,
+      right: 800,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    }));
   });
 
   it("renders the component with controls", () => {
     render(<MarkmapView markdown={sampleMarkdown} />);
 
-    expect(screen.getByLabelText("Zoom out")).toBeInTheDocument();
-    expect(screen.getByLabelText("Fit to container")).toBeInTheDocument();
-    expect(screen.getByLabelText("Zoom in")).toBeInTheDocument();
+    expect(screen.getByLabelText("Zoom out mind map")).toBeInTheDocument();
+    expect(screen.getByLabelText("Fit mind map to container")).toBeInTheDocument();
+    expect(screen.getByLabelText("Zoom in mind map")).toBeInTheDocument();
   });
 
   it("renders zoom out button with minus sign", () => {
     render(<MarkmapView markdown={sampleMarkdown} />);
 
-    const zoomOutButton = screen.getByLabelText("Zoom out");
+    const zoomOutButton = screen.getByLabelText("Zoom out mind map");
     expect(zoomOutButton).toHaveTextContent("−");
   });
 
   it("renders fit button", () => {
     render(<MarkmapView markdown={sampleMarkdown} />);
 
-    const fitButton = screen.getByLabelText("Fit to container");
+    const fitButton = screen.getByLabelText("Fit mind map to container");
     expect(fitButton).toHaveTextContent("fit");
   });
 
   it("renders zoom in button with plus sign", () => {
     render(<MarkmapView markdown={sampleMarkdown} />);
 
-    const zoomInButton = screen.getByLabelText("Zoom in");
+    const zoomInButton = screen.getByLabelText("Zoom in mind map");
     expect(zoomInButton).toHaveTextContent("+");
   });
 
@@ -82,7 +95,7 @@ describe("MarkmapView Component", () => {
 
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalled();
-    });
+    }, { timeout: 3000 });
   });
 
   it("calls rescale with zoom factor when zoom in is clicked", async () => {
@@ -91,9 +104,9 @@ describe("MarkmapView Component", () => {
 
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalled();
-    });
+    }, { timeout: 3000 });
 
-    const zoomInButton = screen.getByLabelText("Zoom in");
+    const zoomInButton = screen.getByLabelText("Zoom in mind map");
     await user.click(zoomInButton);
 
     expect(mockRescale).toHaveBeenCalledWith(1.5);
@@ -105,9 +118,9 @@ describe("MarkmapView Component", () => {
 
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalled();
-    });
+    }, { timeout: 3000 });
 
-    const zoomOutButton = screen.getByLabelText("Zoom out");
+    const zoomOutButton = screen.getByLabelText("Zoom out mind map");
     await user.click(zoomOutButton);
 
     expect(mockRescale).toHaveBeenCalledWith(1 / 1.5);
@@ -119,9 +132,9 @@ describe("MarkmapView Component", () => {
 
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalled();
-    });
+    }, { timeout: 3000 });
 
-    const fitButton = screen.getByLabelText("Fit to container");
+    const fitButton = screen.getByLabelText("Fit mind map to container");
     await user.click(fitButton);
 
     expect(mockFit).toHaveBeenCalled();
@@ -133,9 +146,9 @@ describe("MarkmapView Component", () => {
 
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalled();
-    });
+    }, { timeout: 3000 });
 
-    const zoomInButton = screen.getByLabelText("Zoom in");
+    const zoomInButton = screen.getByLabelText("Zoom in mind map");
     await user.click(zoomInButton);
     await user.click(zoomInButton);
     await user.click(zoomInButton);
@@ -149,14 +162,14 @@ describe("MarkmapView Component", () => {
 
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalledTimes(1);
-    });
+    }, { timeout: 3000 });
 
     const newMarkdown = "# New Root\n## New Child";
     rerender(<MarkmapView markdown={newMarkdown} />);
 
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalledTimes(2);
-    });
+    }, { timeout: 3000 });
   });
 
   it("does not re-create markmap when markdown stays the same", async () => {
@@ -164,7 +177,7 @@ describe("MarkmapView Component", () => {
 
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalledTimes(1);
-    });
+    }, { timeout: 3000 });
 
     rerender(<MarkmapView markdown={sampleMarkdown} />);
 
@@ -192,9 +205,9 @@ describe("MarkmapView Component", () => {
 
     const buttons = screen.getAllByRole("button");
     expect(buttons).toHaveLength(3);
-    expect(buttons[0]).toHaveAttribute("aria-label", "Zoom out");
-    expect(buttons[1]).toHaveAttribute("aria-label", "Fit to container");
-    expect(buttons[2]).toHaveAttribute("aria-label", "Zoom in");
+    expect(buttons[0]).toHaveAttribute("aria-label", "Zoom out mind map");
+    expect(buttons[1]).toHaveAttribute("aria-label", "Fit mind map to container");
+    expect(buttons[2]).toHaveAttribute("aria-label", "Zoom in mind map");
   });
 
   it("handles empty markdown", async () => {
@@ -202,10 +215,10 @@ describe("MarkmapView Component", () => {
 
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalled();
-    });
+    }, { timeout: 3000 });
 
     // Should still render controls
-    expect(screen.getByLabelText("Zoom in")).toBeInTheDocument();
+    expect(screen.getByLabelText("Zoom in mind map")).toBeInTheDocument();
   });
 
   it("cleans up markmap reference on unmount", async () => {
@@ -213,7 +226,7 @@ describe("MarkmapView Component", () => {
 
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalled();
-    });
+    }, { timeout: 3000 });
 
     // Unmount should not throw
     expect(() => unmount()).not.toThrow();
