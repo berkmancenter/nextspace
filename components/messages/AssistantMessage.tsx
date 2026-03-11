@@ -7,12 +7,16 @@ import { MessageProps, MediaItem } from "../../types.internal";
 export interface AssistantMessageProps extends MessageProps {
   onPromptSelect?: (value: string, parentMessageId?: string) => void;
   media?: MediaItem[];
+  onImageClick?: (src: string, mimeType: string) => void;
+  onMarkmapClick?: (markdown: string) => void;
 }
 
 export const AssistantMessage: FC<AssistantMessageProps> = ({
   message,
   onPromptSelect,
   media,
+  onImageClick,
+  onMarkmapClick,
 }) => {
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
 
@@ -35,7 +39,7 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
 
   return (
     <BaseMessage className={className}>
-      <MessageContent text={message.body as string} />
+      <MessageContent text={message.body as string} onMarkmapClick={onMarkmapClick} />
 
       {/* Render media items */}
       {media && media.length > 0 && (
@@ -47,16 +51,29 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
         >
           {media.map((item, index) => {
             if (item.type === "image") {
+              const imgSrc = `data:${item.mimeType};base64,${item.data}`;
               return (
                 <img
                   key={`media-${index}`}
-                  src={`data:${item.mimeType};base64,${item.data}`}
+                  src={imgSrc}
                   alt="Visual response"
+                  role="button"
+                  tabIndex={0}
+                  className="hover:scale-105"
                   style={{
                     maxWidth: "100%",
                     height: "auto",
                     borderRadius: "8px",
                     border: "1px solid rgba(0, 0, 0, 0.1)",
+                    cursor: "pointer",
+                    transition: "transform 0.2s ease-in-out",
+                  }}
+                  onClick={() => onImageClick?.(imgSrc, item.mimeType)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onImageClick?.(imgSrc, item.mimeType);
+                    }
                   }}
                 />
               );
