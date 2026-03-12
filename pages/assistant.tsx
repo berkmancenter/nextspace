@@ -96,7 +96,21 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       description:
         "Create a visual mind map of the key topics discussed in the event",
       value: "/mindmap ",
-      conversationTypes: ["eventAssistantPlus", "eventAssistantPlusProactive"],
+      conversationTypes: [
+        "eventAssistant",
+        "eventAssistantPlus",
+        "eventAssistantPlusProactive",
+      ],
+    },
+    {
+      command: "visual",
+      description: "Request a visual response (image) to a question",
+      value: "/visual ",
+      conversationTypes: [
+        "eventAssistant",
+        "eventAssistantPlus",
+        "eventAssistantPlusProactive",
+      ],
     },
   ];
 

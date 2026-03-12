@@ -3,6 +3,7 @@ import { FC, useMemo } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { MarkmapView } from "../MarkmapView";
+import { parseMessageBody } from "../../utils/Helpers";
 
 /**
  * Props for BaseMessage component
@@ -30,7 +31,7 @@ export const BaseMessage: FC<BaseMessageProps> = ({
  * Props for MessageContent component
  */
 interface MessageContentProps {
-  text: string;
+  text: string | object;
   isFeedback?: boolean;
   onMarkmapClick?: (markdown: string) => void;
 }
@@ -43,8 +44,9 @@ export const MessageContent: FC<MessageContentProps> = ({
   isFeedback = false,
   onMarkmapClick,
 }) => {
-  const isFeedbackMessage = text.startsWith("/feedback");
-  const displayText = isFeedbackMessage ? "User feedback received." : text;
+  const parsed = parseMessageBody(text);
+  const isFeedbackMessage = parsed.text.startsWith("/feedback");
+  const displayText = isFeedbackMessage ? "User feedback received." : parsed.text;
 
   const markdownComponents = useMemo(
     () => ({
