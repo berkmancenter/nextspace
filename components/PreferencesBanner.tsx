@@ -102,6 +102,12 @@ export const PreferencesBanner: FC<PreferencesBannerProps> = ({
                 <Checkbox
                   checked={isSelected}
                   onChange={() => handleToggle(option.value)}
+                  slotProps={{
+                    input: {
+                      tabIndex: 0,
+                      'aria-label': option.label,
+                    },
+                  }}
                   sx={{
                     color: "#4A0979",
                     padding: "2px",
