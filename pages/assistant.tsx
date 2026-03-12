@@ -493,21 +493,9 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     // When in transcript view, default to assistant channel for sending
     const effectiveTab = activeTab === "transcript" ? "assistant" : activeTab;
 
-    // Check if a chat message @mentions the bot — if so, also route to the
-    // bot's direct channel so the agent actually receives and responds to it.
-    const mentionsBotInChat =
-      effectiveTab === "chat" &&
-      agentId &&
-      new RegExp(`@${botName}\\b`, "i").test(message);
-
     let channels =
       effectiveTab === "chat"
-        ? mentionsBotInChat
-          ? [
-              { name: "chat", passcode: chatPasscode },
-              { name: `direct-${userId}-${agentId}` },
-            ]
-          : [{ name: "chat", passcode: chatPasscode }]
+        ? [{ name: "chat", passcode: chatPasscode }]
         : [{ name: `direct-${userId}-${agentId}` }];
 
     // Prepend prefix if in controlled mode

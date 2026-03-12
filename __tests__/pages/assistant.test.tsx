@@ -595,26 +595,6 @@ describe("EventAssistantRoom", () => {
       });
     });
 
-    it("sends message to BOTH chat and direct channel when @mentioning the bot", async () => {
-      await chatSetup();
-
-      const user = userEvent.setup();
-      const input = screen.getByPlaceholderText("Enter your message here");
-      await user.type(input, "@Berkie what is the agenda?{Enter}");
-
-      await waitFor(() => {
-        expect(SendData).toHaveBeenCalledWith(
-          "messages",
-          expect.objectContaining({
-            channels: expect.arrayContaining([
-              { name: "chat", passcode: "chat-pass" },
-              { name: "direct-user-123-agent-123" },
-            ]),
-          }),
-        );
-      });
-    });
-
     it("is case-insensitive when matching the bot @mention", async () => {
       await chatSetup();
 
@@ -628,7 +608,6 @@ describe("EventAssistantRoom", () => {
           expect.objectContaining({
             channels: expect.arrayContaining([
               { name: "chat", passcode: "chat-pass" },
-              { name: "direct-user-123-agent-123" },
             ]),
           }),
         );
