@@ -9,45 +9,8 @@ import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { BotIcon } from "./BotIcon";
 import { createMentionsEnhancer } from "./enhancers/mentionsEnhancer";
-import { normalizeAssistantPseudonym } from "../utils/Helpers";
+import { normalizeAssistantPseudonym, parseMessageBody } from "../utils/Helpers";
 import { MENTION_DISPLAY_REGEX } from "../utils/mentionRegex";
-
-/**
- * Parsed message body structure
- * @property {string} text - The actual text content of the message
- * @property {string} [type] - Optional type for styling (e.g., "moderator_submitted")
- * @property {string} [message] - Optional message ID reference
- * @property {MediaItem[]} [media] - Optional array of media items (images, audio, video)
- */
-interface ParsedMessageBody {
-  text: string;
-  type?: string;
-  message?: string;
-  media?: MediaItem[];
-}
-
-/**
- * Parse the message body to extract text content and metadata
- * Handles both string and object formats
- */
-const parseMessageBody = (body: string | object): ParsedMessageBody => {
-  // Handle object input
-  if (body && typeof body === "object") {
-    const obj = body as Record<string, any>;
-
-    return {
-      text: obj.text?.toString() || "",
-      type: obj.type?.toString(),
-      message: obj.message?.toString(),
-      media: Array.isArray(obj.media) ? obj.media : undefined,
-    };
-  }
-
-  // Handle string input
-  return {
-    text: typeof body === "string" ? body : String(body),
-  };
-};
 
 /**
  * Parse message text and highlight @mentions with linkification.

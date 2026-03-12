@@ -6,7 +6,45 @@ import {
   EventUrl,
   EventUrls,
   PseudonymousMessage,
+  MediaItem,
 } from "../types.internal";
+
+/**
+ * Parsed message body structure
+ * @property {string} text - The actual text content of the message
+ * @property {string} [type] - Optional type for styling (e.g., "moderator_submitted")
+ * @property {string} [message] - Optional message ID reference
+ * @property {MediaItem[]} [media] - Optional array of media items (images, audio, video)
+ */
+export interface ParsedMessageBody {
+  text: string;
+  type?: string;
+  message?: string;
+  media?: MediaItem[];
+}
+
+/**
+ * Parse the message body to extract text content and metadata
+ * Handles both string and object formats
+ */
+export const parseMessageBody = (body: string | object): ParsedMessageBody => {
+  // Handle object input
+  if (body && typeof body === "object") {
+    const obj = body as Record<string, any>;
+
+    return {
+      text: obj.text?.toString() || "",
+      type: obj.type?.toString(),
+      message: obj.message?.toString(),
+      media: Array.isArray(obj.media) ? obj.media : undefined,
+    };
+  }
+
+  // Handle string input
+  return {
+    text: typeof body === "string" ? body : String(body),
+  };
+};
 
 /**
  * Structure to hold API tokens
