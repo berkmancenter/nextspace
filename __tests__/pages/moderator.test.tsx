@@ -112,6 +112,24 @@ describe("ModeratorScreen", () => {
         },
       },
     },
+    {
+      id: "3",
+      pseudonym: "Event Mediator Plus",
+      createdAt: "2026-03-13T00:31:29.268Z",
+      channels: ["moderator"],
+      body: {
+        insights: [
+          {
+            value: "At least 2 participants are independently reporting they cannot hear the speaker/audio.",
+            type: "insight"
+          }
+        ],
+        timestamp: {
+          start: 1773361630922,
+          end: 1773361881969,
+        },
+      },
+    },
   ];
 
   beforeEach(() => {
@@ -294,5 +312,175 @@ describe("ModeratorScreen", () => {
       // It must use the current token from the singleton, not a stale string
       expect(reconnectFetch![1]).toBe("fresh-token-after-reconnect");
     });
+  });
+
+  it("renders insights from Event Mediator Plus pseudonym correctly", async () => {
+    await act(async () => {
+      render(<ModeratorScreen authType={"user"} />);
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/At least 2 participants are independently reporting/)
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("logs unknown message formats to console instead of displaying them", async () => {
+    const consoleLogSpy = jest.spyOn(console, "log").mockImplementation();
+    
+    const messagesWithUnknown = [
+      ...mockMessages,
+      {
+        id: "4",
+        pseudonym: "Unknown Agent",
+        createdAt: "2026-03-13T01:00:00Z",
+        channels: ["moderator"],
+        body: {
+          // Has insights property to pass the filter, but it's not an array
+          // This will cause it to fail the Array.isArray check in renderMessageBody
+          insights: "not an array",
+          timestamp: {
+            start: 1773361630922,
+            end: 1773361881969,
+          },
+        },
+      },
+    ];
+
+    (RetrieveData as jest.Mock).mockResolvedValue(messagesWithUnknown);
+
+    await act(async () => {
+      render(<ModeratorScreen authType={"user"} />);
+    });
+
+    await waitFor(() => {
+      // Check that console.log was called with the unknown message
+      const unknownMessageCalls = consoleLogSpy.mock.calls.filter(
+        (call) => call[0] === "Unknown message format:"
+      );
+      expect(unknownMessageCalls.length).toBeGreaterThan(0);
+      expect(unknownMessageCalls[0][1]).toMatchObject({
+        id: "4",
+        pseudonym: "Unknown Agent",
+      });
+      
+      // Ensure "Unknown message format" text is NOT displayed in the UI
+      expect(screen.queryByText("Unknown message format")).not.toBeInTheDocument();
+    });
+
+    consoleLogSpy.mockRestore();
+  });
+
+  it("handles insights based on body structure rather than pseudonym", async () => {
+    // Test that insights are displayed regardless of the pseudonym name
+    const customInsightsMessage = [
+      {
+        id: "5",
+        pseudonym: "Custom Insight Agent",
+        createdAt: "2026-03-13T02:00:00Z",
+        channels: ["moderator"],
+        body: {
+          insights: [{ value: "Custom insight from non-standard agent" }],
+          timestamp: {
+            start: 1773361630922,
+            end: 1773361881969,
+          },
+        },
+      },
+    ];
+
+    (RetrieveData as jest.Mock).mockResolvedValue(customInsightsMessage);
+
+    await act(async () => {
+      render(<ModeratorScreen authType={"user"} />);
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Custom insight from non-standard agent")
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("logs messages with metrics property that is not an array", async () => {
+    const consoleLogSpy = jest.spyOn(console, "log").mockImplementation();
+    
+    const messagesWithInvalidMetrics = [
+      {
+        id: "6",
+        pseudonym: "Invalid Metrics Agent",
+        createdAt: "2026-03-13T03:00:00Z",
+        channels: ["moderator"],
+        body: {
+          metrics: "not an array",
+          timestamp: {
+            start: 1773361630922,
+            end: 1773361881969,
+          },
+        },
+      },
+    ];
+
+    (RetrieveData as jest.Mock).mockResolvedValue(messagesWithInvalidMetrics);
+
+    await act(async () => {
+      render(<ModeratorScreen authType={"user"} />);
+    });
+
+    await waitFor(() => {
+      const unknownMessageCalls = consoleLogSpy.mock.calls.filter(
+        (call) => call[0] === "Unknown message format:"
+      );
+      expect(unknownMessageCalls.length).toBeGreaterThan(0);
+      expect(unknownMessageCalls[0][1]).toMatchObject({
+        id: "6",
+        pseudonym: "Invalid Metrics Agent",
+      });
+    });
+
+    consoleLogSpy.mockRestore();
+  });
+
+  it("logs messages with preset but no text property", async () => {
+    const consoleLogSpy = jest.spyOn(console, "log").mockImplementation();
+    
+    const messagesWithPartialPreset = [
+      {
+        id: "7",
+        pseudonym: "Partial Preset Agent",
+        createdAt: "2026-03-13T04:00:00Z",
+        channels: ["moderator"],
+        body: {
+          // Has insights to pass the filter
+          insights: {},
+          preset: true,
+          // Missing text property
+          timestamp: {
+            start: 1773361630922,
+            end: 1773361881969,
+          },
+        },
+      },
+    ];
+
+    (RetrieveData as jest.Mock).mockResolvedValue(messagesWithPartialPreset);
+
+    await act(async () => {
+      render(<ModeratorScreen authType={"user"} />);
+    });
+
+    await waitFor(() => {
+      const unknownMessageCalls = consoleLogSpy.mock.calls.filter(
+        (call) => call[0] === "Unknown message format:"
+      );
+      expect(unknownMessageCalls.length).toBeGreaterThan(0);
+      expect(unknownMessageCalls[0][1]).toMatchObject({
+        id: "7",
+        pseudonym: "Partial Preset Agent",
+      });
+    });
+
+    consoleLogSpy.mockRestore();
   });
 });

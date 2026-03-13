@@ -221,7 +221,8 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
   }, [socket, router.query.conversationId, modPasscode]);
 
   const renderMessageBody = (message: PseudonymousMessage) => {
-    if (message.pseudonym === "Back Channel Insights Agent") {
+    // Check for insights array in body (handles multiple pseudonyms)
+    if (message.body.hasOwnProperty("insights") && Array.isArray(message.body.insights)) {
       return (
         <div>
           {(message as ModeratorInsightsMessage).body.insights.map(
@@ -233,7 +234,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
           )}
         </div>
       );
-    } else if (message.pseudonym === "Back Channel Metrics Agent") {
+    } else if (message.body.hasOwnProperty("metrics") && Array.isArray(message.body.metrics)) {
       const metrics = message.body.metrics;
       const messages = metrics.map((m: any, i: number) => {
         const lastInList = i === metrics.length - 1;
@@ -252,18 +253,20 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
           {messages}.
         </div>
       );
-    } else {
+    } else if (
       message.body.hasOwnProperty("preset") &&
       message.body.hasOwnProperty("text")
-        ? (
-            message.body as {
-              text: string;
-              preset: boolean;
-            }
-          ).text
-        : String(message.body);
+    ) {
+      return (
+        <div>
+          {(message.body as { text: string; preset: boolean }).text}
+        </div>
+      );
+    } else {
+      // Log unknown message formats to console instead of displaying
+      console.log("Unknown message format:", message);
+      return null;
     }
-    return <p>Unknown message format</p>;
   };
 
   // Transcript is enabled if we have a passcode
