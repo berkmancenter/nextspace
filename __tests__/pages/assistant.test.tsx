@@ -1447,7 +1447,7 @@ describe("EventAssistantRoom", () => {
       await waitFor(() => {
         expect(SendData).toHaveBeenCalledWith(
           "users/user/user-123/preferences",
-          { visualResponse: true },
+          { visualResponse: true, jargonClarification: false },
           undefined,
           undefined,
           "PUT",
@@ -1597,7 +1597,7 @@ describe("EventAssistantRoom", () => {
       await waitFor(() => {
         expect(SendData).toHaveBeenCalledWith(
           "users/user/user-123/preferences",
-          { visualResponse: true },
+          { visualResponse: true, jargonClarification: false },
           undefined,
           undefined,
           "PUT",
@@ -1669,6 +1669,188 @@ describe("EventAssistantRoom", () => {
         expect(
           screen.getByText("Failed to save preferences. Please try again."),
         ).toBeInTheDocument();
+      });
+    });
+
+    it("renders Jargon Clarification option in the preferences banner", async () => {
+      const user = userEvent.setup();
+
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
+          return Promise.resolve({});
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]);
+        }
+        return Promise.resolve(null);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
+      });
+
+      await user.click(screen.getAllByLabelText("Berkie")[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+      });
+
+      expect(
+        screen.getByRole("checkbox", { name: /Jargon Clarification/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Send me clarification when speakers use jargon"),
+      ).toBeInTheDocument();
+    });
+
+    it("saves jargonClarification: true when only that option is selected", async () => {
+      const user = userEvent.setup();
+
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
+          return Promise.resolve({});
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]);
+        }
+        return Promise.resolve(null);
+      });
+
+      (SendData as jest.Mock).mockResolvedValue({ success: true });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
+      });
+
+      await user.click(screen.getAllByLabelText("Berkie")[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+      });
+
+      await user.click(
+        screen.getByRole("checkbox", { name: /Jargon Clarification/i }),
+      );
+
+      await user.click(
+        screen.getByRole("button", { name: /Save Preferences/i }),
+      );
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          "users/user/user-123/preferences",
+          { visualResponse: false, jargonClarification: true },
+          undefined,
+          undefined,
+          "PUT",
+        );
+      });
+    });
+
+    it("saves both options as true when both are selected", async () => {
+      const user = userEvent.setup();
+
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-pass",
+      };
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
+          return Promise.resolve({});
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]);
+        }
+        return Promise.resolve(null);
+      });
+
+      (SendData as jest.Mock).mockResolvedValue({ success: true });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
+      });
+
+      await user.click(screen.getAllByLabelText("Berkie")[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText("Set Your Preferences")).toBeInTheDocument();
+      });
+
+      await user.click(
+        screen.getByRole("checkbox", { name: /Visual Response/i }),
+      );
+      await user.click(
+        screen.getByRole("checkbox", { name: /Jargon Clarification/i }),
+      );
+
+      await user.click(
+        screen.getByRole("button", { name: /Save Preferences/i }),
+      );
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          "users/user/user-123/preferences",
+          { visualResponse: true, jargonClarification: true },
+          undefined,
+          undefined,
+          "PUT",
+        );
       });
     });
   });

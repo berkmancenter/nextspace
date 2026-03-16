@@ -64,6 +64,11 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       label: "Visual Response",
       description: "Answer my questions with images when appropriate",
     },
+    {
+      value: "jargonClarification",
+      label: "Jargon Clarification",
+      description: "Send me clarification when speakers use jargon",
+    },
   ];
 
   // Ref to track active tab for socket handler
