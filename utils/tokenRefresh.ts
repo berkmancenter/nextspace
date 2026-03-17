@@ -1,151 +1,57 @@
 /**
- * Utility functions for token refresh operations
+ * Utility functions for token refresh operations.
+ *
+ * These functions are thin wrappers around `TokenManager` — the single
+ * source of truth for token storage, refresh deduplication, proactive
+ * scheduling, and cross-tab coordination.  They are kept for backward
+ * compatibility with existing callers.
  */
 
-import { Api } from "./Helpers";
-import { RefreshToken } from "./Api";
+import TokenManagerDefault from "./TokenManager";
 
 /**
- * Ensures that the current access token is valid by attempting a refresh if needed.
- * This should be called before critical operations like WebSocket authentication.
- * 
- * @returns The current valid access token, or null if refresh failed
+ * Ensures that the current access token is valid.
+ *
+ * If the token is still fresh (more than 2 minutes until expiry) the current
+ * access token is returned immediately.  If it is expired or within the
+ * buffer window a refresh is triggered first.
+ *
+ * Concurrent callers are automatically deduplicated by `TokenManager`.
+ *
+ * @returns The current valid access token, or null if refresh failed.
  */
 export async function ensureFreshToken(): Promise<string | null> {
-  const apiI = Api.get();
-  let tokens = apiI.GetTokens();
-
-  // If we don't have tokens at all, can't refresh
-  if (!tokens.access || !tokens.refresh) {
-    return tokens.access;
-  }
-
-  // Try to use the current token first - we'll assume it's valid
-  // The main use case is when it might be expired, so we proactively refresh
-  // However, we don't want to refresh on every call, so we make a lightweight check
-  
-  // Instead, we can try to refresh and handle gracefully if not needed
-  // For now, let's just ensure tokens are in sync with cookie
-  try {
-    // Check if we can get fresh tokens from the cookie via API
-    const response = await fetch("/api/cookie");
-    if (response.ok) {
-      const data = await response.json();
-      if (data.tokens?.access && data.tokens?.refresh) {
-        // Update in-memory tokens if they're different from what we have
-        if (data.tokens.access !== tokens.access) {
-          apiI.SetTokens(data.tokens.access, data.tokens.refresh);
-          tokens = apiI.GetTokens();
-        }
-      }
-    }
-  } catch (error) {
-    console.error("Error checking cookie for fresh tokens:", error);
-  }
-
-  return tokens.access;
+  return TokenManagerDefault.getValidToken();
 }
 
 /**
- * In-flight refresh promise used to deduplicate concurrent refresh calls.
- * If multiple callers invoke refreshAccessToken() simultaneously they all
- * share the same request instead of each sending their own — which would
- * invalidate the single-use refresh token and trigger a destructive race.
- */
-let inflightRefresh: Promise<boolean> | null = null;
-
-/**
  * Attempts to refresh the access token using the refresh token.
- * Updates both in-memory tokens and the session cookie.
+ * Updates both in-memory tokens (via TokenManager) and the session cookie.
  *
  * Concurrent callers are automatically deduplicated: if a refresh is already
  * in progress every additional caller awaits the same promise rather than
  * issuing a second request that would invalidate the first one.
  *
- * @returns True if refresh was successful, false otherwise
+ * Cross-tab coordination is handled by TokenManager via BroadcastChannel:
+ * if another tab already refreshed the token, this will detect the updated
+ * cookie and adopt the new tokens without making a redundant network call.
+ *
+ * @returns True if refresh was successful, false otherwise.
  */
 export async function refreshAccessToken(): Promise<boolean> {
-  if (inflightRefresh) {
-    return inflightRefresh;
-  }
-  inflightRefresh = _refreshAccessToken();
-  try {
-    return await inflightRefresh;
-  } finally {
-    inflightRefresh = null;
-  }
-}
-
-async function _refreshAccessToken(): Promise<boolean> {
-  const apiI = Api.get();
-  let tokens = apiI.GetTokens();
-
-  // If the refresh token is missing from memory, attempt to restore it from
-  // the HttpOnly session cookie before giving up. This handles cases where the
-  // in-memory singleton was cleared (e.g. after a hot-reload or a prior failed
-  // race) but the cookie is still valid.
-  if (!tokens.refresh) {
-    try {
-      const cookieResponse = await fetch("/api/cookie");
-      if (cookieResponse.ok) {
-        const cookieData = await cookieResponse.json();
-        if (cookieData.tokens?.access && cookieData.tokens?.refresh) {
-          apiI.SetTokens(cookieData.tokens.access, cookieData.tokens.refresh);
-          tokens = apiI.GetTokens();
-        }
-      }
-    } catch (cookieError) {
-      console.error("Failed to restore tokens from cookie:", cookieError);
-    }
-  }
-
-  if (!tokens.refresh) {
-    console.error("No refresh token available");
-    return false;
-  }
-
-  try {
-    console.log("Refreshing access token...");
-    const tokensResponse = await RefreshToken(tokens.refresh);
-
-    if (tokensResponse?.access?.token && tokensResponse?.refresh?.token) {
-      // Update tokens in memory
-      apiI.SetTokens(tokensResponse.access.token, tokensResponse.refresh.token);
-
-      // Update session cookie with new tokens
-      await fetch("/api/session", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          accessToken: tokensResponse.access.token,
-          refreshToken: tokensResponse.refresh.token,
-        }),
-      });
-
-      console.log("Token refresh successful");
-      return true;
-    }
-
-    console.error("Token refresh failed: Invalid response");
-    return false;
-  } catch (error) {
-    console.error("Token refresh error:", error);
-    return false;
-  }
+  return TokenManagerDefault.refresh();
 }
 
 /**
- * Wraps a WebSocket emit operation with automatic token refresh on authentication errors.
- * If the socket returns an authentication error, it will attempt to refresh the token
- * and retry the operation once.
- * 
- * @param socket - The socket.io socket instance
- * @param event - The event name to emit
- * @param data - The data to send with the event
- * @param onSuccess - Optional callback for successful emission
- * @param onError - Optional callback for errors (after retry if applicable)
+ * Wraps a WebSocket emit operation with automatic token refresh on
+ * authentication errors.  If the socket returns an authentication error it
+ * will attempt to refresh the token via `TokenManager` and retry once.
+ *
+ * @param socket    The socket.io socket instance.
+ * @param event     The event name to emit.
+ * @param data      The data to send with the event.
+ * @param onSuccess Optional callback for successful emission.
+ * @param onError   Optional callback for errors (after retry if applicable).
  */
 export async function emitWithTokenRefresh(
   socket: any,
@@ -154,12 +60,11 @@ export async function emitWithTokenRefresh(
   onSuccess?: () => void,
   onError?: (error: any) => void
 ) {
-  // Ensure we have a fresh token before emitting
-  const freshToken = await ensureFreshToken();
-  
+  // Ensure we have a fresh token before emitting.
+  const freshToken = await TokenManagerDefault.getValidToken();
+
   if (!freshToken) {
-    console.warn("No valid token available for socket operation - skipping emit");
-    // Call error handler if provided, but don't throw
+    console.warn("No valid token available for socket operation — skipping emit");
     if (onError) {
       try {
         onError(new Error("No valid token"));
@@ -170,26 +75,31 @@ export async function emitWithTokenRefresh(
     return;
   }
 
-  // Update the data with fresh token if it contains a token field
+  // Update the data with the fresh token if it contains a token field.
   const dataWithFreshToken = { ...data };
-  if ('token' in dataWithFreshToken) {
+  if ("token" in dataWithFreshToken) {
     dataWithFreshToken.token = freshToken;
   }
 
-  // Set up one-time error handler for auth errors
+  // Inner handler for auth errors received from the socket server.
   const handleAuthError = async (error: any) => {
-    if (error?.message?.includes("401") || error?.message?.includes("Unauthorized") || error?.message?.includes("authentication")) {
-      console.log("Socket authentication failed, attempting token refresh...");
-      
-      const refreshed = await refreshAccessToken();
-      
+    const isAuthError =
+      error?.message?.includes("401") ||
+      error?.message?.includes("Unauthorized") ||
+      error?.message?.includes("authentication");
+
+    if (isAuthError) {
+      console.log("Socket authentication failed, refreshing token via TokenManager…");
+
+      const refreshed = await TokenManagerDefault.refresh();
+
       if (refreshed) {
-        // Retry with new token
-        const newToken = Api.get().getAccessToken();
-        if ('token' in dataWithFreshToken) {
+        // Retry with the new token.
+        const newToken = TokenManagerDefault.getAccessToken();
+        if ("token" in dataWithFreshToken) {
           dataWithFreshToken.token = newToken;
         }
-        
+
         socket.emit(event, dataWithFreshToken, (response: any) => {
           if (response?.error) {
             console.warn("Socket emit failed after retry:", response.error);
@@ -221,7 +131,7 @@ export async function emitWithTokenRefresh(
         }
       }
     } else {
-      // Not an auth error, pass through
+      // Not an auth error — pass through as-is.
       if (onError) {
         try {
           onError(error);
@@ -232,7 +142,7 @@ export async function emitWithTokenRefresh(
     }
   };
 
-  // Emit the event with acknowledgment callback
+  // Emit the event with acknowledgment callback.
   socket.emit(event, dataWithFreshToken, (response: any) => {
     if (response?.error) {
       handleAuthError(response.error);

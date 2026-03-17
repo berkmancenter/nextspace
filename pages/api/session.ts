@@ -16,7 +16,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   // Handle PATCH request - update tokens in existing session
   if (req.method === "PATCH") {
-    const { accessToken, refreshToken } = req.body;
+    const { accessToken, refreshToken, accessExpires, refreshExpires } = req.body;
 
     if (!accessToken || !refreshToken) {
       res.status(400).json({ error: "accessToken and refreshToken are required" });
@@ -34,10 +34,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // Decrypt existing cookie to get current data
       const { payload } = await jwtDecrypt(existingCookie, secret);
 
-      // Create new cookie with updated tokens but preserve other data
+      // Create new cookie with updated tokens but preserve other data.
+      // Store accessExpires/refreshExpires so the client can schedule
+      // proactive refresh without needing to decode the JWT.
       const cookie = await new EncryptJWT({
         access: accessToken,
         refresh: refreshToken,
+        accessExpires: accessExpires || payload.accessExpires,
+        refreshExpires: refreshExpires || payload.refreshExpires,
         userId: payload.userId,
         authType: payload.authType || "guest",
         version: CURRENT_COOKIE_VERSION,
@@ -92,10 +96,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return;
     }
 
-    // Create encrypted JWT cookie
+    // Create encrypted JWT cookie.  Store accessExpires/refreshExpires so the
+    // client can schedule proactive refresh without needing to decode the JWT.
     const cookie = await new EncryptJWT({
       access: sessionData.accessToken,
       refresh: sessionData.refreshToken,
+      accessExpires: sessionData.accessExpires,
+      refreshExpires: sessionData.refreshExpires,
       userId: sessionData.userId,
       authType: authType,
       version: CURRENT_COOKIE_VERSION,

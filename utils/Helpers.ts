@@ -8,6 +8,7 @@ import {
   PseudonymousMessage,
   MediaItem,
 } from "../types.internal";
+import TokenManagerDefault from "./TokenManager";
 
 /**
  * Parsed message body structure
@@ -58,19 +59,13 @@ type ApiTokens = {
 
 /**
  * Singleton class to manage API tokens.
+ *
+ * Token storage now delegates to `TokenManager` so there is a single source
+ * of truth for token state.  The `Api` class is kept for backward
+ * compatibility but thin-wraps `TokenManager` for all token operations.
  */
 export class Api {
   private static _instance: Api;
-
-  API_TOKENS: ApiTokens = {
-    access: null,
-    refresh: null,
-  };
-
-  ADMIN_TOKENS: ApiTokens = {
-    access: null,
-    refresh: null,
-  };
 
   private configCache: {
     conversationTypes: components["schemas"]["ConversationType"][];
@@ -79,47 +74,55 @@ export class Api {
     conversationBotName: string;
   } | null = null;
 
-  SetTokens(access: string, refresh: string) {
-    this.API_TOKENS = {
+  /**
+   * Store access + refresh tokens.  Delegates to `TokenManager` so that
+   * expiry-based proactive refresh, cross-tab sync, and deduplication all
+   * work automatically.
+   *
+   * @param access        Raw access token string.
+   * @param refresh       Raw refresh token string.
+   * @param accessExpires Optional ISO-8601 expiry for the access token.
+   * @param refreshExpires Optional ISO-8601 expiry for the refresh token.
+   */
+  SetTokens(
+    access: string,
+    refresh: string,
+    accessExpires?: string,
+    refreshExpires?: string
+  ) {
+    TokenManagerDefault.setTokensFromStrings(
       access,
       refresh,
-    };
+      accessExpires,
+      refreshExpires
+    );
   }
-  GetTokens() {
-    return this.API_TOKENS;
+
+  /**
+   * Returns `{ access, refresh }` token strings for backward compatibility.
+   * The authoritative store is `TokenManager`.
+   */
+  GetTokens(): ApiTokens {
+    return TokenManagerDefault.getTokens();
   }
+
   /**
    * Returns the current access token. Always call this at point-of-use so
    * you get the live value from the singleton rather than a value captured
    * at render/effect time that may have gone stale after a token refresh.
    */
   getAccessToken(): string {
-    return this.API_TOKENS.access ?? "";
-  }
-  SetAdminTokens(access: string, refresh: string) {
-    this.ADMIN_TOKENS = {
-      access,
-      refresh,
-    };
-  }
-  GetAdminTokens() {
-    return this.ADMIN_TOKENS;
-  }
-  IsLoggedIn() {
-    return this.ADMIN_TOKENS.access !== null;
+    return TokenManagerDefault.getAccessToken();
   }
 
-  ClearAdminTokens() {
-    this.ADMIN_TOKENS = {
-      access: null,
-      refresh: null,
-    };
+  /** Returns true if the user has a valid access token (via TokenManager). */
+  IsLoggedIn() {
+    return TokenManagerDefault.getAccessToken() !== "";
   }
+
+  /** Clears all regular (non-admin) tokens from `TokenManager`. */
   ClearTokens() {
-    this.API_TOKENS = {
-      access: null,
-      refresh: null,
-    };
+    TokenManagerDefault.clearTokens();
   }
 
   async GetConfig() {

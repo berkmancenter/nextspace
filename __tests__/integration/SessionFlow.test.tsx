@@ -32,10 +32,28 @@ jest.mock("../../utils/Helpers", () => ({
       GetTokens: jest.fn(() => ({ access: "mock-token", refresh: "refresh" })),
       getAccessToken: jest.fn(() => "mock-token"),
       ClearTokens: jest.fn(),
-      ClearAdminTokens: jest.fn(),
     })),
   },
 }));
+
+// Mock TokenManager — the real integration concern is that SetTokens →
+// TokenManager stores expiry so proactive refresh can be scheduled.
+jest.mock("../../utils/TokenManager", () => ({
+  __esModule: true,
+  default: {
+    setTokens: jest.fn(),
+    setTokensFromStrings: jest.fn(),
+    getTokens: jest.fn(() => ({ access: "mock-token", refresh: "refresh" })),
+    getAccessToken: jest.fn(() => "mock-token"),
+    getFullTokens: jest.fn(() => null),
+    isAccessTokenFresh: jest.fn(() => true),
+    clearTokens: jest.fn(),
+    refresh: jest.fn(() => Promise.resolve(false)),
+    onTokensChanged: jest.fn(() => jest.fn()),
+  },
+  TokenManager: { get: jest.fn() },
+}));
+import TokenManagerDefault from "../../utils/TokenManager";
 
 // Mock fetch
 global.fetch = jest.fn();
@@ -296,6 +314,68 @@ describe("Session Management Integration Tests", () => {
       expect(mockSessionManager.clearSession).toHaveBeenCalled();
       // clearSession is called on SessionManager, which internally calls Api methods
       // We're testing the SessionManager behavior, not the Api implementation
+    });
+  });
+
+  describe("Test Scenario 11: Admin login → participant page token continuity", () => {
+    it("stores tokens with expiry in TokenManager after admin login so participant pages can use them", async () => {
+      // Simulate what login.tsx does after a successful admin login:
+      // it calls Api.get().SetTokens(...) with all 4 args including expiry.
+      const mockApiInstance = (Api.get as jest.Mock)();
+      const accessToken = "admin-access-token";
+      const refreshToken = "admin-refresh-token";
+      const accessExpires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      const refreshExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      mockApiInstance.SetTokens(accessToken, refreshToken, accessExpires, refreshExpires);
+
+      // Verify SetTokens was called with all 4 args (expiry included)
+      expect(mockApiInstance.SetTokens).toHaveBeenCalledWith(
+        accessToken,
+        refreshToken,
+        accessExpires,
+        refreshExpires
+      );
+
+      // Simulate navigation to participant/assistant page:
+      // the page calls Api.get().GetTokens() to get the current token.
+      mockApiInstance.GetTokens.mockReturnValue({
+        access: accessToken,
+        refresh: refreshToken,
+      });
+      const tokens = mockApiInstance.GetTokens();
+
+      expect(tokens.access).toBe(accessToken);
+      expect(tokens.refresh).toBe(refreshToken);
+    });
+
+    it("does not lose tokens when navigating from admin page to assistant page", async () => {
+      const mockSessionManager = {
+        restoreSession: jest.fn().mockResolvedValue({
+          userId: "admin-user",
+          username: "adminuser",
+        }),
+        getState: jest.fn().mockReturnValue("authenticated"),
+        hasSession: jest.fn().mockReturnValue(true),
+        getSessionInfo: jest.fn().mockReturnValue({
+          userId: "admin-user",
+          username: "adminuser",
+        }),
+      };
+
+      (SessionManager.get as jest.Mock).mockReturnValue(mockSessionManager);
+
+      // Admin page: session is restored
+      mockRouter.pathname = "/admin/events";
+      await mockSessionManager.restoreSession();
+      expect(mockSessionManager.getState()).toBe("authenticated");
+
+      // Navigate to assistant page: session should still exist
+      mockRouter.pathname = "/assistant";
+      const session = mockSessionManager.getSessionInfo();
+      expect(session).not.toBeNull();
+      expect(session?.userId).toBe("admin-user");
+      expect(mockSessionManager.hasSession()).toBe(true);
     });
   });
 

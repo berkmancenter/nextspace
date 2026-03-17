@@ -7,7 +7,6 @@ const mockApiInstance = {
   GetTokens: jest.fn(() => ({ access: null, refresh: null })),
   getAccessToken: jest.fn(() => ""),
   ClearTokens: jest.fn(),
-  ClearAdminTokens: jest.fn(),
 };
 
 // Mock Api
@@ -15,6 +14,23 @@ jest.mock("../../utils/Helpers", () => ({
   Api: {
     get: jest.fn(() => mockApiInstance),
   },
+}));
+
+// Mock TokenManager — SessionManager imports it but it's also driven
+// through Api.get().SetTokens/ClearTokens so we just need a no-op mock.
+jest.mock("../../utils/TokenManager", () => ({
+  __esModule: true,
+  default: {
+    setTokens: jest.fn(),
+    setTokensFromStrings: jest.fn(),
+    getTokens: jest.fn(() => ({ access: null, refresh: null })),
+    getAccessToken: jest.fn(() => ""),
+    isAccessTokenFresh: jest.fn(() => false),
+    clearTokens: jest.fn(),
+    refresh: jest.fn(() => Promise.resolve(false)),
+    onTokensChanged: jest.fn(() => jest.fn()),
+  },
+  TokenManager: { get: jest.fn() },
 }));
 
 // Mock fetch
@@ -33,7 +49,6 @@ describe("SessionManager", () => {
     mockApiInstance.SetTokens.mockClear();
     mockApiInstance.GetTokens.mockClear();
     mockApiInstance.ClearTokens.mockClear();
-    mockApiInstance.ClearAdminTokens.mockClear();
   });
 
   describe("Singleton Pattern", () => {
@@ -64,9 +79,13 @@ describe("SessionManager", () => {
 
       expect(result).toEqual({ userId: "user-123", username: "testuser" });
       expect(global.fetch).toHaveBeenCalledWith("/api/cookie");
+      // SetTokens is now called with 4 params; last two may be undefined when
+      // the cookie doesn't include accessExpires / refreshExpires.
       expect(mockApiInstance.SetTokens).toHaveBeenCalledWith(
         "mock-access-token",
-        "mock-refresh-token"
+        "mock-refresh-token",
+        undefined,
+        undefined
       );
       expect(sessionManager.getState()).toBe("authenticated");
     });
@@ -332,7 +351,6 @@ describe("SessionManager", () => {
       expect(sessionManager.getState()).toBe("cleared");
       expect(sessionManager.getSessionInfo()).toBeNull();
       expect(mockApiInstance.ClearTokens).toHaveBeenCalled();
-      expect(mockApiInstance.ClearAdminTokens).toHaveBeenCalled();
     });
 
     it("skips session creation when skipCreation is true", async () => {

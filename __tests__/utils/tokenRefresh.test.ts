@@ -1,272 +1,113 @@
 /**
  * @jest-environment jsdom
  */
-import { Api } from "../../utils/Helpers";
-import { RefreshToken } from "../../utils/Api";
+
+// ─── Mock TokenManager ───────────────────────────────────────────────────────
+// tokenRefresh utilities are thin wrappers around TokenManager.
+// jest.mock is hoisted above const declarations so we use jest.fn() inline
+// and obtain typed references after import.
+jest.mock("../../utils/TokenManager", () => ({
+  __esModule: true,
+  default: {
+    getValidToken: jest.fn(),
+    refresh: jest.fn(),
+    getAccessToken: jest.fn(() => ""),
+    getTokens: jest.fn(() => ({ access: null, refresh: null })),
+    setTokens: jest.fn(),
+    setTokensFromStrings: jest.fn(),
+    clearTokens: jest.fn(),
+    isAccessTokenFresh: jest.fn(() => false),
+    onTokensChanged: jest.fn(() => jest.fn()),
+  },
+  TokenManager: { get: jest.fn() },
+}));
+
+// Obtain typed references after jest.mock hoisting.
+import TokenManagerDefault from "../../utils/TokenManager";
+const mockGetValidToken = TokenManagerDefault.getValidToken as jest.Mock;
+const mockRefresh = TokenManagerDefault.refresh as jest.Mock;
+const mockGetAccessToken = TokenManagerDefault.getAccessToken as jest.Mock;
+
+// Also mock Helpers / Api just in case they are transitively imported
+jest.mock("../../utils/Helpers", () => ({
+  Api: {
+    get: jest.fn(() => ({
+      GetTokens: jest.fn(() => ({ access: null, refresh: null })),
+      getAccessToken: jest.fn(() => ""),
+      SetTokens: jest.fn(),
+      ClearTokens: jest.fn(),
+      ClearAdminTokens: jest.fn(),
+    })),
+  },
+}));
+
+jest.mock("../../utils/Api", () => ({
+  RefreshToken: jest.fn(),
+  fetchWithTokenRefresh: jest.fn(),
+  RetrieveData: jest.fn(),
+  Request: jest.fn(),
+  SocketStateHandler: jest.fn(),
+  Authenticate: jest.fn(),
+  getUserTimezone: jest.fn(() => "UTC"),
+}));
+
 import {
   ensureFreshToken,
   refreshAccessToken,
   emitWithTokenRefresh,
 } from "../../utils/tokenRefresh";
 
-// Mock the dependencies
-jest.mock("../../utils/Helpers");
-jest.mock("../../utils/Api");
-
-// Mock global fetch
-global.fetch = jest.fn();
+// ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("tokenRefresh utilities", () => {
-  let mockApi: any;
-
   beforeEach(() => {
     jest.clearAllMocks();
-
-    // Setup mock Api instance
-    mockApi = {
-      GetTokens: jest.fn(),
-      getAccessToken: jest.fn(() => mockApi.GetTokens()?.access ?? ""),
-      SetTokens: jest.fn(),
-    };
-    (Api.get as jest.Mock).mockReturnValue(mockApi);
-
-    // Reset fetch mock
-    (global.fetch as jest.Mock).mockReset();
   });
 
+  // ─── ensureFreshToken ─────────────────────────────────────────────────────
+
   describe("ensureFreshToken", () => {
-    it("should return current access token if no tokens available", async () => {
-      mockApi.GetTokens.mockReturnValue({
-        access: null,
-        refresh: null,
-      });
+    it("delegates to TokenManager.getValidToken() and returns its result", async () => {
+      mockGetValidToken.mockResolvedValueOnce("valid-token");
+
+      const result = await ensureFreshToken();
+
+      expect(mockGetValidToken).toHaveBeenCalledTimes(1);
+      expect(result).toBe("valid-token");
+    });
+
+    it("returns null when TokenManager.getValidToken() returns null", async () => {
+      mockGetValidToken.mockResolvedValueOnce(null);
 
       const result = await ensureFreshToken();
 
       expect(result).toBeNull();
-      expect(mockApi.GetTokens).toHaveBeenCalled();
-    });
-
-    it("should sync tokens from cookie if available", async () => {
-      const currentTokens = {
-        access: "old-access-token",
-        refresh: "old-refresh-token",
-      };
-      const newTokens = {
-        access: "new-access-token",
-        refresh: "new-refresh-token",
-      };
-
-      // First call returns old tokens, second call (after SetTokens) returns new tokens
-      mockApi.GetTokens
-        .mockReturnValueOnce(currentTokens)
-        .mockReturnValueOnce(newTokens);
-
-      // Mock successful cookie fetch
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          tokens: newTokens,
-        }),
-      });
-
-      const result = await ensureFreshToken();
-
-      expect(result).toBe(newTokens.access);
-      expect(mockApi.SetTokens).toHaveBeenCalledWith(
-        newTokens.access,
-        newTokens.refresh
-      );
-    });
-
-    it("should return current token if cookie fetch fails", async () => {
-      const currentTokens = {
-        access: "current-access-token",
-        refresh: "current-refresh-token",
-      };
-
-      mockApi.GetTokens.mockReturnValue(currentTokens);
-
-      // Mock failed cookie fetch
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Network error"));
-
-      const result = await ensureFreshToken();
-
-      expect(result).toBe(currentTokens.access);
-      expect(mockApi.SetTokens).not.toHaveBeenCalled();
     });
   });
+
+  // ─── refreshAccessToken ───────────────────────────────────────────────────
 
   describe("refreshAccessToken", () => {
-    it("should return false if no refresh token available and cookie has no refresh token", async () => {
-      mockApi.GetTokens.mockReturnValue({
-        access: "some-access-token",
-        refresh: null,
-      });
-
-      // Cookie also has no refresh token
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ tokens: { access: "some-access-token", refresh: null } }),
-      });
+    it("delegates to TokenManager.refresh() and returns true on success", async () => {
+      mockRefresh.mockResolvedValueOnce(true);
 
       const result = await refreshAccessToken();
 
-      expect(result).toBe(false);
-      expect(RefreshToken).not.toHaveBeenCalled();
-    });
-
-    it("should fall back to cookie if in-memory refresh token is missing", async () => {
-      // No refresh token in memory
-      mockApi.GetTokens
-        .mockReturnValueOnce({ access: "old-access", refresh: null })
-        // After SetTokens is called, return restored tokens
-        .mockReturnValue({ access: "cookie-access", refresh: "cookie-refresh" });
-
-      const newTokens = {
-        access: { token: "refreshed-access" },
-        refresh: { token: "refreshed-refresh" },
-      };
-
-      // Cookie fetch returns a valid refresh token
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          tokens: { access: "cookie-access", refresh: "cookie-refresh" },
-        }),
-      });
-
-      (RefreshToken as jest.Mock).mockResolvedValueOnce(newTokens);
-
-      // Session PATCH after successful refresh
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ message: "Success" }),
-      });
-
-      const result = await refreshAccessToken();
-
+      expect(mockRefresh).toHaveBeenCalledTimes(1);
       expect(result).toBe(true);
-      // Should have restored tokens from cookie
-      expect(mockApi.SetTokens).toHaveBeenCalledWith("cookie-access", "cookie-refresh");
-      // Should have used the restored refresh token for the actual refresh call
-      expect(RefreshToken).toHaveBeenCalledWith("cookie-refresh");
     });
 
-    it("should deduplicate concurrent refresh calls", async () => {
-      const currentTokens = {
-        access: "old-access-token",
-        refresh: "old-refresh-token",
-      };
-      const newTokens = {
-        access: { token: "new-access-token" },
-        refresh: { token: "new-refresh-token" },
-      };
-
-      mockApi.GetTokens.mockReturnValue(currentTokens);
-
-      // RefreshToken resolves after a short delay to allow concurrency
-      (RefreshToken as jest.Mock).mockImplementationOnce(
-        () =>
-          new Promise((resolve) =>
-            setTimeout(() => resolve(newTokens), 20)
-          )
-      );
-
-      // Session PATCH
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: async () => ({ message: "Success" }),
-      });
-
-      // Fire three concurrent refresh calls
-      const [r1, r2, r3] = await Promise.all([
-        refreshAccessToken(),
-        refreshAccessToken(),
-        refreshAccessToken(),
-      ]);
-
-      expect(r1).toBe(true);
-      expect(r2).toBe(true);
-      expect(r3).toBe(true);
-      // The actual network call must only happen once
-      expect(RefreshToken).toHaveBeenCalledTimes(1);
-    });
-
-    it("should refresh tokens successfully", async () => {
-      const currentTokens = {
-        access: "old-access-token",
-        refresh: "old-refresh-token",
-      };
-      const newTokens = {
-        access: { token: "new-access-token" },
-        refresh: { token: "new-refresh-token" },
-      };
-
-      mockApi.GetTokens.mockReturnValue(currentTokens);
-      (RefreshToken as jest.Mock).mockResolvedValueOnce(newTokens);
-
-      // Mock session update
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ message: "Success" }),
-      });
+    it("delegates to TokenManager.refresh() and returns false on failure", async () => {
+      mockRefresh.mockResolvedValueOnce(false);
 
       const result = await refreshAccessToken();
 
-      expect(result).toBe(true);
-      expect(RefreshToken).toHaveBeenCalledWith(currentTokens.refresh);
-      expect(mockApi.SetTokens).toHaveBeenCalledWith(
-        newTokens.access.token,
-        newTokens.refresh.token
-      );
-      expect(global.fetch).toHaveBeenCalledWith(
-        "/api/session",
-        expect.objectContaining({
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            accessToken: newTokens.access.token,
-            refreshToken: newTokens.refresh.token,
-          }),
-        })
-      );
-    });
-
-    it("should return false if refresh token API fails", async () => {
-      const currentTokens = {
-        access: "old-access-token",
-        refresh: "old-refresh-token",
-      };
-
-      mockApi.GetTokens.mockReturnValue(currentTokens);
-      (RefreshToken as jest.Mock).mockResolvedValueOnce({
-        access: null,
-        refresh: null,
-      });
-
-      const result = await refreshAccessToken();
-
-      expect(result).toBe(false);
-      expect(mockApi.SetTokens).not.toHaveBeenCalled();
-    });
-
-    it("should handle errors during refresh", async () => {
-      const currentTokens = {
-        access: "old-access-token",
-        refresh: "old-refresh-token",
-      };
-
-      mockApi.GetTokens.mockReturnValue(currentTokens);
-      (RefreshToken as jest.Mock).mockRejectedValueOnce(new Error("Network error"));
-
-      const result = await refreshAccessToken();
-
+      expect(mockRefresh).toHaveBeenCalledTimes(1);
       expect(result).toBe(false);
     });
   });
+
+  // ─── emitWithTokenRefresh ─────────────────────────────────────────────────
 
   describe("emitWithTokenRefresh", () => {
     let mockSocket: any;
@@ -274,40 +115,31 @@ describe("tokenRefresh utilities", () => {
     let onError: jest.Mock;
 
     beforeEach(() => {
-      mockSocket = {
-        emit: jest.fn(),
-      };
+      mockSocket = { emit: jest.fn() };
       onSuccess = jest.fn();
       onError = jest.fn();
-
-      mockApi.GetTokens.mockReturnValue({
-        access: "fresh-access-token",
-        refresh: "fresh-refresh-token",
-      });
-
-      // Mock ensureFreshToken to return a token
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          tokens: {
-            access: "fresh-access-token",
-            refresh: "fresh-refresh-token",
-          },
-        }),
-      });
     });
 
-    it("should emit with fresh token successfully", async () => {
-      const eventData = {
-        conversationId: "test-conv-id",
-        token: "old-token",
-        channels: [],
-      };
+    it("calls onError when getValidToken returns null (no valid token)", async () => {
+      mockGetValidToken.mockResolvedValueOnce(null);
 
-      // Mock successful emit
-      mockSocket.emit.mockImplementationOnce((event: string, data: any, callback: any) => {
-        callback({ success: true });
-      });
+      await emitWithTokenRefresh(mockSocket, "test:event", {}, onSuccess, onError);
+
+      expect(onError).toHaveBeenCalledWith(expect.any(Error));
+      expect(onSuccess).not.toHaveBeenCalled();
+      expect(mockSocket.emit).not.toHaveBeenCalled();
+    });
+
+    it("emits the event with the fresh access token in the data payload", async () => {
+      mockGetValidToken.mockResolvedValueOnce("fresh-token");
+
+      mockSocket.emit.mockImplementationOnce(
+        (_event: string, _data: any, callback: (r: any) => void) => {
+          callback({ success: true });
+        }
+      );
+
+      const eventData = { conversationId: "conv-1", token: "old-token" };
 
       await emitWithTokenRefresh(
         mockSocket,
@@ -319,110 +151,115 @@ describe("tokenRefresh utilities", () => {
 
       expect(mockSocket.emit).toHaveBeenCalledWith(
         "conversation:join",
-        expect.objectContaining({
-          conversationId: "test-conv-id",
-          token: "fresh-access-token",
-          channels: [],
-        }),
+        expect.objectContaining({ token: "fresh-token", conversationId: "conv-1" }),
         expect.any(Function)
       );
-      expect(onSuccess).toHaveBeenCalled();
+      expect(onSuccess).toHaveBeenCalledTimes(1);
       expect(onError).not.toHaveBeenCalled();
     });
 
-    it("should retry with refreshed token on auth error", async () => {
-      const eventData = {
-        conversationId: "test-conv-id",
-        token: "old-token",
-      };
+    it("retries with refreshed token when socket returns a 401 auth error", async () => {
+      mockGetValidToken.mockResolvedValueOnce("old-token");
+      mockRefresh.mockResolvedValueOnce(true);
+      mockGetAccessToken.mockReturnValue("new-token");
 
-      const newTokens = {
-        access: { token: "refreshed-access-token" },
-        refresh: { token: "refreshed-refresh-token" },
-      };
-
-      // First emit fails with auth error
-      mockSocket.emit.mockImplementationOnce((event: string, data: any, callback: any) => {
-        callback({ error: { message: "401 Unauthorized" } });
-      });
-
-      // Mock successful refresh
-      (RefreshToken as jest.Mock).mockResolvedValueOnce(newTokens);
-      mockApi.GetTokens
-        .mockReturnValueOnce({
-          access: "old-access-token",
-          refresh: "old-refresh-token",
-        })
-        .mockReturnValueOnce({
-          access: newTokens.access.token,
-          refresh: newTokens.refresh.token,
-        });
-
-      // Second emit succeeds
-      mockSocket.emit.mockImplementationOnce((event: string, data: any, callback: any) => {
-        callback({ success: true });
-      });
+      // First emit → 401 auth error
+      mockSocket.emit.mockImplementationOnce(
+        (_event: string, _data: any, callback: (r: any) => void) => {
+          callback({ error: { message: "401 Unauthorized" } });
+        }
+      );
+      // Second emit (retry) → success
+      mockSocket.emit.mockImplementationOnce(
+        (_event: string, _data: any, callback: (r: any) => void) => {
+          callback({ success: true });
+        }
+      );
 
       await emitWithTokenRefresh(
         mockSocket,
         "conversation:join",
-        eventData,
+        { token: "old-token" },
         onSuccess,
         onError
       );
 
-      // Wait for async operations
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Allow async retry to complete
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
+      expect(mockRefresh).toHaveBeenCalledTimes(1);
       expect(mockSocket.emit).toHaveBeenCalledTimes(2);
-      expect(RefreshToken).toHaveBeenCalled();
+      expect(onSuccess).toHaveBeenCalledTimes(1);
+      expect(onError).not.toHaveBeenCalled();
     });
 
-    it("should call onError if no valid token available", async () => {
-      mockApi.GetTokens.mockReturnValue({
-        access: null,
-        refresh: null,
-      });
+    it("calls onError after retry when refresh fails on auth error", async () => {
+      mockGetValidToken.mockResolvedValueOnce("old-token");
+      mockRefresh.mockResolvedValueOnce(false); // refresh fails
 
-      // Mock ensureFreshToken to return null
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: false,
-      });
+      mockSocket.emit.mockImplementationOnce(
+        (_event: string, _data: any, callback: (r: any) => void) => {
+          callback({ error: { message: "401 Unauthorized" } });
+        }
+      );
 
       await emitWithTokenRefresh(
         mockSocket,
         "conversation:join",
-        {},
+        { token: "old-token" },
         onSuccess,
         onError
       );
 
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockRefresh).toHaveBeenCalledTimes(1);
+      expect(mockSocket.emit).toHaveBeenCalledTimes(1); // no retry
       expect(onError).toHaveBeenCalledWith(expect.any(Error));
       expect(onSuccess).not.toHaveBeenCalled();
-      expect(mockSocket.emit).not.toHaveBeenCalled();
     });
 
-    it("should call onError on non-auth errors", async () => {
-      const eventData = {
-        conversationId: "test-conv-id",
-        token: "valid-token",
-      };
+    it("passes non-auth errors directly to onError without retrying", async () => {
+      mockGetValidToken.mockResolvedValueOnce("valid-token");
 
-      // Emit fails with non-auth error
-      mockSocket.emit.mockImplementationOnce((event: string, data: any, callback: any) => {
-        callback({ error: { message: "Network error" } });
-      });
+      mockSocket.emit.mockImplementationOnce(
+        (_event: string, _data: any, callback: (r: any) => void) => {
+          callback({ error: { message: "Room is full" } });
+        }
+      );
 
       await emitWithTokenRefresh(
         mockSocket,
         "conversation:join",
-        eventData,
+        { token: "valid-token" },
         onSuccess,
         onError
       );
 
-      expect(onError).toHaveBeenCalledWith({ message: "Network error" });
-      expect(RefreshToken).not.toHaveBeenCalled();
+      expect(mockRefresh).not.toHaveBeenCalled();
+      expect(onError).toHaveBeenCalledWith({ message: "Room is full" });
+      expect(onSuccess).not.toHaveBeenCalled();
+    });
+
+    it("does not set token in data if data has no token field", async () => {
+      mockGetValidToken.mockResolvedValueOnce("fresh-token");
+
+      mockSocket.emit.mockImplementationOnce(
+        (_event: string, _data: any, callback: (r: any) => void) => {
+          callback({ success: true });
+        }
+      );
+
+      const eventData = { someOtherField: "value" };
+
+      await emitWithTokenRefresh(mockSocket, "test:event", eventData, onSuccess, onError);
+
+      expect(mockSocket.emit).toHaveBeenCalledWith(
+        "test:event",
+        expect.not.objectContaining({ token: expect.anything() }),
+        expect.any(Function)
+      );
+      expect(onSuccess).toHaveBeenCalled();
     });
   });
 });

@@ -4,55 +4,15 @@
  */
 
 import { Api } from "./Helpers";
-
-/**
- * In-flight refresh promise used to deduplicate concurrent 401 responses.
- * When multiple requests all receive a 401 simultaneously they all share
- * the same refresh request rather than each sending their own — which
- * would invalidate the single-use refresh token and trigger a destructive
- * race condition that clears the session.
- */
-let _inflightFetchRefresh: Promise<boolean> | null = null;
-
-/**
- * Performs the actual token refresh HTTP call and updates tokens in memory
- * and in the session cookie. Used internally by fetchWithTokenRefresh.
- */
-async function _doFetchRefresh(apiI: ReturnType<typeof Api.get>): Promise<boolean> {
-  const currentTokens = apiI.GetTokens();
-  if (!currentTokens.refresh) return false;
-
-  try {
-    const tokensResponse = await RefreshToken(currentTokens.refresh);
-
-    if (tokensResponse?.access?.token && tokensResponse?.refresh?.token) {
-      // Update tokens in memory
-      apiI.SetTokens(tokensResponse.access.token, tokensResponse.refresh.token);
-
-      // Update session cookie with new tokens
-      await fetch("/api/session", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          accessToken: tokensResponse.access.token,
-          refreshToken: tokensResponse.refresh.token,
-        }),
-      });
-
-      return true;
-    }
-
-    return false;
-  } catch (error) {
-    console.error("Token refresh error:", error);
-    return false;
-  }
-}
+import TokenManagerDefault from "./TokenManager";
 
 /**
  * Wrapper for fetch that automatically handles token refresh on 401 responses.
+ *
+ * Refresh deduplication is now handled centrally by `TokenManager.refresh()`,
+ * which ensures that concurrent callers (both HTTP and WebSocket) all share
+ * the same in-flight promise.
+ *
  * @param url - The URL to fetch
  * @param options - Fetch options
  * @param useStoredTokens - Whether to automatically use stored tokens for authorization
@@ -80,22 +40,13 @@ export const fetchWithTokenRefresh = async (
   // First attempt
   let response = await fetch(url, options);
 
-  // If 401 and we have a refresh token, try refreshing
+  // If 401 and we have a refresh token, try refreshing via the central
+  // TokenManager which deduplicates concurrent refresh calls across both
+  // HTTP and WebSocket callers.
   if (response.status === 401 && API_TOKENS.refresh) {
-    console.log("Token expired, refreshing...");
+    console.log("Token expired (HTTP 401), requesting refresh via TokenManager…");
 
-    // Deduplicate concurrent refresh calls — only one HTTP request is made
-    // even when multiple callers all receive a 401 simultaneously.  Without
-    // this guard each concurrent caller would send its own refresh request;
-    // the second request would use the now-invalidated refresh token, receive
-    // a 401, and trigger a logout that destroys the whole session.
-    if (!_inflightFetchRefresh) {
-      _inflightFetchRefresh = _doFetchRefresh(apiI).finally(() => {
-        _inflightFetchRefresh = null;
-      });
-    }
-
-    const refreshed = await _inflightFetchRefresh;
+    const refreshed = await TokenManagerDefault.refresh();
 
     if (refreshed) {
       // Retry with the freshly-issued access token
@@ -179,9 +130,8 @@ export const RefreshToken = async (refreshToken: string) => {
         },
       });
 
-      // Clear tokens from local Api instance
+      // Clear tokens from local Api instance (delegates to TokenManager)
       Api.get().ClearTokens();
-      Api.get().ClearAdminTokens();
 
       if (!logoutResponse.ok) {
         throw new Error("Logout failed");
@@ -251,6 +201,7 @@ export const RetrieveData = async (
       const errorData = await response.json();
       return {
         error: true,
+        status: response.status,
         message: errorData,
       };
     }
@@ -265,6 +216,12 @@ export const RetrieveData = async (
 
 /**
  * Send data to the client API, so cookie can be decrypted and used for request auth.
+ *
+ * If the server-side proxy refreshed the tokens (e.g. because the stored access
+ * token was expired), the response will include an `X-Tokens-Refreshed: true`
+ * header.  In that case we re-sync the in-memory TokenManager from the cookie so
+ * subsequent client-side calls use the fresh token.
+ *
  * @param urlSuffix - The endpoint suffix to send data to.
  * @param payload? - The data payload to send.
  * @returns Promise<any>
@@ -297,6 +254,16 @@ export const Request = async (urlSuffix: string, payload?: any) => {
       message: "No response received",
     };
   }
+
+  // If the server refreshed the tokens, sync the new tokens into TokenManager.
+  // This prevents the next client-side API call from using a stale token.
+  if (response.headers?.get("X-Tokens-Refreshed") === "true") {
+    console.log("Server-side token refresh detected — syncing TokenManager from cookie…");
+    TokenManagerDefault.refresh().catch((err) =>
+      console.error("Failed to sync TokenManager after server-side refresh:", err)
+    );
+  }
+
   if (!response.ok) {
     console.error("Network response was not ok");
     const errorData = await response.json();

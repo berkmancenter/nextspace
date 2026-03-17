@@ -1,4 +1,5 @@
 import { Api } from "./Helpers";
+import TokenManagerDefault from "./TokenManager";
 
 type SessionState =
   | "uninitialized"
@@ -68,8 +69,14 @@ class SessionManager {
       const data = await response.json();
 
       if (response.status === 200 && data.tokens) {
-        // Valid session cookie exists
-        Api.get().SetTokens(data.tokens.access, data.tokens.refresh);
+        // Valid session cookie exists — restore tokens with expiry info so
+        // TokenManager can schedule the proactive refresh correctly.
+        Api.get().SetTokens(
+          data.tokens.access,
+          data.tokens.refresh,
+          data.tokens.accessExpires,
+          data.tokens.refreshExpires
+        );
 
         // Determine if this is a guest or authenticated user
         // Guest users have pseudonym-like usernames, authenticated users have custom usernames
@@ -90,7 +97,6 @@ class SessionManager {
         // Cookie was invalid/malformed and has been cleared by the API
         console.warn("Invalid cookie detected and cleared:", data.error, data.reason);
         Api.get().ClearTokens();
-        Api.get().ClearAdminTokens();
       }
     } catch (error) {
       console.error("Failed to restore session:", error);
@@ -131,13 +137,16 @@ class SessionManager {
         },
       ).then((res) => res.json());
 
-      // Set tokens in memory
+      // Set tokens in memory (with expiry so TokenManager can schedule refresh)
       Api.get().SetTokens(
         registerResponse.tokens.access.token,
         registerResponse.tokens.refresh.token,
+        registerResponse.tokens.access.expires,
+        registerResponse.tokens.refresh.expires,
       );
 
-      // Set encrypted cookie via API route
+      // Set encrypted cookie via API route, including expiry timestamps so
+      // the client can schedule proactive refresh correctly.
       await fetch("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -146,6 +155,8 @@ class SessionManager {
           userId: registerResponse.user.id,
           accessToken: registerResponse.tokens.access.token,
           refreshToken: registerResponse.tokens.refresh.token,
+          accessExpires: registerResponse.tokens.access.expires,
+          refreshExpires: registerResponse.tokens.refresh.expires,
           authType: "guest",
           expirationFromNow: 60 * 60 * 24 * 30, // 30 days like Vue app
         }),
@@ -212,8 +223,9 @@ class SessionManager {
   clearSession(): void {
     this.sessionState = "cleared";
     this.currentSession = null;
+    // ClearTokens() delegates to TokenManager which also cancels the
+    // proactive refresh timer and clears the BroadcastChannel state.
     Api.get().ClearTokens();
-    Api.get().ClearAdminTokens();
   }
 }
 

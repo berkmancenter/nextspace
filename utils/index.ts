@@ -10,3 +10,5 @@ export {
 export { SendData, Api, GetChannelPasscode } from "./Helpers";
 export { QueryParamsError } from "./ErrorHandler";
 export { ensureFreshToken, refreshAccessToken, emitWithTokenRefresh } from "./tokenRefresh";
+export { default as TokenManager } from "./TokenManager";
+export type { TokenSet, TokenPair } from "./TokenManager";

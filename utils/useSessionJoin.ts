@@ -2,11 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { Api } from "./";
 import SessionManager from "./SessionManager";
-import { refreshAccessToken } from "./tokenRefresh";
-
-// Refresh token proactively every 25 minutes (assuming ~30 min token lifetime)
-// This prevents the access token from expiring while the socket is idle.
-const TOKEN_REFRESH_INTERVAL_MS = 25 * 60 * 1000;
+import TokenManagerDefault from "./TokenManager";
 
 // Disconnections shorter than this are treated as transient network blips that
 // Socket.io's own reconnect loop handles cleanly. Longer gaps mean the client
@@ -20,13 +16,13 @@ const RECONNECT_GAP_THRESHOLD_MS = 10_000; // 10 seconds
  *
  * Handles:
  * - Initial socket creation with current access token
- * - Automatic token refresh on auth-related connect_error events
- * - Proactive token refresh on page visibility restore (tab switching)
- * - Periodic proactive token refresh to prevent expiration during idle sessions
+ * - Automatic token refresh on auth-related connect_error events (via TokenManager)
+ * - Proactive token refresh is now managed entirely by TokenManager (expiry-based
+ *   scheduling + cross-tab BroadcastChannel coordination).  When TokenManager
+ *   issues a new token this hook updates socket.auth so any subsequent
+ *   reconnection uses the fresh token.
+ * - Tab visibility changes trigger TokenManager to check expiry and refresh if needed.
  *
- * @param isAuthenticated - Whether the user is authenticated (unused, kept for backward compatibility)
- * @param onSuccess - Optional callback when session info is retrieved
- * @param onError - Optional callback when session retrieval fails
  * @returns Object containing socket, pseudonym, userId, connection state, and
  *          lastReconnectTime (non-null whenever the socket reconnected after a
  *          gap long enough that messages may have been missed — callers should
@@ -42,7 +38,9 @@ export function useSessionJoin(
   const [userId, setUserId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [initialized, setInitialized] = useState(false);
+  // useRef (not useState) so the guard doesn't trigger a second effect run and
+  // the cleanup function fires only on true unmount, not on state transitions.
+  const initializedRef = useRef(false);
   /**
    * Set to the timestamp (ms) of the most recent reconnection that followed a
    * gap longer than RECONNECT_GAP_THRESHOLD_MS. Starts null (no gap-reconnect
@@ -54,12 +52,17 @@ export function useSessionJoin(
   );
   // Records when the socket disconnected so we can measure gap duration on reconnect.
   const disconnectedAtRef = useRef<number | null>(null);
+  // Keep a stable ref to the socket for use inside closures.
+  const socketRef = useRef<Socket | null>(null);
 
-  // Initialize socket and session info once
+  // Initialize socket and session info once (runs exactly once per mount).
+  // onSuccess / onError are intentionally omitted from the dep array so that
+  // callers don't need to memoize them — the socket is created once and the
+  // callbacks captured at that moment are correct for the lifetime of the hook.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    // Only initialize once
-    if (initialized) return;
-    setInitialized(true);
+    if (initializedRef.current) return;
+    initializedRef.current = true;
 
     // Get session info from SessionManager (already initialized by _app.tsx)
     const sessionInfo = SessionManager.get().getSessionInfo();
@@ -88,6 +91,7 @@ export function useSessionJoin(
       auth: { token: tokens.access },
     });
 
+    socketRef.current = socketLocal;
     setSocket(socketLocal);
 
     // Call optional success callback
@@ -95,7 +99,13 @@ export function useSessionJoin(
       userId: sessionInfo.userId,
       pseudonym: sessionInfo.username,
     });
-  }, [initialized, onSuccess, onError]);
+
+    // Disconnect the socket when the component unmounts to prevent orphaned
+    // socket connections (e.g. when navigating away from the assistant page).
+    return () => {
+      socketLocal.disconnect();
+    };
+  }, []);
 
   // Handle socket connection events and auth errors
   useEffect(() => {
@@ -125,6 +135,7 @@ export function useSessionJoin(
       // Record the time we went offline so we can measure the gap on reconnect.
       disconnectedAtRef.current = Date.now();
     };
+
     const handleError = (error: string) => {
       console.error("Socket error:", error);
     };
@@ -132,8 +143,9 @@ export function useSessionJoin(
     /**
      * Handle connect_error events. Socket.io fires this when a connection or
      * reconnection attempt fails. If it's an auth error (expired token), we
-     * refresh the token and update socket.auth so the next reconnection attempt
-     * uses the new token. Socket.io will automatically retry the connection.
+     * ask TokenManager to refresh the token and update socket.auth so the
+     * next reconnection attempt uses the new token. Socket.io will automatically
+     * retry the connection.
      */
     const handleConnectError = async (error: Error) => {
       console.error("Socket connect_error:", error.message);
@@ -145,10 +157,10 @@ export function useSessionJoin(
         error.message?.toLowerCase().includes("auth");
 
       if (isAuthError) {
-        console.log("Socket auth error detected, refreshing token...");
-        const refreshed = await refreshAccessToken();
+        console.log("Socket auth error detected, refreshing token via TokenManager…");
+        const refreshed = await TokenManagerDefault.refresh();
         if (refreshed) {
-          const newToken = Api.get().getAccessToken();
+          const newToken = TokenManagerDefault.getAccessToken();
           if (newToken) {
             // Update socket.auth so the next automatic reconnection attempt
             // uses the refreshed token
@@ -175,58 +187,63 @@ export function useSessionJoin(
   }, [socket]);
 
   /**
-   * Proactive token refresh strategy:
-   * 1. Periodic interval — refreshes the token every TOKEN_REFRESH_INTERVAL_MS to keep
-   *    it from expiring silently while the user is idle on the page.
-   * 2. Visibility change — when the user returns to the tab after being away, immediately
-   *    refresh the token (it may have expired while the tab was in the background) and
-   *    reconnect the socket if it dropped.
+   * Subscribe to TokenManager token change events.
    *
-   * In both cases, socket.auth is updated so any subsequent reconnection uses the new token.
+   * TokenManager handles all proactive refresh scheduling (expiry-based, not
+   * a fixed interval) and cross-tab coordination (BroadcastChannel).  When
+   * it issues new tokens — whether from its own proactive timer, a 401
+   * response, or a broadcast from another tab — we update socket.auth so any
+   * subsequent reconnection uses the fresh token.
+   *
+   * We also reconnect the socket immediately if it is currently disconnected
+   * and we now have valid tokens.
    */
   useEffect(() => {
     if (!socket) return;
 
-    const refreshSocketToken = async () => {
-      const refreshed = await refreshAccessToken();
-      if (refreshed) {
-        const newToken = Api.get().getAccessToken();
-        if (newToken) {
-          // Always update socket.auth with the latest token
-          (socket as any).auth = { token: newToken };
-          console.log("Proactively updated socket auth token");
+    const unsubscribe = TokenManagerDefault.onTokensChanged((tokens) => {
+      const newToken = tokens.access.token;
+      if (newToken) {
+        // Keep socket.auth up to date for the next reconnection attempt.
+        (socket as any).auth = { token: newToken };
+        console.log("Socket auth token updated from TokenManager");
 
-          // If the socket dropped while the tab was hidden or tokens were stale,
-          // reconnect now that we have a fresh token
-          if (!socket.connected) {
-            console.log("Socket disconnected, reconnecting with fresh token...");
-            socket.connect();
-          }
+        // If the socket is currently disconnected (e.g. the tab was hidden
+        // and the socket dropped), reconnect now that we have a fresh token.
+        if (!socket.connected) {
+          console.log("Socket disconnected — reconnecting with fresh token…");
+          socket.connect();
         }
       }
-    };
+    });
 
-    // Refresh when the user returns to this tab
+    return unsubscribe;
+  }, [socket]);
+
+  /**
+   * Visibility change handler — when the user returns to this tab after being
+   * away, ask TokenManager to check the token expiry and refresh if needed.
+   * TokenManager deduplicates the call and coordinates with other tabs via
+   * BroadcastChannel, so this is safe to call on every visibility change.
+   */
+  useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        console.log("Tab became visible, refreshing socket auth token...");
-        refreshSocketToken();
+        console.log("Tab became visible — checking token expiry via TokenManager…");
+        // TokenManager will refresh if the token is expired or within the
+        // 2-minute buffer, otherwise it's a no-op.
+        TokenManagerDefault.getValidToken().catch((err) =>
+          console.error("Visibility-change token check failed:", err)
+        );
       }
     };
-
-    // Periodically refresh token so it never expires during an idle session
-    const refreshInterval = setInterval(
-      refreshSocketToken,
-      TOKEN_REFRESH_INTERVAL_MS
-    );
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      clearInterval(refreshInterval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [socket]);
+  }, []);
 
   return {
     socket,
