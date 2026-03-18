@@ -145,3 +145,14 @@ export interface MediaItem {
   data: string;
   mimeType: string;
 }
+
+/**
+ * Configuration for building a direct channel subscription for a specific agent.
+ * @property {string} agentId - The agent's ID, used to construct the channel name.
+ * @property {string} [preferenceKey] - If set, the channel is only included when
+ *   the matching user preference is true. If omitted, the channel is always included.
+ */
+export interface AgentChannelConfig {
+  agentId: string;
+  preferenceKey?: string;
+}
