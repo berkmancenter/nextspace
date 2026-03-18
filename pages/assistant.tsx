@@ -10,6 +10,7 @@ import {
   SendData,
   GetChannelPasscode,
   emitWithTokenRefresh,
+  buildDirectChannels,
 } from "../utils";
 import { components } from "../types";
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
@@ -41,11 +42,13 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
   const [activeTab, setActiveTab] = useState<NavTab>("chat");
   const [unseenAssistantCount, setUnseenAssistantCount] = useState<number>(0);
   const [unseenChatCount, setUnseenChatCount] = useState<number>(0);
-  const [assistantMessages, setAssistantMessages] = useState<
-    PseudonymousMessage[]
-  >([]);
+  const [unseenJargonCount, setUnseenJargonCount] = useState<number>(0);
+  const [assistantMessages, setAssistantMessages] = useState<PseudonymousMessage[]>([]);
   const [chatMessages, setChatMessages] = useState<PseudonymousMessage[]>([]);
+  const [jargonMessages, setJargonMessages] = useState<PseudonymousMessage[]>([]);
   const [agentId, setAgentId] = useState<string | null>(null);
+  const [jargonFilterAgentId, setJargonFilterAgentId] = useState<string | null>(null);
+  const [userPreferences, setUserPreferences] = useState<Record<string, boolean>>({});
   const [conversationType, setConversationType] = useState<string | null>(null);
   const [controlledMode, setControlledMode] =
     useState<ControlledInputConfig | null>(null);
@@ -143,6 +146,14 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
         if (activeTabRef.current !== "chat") {
           setUnseenChatCount((prev) => prev + 1);
         }
+      } else if (
+        jargonFilterAgentId &&
+        data.channels?.some((c) => c.includes(jargonFilterAgentId))
+      ) {
+        setJargonMessages((prev) => [...prev, data]);
+        if (activeTabRef.current !== "jargon") {
+          setUnseenJargonCount((prev) => prev + 1);
+        }
       } else if (!data.channels || !data.channels.includes("transcript")) {
         setAssistantMessages((prev) => [...prev, data]);
         // Increment counter if NOT viewing assistant tab
@@ -166,7 +177,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     return () => {
       socket.off("message:new", messageHandler);
     };
-  }, [socket]);
+  }, [socket, jargonFilterAgentId]);
 
   // Keep activeTabRef in sync with activeTab state
   useEffect(() => {
@@ -258,6 +269,14 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
           );
           return;
         }
+
+        const jargonAgent = conversation.agents.find(
+          (agent: components["schemas"]["Agent"]) =>
+            agent.agentType === "jargonFilterAgent",
+        );
+        if (jargonAgent) {
+          setJargonFilterAgentId(jargonAgent.id!);
+        }
       } catch (error) {
         console.error("Error fetching conversation data:", error);
         setLocalError("Failed to fetch conversation data.");
@@ -274,14 +293,19 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       return;
     }
 
-    // Join channels - include both direct and chat if chatPasscode is available
-    const channels: components["schemas"]["Channel"][] = [
-      {
-        name: `direct-${userId}-${agentId}`,
-        passcode: null,
-        direct: true,
-      },
-    ];
+    // Build direct channels based on available agents and user preferences
+    const agentChannels = buildDirectChannels(
+      userId,
+      [
+        { agentId },
+        ...(jargonFilterAgentId
+          ? [{ agentId: jargonFilterAgentId, preferenceKey: "jargonClarification" }]
+          : []),
+      ],
+      userPreferences,
+    );
+
+    const channels: components["schemas"]["Channel"][] = [...agentChannels];
     if (chatPasscode) {
       channels.push({
         name: "chat",
@@ -316,7 +340,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     return () => {
       socket.off("connect", joinConversation);
     };
-  }, [socket, agentId, userId, chatPasscode, router.query.conversationId]);
+  }, [socket, agentId, jargonFilterAgentId, userId, userPreferences, chatPasscode, router.query.conversationId]);
 
   // Helper function to fetch replies for messages and insert them into the array
   const fetchAndInsertReplies = async (
@@ -413,6 +437,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
           Object.keys(preferences).length > 0
         ) {
           setShowPreferences(false);
+          setUserPreferences(preferences as Record<string, boolean>);
         } else {
           // Empty object means no preferences set yet
           setShowPreferences(true);
@@ -644,6 +669,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
 
       setShowPreferences(false);
       setPreferencesError(null);
+      setUserPreferences(preferencesObject);
     } catch (error) {
       console.error("Error saving preferences:", error);
       setPreferencesError("Failed to save preferences. Please try again.");
@@ -682,8 +708,10 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
             onTabChange={handleTabChange}
             unseenAssistantCount={unseenAssistantCount}
             unseenChatCount={unseenChatCount}
+            unseenJargonCount={unseenJargonCount}
             showChat={!!chatPasscode}
             showTranscript={!!transcriptPasscode}
+            showJargon={!!jargonFilterAgentId && !!userPreferences.jargonClarification}
             botName={botName}
           />
 
@@ -719,6 +747,28 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
                         onExitControlledMode={exitControlledMode}
                         enterControlledMode={enterControlledMode}
                         sendFeedbackRating={sendFeedbackRating}
+                      />
+                    ) : activeTab === "jargon" ? (
+                      <AssistantChatPanel
+                        messages={jargonMessages}
+                        pseudonym={pseudonym}
+                        waitingForResponse={false}
+                        controlledMode={null}
+                        slashCommands={[]}
+                        eventName={eventName}
+                        botName={botName}
+                        inputValue=""
+                        onInputChange={() => {}}
+                        onSendMessage={() => {}}
+                        onExitControlledMode={() => {}}
+                        onPromptSelect={() => {}}
+                        enterControlledMode={() => {}}
+                        sendFeedbackRating={() => {}}
+                        userId={userId}
+                        showPreferences={false}
+                        preferenceOptions={[]}
+                        onPreferencesSubmit={() => {}}
+                        preferencesError={null}
                       />
                     ) : (
                       <AssistantChatPanel

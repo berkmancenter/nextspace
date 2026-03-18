@@ -85,6 +85,11 @@ jest.mock("../../utils", () => ({
     // Also call socket.emit so existing tests can verify it
     socket.emit(event, data);
   }),
+  buildDirectChannels: jest.fn((userId, agents, preferences) =>
+    agents
+      .filter((a: any) => !a.preferenceKey || preferences[a.preferenceKey])
+      .map((a: any) => ({ name: `direct-${userId}-${a.agentId}`, passcode: null, direct: true }))
+  ),
 }));
 
 // Mock useSessionJoin hook
