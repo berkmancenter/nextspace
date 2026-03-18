@@ -78,11 +78,10 @@ class SessionManager {
           data.tokens.refreshExpires
         );
 
-        // Determine if this is a guest or authenticated user
-        // Guest users have pseudonym-like usernames, authenticated users have custom usernames
-        // (This is a heuristic - you might want to add an explicit flag in the cookie)
+        // Determine if this is a guest or authenticated user using the
+        // authType field stored in the cookie (set when the session was created).
         this.sessionState =
-          data.username && !data.username.startsWith("Guest")
+          data.authType && data.authType !== "guest"
             ? "authenticated"
             : "guest";
 

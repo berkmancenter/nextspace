@@ -33,8 +33,8 @@ Nextspace supports two kinds of users:
 
 | Kind | How they get in | Token source |
 |---|---|---|
-| **Guest** | Auto-registered on first visit; username starts with "Guest" | API `/auth/register` after `/auth/newPseudonym` |
-| **Authenticated** | Explicit login via `/login` page | API `/auth/login` |
+| **Guest** | Auto-registered on first visit; `authType = "guest"` in session cookie | API `/auth/register` after `/auth/newPseudonym` |
+| **Authenticated** | Explicit login via `/login` page; `authType = "user"` or `"admin"` | API `/auth/login` |
 
 Both kinds receive a standard **JWT access token + refresh token pair** from the backend API. These tokens are:
 
@@ -134,8 +134,8 @@ The `accessExpires` / `refreshExpires` fields are critical — they let the clie
        │
        │ restoreSession() called
        ▼
-  initializing  ──── cookie exists ────► authenticated (username doesn't start "Guest")
-       │                              └─► guest        (username starts "Guest")
+  initializing  ──── cookie exists ────► authenticated (authType != "guest")
+       │                              └─► guest        (authType == "guest")
        │
        │ no cookie → _createGuestSession()
        ▼

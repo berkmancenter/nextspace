@@ -68,6 +68,7 @@ describe("SessionManager", () => {
         },
         userId: "user-123",
         username: "testuser",
+        authType: "admin",
       };
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -97,7 +98,8 @@ describe("SessionManager", () => {
           refresh: "guest-refresh-token",
         },
         userId: "guest-456",
-        username: "GuestUser123", // Starts with "Guest"
+        username: "SomePseudonym",
+        authType: "guest",
       };
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -372,6 +374,7 @@ describe("SessionManager", () => {
         tokens: { access: "token", refresh: "refresh" },
         userId: "user-123",
         username: "testuser",
+        authType: "user",
       };
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -440,6 +443,7 @@ describe("SessionManager", () => {
         tokens: { access: "token", refresh: "refresh" },
         userId: "user-123",
         username: "testuser",
+        authType: "user",
       };
 
       (global.fetch as jest.Mock).mockImplementation(async () => {
