@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 
 import { AssistantChatPanel } from "../components/AssistantChatPanel";
+import { JargonChatPanel } from "../components/JargonChatPanel";
 import { GroupChatPanel } from "../components/GroupChatPanel";
 import { SlashCommand } from "../components/enhancers/slashCommandEnhancer";
 import {
@@ -770,26 +771,9 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
                         sendFeedbackRating={sendFeedbackRating}
                       />
                     ) : activeTab === "jargon" ? (
-                      <AssistantChatPanel
+                      <JargonChatPanel
                         messages={jargonMessages}
-                        pseudonym={pseudonym}
-                        waitingForResponse={false}
-                        controlledMode={null}
-                        slashCommands={[]}
                         eventName={eventName}
-                        botName={botName}
-                        inputValue=""
-                        onInputChange={() => {}}
-                        onSendMessage={() => {}}
-                        onExitControlledMode={() => {}}
-                        onPromptSelect={() => {}}
-                        enterControlledMode={() => {}}
-                        sendFeedbackRating={() => {}}
-                        userId={userId}
-                        showPreferences={false}
-                        preferenceOptions={[]}
-                        onPreferencesSubmit={() => {}}
-                        preferencesError={null}
                       />
                     ) : (
                       <AssistantChatPanel

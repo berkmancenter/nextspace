@@ -6,6 +6,7 @@ import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import GroupIcon from "@mui/icons-material/Group";
 import { BotIcon } from "./BotIcon";
 import { TranscriptIcon } from "./TranscriptIcon";
+import { JargonIcon } from "./JargonIcon";
 export type NavTab = "assistant" | "chat" | "transcript" | "jargon";
 
 interface NavItem {
@@ -104,7 +105,7 @@ export function NavigationBar({
       return <TranscriptIcon size={size} color={color} />;
     }
     if (id === "jargon") {
-      return <span style={{ fontSize: size, color, lineHeight: 1 }}>{"A→B"}</span>;
+      return <JargonIcon size={size} color={color} />;
     }
     const Icon = (isActive ? ActiveIcon : InactiveIcon)!;
     return <Icon sx={{ fontSize: size, color }} />;
