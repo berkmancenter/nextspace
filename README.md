@@ -46,6 +46,10 @@ Nextspace uses a hybrid authentication model that supports both anonymous partic
 - Certain pages (home, login, signup, logout) skip automatic guest session creation to avoid unnecessary accounts
 - The `SESSION_SECRET` environment variable must be at least 32 characters for secure cookie encryption
 
+### Documentation
+
+- 📖 **[SESSION_AND_TOKEN_SYSTEM.md](./SESSION_AND_TOKEN_SYSTEM.md)** - Complete developer guide covering the full token lifecycle: `SessionManager`, `TokenManager`, proactive refresh scheduling, 401 recovery, multi-tab coordination via `BroadcastChannel`, WebSocket reconnection, and debugging tips
+
 ## App views overview
 
 ### Moderator
@@ -137,6 +141,10 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
     Checks if IP addresses are within specified CIDR ranges for location detection.
   - **SessionManager.ts**
     Singleton that manages session state across the app. Automatically restores sessions from encrypted cookies on app initialization, creates guest sessions for new users, and handles transitions between guest and authenticated states. Certain pages (home, login, signup, logout) skip session creation to avoid unnecessary guest accounts.
+  - **TokenManager.ts**
+    Process singleton that is the single source of truth for access/refresh tokens. Handles token storage with expiry timestamps, deduplicated refresh calls, proactive expiry-based scheduling, subscriber notifications, and cross-tab coordination via `BroadcastChannel`.
+  - **tokenRefresh.ts**
+    Thin wrappers (`ensureFreshToken`, `refreshAccessToken`, `emitWithTokenRefresh`) for ensuring fresh tokens before HTTP and WebSocket calls.
   - **useSessionJoin.ts**
     Hook for initializing socket connections with session info from SessionManager.
   - **validateEnv.ts**

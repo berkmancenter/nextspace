@@ -46,6 +46,10 @@ export default async function handler(
           tokens: {
             access: decrypted.payload.access,
             refresh: decrypted.payload.refresh,
+            // Include expiry timestamps so the client can schedule proactive
+            // refresh without needing to decode the JWT itself.
+            accessExpires: decrypted.payload.accessExpires,
+            refreshExpires: decrypted.payload.refreshExpires,
           },
           userId: decrypted.payload.userId,
           username: decrypted.payload.sub,

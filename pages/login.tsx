@@ -72,12 +72,14 @@ export default function LoginPage() {
         return;
       }
 
-      // TODO: we should not store admin tokens locally in memory like this;
-      // while technically not easily accessed by browser, this is not good practice.
-      // client should have to call a local API route to decrypt the cookie and then send requests.
-      Api.get().SetAdminTokens(response.tokens.access.token, response.tokens.refresh.token);
-      // Set regular token as well, for other operations
-      Api.get().SetTokens(response.tokens.access.token, response.tokens.refresh.token);
+      // Store tokens with expiry info so TokenManager can schedule
+      // proactive refresh correctly.
+      Api.get().SetTokens(
+        response.tokens.access.token,
+        response.tokens.refresh.token,
+        response.tokens.access.expires,
+        response.tokens.refresh.expires,
+      );
 
       const userId = response.user?.id || response.userId;
       
@@ -94,7 +96,8 @@ export default function LoginPage() {
       // Mark session as authenticated with user info
       SessionManager.get().markAuthenticated(activePseudonym, userId);
 
-      // Set session cookie via local API route
+      // Set session cookie via local API route, including expiry timestamps
+      // so the cookie-based proactive refresh can schedule correctly.
       await fetch("/api/session", {
         method: "POST",
         headers: {
@@ -105,6 +108,8 @@ export default function LoginPage() {
           userId: userId,
           accessToken: response.tokens.access.token,
           refreshToken: response.tokens.refresh.token,
+          accessExpires: response.tokens.access.expires,
+          refreshExpires: response.tokens.refresh.expires,
           authType: "admin",
         }),
       });

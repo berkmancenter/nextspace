@@ -39,11 +39,13 @@ async function refreshTokens(refreshToken: string) {
 }
 
 /**
- * Update the session cookie with new tokens
+ * Update the session cookie with new tokens and expiry info.
  * @param req - NextApiRequest object
  * @param res - NextApiResponse object
  * @param newAccessToken - New access token
  * @param newRefreshToken - New refresh token
+ * @param accessExpires - ISO-8601 expiry for the new access token
+ * @param refreshExpires - ISO-8601 expiry for the new refresh token
  * @param existingCookie - Existing decrypted cookie payload
  */
 async function updateSessionCookie(
@@ -51,14 +53,20 @@ async function updateSessionCookie(
   res: NextApiResponse,
   newAccessToken: string,
   newRefreshToken: string,
-  existingCookie: any
+  existingCookie: any,
+  accessExpires?: string,
+  refreshExpires?: string,
 ) {
   const secret = new TextEncoder().encode(process.env.SESSION_SECRET!);
 
-  // Create new cookie with updated tokens but preserve other data
+  // Create new cookie with updated tokens but preserve other data.
+  // Store accessExpires/refreshExpires so the client can schedule proactive
+  // refresh without needing to decode the JWT.
   const cookie = await new EncryptJWT({
     access: newAccessToken,
     refresh: newRefreshToken,
+    accessExpires: accessExpires || existingCookie.accessExpires,
+    refreshExpires: refreshExpires || existingCookie.refreshExpires,
     userId: existingCookie.userId,
     authType: existingCookie.authType || "guest",
     version: CURRENT_COOKIE_VERSION,
@@ -148,14 +156,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const tokensResponse = await refreshTokens(cookie.payload.refresh as string);
 
     if (tokensResponse?.access?.token && tokensResponse?.refresh?.token) {
-      // Update session cookie with new tokens
+      // Update session cookie with new tokens and expiry info.
       await updateSessionCookie(
         req,
         res,
         tokensResponse.access.token,
         tokensResponse.refresh.token,
-        cookie.payload
+        cookie.payload,
+        tokensResponse.access.expires,
+        tokensResponse.refresh.expires,
       );
+
+      // Signal to the client that tokens were refreshed server-side so it
+      // can re-sync its in-memory TokenManager state from the cookie.
+      res.setHeader("X-Tokens-Refreshed", "true");
 
       // Retry the original request with new access token
       accessToken = tokensResponse.access.token;
