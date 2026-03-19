@@ -43,12 +43,20 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
   const [unseenAssistantCount, setUnseenAssistantCount] = useState<number>(0);
   const [unseenChatCount, setUnseenChatCount] = useState<number>(0);
   const [unseenJargonCount, setUnseenJargonCount] = useState<number>(0);
-  const [assistantMessages, setAssistantMessages] = useState<PseudonymousMessage[]>([]);
+  const [assistantMessages, setAssistantMessages] = useState<
+    PseudonymousMessage[]
+  >([]);
   const [chatMessages, setChatMessages] = useState<PseudonymousMessage[]>([]);
-  const [jargonMessages, setJargonMessages] = useState<PseudonymousMessage[]>([]);
+  const [jargonMessages, setJargonMessages] = useState<PseudonymousMessage[]>(
+    [],
+  );
   const [agentId, setAgentId] = useState<string | null>(null);
-  const [jargonFilterAgentId, setJargonFilterAgentId] = useState<string | null>(null);
-  const [userPreferences, setUserPreferences] = useState<Record<string, boolean>>({});
+  const [jargonFilterAgentId, setJargonFilterAgentId] = useState<string | null>(
+    null,
+  );
+  const [userPreferences, setUserPreferences] = useState<
+    Record<string, boolean>
+  >({});
   const [conversationType, setConversationType] = useState<string | null>(null);
   const [controlledMode, setControlledMode] =
     useState<ControlledInputConfig | null>(null);
@@ -170,9 +178,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       }
     };
 
-    if (!socket.hasListeners("message:new")) {
-      socket.on("message:new", messageHandler);
-    }
+    socket.on("message:new", messageHandler);
 
     return () => {
       socket.off("message:new", messageHandler);
@@ -299,7 +305,12 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       [
         { agentId },
         ...(jargonFilterAgentId
-          ? [{ agentId: jargonFilterAgentId, preferenceKey: "jargonClarification" }]
+          ? [
+              {
+                agentId: jargonFilterAgentId,
+                preferenceKey: "jargonClarification",
+              },
+            ]
           : []),
       ],
       userPreferences,
@@ -340,7 +351,15 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     return () => {
       socket.off("connect", joinConversation);
     };
-  }, [socket, agentId, jargonFilterAgentId, userId, userPreferences, chatPasscode, router.query.conversationId]);
+  }, [
+    socket,
+    agentId,
+    jargonFilterAgentId,
+    userId,
+    userPreferences,
+    chatPasscode,
+    router.query.conversationId,
+  ]);
 
   // Helper function to fetch replies for messages and insert them into the array
   const fetchAndInsertReplies = async (
@@ -711,7 +730,9 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
             unseenJargonCount={unseenJargonCount}
             showChat={!!chatPasscode}
             showTranscript={!!transcriptPasscode}
-            showJargon={!!jargonFilterAgentId && !!userPreferences.jargonClarification}
+            showJargon={
+              !!jargonFilterAgentId && !!userPreferences.jargonClarification
+            }
             botName={botName}
           />
 

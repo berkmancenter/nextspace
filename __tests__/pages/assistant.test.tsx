@@ -1859,4 +1859,72 @@ describe("EventAssistantRoom", () => {
       });
     });
   });
+
+  describe("Jargon message routing", () => {
+    it("routes jargon clarification messages to the jargon tab when jargonFilterAgentId is set", async () => {
+      const conversationWithJargon = {
+        agents: [
+          { id: "agent-123", agentType: "eventAssistantPlus" },
+          { id: "jargon-agent-456", agentType: "jargonFilterAgent" },
+        ],
+        type: { name: "eventAssistantPlus" },
+      };
+      (createConversationFromData as jest.Mock).mockResolvedValue(conversationWithJargon);
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve(conversationWithJargon);
+        } else if (path.includes("users/user/") && path.includes("/preferences")) {
+          return Promise.resolve({ jargonClarification: true });
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]);
+        }
+        return Promise.resolve({});
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      // Wait for jargonFilterAgentId to be set from conversation data
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+      });
+
+      // Retrieve the most recently registered message:new handler — it has jargonFilterAgentId in its closure
+      const messageHandler: Function = mockSocket.on.mock.calls
+        .filter(([event]: [string]) => event === "message:new")
+        .map(([, handler]: [string, Function]) => handler)
+        .at(-1)!;
+
+      expect(messageHandler).toBeDefined();
+      expect(typeof messageHandler).toBe("function");
+
+      // Simulate a jargon clarification message arriving on the jargon filter's direct channel
+      const jargonMessage = {
+        id: "msg-jargon-1",
+        body: { type: "jargon_clarification", text: "An SLO is a reliability target.", sourceText: "Our SLOs..." },
+        bodyType: "json",
+        fromAgent: true,
+        channels: ["direct-user-123-jargon-agent-456"],
+        pseudonym: "Jargon Filter Agent",
+        pseudonymId: "jargon-agent-456",
+        conversation: "test-conversation-id",
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      act(() => {
+        messageHandler(jargonMessage);
+      });
+
+      // The jargon tab should now show the message — switch to it and verify
+      await waitFor(() => {
+        const jargonTab = screen.queryAllByLabelText("Jargon Filter");
+        expect(jargonTab.length).toBeGreaterThan(0);
+      });
+    });
+  });
 });
