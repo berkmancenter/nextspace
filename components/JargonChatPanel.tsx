@@ -1,6 +1,8 @@
 "use client";
 
 import React, { FC } from "react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { PseudonymousMessage } from "../types.internal";
 import { parseMessageBody } from "../utils/Helpers";
 import { useAutoScroll } from "../hooks/useAutoScroll";
@@ -35,7 +37,8 @@ export const JargonChatPanel: FC<JargonChatPanelProps> = ({
               </span>
             </h2>
             <p className="text-sm text-gray-500 mt-0.5">
-              Jargon Filter — technical terms from this session, explained in plain language.
+              Jargon Filter — terms from this session, explained in plain
+              language.
             </p>
           </div>
 
@@ -80,18 +83,27 @@ export const JargonChatPanel: FC<JargonChatPanelProps> = ({
                       <p className="text-xs font-semibold uppercase tracking-wider mb-1 text-mediumslateblue">
                         Original
                       </p>
-                      <p className="text-sm italic text-[#333]">
-                        {sourceText}
-                      </p>
+                      <p className="text-sm italic text-[#333]">{sourceText}</p>
                     </div>
                   )}
 
                   {/* Plain English section */}
                   <div className="px-4 py-3 bg-white border-l-[3px] border-l-[#7B78E5]">
-                    <p className="text-xs font-semibold uppercase tracking-wider mb-1 text-mediumslateblue">
+                    <p className="text-xs font-semibold uppercase tracking-wider mb-4 text-mediumslateblue">
                       Plain English
                     </p>
-                    <p className="text-sm text-gray-800">{parsed.text}</p>
+                    <div className="markdown-content text-sm text-gray-800">
+                      <Markdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          li: ({ node, ...props }) => (
+                            <li {...props} className="my-3" />
+                          ),
+                        }}
+                      >
+                        {parsed.text}
+                      </Markdown>
+                    </div>
                   </div>
                 </div>
               </div>

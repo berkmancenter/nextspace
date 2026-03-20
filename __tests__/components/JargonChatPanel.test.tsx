@@ -34,7 +34,7 @@ describe("JargonChatPanel", () => {
 
   it("renders the subtitle with 'Jargon Filter'", () => {
     render(<JargonChatPanel messages={[]} />);
-    expect(screen.getByText(/jargon filter — technical terms/i)).toBeInTheDocument();
+    expect(screen.getByText(/jargon filter — terms from this session/i)).toBeInTheDocument();
   });
 
   it("includes the event name in the header when provided", () => {
