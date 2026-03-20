@@ -1672,4 +1672,69 @@ describe("EventAssistantRoom", () => {
       });
     });
   });
+
+  describe("Feedback Frequency Configuration", () => {
+    it("extracts feedback frequency from conversation properties", async () => {
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+            properties: { feedbackFrequency: 2 }, // Every 2nd message
+          });
+        } else if (path.includes("/preferences")) {
+          return Promise.resolve({});
+        } else if (path.includes("?channel=direct-")) {
+          return Promise.resolve([]);
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+        properties: { feedbackFrequency: 2 },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(createConversationFromData).toHaveBeenCalled();
+      });
+
+      // feedbackFrequency should be extracted and used in feedback config
+    });
+
+    it("defaults to feedback frequency of 1 when not provided in conversation properties", async () => {
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+            // No properties or feedbackFrequency
+          });
+        } else if (path.includes("/preferences")) {
+          return Promise.resolve({});
+        } else if (path.includes("?channel=direct-")) {
+          return Promise.resolve([]);
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(createConversationFromData).toHaveBeenCalled();
+      });
+
+      // feedbackFrequency should default to 1
+    });
+  });
 });

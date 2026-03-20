@@ -13,12 +13,15 @@ import {
 } from "./enhancers/slashCommandEnhancer";
 import {
   ControlledInputConfig,
-  MediaItem,
   PseudonymousMessage,
+  FeedbackConfig,
 } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
-import { normalizeAssistantPseudonym, parseMessageBody } from "../utils/Helpers";
+import {
+  normalizeAssistantPseudonym,
+  parseMessageBody,
+} from "../utils/Helpers";
 import { BotIcon } from "./BotIcon";
 import { PreferencesBanner, PreferenceOption } from "./PreferencesBanner";
 import { MediaLightbox } from "./MediaLightbox";
@@ -36,13 +39,12 @@ interface AssistantChatPanelProps {
   onSendMessage: (message: string) => void;
   onExitControlledMode: () => void;
   onPromptSelect: (prompt: string) => void;
-  enterControlledMode: (config: ControlledInputConfig) => void;
-  sendFeedbackRating: (messageId: string, rating: string) => void;
   userId: string | null;
   showPreferences?: boolean;
   preferenceOptions?: PreferenceOption[];
   onPreferencesSubmit?: (selectedValues: string[]) => void;
   preferencesError?: string | null;
+  feedbackConfig?: FeedbackConfig;
 }
 
 export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
@@ -58,13 +60,12 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   onSendMessage,
   onExitControlledMode,
   onPromptSelect,
-  enterControlledMode,
-  sendFeedbackRating,
   userId,
   showPreferences = false,
   preferenceOptions = [],
   onPreferencesSubmit,
   preferencesError = null,
+  feedbackConfig,
 }) => {
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(messages);
   const [preferencesVisible, setPreferencesVisible] = useState(showPreferences);
@@ -427,15 +428,22 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                           )}
 
                           {/* Feedback - rendered below the bubble */}
-                          {message.id && !messageType && (
-                            <div className="mt-0">
-                              <MessageFeedback
-                                messageId={message.id}
-                                onPopulateFeedbackText={enterControlledMode}
-                                onSendFeedbackRating={sendFeedbackRating}
-                              />
-                            </div>
-                          )}
+                          {message.id &&
+                            feedbackConfig?.eligibleMessageIds.has(
+                              message.id,
+                            ) && (
+                              <div className="mt-0">
+                                <MessageFeedback
+                                  messageId={message.id}
+                                  onPopulateFeedbackText={
+                                    feedbackConfig.onPopulateFeedbackText
+                                  }
+                                  onSendFeedbackRating={
+                                    feedbackConfig.onSendRating
+                                  }
+                                />
+                              </div>
+                            )}
                         </>
                       ) : (
                         <div

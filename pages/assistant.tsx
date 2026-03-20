@@ -12,7 +12,11 @@ import {
   emitWithTokenRefresh,
 } from "../utils";
 import { components } from "../types";
-import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
+import {
+  ControlledInputConfig,
+  PseudonymousMessage,
+  FeedbackConfig,
+} from "../types.internal";
 import {
   CheckAuthHeader,
   createConversationFromData,
@@ -24,12 +28,13 @@ import { trackConversationEvent, setUserId } from "../utils/analytics";
 import { Transcript } from "../components/";
 import { useSessionJoin } from "../utils/useSessionJoin";
 import { NavigationBar, NavTab } from "../components/NavigationBar";
+import { getFeedbackEligibleMessages } from "../utils/feedbackEligibility";
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
-function EventAssistantRoom({ authType }: { authType: AuthType }) {
+function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const router = useRouter();
 
   // Initialize page-level analytics
@@ -47,6 +52,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
   const [chatMessages, setChatMessages] = useState<PseudonymousMessage[]>([]);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [conversationType, setConversationType] = useState<string | null>(null);
+  const [feedbackFrequency, setFeedbackFrequency] = useState<number>(1);
   const [controlledMode, setControlledMode] =
     useState<ControlledInputConfig | null>(null);
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>("");
@@ -207,6 +213,12 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
         const conversation = await createConversationFromData(conversationData);
         setConversationType(conversation.type.name);
         if (conversation.name) setEventName(conversation.name);
+
+        // Extract feedback frequency from conversation properties
+        const frequency =
+          (conversation?.properties?.feedbackFrequency as number) || 1;
+
+        setFeedbackFrequency(frequency);
 
         // Override botName from the first agent's agentConfig if available,
         // falling back to config.conversationBotName
@@ -662,6 +674,26 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     );
   };
 
+  // Create feedback config for assistant messages
+  const assistantFeedbackConfig: FeedbackConfig = {
+    eligibleMessageIds: getFeedbackEligibleMessages(
+      assistantMessages,
+      feedbackFrequency
+    ),
+    onPopulateFeedbackText: enterControlledMode,
+    onSendRating: sendFeedbackRating,
+  };
+
+  // Create feedback config for chat messages
+  const chatFeedbackConfig: FeedbackConfig = {
+    eligibleMessageIds: getFeedbackEligibleMessages(
+      chatMessages,
+      feedbackFrequency
+    ),
+    onPopulateFeedbackText: enterControlledMode,
+    onSendRating: sendFeedbackRating,
+  };
+
   return (
     // On mobile we add bottom padding so the fixed nav bar doesn't cover content
     <div className="flex flex-row h-[calc(100vh-96px)] overflow-hidden pb-[60px] lg:pb-0">
@@ -712,8 +744,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
                         onSendMessage={sendMessage}
                         controlledMode={controlledMode}
                         onExitControlledMode={exitControlledMode}
-                        enterControlledMode={enterControlledMode}
-                        sendFeedbackRating={sendFeedbackRating}
+                        feedbackConfig={chatFeedbackConfig}
                       />
                     ) : (
                       <AssistantChatPanel
@@ -729,13 +760,12 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
                         onSendMessage={sendMessage}
                         onExitControlledMode={exitControlledMode}
                         onPromptSelect={handlePromptSelect}
-                        enterControlledMode={enterControlledMode}
-                        sendFeedbackRating={sendFeedbackRating}
                         userId={userId}
                         showPreferences={showPreferences}
                         preferenceOptions={preferenceOptions}
                         onPreferencesSubmit={handlePreferencesSubmit}
                         preferencesError={preferencesError}
+                        feedbackConfig={assistantFeedbackConfig}
                       />
                     )
                   ) : (
