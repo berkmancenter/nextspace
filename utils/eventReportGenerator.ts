@@ -18,6 +18,7 @@ interface ServerReportData {
 
 /**
  * Fetch detailed visit information including device types and location types (local/remote) per user
+ * Note: Fetches all visits for the day, then filters for the specific conversation
  */
 async function fetchMatomoVisitDetails(
   siteId: string,
@@ -31,8 +32,6 @@ async function fetchMatomoVisitDetails(
     return null;
   }
 
-  const segment = `pageUrl=@assistant?conversationId=${conversationId}`;
-
   try {
     const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
@@ -42,13 +41,12 @@ async function fetchMatomoVisitDetails(
       idSite: siteId,
       period: "day",
       date: formatDate(conversationDate),
-      segment,
       format: "JSON",
       filter_limit: "-1",
     };
 
     console.log(
-      `Fetching Matomo visit details for conversationId: ${conversationId}`,
+      `Fetching Matomo visit details for date ${formatDate(conversationDate)}`,
     );
 
     const response = await fetch("/api/matomo-proxy", {
@@ -88,7 +86,8 @@ async function fetchMatomoVisitDetails(
         for (const action of visit.actionDetails) {
           if (
             action.url &&
-            action.url.includes(`assistant?conversationId=${conversationId}`)
+            action.url.includes("/assistant") &&
+            action.url.includes(`conversationId=${conversationId}`)
           ) {
             hasRelevantAction = true;
 
@@ -126,7 +125,7 @@ async function fetchMatomoVisitDetails(
     }
 
     console.log(
-      `Aggregated device/location data for ${userDetails.size} users from ${visits.length} visits`,
+      `Aggregated device/location data for ${userDetails.size} users from ${visits.length} visits (filtered for conversationId: ${conversationId})`,
     );
     return userDetails;
   } catch (error: any) {
@@ -137,6 +136,7 @@ async function fetchMatomoVisitDetails(
 
 /**
  * Fetch Matomo UserId report for a specific conversation ID
+ * Note: Fetches all users for the day, then filters based on visit details
  */
 async function fetchMatomoUserIdReport(
   siteId: string,
@@ -148,9 +148,6 @@ async function fetchMatomoUserIdReport(
     return null;
   }
 
-  // Construct segment to filter for URLs containing 'assistant?conversationId=...'
-  const segment = `pageUrl=@assistant?conversationId=${conversationId}`;
-
   try {
     const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
@@ -160,13 +157,12 @@ async function fetchMatomoUserIdReport(
       idSite: siteId,
       period: "day",
       date: formatDate(conversationDate),
-      segment,
       format: "JSON",
       filter_limit: "-1", // Get all rows
     };
 
     console.log(
-      `Fetching Matomo UserId report for date ${formatDate(conversationDate)} for conversationId: ${conversationId}`,
+      `Fetching Matomo UserId report for date ${formatDate(conversationDate)}`,
     );
 
     const response = await fetch("/api/matomo-proxy", {
@@ -440,6 +436,23 @@ export async function generateAndDownloadUserMetricsReport(
         reportDate,
         conversationId,
       );
+
+      // Filter matomoResult to only include users who actually visited this conversation
+      if (matomoResult && matomoVisitDetails) {
+        const visitedUserIds = new Set(matomoVisitDetails.keys());
+        const filteredData = matomoResult.data.filter((user) =>
+          visitedUserIds.has(user.label),
+        );
+
+        console.log(
+          `Filtered Matomo data from ${matomoResult.data.length} to ${filteredData.length} users who visited this conversation`,
+        );
+
+        matomoResult = {
+          data: filteredData,
+          columns: matomoResult.columns,
+        };
+      }
     } else {
       console.log(
         "Matomo configuration not found, generating report without Matomo data",
