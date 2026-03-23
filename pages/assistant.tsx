@@ -483,6 +483,16 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
           Api.get().getAccessToken(),
         );
 
+        // Fetches jargon filter agent's messages, if enabled
+        if (jargonFilterAgentId) {
+          const jargonChannelName = `direct-${userId}-${jargonFilterAgentId}`;
+          const jargonMessages = await RetrieveData(
+            `messages/${router.query.conversationId}?channel=${jargonChannelName}`,
+            Api.get().getAccessToken(),
+          );
+          if (Array.isArray(jargonMessages)) setJargonMessages(jargonMessages);
+        }
+
         if (Array.isArray(assistantMessages)) {
           const messagesWithReplies =
             await fetchAndInsertReplies(assistantMessages);
@@ -494,7 +504,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     };
 
     fetchInitialAssistantMessages();
-  }, [userId, agentId, router.query.conversationId]);
+  }, [userId, agentId, jargonFilterAgentId, router.query.conversationId]);
 
   // Re-fetch all message history when the socket reconnects after a significant
   // gap (user was on another tab/app for a while). Fills any messages missed
@@ -528,7 +538,21 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
           console.error("Error re-fetching assistant messages:", err),
         );
     }
-  }, [lastReconnectTime]);
+
+    if (jargonFilterAgentId) {
+      const jargonChannelName = `direct-${userId}-${jargonFilterAgentId}`;
+      RetrieveData(
+        `messages/${router.query.conversationId}?channel=${jargonChannelName}`,
+        Api.get().getAccessToken(),
+      )
+        .then((jargonMessages) => {
+          if (Array.isArray(jargonMessages)) setJargonMessages(jargonMessages);
+        })
+        .catch((error) => {
+          console.error("Error re-fetching jargon filter agent messages.");
+        });
+    }
+  }, [lastReconnectTime, jargonFilterAgentId]);
 
   async function sendMessage(
     message: string,
