@@ -214,10 +214,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                 message.prompt.options.length > 0 &&
                 message.prompt.type === "singleChoice";
 
-              const bodyText =
-                messageType === "jargon_clarification" && typeof message.body === "object"
-                  ? `**Source text:** ${(message.body as Record<string, string>).sourceText}\n\n**Clarified text:** ${parsed.text}`
-                  : parsed.text;
+              const bodyText = parsed.text;
 
               if (
                 messageType === "moderator_submitted" ||

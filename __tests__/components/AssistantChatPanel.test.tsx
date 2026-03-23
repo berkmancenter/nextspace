@@ -183,37 +183,6 @@ describe("AssistantChatPanel", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders jargon_clarification messages with source and clarified text", () => {
-    const messages = [
-      {
-        id: "4",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:03:00Z",
-        body: {
-          type: "jargon_clarification",
-          text: "An SLO is a target for how reliable a service should be.",
-          sourceText: "Our SLOs are defined in terms of error budget.",
-          transcriptWindow: { start: 1000, end: 2000 },
-        },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
-        fromAgent: true,
-        pause: false,
-        visible: true,
-        upVotes: [],
-        downVotes: [],
-      },
-    ];
-
-    render(<AssistantChatPanel {...baseProps} messages={messages} />);
-
-    const assistantMessage = screen.getByTestId("assistant-message");
-    expect(assistantMessage.textContent).toContain("Source text:");
-    expect(assistantMessage.textContent).toContain("Our SLOs are defined in terms of error budget.");
-    expect(assistantMessage.textContent).toContain("Clarified text:");
-    expect(assistantMessage.textContent).toContain("An SLO is a target for how reliable a service should be.");
-  });
 
   it("renders submitted messages (referenced by moderator)", () => {
     const messages = [
