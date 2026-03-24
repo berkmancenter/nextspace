@@ -727,6 +727,8 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       setUnseenAssistantCount(0);
     } else if (tab === "chat") {
       setUnseenChatCount(0);
+    } else if (tab === "jargon") {
+      setUnseenJargonCount(0);
     }
     // Track tab switch analytics (transcript treated as a nav destination)
     trackConversationEvent(
