@@ -609,20 +609,13 @@ export const EventCreationForm: React.FC = ({}) => {
                                 sx={{ mt: 1, width: "100%" }}
                                 onChange={(e) => {
                                   const inputValue = e.target.value;
-                                  console.log(
-                                    `Object field ${prop.name}.${key}.${fieldKey} changed - input:`,
-                                    inputValue,
-                                  );
+
                                   let newValue;
                                   if (inputValue === "") {
                                     newValue = 0;
                                   } else {
                                     const numValue = parseInt(inputValue, 10);
                                     newValue = isNaN(numValue) ? 0 : numValue;
-                                    console.log(
-                                      `Object field ${prop.name}.${key}.${fieldKey} - parsed value:`,
-                                      newValue,
-                                    );
                                   }
                                   setDynamicPropertyValues((prev) => ({
                                     ...prev,
@@ -742,9 +735,6 @@ export const EventCreationForm: React.FC = ({}) => {
         }
 
         const value = dynamicPropertyValues[prop.name];
-
-        // Debug logging
-        console.log(`Property ${prop.name}:`, value, typeof value);
 
         // Only include the property if it has a value or if it's required
         if (value !== undefined && value !== null && value !== "") {
