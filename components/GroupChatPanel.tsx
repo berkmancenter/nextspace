@@ -4,7 +4,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { MessageInput } from "./MessageInput";
 import { MessageFeedback } from "./MessageFeedback";
-import { PseudonymousMessage, ControlledInputConfig, MediaItem } from "../types.internal";
+import { PseudonymousMessage, ControlledInputConfig, FeedbackConfig } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { BotIcon } from "./BotIcon";
@@ -103,8 +103,7 @@ interface GroupChatPanelProps {
   onSendMessage: (message: string) => void;
   controlledMode?: ControlledInputConfig | null;
   onExitControlledMode?: () => void;
-  enterControlledMode?: (config: ControlledInputConfig) => void;
-  sendFeedbackRating?: (messageId: string, rating: string) => void;
+  feedbackConfig?: FeedbackConfig;
 }
 
 export const GroupChatPanel: FC<GroupChatPanelProps> = ({
@@ -117,8 +116,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   onSendMessage,
   controlledMode,
   onExitControlledMode,
-  enterControlledMode,
-  sendFeedbackRating,
+  feedbackConfig,
 }) => {
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(messages);
 
@@ -303,13 +301,15 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                       {/* Feedback - rendered below the bubble for Event Assistant messages */}
                       {isAssistant &&
                         message.id &&
-                        enterControlledMode &&
-                        sendFeedbackRating && (
+                        feedbackConfig &&
+                        feedbackConfig.eligibleMessageIds.has(message.id) && (
                           <div className="mt-0" style={{ width: "85%" }}>
                             <MessageFeedback
                               messageId={message.id}
-                              onPopulateFeedbackText={enterControlledMode}
-                              onSendFeedbackRating={sendFeedbackRating}
+                              onPopulateFeedbackText={
+                                feedbackConfig.onPopulateFeedbackText
+                              }
+                              onSendFeedbackRating={feedbackConfig.onSendRating}
                             />
                           </div>
                         )}

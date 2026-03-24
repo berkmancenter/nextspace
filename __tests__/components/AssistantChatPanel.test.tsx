@@ -29,7 +29,11 @@ jest.mock("../../components/messages", () => ({
 
 // Mock MessageFeedback component
 jest.mock("../../components/MessageFeedback", () => ({
-  MessageFeedback: ({ messageId, onPopulateFeedbackText, onSendFeedbackRating }: any) => (
+  MessageFeedback: ({
+    messageId,
+    onPopulateFeedbackText,
+    onSendFeedbackRating,
+  }: any) => (
     <div data-testid="message-feedback" data-message-id={messageId}>
       <button
         data-testid="rating-button-3"
@@ -179,7 +183,7 @@ describe("AssistantChatPanel", () => {
 
     expect(screen.getByText("This was submitted")).toBeInTheDocument();
     expect(
-      screen.getByTestId("moderator-submitted-message")
+      screen.getByTestId("moderator-submitted-message"),
     ).toBeInTheDocument();
   });
 
@@ -351,7 +355,7 @@ describe("AssistantChatPanel", () => {
         {...baseProps}
         messages={messages}
         waitingForResponse={true}
-      />
+      />,
     );
 
     // Should show animated SVG bot loading indicator below the user's message
@@ -392,7 +396,19 @@ describe("AssistantChatPanel", () => {
       },
     ];
 
-    render(<AssistantChatPanel {...baseProps} messages={messages} />);
+    const feedbackConfig = {
+      eligibleMessageIds: new Set(["1"]),
+      onPopulateFeedbackText: mockEnterControlledMode,
+      onSendRating: mockSendFeedbackRating,
+    };
+
+    render(
+      <AssistantChatPanel
+        {...baseProps}
+        messages={messages}
+        feedbackConfig={feedbackConfig}
+      />,
+    );
 
     const ratingButton = screen.getByTestId("rating-button-3");
     await user.click(ratingButton);
@@ -420,7 +436,19 @@ describe("AssistantChatPanel", () => {
       },
     ];
 
-    render(<AssistantChatPanel {...baseProps} messages={messages} />);
+    const feedbackConfig = {
+      eligibleMessageIds: new Set(["1"]),
+      onPopulateFeedbackText: mockEnterControlledMode,
+      onSendRating: mockSendFeedbackRating,
+    };
+
+    render(
+      <AssistantChatPanel
+        {...baseProps}
+        messages={messages}
+        feedbackConfig={feedbackConfig}
+      />,
+    );
 
     const sayMoreButton = screen.getByTestId("say-more-button");
     await user.click(sayMoreButton);
@@ -429,13 +457,13 @@ describe("AssistantChatPanel", () => {
       expect.objectContaining({
         prefix: "/feedback|Text|1|",
         label: "Feedback Mode",
-      })
+      }),
     );
   });
 
   it("scrolls to bottom when new messages arrive", async () => {
     const { rerender, container } = render(
-      <AssistantChatPanel {...baseProps} messages={[]} />
+      <AssistantChatPanel {...baseProps} messages={[]} />,
     );
 
     // Get the scrollable messages container
@@ -553,7 +581,9 @@ describe("AssistantChatPanel", () => {
             typeof message.body === "string"
               ? message.body
               : message.body?.text || "";
-          return <div data-testid="moderator-submitted-message">{messageText}</div>;
+          return (
+            <div data-testid="moderator-submitted-message">{messageText}</div>
+          );
         },
       }));
 
@@ -850,7 +880,7 @@ describe("AssistantChatPanel", () => {
       ];
 
       const { container } = render(
-        <AssistantChatPanel {...baseProps} messages={messages} />
+        <AssistantChatPanel {...baseProps} messages={messages} />,
       );
 
       // User messages are rendered in a plain div without AssistantMessage component
@@ -879,7 +909,7 @@ describe("AssistantChatPanel", () => {
       ];
 
       const { container } = render(
-        <AssistantChatPanel {...baseProps} messages={messages} />
+        <AssistantChatPanel {...baseProps} messages={messages} />,
       );
 
       // Check timestamp is displayed
@@ -920,7 +950,7 @@ describe("AssistantChatPanel", () => {
       ];
 
       const { container } = render(
-        <AssistantChatPanel {...baseProps} messages={messages} />
+        <AssistantChatPanel {...baseProps} messages={messages} />,
       );
 
       // Should show two timestamps (one for each different minute)
@@ -961,7 +991,7 @@ describe("AssistantChatPanel", () => {
       ];
 
       const { container } = render(
-        <AssistantChatPanel {...baseProps} messages={messages} />
+        <AssistantChatPanel {...baseProps} messages={messages} />,
       );
 
       // Should show two timestamps (one for each different hour)
@@ -1002,7 +1032,7 @@ describe("AssistantChatPanel", () => {
       ];
 
       const { container } = render(
-        <AssistantChatPanel {...baseProps} messages={messages} />
+        <AssistantChatPanel {...baseProps} messages={messages} />,
       );
 
       // Should only show one timestamp (for the first message)
@@ -1047,7 +1077,7 @@ describe("AssistantChatPanel", () => {
       ];
 
       const { container } = render(
-        <AssistantChatPanel {...baseProps} messages={messages} />
+        <AssistantChatPanel {...baseProps} messages={messages} />,
       );
 
       // Should show two timestamps (one for each different minute)
@@ -1088,7 +1118,7 @@ describe("AssistantChatPanel", () => {
       ];
 
       const { container } = render(
-        <AssistantChatPanel {...baseProps} messages={messages} />
+        <AssistantChatPanel {...baseProps} messages={messages} />,
       );
 
       // Should show two timestamps (one for each different minute)
@@ -1133,12 +1163,381 @@ describe("AssistantChatPanel", () => {
       ];
 
       const { container } = render(
-        <AssistantChatPanel {...baseProps} messages={messages} />
+        <AssistantChatPanel {...baseProps} messages={messages} />,
       );
 
       // Should only show one timestamp (for the first message)
       const timestamps = container.querySelectorAll(".text-gray-400");
       expect(timestamps.length).toBe(1);
+    });
+  });
+
+  describe("Feedback Configuration", () => {
+    it("renders feedback UI only for messages in eligibleMessageIds set", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Message 1" },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "2",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "Message 2" },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "3",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:02:00Z",
+          body: { text: "Message 3" },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const feedbackConfig = {
+        eligibleMessageIds: new Set(["1", "3"]), // Only messages 1 and 3 are eligible
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendFeedbackRating,
+      };
+
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />,
+      );
+
+      // Get all feedback elements
+      const feedbackElements = screen.getAllByTestId("message-feedback");
+
+      // Should have 2 feedback elements (for messages 1 and 3)
+      expect(feedbackElements).toHaveLength(2);
+
+      // Verify they are for the correct messages
+      expect(feedbackElements[0]).toHaveAttribute("data-message-id", "1");
+      expect(feedbackElements[1]).toHaveAttribute("data-message-id", "3");
+    });
+
+    it("does not render feedback UI when message is not in eligibleMessageIds", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Message without feedback" },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const feedbackConfig = {
+        eligibleMessageIds: new Set<string>(), // No eligible messages
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendFeedbackRating,
+      };
+
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />,
+      );
+
+      // Should not have any feedback elements
+      expect(screen.queryByTestId("message-feedback")).not.toBeInTheDocument();
+    });
+
+    it("does not render feedback for messages with ineligible types even if fromAgent", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Intro message", type: "intro" },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "2",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: "Regular message",
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const feedbackConfig = {
+        eligibleMessageIds: new Set(["2"]), // Only message 2 is eligible (message 1 excluded by type)
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendFeedbackRating,
+      };
+
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />,
+      );
+
+      const feedbackElements = screen.queryAllByTestId("message-feedback");
+
+      // Should only have 1 feedback element (for message 2)
+      expect(feedbackElements).toHaveLength(1);
+      expect(feedbackElements[0]).toHaveAttribute("data-message-id", "2");
+    });
+
+    it("calls feedbackConfig callbacks when feedback buttons are clicked", async () => {
+      const user = userEvent.setup();
+
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Message with feedback" },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const feedbackConfig = {
+        eligibleMessageIds: new Set(["1"]),
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendFeedbackRating,
+      };
+
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />,
+      );
+
+      // Click rating button
+      const ratingButton = screen.getByTestId("rating-button-3");
+      await user.click(ratingButton);
+
+      expect(mockSendFeedbackRating).toHaveBeenCalledWith("1", 3);
+
+      // Click "Say more" button
+      const sayMoreButton = screen.getByTestId("say-more-button");
+      await user.click(sayMoreButton);
+
+      expect(mockEnterControlledMode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prefix: "/feedback|Text|1|",
+          label: "Feedback Mode",
+        }),
+      );
+    });
+
+    it("handles empty eligibleMessageIds set", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Message 1" },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "2",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "Message 2" },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const feedbackConfig = {
+        eligibleMessageIds: new Set<string>(),
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendFeedbackRating,
+      };
+
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />,
+      );
+
+      // No feedback UI should be rendered
+      expect(screen.queryByTestId("message-feedback")).not.toBeInTheDocument();
+    });
+
+    it("renders feedback for all agent messages when all are in eligibleMessageIds", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Message 1" },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "2",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "Message 2" },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const feedbackConfig = {
+        eligibleMessageIds: new Set(["1", "2"]),
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendFeedbackRating,
+      };
+
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />,
+      );
+
+      const feedbackElements = screen.getAllByTestId("message-feedback");
+
+      // Should have 2 feedback elements
+      expect(feedbackElements).toHaveLength(2);
+    });
+
+    it("does not render feedback for user messages even if in eligibleMessageIds", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "test-user",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "User message" },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "tu-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "2",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "Agent message" },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const feedbackConfig = {
+        eligibleMessageIds: new Set(["1", "2"]),
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendFeedbackRating,
+      };
+
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />,
+      );
+
+      const feedbackElements = screen.queryAllByTestId("message-feedback");
+
+      // Should only have 1 feedback element (for agent message)
+      expect(feedbackElements).toHaveLength(1);
+      expect(feedbackElements[0]).toHaveAttribute("data-message-id", "2");
     });
   });
 });

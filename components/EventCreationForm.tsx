@@ -332,18 +332,29 @@ export const EventCreationForm: React.FC = ({}) => {
             name={prop.name}
             label={prop.label}
             type="number"
-            value={value ?? prop.default ?? ""}
+            value={
+              value === 0 || value === null || value === undefined ? "" : value
+            }
             helperText={prop.description}
             fullWidth
             variant="outlined"
             margin="normal"
             required={prop.required}
+            slotProps={{ htmlInput: { min: 0, step: 1 } }}
             onChange={(e) => {
-              const numValue = parseFloat(e.target.value);
-              setDynamicPropertyValues((prev) => ({
-                ...prev,
-                [prop.name]: isNaN(numValue) ? 0 : numValue,
-              }));
+              const inputValue = e.target.value;
+              if (inputValue === "") {
+                setDynamicPropertyValues((prev) => ({
+                  ...prev,
+                  [prop.name]: 0,
+                }));
+              } else {
+                const numValue = parseInt(inputValue, 10);
+                setDynamicPropertyValues((prev) => ({
+                  ...prev,
+                  [prop.name]: isNaN(numValue) ? 0 : numValue,
+                }));
+              }
             }}
           />
         );
@@ -590,21 +601,29 @@ export const EventCreationForm: React.FC = ({}) => {
                                   fieldKey.slice(1)
                                 }
                                 type="number"
-                                value={fieldValue}
-                                inputProps={{ min: 0, max: 10, step: 0.1 }}
+                                value={fieldValue === 0 ? "" : fieldValue}
+                                slotProps={{
+                                  htmlInput: { min: 0, max: 10, step: 1 },
+                                }}
                                 size="small"
                                 sx={{ mt: 1, width: "100%" }}
                                 onChange={(e) => {
-                                  const numValue = parseFloat(e.target.value);
+                                  const inputValue = e.target.value;
+
+                                  let newValue;
+                                  if (inputValue === "") {
+                                    newValue = 0;
+                                  } else {
+                                    const numValue = parseInt(inputValue, 10);
+                                    newValue = isNaN(numValue) ? 0 : numValue;
+                                  }
                                   setDynamicPropertyValues((prev) => ({
                                     ...prev,
                                     [prop.name]: {
                                       ...prev[prop.name],
                                       [key]: {
                                         ...itemValue,
-                                        [fieldKey]: isNaN(numValue)
-                                          ? 0
-                                          : numValue,
+                                        [fieldKey]: newValue,
                                       },
                                     },
                                   }));
@@ -725,6 +744,8 @@ export const EventCreationForm: React.FC = ({}) => {
         }
       });
     }
+
+    console.log("Final properties object:", properties);
 
     body = {
       ...body,

@@ -135,6 +135,18 @@ export interface ControlledInputConfig {
 }
 
 /**
+ * Feedback configuration for message feedback UI
+ * @property {Set<string>} eligibleMessageIds - Set of message IDs that should display feedback UI
+ * @property {function} onPopulateFeedbackText - Callback to populate feedback text input
+ * @property {function} onSendRating - Callback to send feedback rating
+ */
+export interface FeedbackConfig {
+  eligibleMessageIds: Set<string>;
+  onPopulateFeedbackText: (config: ControlledInputConfig) => void;
+  onSendRating: (messageId: string, rating: string) => void;
+}
+
+/**
  * Media item structure for multimodal messages
  * @property {"image" | "audio" | "video"} type - The type of media
  * @property {string} data - Base64 encoded media data

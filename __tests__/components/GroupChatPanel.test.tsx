@@ -20,6 +20,32 @@ jest.mock("../../components/MessageInput", () => ({
   ),
 }));
 
+// Mock MessageFeedback component
+jest.mock("../../components/MessageFeedback", () => ({
+  MessageFeedback: ({ messageId, onPopulateFeedbackText, onSendFeedbackRating }: any) => (
+    <div data-testid="message-feedback" data-message-id={messageId}>
+      <button
+        data-testid={`rating-button-${messageId}`}
+        onClick={() => onSendFeedbackRating?.(messageId, 3)}
+      >
+        Rate
+      </button>
+      <button
+        data-testid={`say-more-button-${messageId}`}
+        onClick={() =>
+          onPopulateFeedbackText?.({
+            prefix: `/feedback|Text|${messageId}|`,
+            icon: null,
+            label: "Feedback Mode",
+          })
+        }
+      >
+        Say more
+      </button>
+    </div>
+  ),
+}));
+
 describe("GroupChatPanel", () => {
   const mockOnSendMessage = jest.fn();
 
@@ -1340,6 +1366,306 @@ describe("GroupChatPanel", () => {
       // Should show two timestamps (one for each different minute)
       const timestamps = container.querySelectorAll(".text-gray-400");
       expect(timestamps.length).toBe(2);
+    });
+  });
+
+  describe("Feedback Configuration in Group Chat", () => {
+    it("renders feedback UI for agent messages in eligibleMessageIds", () => {
+      const mockEnterControlledMode = jest.fn();
+      const mockSendRating = jest.fn();
+
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "User message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "2",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "Agent message 1" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "3",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:02:00Z",
+          body: { text: "Agent message 2" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const feedbackConfig = {
+        eligibleMessageIds: new Set(["2"]), // Only message 2 eligible
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendRating,
+      };
+
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      // Should have 1 feedback element (for message 2 only)
+      const feedbackElements = screen.queryAllByTestId("message-feedback");
+      expect(feedbackElements).toHaveLength(1);
+      expect(feedbackElements[0]).toHaveAttribute("data-message-id", "2");
+    });
+
+    it("does not render feedback UI when feedbackConfig is not provided", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Agent message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      // Should not have any feedback elements
+      expect(screen.queryByTestId("message-feedback")).not.toBeInTheDocument();
+    });
+
+    it("does not render feedback for user messages even with feedbackConfig", () => {
+      const mockEnterControlledMode = jest.fn();
+      const mockSendRating = jest.fn();
+
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "User message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const feedbackConfig = {
+        eligibleMessageIds: new Set(["1"]),
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendRating,
+      };
+
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      // Should not have feedback for user messages
+      expect(screen.queryByTestId("message-feedback")).not.toBeInTheDocument();
+    });
+
+    it("renders feedback for multiple eligible agent messages", () => {
+      const mockEnterControlledMode = jest.fn();
+      const mockSendRating = jest.fn();
+
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Agent message 1" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "2",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "Agent message 2" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "3",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:02:00Z",
+          body: { text: "Agent message 3" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const feedbackConfig = {
+        eligibleMessageIds: new Set(["1", "3"]), // Messages 1 and 3 eligible
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendRating,
+      };
+
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      const feedbackElements = screen.queryAllByTestId("message-feedback");
+
+      // Should have 2 feedback elements
+      expect(feedbackElements).toHaveLength(2);
+      expect(feedbackElements[0]).toHaveAttribute("data-message-id", "1");
+      expect(feedbackElements[1]).toHaveAttribute("data-message-id", "3");
+    });
+
+    it("handles empty eligibleMessageIds set", () => {
+      const mockEnterControlledMode = jest.fn();
+      const mockSendRating = jest.fn();
+
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Agent message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const feedbackConfig = {
+        eligibleMessageIds: new Set<string>(), // No eligible messages
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendRating,
+      };
+
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      // Should not have any feedback elements
+      expect(screen.queryByTestId("message-feedback")).not.toBeInTheDocument();
+    });
+
+    it("excludes feedback for intro type messages in chat", () => {
+      const mockEnterControlledMode = jest.fn();
+      const mockSendRating = jest.fn();
+
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Welcome message", type: "intro" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "2",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "Regular message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const feedbackConfig = {
+        eligibleMessageIds: new Set(["2"]), // Message 1 excluded by type
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendRating,
+      };
+
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      const feedbackElements = screen.queryAllByTestId("message-feedback");
+
+      // Should only have 1 feedback element (for message 2)
+      expect(feedbackElements).toHaveLength(1);
+      expect(feedbackElements[0]).toHaveAttribute("data-message-id", "2");
     });
   });
 });
