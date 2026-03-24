@@ -214,7 +214,8 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                 message.prompt.options.length > 0 &&
                 message.prompt.type === "singleChoice";
 
-              // Special message types rendered in the same avatar+name layout
+              const bodyText = parsed.text;
+
               if (
                 messageType === "moderator_submitted" ||
                 submittedIds.includes(message.id)
@@ -395,7 +396,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                                 key={`msg-${i}`}
                                 message={{
                                   ...message,
-                                  body: parsed.text,
+                                  body: bodyText,
                                 }}
                                 media={parsed.media}
                                 onPromptSelect={onPromptSelect}
@@ -416,7 +417,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                                 key={`msg-${i}`}
                                 message={{
                                   ...message,
-                                  body: parsed.text,
+                                  body: bodyText,
                                 }}
                                 media={parsed.media}
                                 onPromptSelect={onPromptSelect}

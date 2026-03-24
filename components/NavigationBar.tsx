@@ -6,7 +6,8 @@ import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import GroupIcon from "@mui/icons-material/Group";
 import { BotIcon } from "./BotIcon";
 import { TranscriptIcon } from "./TranscriptIcon";
-export type NavTab = "assistant" | "chat" | "transcript";
+import { JargonIcon } from "./JargonIcon";
+export type NavTab = "assistant" | "chat" | "transcript" | "jargon";
 
 interface NavItem {
   id: NavTab;
@@ -21,8 +22,10 @@ interface NavigationBarProps {
   onTabChange: (tab: NavTab) => void;
   unseenAssistantCount: number;
   unseenChatCount: number;
+  unseenJargonCount: number;
   showChat: boolean;
   showTranscript: boolean;
+  showJargon: boolean;
   botName: string;
 }
 
@@ -41,8 +44,10 @@ export function NavigationBar({
   onTabChange,
   unseenAssistantCount,
   unseenChatCount,
+  unseenJargonCount,
   showChat,
   showTranscript,
+  showJargon,
   botName,
 }: NavigationBarProps) {
   const navItems: NavItem[] = (
@@ -68,12 +73,20 @@ export function NavigationBar({
         InactiveIcon: null,
         show: showTranscript,
       },
+      {
+        id: "jargon" as NavTab,
+        label: "Jargon Filter",
+        ActiveIcon: null,
+        InactiveIcon: null,
+        show: showJargon,
+      },
     ] as NavItem[]
   ).filter((item) => item.show);
 
   const getUnseenCount = (id: NavTab) => {
     if (id === "assistant") return unseenAssistantCount;
     if (id === "chat") return unseenChatCount;
+    if (id === "jargon") return unseenJargonCount;
     return 0;
   };
 
@@ -90,6 +103,9 @@ export function NavigationBar({
     }
     if (id === "transcript") {
       return <TranscriptIcon size={size} color={color} />;
+    }
+    if (id === "jargon") {
+      return <JargonIcon size={size} color={color} />;
     }
     const Icon = (isActive ? ActiveIcon : InactiveIcon)!;
     return <Icon sx={{ fontSize: size, color }} />;

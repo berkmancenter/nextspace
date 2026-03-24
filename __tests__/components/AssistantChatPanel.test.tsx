@@ -183,6 +183,7 @@ describe("AssistantChatPanel", () => {
     ).toBeInTheDocument();
   });
 
+
   it("renders submitted messages (referenced by moderator)", () => {
     const messages = [
       {

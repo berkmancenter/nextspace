@@ -8,8 +8,10 @@ const baseProps = {
   onTabChange: jest.fn(),
   unseenAssistantCount: 0,
   unseenChatCount: 0,
+  unseenJargonCount: 0,
   showChat: true,
   showTranscript: true,
+  showJargon: false,
   botName: "Berkie",
 };
 
@@ -136,6 +138,41 @@ describe("NavigationBar", () => {
       "nav[aria-label='Main navigation']",
     );
     expect(navElements.length).toBe(2);
+  });
+
+  describe("jargon tab", () => {
+    it("hides jargon tab when showJargon is false", () => {
+      render(<NavigationBar {...baseProps} showJargon={false} />);
+      expect(screen.queryByLabelText("Jargon Filter")).not.toBeInTheDocument();
+    });
+
+    it("shows jargon tab when showJargon is true", () => {
+      render(<NavigationBar {...baseProps} showJargon={true} />);
+      expect(screen.getAllByLabelText("Jargon Filter").length).toBeGreaterThan(0);
+    });
+
+    it("calls onTabChange with 'jargon' when jargon tab is clicked", async () => {
+      const user = userEvent.setup();
+      const onTabChange = jest.fn();
+      render(<NavigationBar {...baseProps} showJargon={true} onTabChange={onTabChange} />);
+
+      const jargonBtns = screen.getAllByLabelText("Jargon Filter");
+      await user.click(jargonBtns[0]);
+
+      expect(onTabChange).toHaveBeenCalledWith("jargon");
+    });
+
+    it("shows unseen badge on jargon tab when unseenJargonCount > 0 and not on jargon tab", () => {
+      const { container } = render(
+        <NavigationBar {...baseProps} showJargon={true} unseenJargonCount={2} activeTab="assistant" />,
+      );
+
+      const badges = container.querySelectorAll(".MuiBadge-badge");
+      const visibleBadges = Array.from(badges).filter(
+        (badge) => !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      expect(visibleBadges.length).toBeGreaterThan(0);
+    });
   });
 
   describe("unseen badges", () => {

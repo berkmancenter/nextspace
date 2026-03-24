@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 
 import { AssistantChatPanel } from "../components/AssistantChatPanel";
+import { JargonChatPanel } from "../components/JargonChatPanel";
 import { GroupChatPanel } from "../components/GroupChatPanel";
 import { SlashCommand } from "../components/enhancers/slashCommandEnhancer";
 import {
@@ -10,6 +11,7 @@ import {
   SendData,
   GetChannelPasscode,
   emitWithTokenRefresh,
+  buildDirectChannels,
 } from "../utils";
 import { components } from "../types";
 import { ControlledInputConfig, PseudonymousMessage } from "../types.internal";
@@ -41,11 +43,21 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
   const [activeTab, setActiveTab] = useState<NavTab>("chat");
   const [unseenAssistantCount, setUnseenAssistantCount] = useState<number>(0);
   const [unseenChatCount, setUnseenChatCount] = useState<number>(0);
+  const [unseenJargonCount, setUnseenJargonCount] = useState<number>(0);
   const [assistantMessages, setAssistantMessages] = useState<
     PseudonymousMessage[]
   >([]);
   const [chatMessages, setChatMessages] = useState<PseudonymousMessage[]>([]);
+  const [jargonMessages, setJargonMessages] = useState<PseudonymousMessage[]>(
+    [],
+  );
   const [agentId, setAgentId] = useState<string | null>(null);
+  const [jargonFilterAgentId, setJargonFilterAgentId] = useState<string | null>(
+    null,
+  );
+  const [userPreferences, setUserPreferences] = useState<
+    Record<string, boolean>
+  >({});
   const [conversationType, setConversationType] = useState<string | null>(null);
   const [controlledMode, setControlledMode] =
     useState<ControlledInputConfig | null>(null);
@@ -63,6 +75,11 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       value: "visualResponse",
       label: "Visual Response",
       description: "Answer my questions with images when appropriate",
+    },
+    {
+      value: "jargonClarification",
+      label: "Jargon Clarification",
+      description: "Send me clarification when speakers use jargon",
     },
   ];
 
@@ -138,6 +155,14 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
         if (activeTabRef.current !== "chat") {
           setUnseenChatCount((prev) => prev + 1);
         }
+      } else if (
+        jargonFilterAgentId &&
+        data.channels?.some((c) => c.includes(jargonFilterAgentId))
+      ) {
+        setJargonMessages((prev) => [...prev, data]);
+        if (activeTabRef.current !== "jargon") {
+          setUnseenJargonCount((prev) => prev + 1);
+        }
       } else if (!data.channels || !data.channels.includes("transcript")) {
         setAssistantMessages((prev) => [...prev, data]);
         // Increment counter if NOT viewing assistant tab
@@ -154,14 +179,12 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       }
     };
 
-    if (!socket.hasListeners("message:new")) {
-      socket.on("message:new", messageHandler);
-    }
+    socket.on("message:new", messageHandler);
 
     return () => {
       socket.off("message:new", messageHandler);
     };
-  }, [socket]);
+  }, [socket, jargonFilterAgentId]);
 
   // Keep activeTabRef in sync with activeTab state
   useEffect(() => {
@@ -253,6 +276,14 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
           );
           return;
         }
+
+        const jargonAgent = conversation.agents.find(
+          (agent: components["schemas"]["Agent"]) =>
+            agent.agentType === "jargonFilterAgent",
+        );
+        if (jargonAgent) {
+          setJargonFilterAgentId(jargonAgent.id!);
+        }
       } catch (error) {
         console.error("Error fetching conversation data:", error);
         setLocalError("Failed to fetch conversation data.");
@@ -269,14 +300,24 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       return;
     }
 
-    // Join channels - include both direct and chat if chatPasscode is available
-    const channels: components["schemas"]["Channel"][] = [
-      {
-        name: `direct-${userId}-${agentId}`,
-        passcode: null,
-        direct: true,
-      },
-    ];
+    // Build direct channels based on available agents and user preferences
+    const agentChannels = buildDirectChannels(
+      userId,
+      [
+        { agentId },
+        ...(jargonFilterAgentId
+          ? [
+              {
+                agentId: jargonFilterAgentId,
+                preferenceKey: "jargonClarification",
+              },
+            ]
+          : []),
+      ],
+      userPreferences,
+    );
+
+    const channels: components["schemas"]["Channel"][] = [...agentChannels];
     if (chatPasscode) {
       channels.push({
         name: "chat",
@@ -311,7 +352,15 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     return () => {
       socket.off("connect", joinConversation);
     };
-  }, [socket, agentId, userId, chatPasscode, router.query.conversationId]);
+  }, [
+    socket,
+    agentId,
+    jargonFilterAgentId,
+    userId,
+    userPreferences,
+    chatPasscode,
+    router.query.conversationId,
+  ]);
 
   // Helper function to fetch replies for messages and insert them into the array
   const fetchAndInsertReplies = async (
@@ -408,6 +457,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
           Object.keys(preferences).length > 0
         ) {
           setShowPreferences(false);
+          setUserPreferences(preferences as Record<string, boolean>);
         } else {
           // Empty object means no preferences set yet
           setShowPreferences(true);
@@ -433,6 +483,16 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
           Api.get().getAccessToken(),
         );
 
+        // Fetches jargon filter agent's messages, if enabled
+        if (jargonFilterAgentId) {
+          const jargonChannelName = `direct-${userId}-${jargonFilterAgentId}`;
+          const jargonMessages = await RetrieveData(
+            `messages/${router.query.conversationId}?channel=${jargonChannelName}`,
+            Api.get().getAccessToken(),
+          );
+          if (Array.isArray(jargonMessages)) setJargonMessages(jargonMessages);
+        }
+
         if (Array.isArray(assistantMessages)) {
           const messagesWithReplies =
             await fetchAndInsertReplies(assistantMessages);
@@ -444,7 +504,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
     };
 
     fetchInitialAssistantMessages();
-  }, [userId, agentId, router.query.conversationId]);
+  }, [userId, agentId, jargonFilterAgentId, router.query.conversationId]);
 
   // Re-fetch all message history when the socket reconnects after a significant
   // gap (user was on another tab/app for a while). Fills any messages missed
@@ -478,7 +538,21 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
           console.error("Error re-fetching assistant messages:", err),
         );
     }
-  }, [lastReconnectTime]);
+
+    if (jargonFilterAgentId) {
+      const jargonChannelName = `direct-${userId}-${jargonFilterAgentId}`;
+      RetrieveData(
+        `messages/${router.query.conversationId}?channel=${jargonChannelName}`,
+        Api.get().getAccessToken(),
+      )
+        .then((jargonMessages) => {
+          if (Array.isArray(jargonMessages)) setJargonMessages(jargonMessages);
+        })
+        .catch((error) => {
+          console.error("Error re-fetching jargon filter agent messages.");
+        });
+    }
+  }, [lastReconnectTime, jargonFilterAgentId]);
 
   async function sendMessage(
     message: string,
@@ -639,6 +713,7 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
 
       setShowPreferences(false);
       setPreferencesError(null);
+      setUserPreferences(preferencesObject);
     } catch (error) {
       console.error("Error saving preferences:", error);
       setPreferencesError("Failed to save preferences. Please try again.");
@@ -652,6 +727,8 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
       setUnseenAssistantCount(0);
     } else if (tab === "chat") {
       setUnseenChatCount(0);
+    } else if (tab === "jargon") {
+      setUnseenJargonCount(0);
     }
     // Track tab switch analytics (transcript treated as a nav destination)
     trackConversationEvent(
@@ -677,8 +754,12 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
             onTabChange={handleTabChange}
             unseenAssistantCount={unseenAssistantCount}
             unseenChatCount={unseenChatCount}
+            unseenJargonCount={unseenJargonCount}
             showChat={!!chatPasscode}
             showTranscript={!!transcriptPasscode}
+            showJargon={
+              !!jargonFilterAgentId && !!userPreferences.jargonClarification
+            }
             botName={botName}
           />
 
@@ -714,6 +795,11 @@ function EventAssistantRoom({ authType }: { authType: AuthType }) {
                         onExitControlledMode={exitControlledMode}
                         enterControlledMode={enterControlledMode}
                         sendFeedbackRating={sendFeedbackRating}
+                      />
+                    ) : activeTab === "jargon" ? (
+                      <JargonChatPanel
+                        messages={jargonMessages}
+                        eventName={eventName}
                       />
                     ) : (
                       <AssistantChatPanel

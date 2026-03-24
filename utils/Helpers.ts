@@ -7,6 +7,7 @@ import {
   EventUrls,
   PseudonymousMessage,
   MediaItem,
+  AgentChannelConfig,
 } from "../types.internal";
 import TokenManagerDefault from "./TokenManager";
 
@@ -489,4 +490,20 @@ export const normalizeAssistantPseudonym = (
 ): string => {
   if (!message || !message.pseudonym) return "";
   return message.fromAgent ? botName : message.pseudonym;
+};
+
+export const buildDirectChannels = (
+  userId: string,
+  agents: AgentChannelConfig[],
+  preferences: Record<string, boolean>,
+): components["schemas"]["Channel"][] => {
+  return agents
+    .filter((agent) =>
+      agent.preferenceKey ? preferences[agent.preferenceKey] === true : true,
+    )
+    .map((agent) => ({
+      name: `direct-${userId}-${agent.agentId}`,
+      passcode: null,
+      direct: true,
+    }));
 };
