@@ -129,8 +129,9 @@ export const MessageInput: FC<MessageInputProps> = ({
   };
 
   /** Handle Enter key */
-  const handleKeyUp = (e: KeyboardEvent<HTMLDivElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" && enterUsedForCommandRef.current) {
+      e.preventDefault();
       enterUsedForCommandRef.current = false;
       return;
     }
@@ -140,6 +141,7 @@ export const MessageInput: FC<MessageInputProps> = ({
       !waitingForResponse &&
       !activeEnhancer
     ) {
+      e.preventDefault();
       handleSend();
     }
   };
@@ -247,93 +249,88 @@ export const MessageInput: FC<MessageInputProps> = ({
               )}
             </div>
 
-            {/* Input field */}
-            <TextField
-              id="message-input"
-              inputRef={messageInputRef}
-              type="text"
-              placeholder="Enter your message here"
-              value={currentMessage}
-              onChange={handleChange}
-              onKeyUp={handleKeyUp}
-              style={{ flex: 1 }}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#A5B4FC",
-                    borderWidth: "1px",
-                    borderBottomLeftRadius: enhancers.length > 0 ? 0 : "8px",
-                    borderBottomRightRadius: enhancers.length > 0 ? 0 : "8px",
-                    borderTopLeftRadius: 0,
-                    borderTopRightRadius: 0,
-                  },
-                },
-              }}
-              slotProps={{
-                input: {
-                  endAdornment: (
-                    <InputAdornment position="end">
+            {/* Input field with buttons at bottom */}
+            <div className="border-[1px] border-[#A5B4FC] border-t-0 rounded-b-lg bg-white transition-all focus-within:border-[#6366f1] focus-within:shadow-md">
+              <textarea
+                id="message-input"
+                ref={messageInputRef as any}
+                placeholder="Enter your message here"
+                value={currentMessage}
+                onChange={handleChange as any}
+                onKeyDown={handleKeyDown as any}
+                className="w-full px-4 pt-3 pb-1 focus:outline-none text-base resize-none"
+                rows={1}
+              />
+              <div className="flex items-center justify-between px-2 pb-1">
+                {/* Enhancer buttons at bottom left */}
+                <div className="flex gap-1">
+                  {enhancers.map((enhancer) => {
+                    const isActive = activeEnhancer?.enhancer.id === enhancer.id;
+                    return (
                       <IconButton
-                        onClick={handleSend}
-                        aria-label="send message"
-                        disabled={!currentMessage || waitingForResponse}
-                      >
-                        <Send
-                          sx={{
-                            opacity: !currentMessage ? 0.5 : 1,
-                            color: "white",
-                            backgroundColor: "#2f69c4",
-                            borderRadius: "50%",
-                            padding: "4px",
-                            transform: "rotate(-45deg)",
-                          }}
-                        />
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            />
-
-            {/* Dynamic toolbar buttons */}
-            {enhancers.length > 0 && (
-              <div
-                className="flex gap-2 p-2 border-[1px] border-t-0 border-[#A5B4FC] rounded-b-lg"
-                style={{ backgroundColor: "#f9fafb" }}
-              >
-                {enhancers.map((enhancer) => {
-                  const isActive = activeEnhancer?.enhancer.id === enhancer.id;
-                  return (
-                    <button
-                      key={enhancer.id}
-                      onClick={() => {
-                        const cursor =
-                          messageInputRef.current?.selectionStart ??
-                          currentMessage.length;
-                        const result = enhancer.button.onClick(
-                          currentMessage,
-                          cursor
-                        );
-                        setCurrentMessage(result.value);
-                        setTimeout(() => {
-                          messageInputRef.current?.focus();
-                          messageInputRef.current?.setSelectionRange(
-                            result.cursorPos,
-                            result.cursorPos
+                        key={enhancer.id}
+                        onClick={() => {
+                          const cursor =
+                            messageInputRef.current?.selectionStart ??
+                            currentMessage.length;
+                          const result = enhancer.button.onClick(
+                            currentMessage,
+                            cursor
                           );
-                          // Re-trigger detection after cursor is positioned
-                          handleMessageChange(result.value);
-                        }, 0);
-                      }}
-                      className="flex items-center justify-center w-6 h-6 border border-gray-300 rounded bg-white hover:bg-gray-100 text-gray-700 font-mono text-sm transition-colors"
-                      title={enhancer.button.getTitle(isActive)}
-                    >
-                      {enhancer.button.icon}
-                    </button>
-                  );
-                })}
+                          setCurrentMessage(result.value);
+                          setTimeout(() => {
+                            messageInputRef.current?.focus();
+                            messageInputRef.current?.setSelectionRange(
+                              result.cursorPos,
+                              result.cursorPos
+                            );
+                            // Re-trigger detection after cursor is positioned
+                            handleMessageChange(result.value);
+                          }, 0);
+                        }}
+                        size="small"
+                        title={enhancer.button.getTitle(isActive)}
+                        sx={{
+                          padding: "6px",
+                          fontSize: "0.875rem",
+                          color: "#374151",
+                          backgroundColor: "#e5e7eb",
+                          borderRadius: "50%",
+                          width: "32px",
+                          height: "32px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          "&:hover": {
+                            backgroundColor: "#d1d5db",
+                          },
+                        }}
+                      >
+                        {enhancer.button.icon}
+                      </IconButton>
+                    );
+                  })}
+                </div>
+                {/* Send button at bottom right */}
+                <IconButton
+                  onClick={handleSend}
+                  aria-label="send message"
+                  disabled={!currentMessage || waitingForResponse}
+                  sx={{ padding: 0 }}
+                >
+                  <Send
+                    sx={{
+                      opacity: !currentMessage ? 0.5 : 1,
+                      color: "white",
+                      backgroundColor: "#2f69c4",
+                      borderRadius: "50%",
+                      padding: "4px",
+                      transform: "rotate(-45deg)",
+                    }}
+                  />
+                </IconButton>
               </div>
-            )}
+            </div>
 
             {/* Single generic popup menu */}
             {activeEnhancer && (
