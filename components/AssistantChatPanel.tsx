@@ -36,7 +36,7 @@ interface AssistantChatPanelProps {
   botName: string;
   inputValue?: string;
   onInputChange?: (value: string) => void;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, parentMessageId?: string) => void;
   onExitControlledMode: () => void;
   onPromptSelect: (prompt: string, promptMessageId?: string) => void;
   userId: string | null;
@@ -365,7 +365,6 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                         )}
                       </div>
 
-
                       {/* Message bubble */}
                       {isAssistant ? (
                         <>
@@ -374,7 +373,9 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                             <div style={{ width: "85%" }}>
                               {sourceContextText && (
                                 <div className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded">
-                                  <span className="font-medium">In reply to: </span>
+                                  <span className="font-medium">
+                                    In reply to:{" "}
+                                  </span>
                                   {sourceContextText}
                                 </div>
                               )}
@@ -406,7 +407,9 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                             <div style={{ width: "85%" }}>
                               {sourceContextText && (
                                 <div className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded">
-                                  <span className="font-medium">In reply to: </span>
+                                  <span className="font-medium">
+                                    In reply to:{" "}
+                                  </span>
                                   {sourceContextText}
                                 </div>
                               )}

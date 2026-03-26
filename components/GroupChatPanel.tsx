@@ -3,7 +3,8 @@ import Linkify from "linkify-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { MessageInput } from "./MessageInput";
-import { MessageFeedback } from "./MessageFeedback";
+import { ThreadedMessage } from "./ThreadedMessage";
+import { ThreadPanel } from "./ThreadPanel";
 import {
   PseudonymousMessage,
   ControlledInputConfig,
@@ -107,7 +108,7 @@ interface GroupChatPanelProps {
   botName?: string;
   inputValue?: string;
   onInputChange?: (value: string) => void;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, parentMessageId?: string) => void;
   controlledMode?: ControlledInputConfig | null;
   onExitControlledMode?: () => void;
   feedbackConfig?: FeedbackConfig;
@@ -125,7 +126,10 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   onExitControlledMode,
   feedbackConfig,
 }) => {
-  const { messagesEndRef, messagesContainerRef } = useAutoScroll(messages);
+  // State for tracking which thread is open in split view
+  const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(
+    null,
+  );
 
   // Extract unique contributors for mentions
   // Normalize "Event Assistant Plus" and "Mediators" to "Event Assistant" for consistency
@@ -148,6 +152,37 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     () => [createMentionsEnhancer(contributors)],
     [contributors],
   );
+
+  // Organize messages into threads
+  const { parentMessages, threadMap } = useMemo(() => {
+    // Separate parents from replies
+    const parents = messages.filter((m) => !m.parentMessage);
+
+    // Build map of parent ID -> replies array
+    const map = new Map<string, PseudonymousMessage[]>();
+    messages
+      .filter((m) => m.parentMessage)
+      .forEach((reply) => {
+        const parentId = reply.parentMessage!;
+        if (!map.has(parentId)) {
+          map.set(parentId, []);
+        }
+        map.get(parentId)!.push(reply);
+      });
+
+    // Sort replies by createdAt
+    map.forEach((replies) => {
+      replies.sort(
+        (a, b) =>
+          new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime(),
+      );
+    });
+
+    return { parentMessages: parents, threadMap: map };
+  }, [messages]);
+
+  // Auto-scroll based on parent messages only (not threaded replies)
+  const { messagesEndRef, messagesContainerRef } = useAutoScroll(parentMessages);
 
   // Helper to render avatar for chat mode
   const renderAvatar = (message: PseudonymousMessage) => {
@@ -172,184 +207,185 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     );
   };
 
-  return (
-    <div className="flex flex-col h-full w-full overflow-hidden">
-      {/* Scrollable messages area */}
+  // Helper to render message content bubble
+  const renderMessageContent = (
+    message: PseudonymousMessage,
+    isHovered?: boolean,
+  ) => {
+    const isCurrentUser = message.pseudonym === pseudonym;
+    const isAssistant = message.fromAgent;
+    const parsed = parseMessageBody(message.body);
+
+    const style = isAssistant
+      ? getAssistantAvatarStyle()
+      : getAvatarStyle(message.pseudonym || "", isCurrentUser);
+
+    return (
       <div
-        ref={messagesContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-2 pr-2 md:px-8 pt-2 bg-gray-100"
+        className="rounded-2xl px-2 py-1 text-gray-800 self-start"
+        style={{
+          backgroundColor: isHovered ? "white" : style.bubbleBg,
+          width: "85%",
+          border: "1px solid rgba(0, 0, 0, 0.1)",
+        }}
       >
-        <div
-          className="flex flex-col items-start gap-4 pb-2"
-          aria-live="assertive"
-        >
-          {/* Panel title and subtitle */}
-          <div className="w-full pt-4 pb-2">
-            <h2 className="text-xl font-bold uppercase tracking-wide text-gray-900">
-              Welcome to&nbsp;
-              <span className="text-medium-slate-blue">
-                {eventName || "Your Event"}
-              </span>
-              &nbsp;Group Chat
-            </h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Chat in real time with other event participants.
-            </p>
+        {isAssistant
+          ? renderAssistantMessage(parsed.text)
+          : renderMessageWithMentions(parsed.text, contributors)}
+
+        {/* Render media items */}
+        {parsed.media && parsed.media.length > 0 && (
+          <div
+            style={{
+              marginTop: "0.5rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem",
+            }}
+          >
+            {parsed.media.map((item, index) => {
+              if (item.type === "image") {
+                return (
+                  <img
+                    key={`media-${index}`}
+                    src={`data:${item.mimeType};base64,${item.data}`}
+                    alt="Visual response"
+                    style={{
+                      maxWidth: "100%",
+                      height: "auto",
+                      borderRadius: "8px",
+                      border: "1px solid rgba(0, 0, 0, 0.1)",
+                    }}
+                  />
+                );
+              }
+              // Future: handle audio, video types here
+              return null;
+            })}
           </div>
+        )}
+      </div>
+    );
+  };
 
-          {messages.map((message, i) => {
-            const parsed = parseMessageBody(message.body);
-            const isCurrentUser = message.pseudonym === pseudonym;
-            const isAssistant = message.fromAgent;
+  // Handler for sending replies
+  const handleSendReply = (text: string, parentId: string) => {
+    onSendMessage(text, parentId);
+  };
 
-            const style = isAssistant
-              ? getAssistantAvatarStyle()
-              : getAvatarStyle(message.pseudonym || "", isCurrentUser);
+  // Handler for opening thread in split view
+  const handleOpenThread = (messageId: string) => {
+    setSelectedThreadId(messageId);
+  };
 
-            // Normalize Plus versions to bot name
-            const displayName = normalizeAssistantPseudonym(message, botName);
+  // Handler for closing thread split view
+  const handleCloseThread = () => {
+    setSelectedThreadId(null);
+  };
 
-            return (
-              <div key={`msg-${i}`} className="w-full">
-                {/* Timestamp centered */}
-                {(() => {
-                  if (i === 0) return true;
-                  const prevDate = new Date(messages[i - 1].createdAt!);
-                  const currDate = new Date(message.createdAt!);
-                  return (
-                    prevDate.getHours() !== currDate.getHours() ||
-                    prevDate.getMinutes() !== currDate.getMinutes()
-                  );
-                })() ? (
-                  <div className="flex justify-center my-1">
-                    <span className="text-sm text-gray-400">
-                      {new Date(message.createdAt!).toLocaleTimeString(
-                        "en-US",
-                        {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        },
-                      )}
-                    </span>
-                  </div>
-                ) : null}
+  // Get the selected thread data
+  const selectedThread = selectedThreadId
+    ? parentMessages.find((m) => m.id === selectedThreadId)
+    : null;
+  const selectedThreadReplies = selectedThreadId
+    ? threadMap.get(selectedThreadId) || []
+    : [];
 
-                {/* Message with avatar */}
-                <div
-                  className={`flex gap-1.5 mb-1 ${
-                    isCurrentUser ? "flex-row-reverse" : "flex-row"
-                  }`}
-                >
-                  {/* Avatar */}
-                  {renderAvatar(message)}
+  return (
+    <div className="flex h-full w-full overflow-hidden">
+      {/* Main chat panel */}
+      <div
+        className={`flex flex-col h-full overflow-hidden transition-all duration-300 ${
+          selectedThreadId ? "hidden md:flex md:w-1/2" : "w-full"
+        }`}
+      >
+        {/* Scrollable messages area */}
+        <div
+          ref={messagesContainerRef}
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-2 pr-2 md:px-8 pt-2 bg-gray-100"
+        >
+          <div
+            className="flex flex-col items-start gap-4 pb-2"
+            aria-live="assertive"
+          >
+            {/* Panel title and subtitle */}
+            <div className="w-full pt-4 pb-2">
+              <h2 className="text-xl font-bold uppercase tracking-wide text-gray-900">
+                Welcome to&nbsp;
+                <span className="text-medium-slate-blue">
+                  {eventName || "Your Event"}
+                </span>
+                &nbsp;Group Chat
+              </h2>
+              <p className="text-sm text-gray-500 mt-0.5">
+                Chat in real time with other event participants.
+              </p>
+            </div>
 
-                  {/* Message content */}
-                  <div
-                    className={`flex flex-col ${
-                      isCurrentUser ? "items-end" : "items-start"
-                    } flex-1`}
-                  >
-                    {/* Name */}
-                    <div
-                      className={`text-sm font-bold mb-1 ${
-                        isCurrentUser ? "text-right" : "text-left"
-                      }`}
-                    >
-                      {displayName}
-                      {isCurrentUser && (
-                        <span className="text-gray-600 font-normal">
-                          {" "}
-                          (You)
-                        </span>
-                      )}
-                    </div>
+            {parentMessages.map((message, i) => {
+              // Determine if we should show timestamp
+              const showTimestamp = (() => {
+                if (i === 0) return true;
+                const prevDate = new Date(parentMessages[i - 1].createdAt!);
+                const currDate = new Date(message.createdAt!);
+                return (
+                  prevDate.getHours() !== currDate.getHours() ||
+                  prevDate.getMinutes() !== currDate.getMinutes()
+                );
+              })();
 
-                    {/* Message bubble */}
-                    <div
-                      className={`rounded-2xl px-2 py-1 text-gray-800 ${
-                        isCurrentUser ? "self-end" : "self-start"
-                      }`}
-                      style={{
-                        backgroundColor: style.bubbleBg,
-                        width: "85%",
-                        border: "1px solid rgba(0, 0, 0, 0.1)",
-                      }}
-                    >
-                      {isAssistant
-                        ? renderAssistantMessage(parsed.text)
-                        : renderMessageWithMentions(parsed.text, contributors)}
+              return (
+                <ThreadedMessage
+                  key={message.id || `msg-${i}`}
+                  message={message}
+                  replies={threadMap.get(message.id!) || []}
+                  pseudonym={pseudonym}
+                  onOpenThread={handleOpenThread}
+                  botName={botName}
+                  renderAvatar={renderAvatar}
+                  renderMessageContent={renderMessageContent}
+                  feedbackConfig={feedbackConfig}
+                  showTimestamp={showTimestamp}
+                  isThreadOpen={selectedThreadId === message.id}
+                />
+              );
+            })}
+            {/* Scroll target */}
+            <div ref={messagesEndRef} className="h-2" />
+          </div>
+        </div>
 
-                      {/* Render media items */}
-                      {parsed.media && parsed.media.length > 0 && (
-                        <div
-                          style={{
-                            marginTop: "0.5rem",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "0.5rem",
-                          }}
-                        >
-                          {parsed.media.map((item, index) => {
-                            if (item.type === "image") {
-                              return (
-                                <img
-                                  key={`media-${index}`}
-                                  src={`data:${item.mimeType};base64,${item.data}`}
-                                  alt="Visual response"
-                                  style={{
-                                    maxWidth: "100%",
-                                    height: "auto",
-                                    borderRadius: "8px",
-                                    border: "1px solid rgba(0, 0, 0, 0.1)",
-                                  }}
-                                />
-                              );
-                            }
-                            // Future: handle audio, video types here
-                            return null;
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Feedback - rendered below the bubble for Event Assistant messages */}
-                    {isAssistant &&
-                      message.id &&
-                      feedbackConfig &&
-                      feedbackConfig.eligibleMessageIds.has(message.id) && (
-                        <div className="mt-0" style={{ width: "85%" }}>
-                          <MessageFeedback
-                            messageId={message.id}
-                            onPopulateFeedbackText={
-                              feedbackConfig.onPopulateFeedbackText
-                            }
-                            onSendFeedbackRating={feedbackConfig.onSendRating}
-                          />
-                        </div>
-                      )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          {/* Scroll target */}
-          <div ref={messagesEndRef} className="h-2" />
+        {/* MessageInput*/}
+        <div className="flex-shrink-0">
+          <MessageInput
+            pseudonym={pseudonym}
+            enhancers={enhancers}
+            onSendMessage={onSendMessage}
+            waitingForResponse={false}
+            controlledMode={controlledMode || null}
+            onExitControlledMode={onExitControlledMode || (() => {})}
+            inputValue={inputValue}
+            onInputChange={onInputChange}
+          />
         </div>
       </div>
 
-      {/* MessageInput*/}
-      <div className="flex-shrink-0">
-        <MessageInput
-          pseudonym={pseudonym}
-          enhancers={enhancers}
-          onSendMessage={onSendMessage}
-          waitingForResponse={false}
-          controlledMode={controlledMode || null}
-          onExitControlledMode={onExitControlledMode || (() => {})}
-          inputValue={inputValue}
-          onInputChange={onInputChange}
-        />
-      </div>
+      {/* Thread panel - shown when a thread is selected */}
+      {selectedThreadId && selectedThread && (
+        <div className="w-full md:w-1/2 h-full">
+          <ThreadPanel
+            parentMessage={selectedThread}
+            replies={selectedThreadReplies}
+            pseudonym={pseudonym}
+            onClose={handleCloseThread}
+            onSendReply={handleSendReply}
+            renderAvatar={renderAvatar}
+            renderMessageContent={renderMessageContent}
+            enhancers={enhancers}
+            botName={botName}
+          />
+        </div>
+      )}
     </div>
   );
 };

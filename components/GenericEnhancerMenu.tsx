@@ -48,14 +48,23 @@ export const GenericEnhancerMenu = <T,>({
   // Calculate position based on anchor element
   const rect = anchorEl.getBoundingClientRect();
 
+  // Calculate left position, ensuring menu stays within viewport
+  const menuWidth = 280;
+  let leftPos = rect.left;
+
+  // If menu would extend beyond right edge of viewport, align it to the right edge of the anchor
+  if (leftPos + menuWidth > window.innerWidth) {
+    leftPos = Math.max(8, rect.right - menuWidth);
+  }
+
   return (
     <Paper
       ref={menuRef}
       elevation={8}
       sx={{
         position: "fixed",
-        bottom: `${window.innerHeight - rect.top + 8}px`,
-        left: rect.left,
+        top: `${rect.bottom + 8}px`,
+        left: `${leftPos}px`,
         zIndex: 1400,
         maxHeight: 240,
         minWidth: 280,

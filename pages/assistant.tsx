@@ -838,7 +838,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                         botName={botName}
                         inputValue={chatInputValue}
                         onInputChange={setChatInputValue}
-                        onSendMessage={sendMessage}
+                        onSendMessage={(msg, parentMessageId) =>
+                          sendMessage(msg, false, parentMessageId)
+                        }
                         controlledMode={controlledMode}
                         onExitControlledMode={exitControlledMode}
                         feedbackConfig={chatFeedbackConfig}
@@ -859,7 +861,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                         botName={botName}
                         inputValue={assistantInputValue}
                         onInputChange={setAssistantInputValue}
-                        onSendMessage={sendMessage}
+                        onSendMessage={(msg, parentMessageId) =>
+                          sendMessage(msg, true, parentMessageId)
+                        }
                         onExitControlledMode={exitControlledMode}
                         onPromptSelect={handlePromptSelect}
                         userId={userId}
