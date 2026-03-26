@@ -302,6 +302,7 @@ describe("AssistantChatPanel", () => {
         body: { text: "Option A" },
         channels: ["user"],
         parentMessage: "1",
+        answersPrompt: "1",
         conversation: "conv-1",
         pseudonymId: "tu-1",
         fromAgent: false,
@@ -314,8 +315,158 @@ describe("AssistantChatPanel", () => {
 
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("Choose an option:")).toBeInTheDocument();
+    // There should be only one instance of "Choose an option:" - the prompt message
+    const promptMessages = screen.getAllByText("Choose an option:");
+    expect(promptMessages).toHaveLength(1);
+
+    // The response "Option A" should not be visible
     expect(screen.queryByText("Option A")).not.toBeInTheDocument();
+  });
+
+  it("filters out messages that have answersPrompt property", () => {
+    const messages = [
+      {
+        id: "1",
+        pseudonym: "Event Assistant",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: "Would you like more information?",
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "ea-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+        prompt: {
+          type: "singleChoice" as const,
+          options: [
+            { label: "Yes", value: "yes" },
+            { label: "No", value: "no" },
+          ],
+        },
+      },
+      {
+        id: "2",
+        pseudonym: "test-user",
+        createdAt: "2025-10-17T12:01:00Z",
+        body: "Yes",
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "tu-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+        answersPrompt: "1",
+      },
+      {
+        id: "3",
+        pseudonym: "Event Assistant",
+        createdAt: "2025-10-17T12:02:00Z",
+        body: "Here is more information...",
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "ea-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      },
+    ];
+
+    render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+    // Prompt question should be visible
+    expect(screen.getByText("Would you like more information?")).toBeInTheDocument();
+
+    // Response with answersPrompt should be filtered out
+    expect(screen.queryByText("Yes")).not.toBeInTheDocument();
+
+    // Follow-up message should be visible
+    expect(screen.getByText("Here is more information...")).toBeInTheDocument();
+  });
+
+  it("passes initialSelectedPrompt to AssistantMessage when a response exists", () => {
+    // Mock AssistantMessage to capture props
+    const mockAssistantMessage = jest.fn(({ message, initialSelectedPrompt }: any) => {
+      const messageText =
+        typeof message.body === "string"
+          ? message.body
+          : message.body?.text || "";
+      return (
+        <div data-testid="assistant-message" data-initial-prompt={initialSelectedPrompt}>
+          {messageText}
+        </div>
+      );
+    });
+
+    jest.mock("../../components/messages", () => ({
+      AssistantMessage: mockAssistantMessage,
+      SubmittedMessage: ({ message }: any) => {
+        const messageText =
+          typeof message.body === "string"
+            ? message.body
+            : message.body?.text || "";
+        return <div data-testid="submitted-message">{messageText}</div>;
+      },
+      ModeratorSubmittedMessage: ({ message }: any) => {
+        const messageText =
+          typeof message.body === "string"
+            ? message.body
+            : message.body?.text || "";
+        return <div data-testid="moderator-submitted-message">{messageText}</div>;
+      },
+    }));
+
+    const messages = [
+      {
+        id: "prompt-1",
+        pseudonym: "Event Assistant",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: "Do you need help?",
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "ea-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+        prompt: {
+          type: "singleChoice" as const,
+          options: [
+            { label: "Yes", value: "yes" },
+            { label: "No", value: "no" },
+          ],
+        },
+      },
+      {
+        id: "response-1",
+        pseudonym: "test-user",
+        createdAt: "2025-10-17T12:01:00Z",
+        body: "Yes",
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "tu-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+        answersPrompt: "prompt-1",
+      },
+    ];
+
+    render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+    // The prompt message should be visible
+    expect(screen.getByText("Do you need help?")).toBeInTheDocument();
+
+    // The response message should be filtered out
+    expect(screen.queryByText("Yes")).not.toBeInTheDocument();
   });
 
   it("shows loading indicator when waiting for response", () => {

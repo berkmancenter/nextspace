@@ -38,7 +38,7 @@ interface AssistantChatPanelProps {
   onInputChange?: (value: string) => void;
   onSendMessage: (message: string) => void;
   onExitControlledMode: () => void;
-  onPromptSelect: (prompt: string) => void;
+  onPromptSelect: (prompt: string, promptMessageId?: string) => void;
   userId: string | null;
   showPreferences?: boolean;
   preferenceOptions?: PreferenceOption[];
@@ -142,17 +142,10 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     setPreferencesVisible(false);
   };
 
-  // Collect message IDs that have singleChoice prompts
-  const singleChoicePromptIds = new Set(
-    messages
-      .filter(
-        (msg) =>
-          msg.prompt?.type === "singleChoice" &&
-          msg.prompt?.options &&
-          msg.prompt.options.length > 0,
-      )
-      .map((msg) => msg.id),
-  );
+  // Helper to check if a message is a prompt response
+  const isPromptResponse = (msg: PseudonymousMessage): boolean => {
+    return !!msg.answersPrompt;
+  };
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
@@ -193,11 +186,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
           )}
 
           {messages
-            .filter(
-              (message) =>
-                !message.parentMessage ||
-                !singleChoicePromptIds.has(message.parentMessage),
-            )
+            .filter((message) => !isPromptResponse(message))
             .map((message, i) => {
               const isAssistant = message.fromAgent;
               const isCurrentUser = message.pseudonym === pseudonym;
@@ -403,6 +392,18 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                                 onPromptSelect={onPromptSelect}
                                 onImageClick={handleImageClick}
                                 onMarkmapClick={handleMarkmapClick}
+                                initialSelectedPrompt={
+                                  message.id
+                                    ? (() => {
+                                        const response = messages.find(
+                                          (m) => m.answersPrompt === message.id,
+                                        );
+                                        return response
+                                          ? parseMessageBody(response.body).text
+                                          : undefined;
+                                      })()
+                                    : undefined
+                                }
                               />
                             </div>
                           ) : (

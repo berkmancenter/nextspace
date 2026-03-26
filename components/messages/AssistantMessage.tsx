@@ -1,4 +1,4 @@
-import { FC, useState } from "react";
+import { FC, useState, useEffect } from "react";
 import { Box, Button, alpha } from "@mui/material";
 import { Check } from "@mui/icons-material";
 import { BaseMessage, MessageContent } from "./BaseMessage";
@@ -9,6 +9,7 @@ export interface AssistantMessageProps extends MessageProps {
   media?: MediaItem[];
   onImageClick?: (src: string, mimeType: string) => void;
   onMarkmapClick?: (markdown: string) => void;
+  initialSelectedPrompt?: string;
 }
 
 export const AssistantMessage: FC<AssistantMessageProps> = ({
@@ -17,8 +18,18 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
   media,
   onImageClick,
   onMarkmapClick,
+  initialSelectedPrompt,
 }) => {
-  const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
+  const [selectedPrompt, setSelectedPrompt] = useState<string | null>(
+    initialSelectedPrompt || null,
+  );
+
+  // Sync with initialSelectedPrompt when it changes (e.g., on page load/refresh)
+  useEffect(() => {
+    if (initialSelectedPrompt !== undefined) {
+      setSelectedPrompt(initialSelectedPrompt);
+    }
+  }, [initialSelectedPrompt]);
 
   const handlePromptClick = (value: string) => {
     if (selectedPrompt !== null) return;

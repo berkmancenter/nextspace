@@ -560,7 +560,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         .then((jargonMessages) => {
           if (Array.isArray(jargonMessages)) setJargonMessages(jargonMessages);
         })
-        .catch((error) => {
+        .catch(() => {
           console.error("Error re-fetching jargon filter agent messages.");
         });
     }
@@ -571,7 +571,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     shouldWaitForResponse: boolean = true,
     parentMessageId?: string,
     skipTracking: boolean = false,
-    messageSource: "message" | "reaction" = "message",
+    messageSource: "message" | "promptResponse" = "message",
+    promptQuestionId?: string,
   ) {
     if (!Api.get().GetTokens() || !message) return;
 
@@ -635,6 +636,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       conversation: router.query.conversationId,
       channels,
       ...(parentMessageId !== undefined && { parentMessage: parentMessageId }),
+      ...(messageSource === "promptResponse" &&
+        promptQuestionId && { answersPrompt: promptQuestionId }),
     });
 
     // Auto-exit controlled mode after sending
@@ -677,9 +680,22 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   const handlePromptSelect = async (
     value: string,
-    parentMessageId?: string,
+    promptMessageId?: string,
   ) => {
-    await sendMessage(value, true, parentMessageId, false, "reaction");
+    // Find the prompt message to get its parentMessage (if it's in a thread)
+    const promptMessage = assistantMessages.find(
+      (msg) => msg.id === promptMessageId,
+    );
+    const threadParentId = promptMessage?.parentMessage;
+
+    await sendMessage(
+      value,
+      true,
+      threadParentId, // parentMessageId: thread parent (or undefined)
+      false,
+      "promptResponse",
+      promptMessageId, // promptQuestionId: for body.promptResponseTo
+    );
   };
 
   const handlePreferencesSubmit = async (selectedValues: string[]) => {
@@ -755,7 +771,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const assistantFeedbackConfig: FeedbackConfig = {
     eligibleMessageIds: getFeedbackEligibleMessages(
       assistantMessages,
-      feedbackFrequency
+      feedbackFrequency,
     ),
     onPopulateFeedbackText: enterControlledMode,
     onSendRating: sendFeedbackRating,
@@ -765,7 +781,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const chatFeedbackConfig: FeedbackConfig = {
     eligibleMessageIds: getFeedbackEligibleMessages(
       chatMessages,
-      feedbackFrequency
+      feedbackFrequency,
     ),
     onPopulateFeedbackText: enterControlledMode,
     onSendRating: sendFeedbackRating,
