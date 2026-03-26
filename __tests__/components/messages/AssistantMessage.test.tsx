@@ -4,13 +4,8 @@ import { AssistantMessage } from "../../../components/messages/AssistantMessage"
 import { PseudonymousMessage } from "../../../types.internal";
 import { components } from "../../../types";
 
-// Mock the BaseMessage component
+// Mock the MessageContent component
 jest.mock("../../../components/messages/BaseMessage", () => ({
-  BaseMessage: ({ children, className }: any) => (
-    <div data-testid="base-message" className={className}>
-      {children}
-    </div>
-  ),
   MessageContent: ({ text }: any) => (
     <div data-testid="message-content">{text}</div>
   ),
@@ -93,10 +88,12 @@ describe("AssistantMessage Component", () => {
         },
       };
 
-      render(<AssistantMessage message={messageWithPrompt} />);
+      const { container } = render(<AssistantMessage message={messageWithPrompt} />);
 
-      const baseMessage = screen.getByTestId("base-message");
-      expect(baseMessage).toHaveClass(
+      // Find the inner div with purple styling
+      const styledDiv = container.querySelector(".bg-purple-100");
+      expect(styledDiv).toBeInTheDocument();
+      expect(styledDiv).toHaveClass(
         "bg-purple-100",
         "border-l-4",
         "border-purple-500",
@@ -106,10 +103,10 @@ describe("AssistantMessage Component", () => {
     });
 
     it("does not apply purple styling when message has no prompt options", () => {
-      render(<AssistantMessage message={mockMessage} />);
+      const { container } = render(<AssistantMessage message={mockMessage} />);
 
-      const baseMessage = screen.getByTestId("base-message");
-      expect(baseMessage).not.toHaveClass("bg-purple-100");
+      const styledDiv = container.querySelector(".bg-purple-100");
+      expect(styledDiv).not.toBeInTheDocument();
     });
   });
 
@@ -200,10 +197,8 @@ describe("AssistantMessage Component", () => {
         <AssistantMessage message={mockMessage} media={media} />,
       );
 
-      // Find the media container (Box component)
-      const mediaContainer = container.querySelector(
-        '[data-testid="base-message"] > div',
-      );
+      // Find the media container (Box component with margin and display flex)
+      const mediaContainer = container.querySelector('.MuiBox-root');
       expect(mediaContainer).toBeInTheDocument();
     });
 
@@ -443,6 +438,7 @@ describe("AssistantMessage Component", () => {
       expect(screen.queryByRole("button")).not.toBeInTheDocument();
     });
   });
+
 
   describe("Integration: Media with prompts", () => {
     it("renders both media and prompt options together", () => {

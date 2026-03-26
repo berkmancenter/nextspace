@@ -9,7 +9,11 @@ jest.mock("../../components/messages", () => ({
       typeof message.body === "string"
         ? message.body
         : message.body?.text || "";
-    return <div data-testid="assistant-message">{messageText}</div>;
+    return (
+      <div data-testid="assistant-message">
+        {messageText}
+      </div>
+    );
   },
   SubmittedMessage: ({ message }: any) => {
     const messageText =
@@ -64,7 +68,7 @@ jest.mock("../../components/MessageInput", () => ({
       <input
         data-testid="message-input-field"
         placeholder="Write a Comment"
-        onKeyPress={(e) => {
+        onKeyDown={(e) => {
           if (e.key === "Enter" && e.currentTarget.value) {
             onSendMessage(e.currentTarget.value);
             e.currentTarget.value = "";
@@ -187,7 +191,6 @@ describe("AssistantChatPanel", () => {
     ).toBeInTheDocument();
   });
 
-
   it("renders submitted messages (referenced by moderator)", () => {
     const messages = [
       {
@@ -226,17 +229,17 @@ describe("AssistantChatPanel", () => {
     expect(screen.getByTestId("submitted-message")).toBeInTheDocument();
   });
 
-  it("shows reply messages for regular messages", () => {
+  it("shows source context for multimodal messages with sourceMessage", () => {
     const messages = [
       {
         id: "1",
         pseudonym: "test-user",
         createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Main message" },
+        body: { text: "What is the schedule?" },
         channels: ["user"],
         conversation: "conv-1",
-        pseudonymId: "ea-1",
-        fromAgent: true,
+        pseudonymId: "tu-1",
+        fromAgent: false,
         pause: false,
         visible: true,
         upVotes: [],
@@ -244,11 +247,20 @@ describe("AssistantChatPanel", () => {
       },
       {
         id: "2",
-        pseudonym: "test-user",
+        pseudonym: "Event Assistant",
         createdAt: "2025-10-17T12:01:00Z",
-        body: { text: "Reply message" },
+        body: {
+          text: "",
+          sourceMessage: "1",
+          media: [
+            {
+              type: "image",
+              data: "base64imagedata",
+              mimeType: "image/png",
+            },
+          ],
+        },
         channels: ["user"],
-        parentMessage: "1",
         conversation: "conv-1",
         pseudonymId: "ea-1",
         fromAgent: true,
@@ -261,15 +273,70 @@ describe("AssistantChatPanel", () => {
 
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-    // Main message appears in the message list
-    const mainMessages = screen.getAllByText("Main message");
-    expect(mainMessages.length).toBeGreaterThan(0);
+    // Original question appears twice: once in the message list, once in source context
+    const questionTexts = screen.getAllByText("What is the schedule?");
+    expect(questionTexts.length).toBeGreaterThanOrEqual(1);
 
-    // Reply message is shown (not filtered out)
-    expect(screen.getByText("Reply message")).toBeInTheDocument();
-
-    // Reply context should show "In reply to:"
+    // Source context should show "In reply to:"
     expect(screen.getByText(/In reply to:/)).toBeInTheDocument();
+  });
+
+  it("truncates long source messages in context display", () => {
+    const longMessage =
+      "This is a very long message that exceeds sixty characters and should be truncated";
+    const messages = [
+      {
+        id: "1",
+        pseudonym: "test-user",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: longMessage },
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "tu-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      },
+      {
+        id: "2",
+        pseudonym: "Event Assistant",
+        createdAt: "2025-10-17T12:01:00Z",
+        body: {
+          text: "",
+          sourceMessage: "1",
+          media: [
+            {
+              type: "image",
+              data: "base64imagedata",
+              mimeType: "image/png",
+            },
+          ],
+        },
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "ea-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      },
+    ];
+
+    render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+    // Full message appears in the message list
+    expect(screen.getByText(longMessage)).toBeInTheDocument();
+
+    // Context should show truncated version with ellipsis (60 chars + "...")
+    expect(screen.getByText(/In reply to:/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "This is a very long message that exceeds sixty characters an...",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("filters out replies to singleChoice prompts", () => {
@@ -301,7 +368,6 @@ describe("AssistantChatPanel", () => {
         createdAt: "2025-10-17T12:01:00Z",
         body: { text: "Option A" },
         channels: ["user"],
-        parentMessage: "1",
         answersPrompt: "1",
         conversation: "conv-1",
         pseudonymId: "tu-1",
@@ -380,7 +446,9 @@ describe("AssistantChatPanel", () => {
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
     // Prompt question should be visible
-    expect(screen.getByText("Would you like more information?")).toBeInTheDocument();
+    expect(
+      screen.getByText("Would you like more information?"),
+    ).toBeInTheDocument();
 
     // Response with answersPrompt should be filtered out
     expect(screen.queryByText("Yes")).not.toBeInTheDocument();
@@ -391,17 +459,22 @@ describe("AssistantChatPanel", () => {
 
   it("passes initialSelectedPrompt to AssistantMessage when a response exists", () => {
     // Mock AssistantMessage to capture props
-    const mockAssistantMessage = jest.fn(({ message, initialSelectedPrompt }: any) => {
-      const messageText =
-        typeof message.body === "string"
-          ? message.body
-          : message.body?.text || "";
-      return (
-        <div data-testid="assistant-message" data-initial-prompt={initialSelectedPrompt}>
-          {messageText}
-        </div>
-      );
-    });
+    const mockAssistantMessage = jest.fn(
+      ({ message, initialSelectedPrompt }: any) => {
+        const messageText =
+          typeof message.body === "string"
+            ? message.body
+            : message.body?.text || "";
+        return (
+          <div
+            data-testid="assistant-message"
+            data-initial-prompt={initialSelectedPrompt}
+          >
+            {messageText}
+          </div>
+        );
+      },
+    );
 
     jest.mock("../../components/messages", () => ({
       AssistantMessage: mockAssistantMessage,
@@ -417,7 +490,9 @@ describe("AssistantChatPanel", () => {
           typeof message.body === "string"
             ? message.body
             : message.body?.text || "";
-        return <div data-testid="moderator-submitted-message">{messageText}</div>;
+        return (
+          <div data-testid="moderator-submitted-message">{messageText}</div>
+        );
       },
     }));
 
@@ -1030,7 +1105,7 @@ describe("AssistantChatPanel", () => {
         },
       ];
 
-      const { container } = render(
+      render(
         <AssistantChatPanel {...baseProps} messages={messages} />,
       );
 

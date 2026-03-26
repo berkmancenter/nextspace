@@ -22,7 +22,11 @@ jest.mock("../../components/MessageInput", () => ({
 
 // Mock MessageFeedback component
 jest.mock("../../components/MessageFeedback", () => ({
-  MessageFeedback: ({ messageId, onPopulateFeedbackText, onSendFeedbackRating }: any) => (
+  MessageFeedback: ({
+    messageId,
+    onPopulateFeedbackText,
+    onSendFeedbackRating,
+  }: any) => (
     <div data-testid="message-feedback" data-message-id={messageId}>
       <button
         data-testid={`rating-button-${messageId}`}
@@ -276,45 +280,6 @@ describe("GroupChatPanel", () => {
     expect(mentionSpan).toBeInTheDocument();
     expect(mentionSpan?.textContent).toBe("@Charlie Brown Jr");
     expect(container.textContent).toContain("please respond");
-  });
-
-  it("filters out parent messages", () => {
-    const messages = [
-      {
-        id: "1",
-        pseudonym: "Alice",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Main message" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "alice-1",
-        fromAgent: false,
-        pause: false,
-        visible: true,
-        upVotes: [],
-        downVotes: [],
-      },
-      {
-        id: "2",
-        pseudonym: "Bob",
-        createdAt: "2025-10-17T12:01:00Z",
-        body: { text: "Child message" },
-        channels: ["chat"],
-        parentMessage: "1",
-        conversation: "conv-1",
-        pseudonymId: "bob-1",
-        fromAgent: false,
-        pause: false,
-        visible: true,
-        upVotes: [],
-        downVotes: [],
-      },
-    ];
-
-    render(<GroupChatPanel {...baseProps} messages={messages} />);
-
-    expect(screen.getByText("Main message")).toBeInTheDocument();
-    expect(screen.queryByText("Child message")).not.toBeInTheDocument();
   });
 
   it("calls onSendMessage when user sends a message", async () => {
@@ -715,7 +680,7 @@ describe("GroupChatPanel", () => {
       const image = screen.getByAltText("Visual response");
       expect(image).toHaveAttribute(
         "src",
-        "data:image/png;base64,base64imagedata"
+        "data:image/png;base64,base64imagedata",
       );
     });
 
@@ -762,15 +727,15 @@ describe("GroupChatPanel", () => {
       expect(images).toHaveLength(3);
       expect(images[0]).toHaveAttribute(
         "src",
-        "data:image/png;base64,image1data"
+        "data:image/png;base64,image1data",
       );
       expect(images[1]).toHaveAttribute(
         "src",
-        "data:image/jpeg;base64,image2data"
+        "data:image/jpeg;base64,image2data",
       );
       expect(images[2]).toHaveAttribute(
         "src",
-        "data:image/gif;base64,image3data"
+        "data:image/gif;base64,image3data",
       );
     });
 
@@ -910,7 +875,7 @@ describe("GroupChatPanel", () => {
       expect(images).toHaveLength(1);
       expect(images[0]).toHaveAttribute(
         "src",
-        "data:image/png;base64,imagedata"
+        "data:image/png;base64,imagedata",
       );
     });
 
@@ -1093,11 +1058,14 @@ describe("GroupChatPanel", () => {
         ];
 
         const { unmount } = render(
-          <GroupChatPanel {...baseProps} messages={messages} />
+          <GroupChatPanel {...baseProps} messages={messages} />,
         );
 
         const image = screen.getByAltText("Visual response");
-        expect(image).toHaveAttribute("src", `data:${mimeType};base64,testdata`);
+        expect(image).toHaveAttribute(
+          "src",
+          `data:${mimeType};base64,testdata`,
+        );
 
         unmount();
       });
@@ -1136,7 +1104,7 @@ describe("GroupChatPanel", () => {
       const image = screen.getByAltText("Visual response");
       expect(image).toHaveAttribute(
         "src",
-        `data:image/png;base64,${longBase64}`
+        `data:image/png;base64,${longBase64}`,
       );
     });
 
@@ -1167,7 +1135,7 @@ describe("GroupChatPanel", () => {
       ];
 
       const { container } = render(
-        <GroupChatPanel {...baseProps} messages={messages} />
+        <GroupChatPanel {...baseProps} messages={messages} />,
       );
 
       expect(screen.getByText("Malformed media")).toBeInTheDocument();
@@ -1430,7 +1398,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={messages}
           feedbackConfig={feedbackConfig}
-        />
+        />,
       );
 
       // Should have 1 feedback element (for message 2 only)
@@ -1495,7 +1463,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={messages}
           feedbackConfig={feedbackConfig}
-        />
+        />,
       );
 
       // Should not have feedback for user messages
@@ -1562,7 +1530,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={messages}
           feedbackConfig={feedbackConfig}
-        />
+        />,
       );
 
       const feedbackElements = screen.queryAllByTestId("message-feedback");
@@ -1605,7 +1573,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={messages}
           feedbackConfig={feedbackConfig}
-        />
+        />,
       );
 
       // Should not have any feedback elements
@@ -1658,7 +1626,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={messages}
           feedbackConfig={feedbackConfig}
-        />
+        />,
       );
 
       const feedbackElements = screen.queryAllByTestId("message-feedback");

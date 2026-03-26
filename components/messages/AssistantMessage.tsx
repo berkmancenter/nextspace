@@ -1,11 +1,11 @@
 import { FC, useState, useEffect } from "react";
 import { Box, Button, alpha } from "@mui/material";
 import { Check } from "@mui/icons-material";
-import { BaseMessage, MessageContent } from "./BaseMessage";
+import { MessageContent } from "./BaseMessage";
 import { MessageProps, MediaItem } from "../../types.internal";
 
 export interface AssistantMessageProps extends MessageProps {
-  onPromptSelect?: (value: string, parentMessageId?: string) => void;
+  onPromptSelect?: (value: string, promptMessageId?: string) => void;
   media?: MediaItem[];
   onImageClick?: (src: string, mimeType: string) => void;
   onMarkmapClick?: (markdown: string) => void;
@@ -49,8 +49,12 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
     : "";
 
   return (
-    <BaseMessage className={className}>
-      <MessageContent text={message.body as string} onMarkmapClick={onMarkmapClick} />
+    <Box display="flex" flexDirection="column" rowGap=".5rem">
+      <div className={`block w-full my-1 ${className}`}>
+        <MessageContent
+          text={message.body as string}
+          onMarkmapClick={onMarkmapClick}
+        />
 
       {/* Render media items */}
       {media && media.length > 0 && (
@@ -153,6 +157,7 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
           ))}
         </Box>
       )}
-    </BaseMessage>
+      </div>
+    </Box>
   );
 };

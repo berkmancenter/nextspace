@@ -4,12 +4,19 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { MessageInput } from "./MessageInput";
 import { MessageFeedback } from "./MessageFeedback";
-import { PseudonymousMessage, ControlledInputConfig, FeedbackConfig } from "../types.internal";
+import {
+  PseudonymousMessage,
+  ControlledInputConfig,
+  FeedbackConfig,
+} from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { BotIcon } from "./BotIcon";
 import { createMentionsEnhancer } from "./enhancers/mentionsEnhancer";
-import { normalizeAssistantPseudonym, parseMessageBody } from "../utils/Helpers";
+import {
+  normalizeAssistantPseudonym,
+  parseMessageBody,
+} from "../utils/Helpers";
 import { MENTION_DISPLAY_REGEX } from "../utils/mentionRegex";
 
 /**
@@ -126,7 +133,9 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     () =>
       Array.from(
         new Set(
-          messages.map((m) => normalizeAssistantPseudonym(m, botName)).filter(Boolean),
+          messages
+            .map((m) => normalizeAssistantPseudonym(m, botName))
+            .filter(Boolean),
         ),
       ),
     [messages],
@@ -188,136 +197,141 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             </p>
           </div>
 
-          {messages
-            .filter((message) => !message.parentMessage)
-            .map((message, i) => {
-              const parsed = parseMessageBody(message.body);
-              const isCurrentUser = message.pseudonym === pseudonym;
-              const isAssistant = message.fromAgent;
+          {messages.map((message, i) => {
+            const parsed = parseMessageBody(message.body);
+            const isCurrentUser = message.pseudonym === pseudonym;
+            const isAssistant = message.fromAgent;
 
-              const style = isAssistant
-                ? getAssistantAvatarStyle()
-                : getAvatarStyle(message.pseudonym || "", isCurrentUser);
+            const style = isAssistant
+              ? getAssistantAvatarStyle()
+              : getAvatarStyle(message.pseudonym || "", isCurrentUser);
 
-              // Normalize Plus versions to bot name
-              const displayName = normalizeAssistantPseudonym(message, botName);
+            // Normalize Plus versions to bot name
+            const displayName = normalizeAssistantPseudonym(message, botName);
 
-              return (
-                <div key={`msg-${i}`} className="w-full">
-                  {/* Timestamp centered */}
-                  {(() => {
-                    if (i === 0) return true;
-                    const prevDate = new Date(messages[i - 1].createdAt!);
-                    const currDate = new Date(message.createdAt!);
-                    return (
-                      prevDate.getHours() !== currDate.getHours() ||
-                      prevDate.getMinutes() !== currDate.getMinutes()
-                    );
-                  })() ? (
-                    <div className="flex justify-center my-1">
-                      <span className="text-sm text-gray-400">
-                        {new Date(message.createdAt!).toLocaleTimeString(
-                          "en-US",
-                          {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          },
-                        )}
-                      </span>
-                    </div>
-                  ) : null}
+            return (
+              <div key={`msg-${i}`} className="w-full">
+                {/* Timestamp centered */}
+                {(() => {
+                  if (i === 0) return true;
+                  const prevDate = new Date(messages[i - 1].createdAt!);
+                  const currDate = new Date(message.createdAt!);
+                  return (
+                    prevDate.getHours() !== currDate.getHours() ||
+                    prevDate.getMinutes() !== currDate.getMinutes()
+                  );
+                })() ? (
+                  <div className="flex justify-center my-1">
+                    <span className="text-sm text-gray-400">
+                      {new Date(message.createdAt!).toLocaleTimeString(
+                        "en-US",
+                        {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        },
+                      )}
+                    </span>
+                  </div>
+                ) : null}
 
-                  {/* Message with avatar */}
+                {/* Message with avatar */}
+                <div
+                  className={`flex gap-1.5 mb-1 ${
+                    isCurrentUser ? "flex-row-reverse" : "flex-row"
+                  }`}
+                >
+                  {/* Avatar */}
+                  {renderAvatar(message)}
+
+                  {/* Message content */}
                   <div
-                    className={`flex gap-1.5 mb-1 ${
-                      isCurrentUser ? "flex-row-reverse" : "flex-row"
-                    }`}
+                    className={`flex flex-col ${
+                      isCurrentUser ? "items-end" : "items-start"
+                    } flex-1`}
                   >
-                    {/* Avatar */}
-                    {renderAvatar(message)}
-
-                    {/* Message content */}
+                    {/* Name */}
                     <div
-                      className={`flex flex-col ${
-                        isCurrentUser ? "items-end" : "items-start"
-                      } flex-1`}
+                      className={`text-sm font-bold mb-1 ${
+                        isCurrentUser ? "text-right" : "text-left"
+                      }`}
                     >
-                      {/* Name */}
-                      <div
-                        className={`text-sm font-bold mb-1 ${
-                          isCurrentUser ? "text-right" : "text-left"
-                        }`}
-                      >
-                        {displayName}
-                        {isCurrentUser && (
-                          <span className="text-gray-600 font-normal">
-                            {" "}
-                            (You)
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Message bubble */}
-                      <div
-                        className={`rounded-2xl px-2 py-1 text-gray-800 ${
-                          isCurrentUser ? "self-end" : "self-start"
-                        }`}
-                        style={{
-                          backgroundColor: style.bubbleBg,
-                          width: "85%",
-                          border: "1px solid rgba(0, 0, 0, 0.1)",
-                        }}
-                      >
-                        {isAssistant
-                          ? renderAssistantMessage(parsed.text)
-                          : renderMessageWithMentions(parsed.text, contributors)}
-
-                        {/* Render media items */}
-                        {parsed.media && parsed.media.length > 0 && (
-                          <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                            {parsed.media.map((item, index) => {
-                              if (item.type === 'image') {
-                                return (
-                                  <img
-                                    key={`media-${index}`}
-                                    src={`data:${item.mimeType};base64,${item.data}`}
-                                    alt="Visual response"
-                                    style={{
-                                      maxWidth: "100%",
-                                      height: "auto",
-                                      borderRadius: "8px",
-                                      border: "1px solid rgba(0, 0, 0, 0.1)",
-                                    }}
-                                  />
-                                );
-                              }
-                              // Future: handle audio, video types here
-                              return null;
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Feedback - rendered below the bubble for Event Assistant messages */}
-                      {isAssistant &&
-                        message.id &&
-                        feedbackConfig &&
-                        feedbackConfig.eligibleMessageIds.has(message.id) && (
-                          <div className="mt-0" style={{ width: "85%" }}>
-                            <MessageFeedback
-                              messageId={message.id}
-                              onPopulateFeedbackText={
-                                feedbackConfig.onPopulateFeedbackText
-                              }
-                              onSendFeedbackRating={feedbackConfig.onSendRating}
-                            />
-                          </div>
-                        )}
+                      {displayName}
+                      {isCurrentUser && (
+                        <span className="text-gray-600 font-normal">
+                          {" "}
+                          (You)
+                        </span>
+                      )}
                     </div>
+
+                    {/* Message bubble */}
+                    <div
+                      className={`rounded-2xl px-2 py-1 text-gray-800 ${
+                        isCurrentUser ? "self-end" : "self-start"
+                      }`}
+                      style={{
+                        backgroundColor: style.bubbleBg,
+                        width: "85%",
+                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                      }}
+                    >
+                      {isAssistant
+                        ? renderAssistantMessage(parsed.text)
+                        : renderMessageWithMentions(parsed.text, contributors)}
+
+                      {/* Render media items */}
+                      {parsed.media && parsed.media.length > 0 && (
+                        <div
+                          style={{
+                            marginTop: "0.5rem",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.5rem",
+                          }}
+                        >
+                          {parsed.media.map((item, index) => {
+                            if (item.type === "image") {
+                              return (
+                                <img
+                                  key={`media-${index}`}
+                                  src={`data:${item.mimeType};base64,${item.data}`}
+                                  alt="Visual response"
+                                  style={{
+                                    maxWidth: "100%",
+                                    height: "auto",
+                                    borderRadius: "8px",
+                                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                                  }}
+                                />
+                              );
+                            }
+                            // Future: handle audio, video types here
+                            return null;
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Feedback - rendered below the bubble for Event Assistant messages */}
+                    {isAssistant &&
+                      message.id &&
+                      feedbackConfig &&
+                      feedbackConfig.eligibleMessageIds.has(message.id) && (
+                        <div className="mt-0" style={{ width: "85%" }}>
+                          <MessageFeedback
+                            messageId={message.id}
+                            onPopulateFeedbackText={
+                              feedbackConfig.onPopulateFeedbackText
+                            }
+                            onSendFeedbackRating={feedbackConfig.onSendRating}
+                          />
+                        </div>
+                      )}
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            );
+          })}
           {/* Scroll target */}
           <div ref={messagesEndRef} className="h-2" />
         </div>

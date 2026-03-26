@@ -2,6 +2,7 @@ import {
   resolveConversationBotName,
   normalizeAssistantPseudonym,
   buildDirectChannels,
+  parseMessageBody,
 } from "../../utils/Helpers";
 
 describe("resolveConversationBotName", () => {
@@ -161,5 +162,104 @@ describe("buildDirectChannels", () => {
     const [channel] = buildDirectChannels(userId, agents, {});
     expect(channel.direct).toBe(true);
     expect(channel.passcode).toBeNull();
+  });
+});
+
+describe("parseMessageBody", () => {
+  it("parses string body into text field", () => {
+    const result = parseMessageBody("Simple text message");
+    expect(result.text).toBe("Simple text message");
+    expect(result.type).toBeUndefined();
+    expect(result.message).toBeUndefined();
+    expect(result.media).toBeUndefined();
+    expect(result.sourceMessage).toBeUndefined();
+  });
+
+  it("parses object body with text field", () => {
+    const result = parseMessageBody({ text: "Object text" });
+    expect(result.text).toBe("Object text");
+  });
+
+  it("parses object body with type field", () => {
+    const result = parseMessageBody({ text: "Message", type: "moderator_submitted" });
+    expect(result.text).toBe("Message");
+    expect(result.type).toBe("moderator_submitted");
+  });
+
+  it("parses object body with message field", () => {
+    const result = parseMessageBody({ text: "Response", message: "msg-123" });
+    expect(result.text).toBe("Response");
+    expect(result.message).toBe("msg-123");
+  });
+
+  it("parses object body with media array", () => {
+    const media = [
+      { type: "image", data: "base64data", mimeType: "image/png" },
+    ];
+    const result = parseMessageBody({ text: "Image message", media });
+    expect(result.text).toBe("Image message");
+    expect(result.media).toEqual(media);
+  });
+
+  it("parses object body with sourceMessage field", () => {
+    const result = parseMessageBody({
+      text: "Visual response",
+      sourceMessage: "msg-456",
+      media: [{ type: "image", data: "data", mimeType: "image/png" }],
+    });
+    expect(result.text).toBe("Visual response");
+    expect(result.sourceMessage).toBe("msg-456");
+  });
+
+  it("returns undefined for sourceMessage when not present", () => {
+    const result = parseMessageBody({ text: "Regular message" });
+    expect(result.sourceMessage).toBeUndefined();
+  });
+
+  it("returns empty string for text when text field is missing in object", () => {
+    const result = parseMessageBody({ type: "moderator_submitted" });
+    expect(result.text).toBe("");
+  });
+
+  it("handles non-array media value gracefully", () => {
+    const result = parseMessageBody({ text: "Message", media: "not-an-array" });
+    expect(result.text).toBe("Message");
+    expect(result.media).toBeUndefined();
+  });
+
+  it("parses all fields together", () => {
+    const media = [{ type: "image", data: "data", mimeType: "image/png" }];
+    const result = parseMessageBody({
+      text: "Complete message",
+      type: "multimodal",
+      message: "msg-123",
+      media,
+      sourceMessage: "msg-456",
+    });
+    expect(result.text).toBe("Complete message");
+    expect(result.type).toBe("multimodal");
+    expect(result.message).toBe("msg-123");
+    expect(result.media).toEqual(media);
+    expect(result.sourceMessage).toBe("msg-456");
+  });
+
+  it("converts non-string values to string for text field", () => {
+    const result = parseMessageBody({ text: 123 });
+    expect(result.text).toBe("123");
+  });
+
+  it("converts non-string values to string for type field", () => {
+    const result = parseMessageBody({ text: "Message", type: 456 });
+    expect(result.type).toBe("456");
+  });
+
+  it("converts non-string values to string for message field", () => {
+    const result = parseMessageBody({ text: "Message", message: 789 });
+    expect(result.message).toBe("789");
+  });
+
+  it("converts non-string values to string for sourceMessage field", () => {
+    const result = parseMessageBody({ text: "Message", sourceMessage: 999 });
+    expect(result.sourceMessage).toBe("999");
   });
 });
