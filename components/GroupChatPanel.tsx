@@ -383,6 +383,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             renderMessageContent={renderMessageContent}
             enhancers={enhancers}
             botName={botName}
+            feedbackConfig={feedbackConfig}
           />
         </div>
       )}

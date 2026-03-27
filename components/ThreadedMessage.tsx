@@ -177,6 +177,23 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
 
                   {/* Message bubble */}
                   {renderMessageContent(replies[0])}
+
+                  {/* Feedback - rendered below the bubble for Event Assistant messages */}
+                  {replies[0].fromAgent &&
+                    replies[0].id &&
+                    feedbackConfig &&
+                    feedbackConfig.eligibleMessageIds.has(replies[0].id) && (
+                      <div className="mt-0" style={{ width: "85%" }}>
+                        <MessageFeedback
+                          messageId={replies[0].id}
+                          initialRating={feedbackConfig.messageRatings.get(
+                            replies[0].id,
+                          )}
+                          onPopulateFeedbackText={feedbackConfig.onPopulateFeedbackText}
+                          onSendFeedbackRating={feedbackConfig.onSendRating}
+                        />
+                      </div>
+                    )}
                 </div>
               </div>
 
@@ -211,6 +228,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
               <div className="mt-0" style={{ width: "85%" }}>
                 <MessageFeedback
                   messageId={message.id}
+                  initialRating={feedbackConfig.messageRatings.get(message.id)}
                   onPopulateFeedbackText={feedbackConfig.onPopulateFeedbackText}
                   onSendFeedbackRating={feedbackConfig.onSendRating}
                 />

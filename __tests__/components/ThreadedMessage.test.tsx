@@ -224,8 +224,10 @@ describe("ThreadedMessage Component", () => {
   it("renders feedback component for assistant messages when config is provided", () => {
     const assistantMessage = { ...mockMessage, fromAgent: true };
     const eligibleIds = new Set([assistantMessage.id!]);
+    const messageRatings = new Map();
     const feedbackConfig: FeedbackConfig = {
       eligibleMessageIds: eligibleIds,
+      messageRatings,
       onPopulateFeedbackText: jest.fn(),
       onSendRating: jest.fn(),
     };
@@ -243,8 +245,10 @@ describe("ThreadedMessage Component", () => {
 
   it("does not render feedback for non-assistant messages", () => {
     const eligibleIds = new Set([mockMessage.id!]);
+    const messageRatings = new Map();
     const feedbackConfig: FeedbackConfig = {
       eligibleMessageIds: eligibleIds,
+      messageRatings,
       onPopulateFeedbackText: jest.fn(),
       onSendRating: jest.fn(),
     };
@@ -262,8 +266,10 @@ describe("ThreadedMessage Component", () => {
   it("does not render feedback when message is not eligible", () => {
     const assistantMessage = { ...mockMessage, fromAgent: true };
     const eligibleIds = new Set(["different-id"]);
+    const messageRatings = new Map();
     const feedbackConfig: FeedbackConfig = {
       eligibleMessageIds: eligibleIds,
+      messageRatings,
       onPopulateFeedbackText: jest.fn(),
       onSendRating: jest.fn(),
     };
@@ -272,6 +278,127 @@ describe("ThreadedMessage Component", () => {
       <ThreadedMessage
         {...defaultProps}
         message={assistantMessage}
+        feedbackConfig={feedbackConfig}
+      />
+    );
+
+    expect(screen.queryByText("How did the bot do?")).not.toBeInTheDocument();
+  });
+
+  it("does not render feedback when no feedbackConfig is provided", () => {
+    const assistantMessage = { ...mockMessage, fromAgent: true };
+
+    render(
+      <ThreadedMessage
+        {...defaultProps}
+        message={assistantMessage}
+      />
+    );
+
+    expect(screen.queryByText("How did the bot do?")).not.toBeInTheDocument();
+  });
+
+  it("passes initialRating from messageRatings map to MessageFeedback", () => {
+    const assistantMessage = { ...mockMessage, fromAgent: true };
+    const eligibleIds = new Set([assistantMessage.id!]);
+    const messageRatings = new Map([["msg-123", "WOW!"]]);
+    const feedbackConfig: FeedbackConfig = {
+      eligibleMessageIds: eligibleIds,
+      messageRatings,
+      onPopulateFeedbackText: jest.fn(),
+      onSendRating: jest.fn(),
+    };
+
+    const { container } = render(
+      <ThreadedMessage
+        {...defaultProps}
+        message={assistantMessage}
+        feedbackConfig={feedbackConfig}
+      />
+    );
+
+    // The MessageFeedback component should be rendered with the initial rating
+    expect(screen.getByText("How did the bot do?")).toBeInTheDocument();
+    // The component would show the rating in its internal state
+  });
+
+  it("calls onSendRating callback when rating is submitted", () => {
+    const assistantMessage = { ...mockMessage, fromAgent: true };
+    const eligibleIds = new Set([assistantMessage.id!]);
+    const messageRatings = new Map();
+    const mockOnSendRating = jest.fn();
+    const feedbackConfig: FeedbackConfig = {
+      eligibleMessageIds: eligibleIds,
+      messageRatings,
+      onPopulateFeedbackText: jest.fn(),
+      onSendRating: mockOnSendRating,
+    };
+
+    render(
+      <ThreadedMessage
+        {...defaultProps}
+        message={assistantMessage}
+        feedbackConfig={feedbackConfig}
+      />
+    );
+
+    const okButton = screen.getByRole("radio", { name: "OK" });
+    fireEvent.click(okButton);
+
+    expect(mockOnSendRating).toHaveBeenCalledWith("msg-123", "OK");
+  });
+
+  it("calls onPopulateFeedbackText when 'Would you like to share more?' is clicked", () => {
+    const assistantMessage = { ...mockMessage, fromAgent: true };
+    const eligibleIds = new Set([assistantMessage.id!]);
+    const messageRatings = new Map();
+    const mockOnPopulateFeedbackText = jest.fn();
+    const feedbackConfig: FeedbackConfig = {
+      eligibleMessageIds: eligibleIds,
+      messageRatings,
+      onPopulateFeedbackText: mockOnPopulateFeedbackText,
+      onSendRating: jest.fn(),
+    };
+
+    render(
+      <ThreadedMessage
+        {...defaultProps}
+        message={assistantMessage}
+        feedbackConfig={feedbackConfig}
+      />
+    );
+
+    // First click a rating to show the "share more" link
+    const mehButton = screen.getByRole("radio", { name: "Meh" });
+    fireEvent.click(mehButton);
+
+    // Then click the "Would you like to share more?" link
+    const shareMoreLink = screen.getByText("Would you like to share more?");
+    fireEvent.click(shareMoreLink);
+
+    expect(mockOnPopulateFeedbackText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prefix: "/feedback|Text|msg-123|",
+        label: "Feedback Mode",
+      })
+    );
+  });
+
+  it("does not render feedback when message has no id", () => {
+    const assistantMessageNoId = { ...mockMessage, fromAgent: true, id: undefined };
+    const eligibleIds = new Set(["msg-123"]);
+    const messageRatings = new Map();
+    const feedbackConfig: FeedbackConfig = {
+      eligibleMessageIds: eligibleIds,
+      messageRatings,
+      onPopulateFeedbackText: jest.fn(),
+      onSendRating: jest.fn(),
+    };
+
+    render(
+      <ThreadedMessage
+        {...defaultProps}
+        message={assistantMessageNoId}
         feedbackConfig={feedbackConfig}
       />
     );

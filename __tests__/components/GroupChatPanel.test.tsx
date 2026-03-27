@@ -24,10 +24,15 @@ jest.mock("../../components/MessageInput", () => ({
 jest.mock("../../components/MessageFeedback", () => ({
   MessageFeedback: ({
     messageId,
+    initialRating,
     onPopulateFeedbackText,
     onSendFeedbackRating,
   }: any) => (
-    <div data-testid="message-feedback" data-message-id={messageId}>
+    <div
+      data-testid="message-feedback"
+      data-message-id={messageId}
+      data-initial-rating={initialRating}
+    >
       <button
         data-testid={`rating-button-${messageId}`}
         onClick={() => onSendFeedbackRating?.(messageId, 3)}
@@ -1389,6 +1394,7 @@ describe("GroupChatPanel", () => {
 
       const feedbackConfig = {
         eligibleMessageIds: new Set(["2"]), // Only message 2 eligible
+        messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendRating,
       };
@@ -1454,6 +1460,7 @@ describe("GroupChatPanel", () => {
 
       const feedbackConfig = {
         eligibleMessageIds: new Set(["1"]),
+        messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendRating,
       };
@@ -1521,6 +1528,7 @@ describe("GroupChatPanel", () => {
 
       const feedbackConfig = {
         eligibleMessageIds: new Set(["1", "3"]), // Messages 1 and 3 eligible
+        messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendRating,
       };
@@ -1564,6 +1572,7 @@ describe("GroupChatPanel", () => {
 
       const feedbackConfig = {
         eligibleMessageIds: new Set<string>(), // No eligible messages
+        messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendRating,
       };
@@ -1617,6 +1626,7 @@ describe("GroupChatPanel", () => {
 
       const feedbackConfig = {
         eligibleMessageIds: new Set(["2"]), // Message 1 excluded by type
+        messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendRating,
       };
@@ -1634,6 +1644,150 @@ describe("GroupChatPanel", () => {
       // Should only have 1 feedback element (for message 2)
       expect(feedbackElements).toHaveLength(1);
       expect(feedbackElements[0]).toHaveAttribute("data-message-id", "2");
+    });
+
+    it("passes initial rating from messageRatings to MessageFeedback", () => {
+      const mockEnterControlledMode = jest.fn();
+      const mockSendRating = jest.fn();
+
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Agent message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const messageRatings = new Map([["1", "WOW!"]]);
+      const feedbackConfig = {
+        eligibleMessageIds: new Set(["1"]),
+        messageRatings,
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendRating,
+      };
+
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />,
+      );
+
+      // MessageFeedback mock should be rendered
+      const feedbackElement = screen.getByTestId("message-feedback");
+      expect(feedbackElement).toBeInTheDocument();
+    });
+
+    it("synchronizes feedback ratings across parent message and thread panel", () => {
+      const mockEnterControlledMode = jest.fn();
+      const mockSendRating = jest.fn();
+
+      const parentMessage = {
+        id: "parent-1",
+        pseudonym: "Event Assistant",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "Parent agent message" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "ea-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const messages = [parentMessage];
+
+      // Parent message has been rated
+      const messageRatings = new Map([["parent-1", "OK"]]);
+      const feedbackConfig = {
+        eligibleMessageIds: new Set(["parent-1"]),
+        messageRatings,
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendRating,
+      };
+
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />,
+      );
+
+      // Check that MessageFeedback receives the initialRating
+      const feedbackElements = screen.getAllByTestId("message-feedback");
+      expect(feedbackElements[0]).toHaveAttribute("data-initial-rating", "OK");
+    });
+
+    it("synchronizes feedback ratings for reply messages in thread preview", () => {
+      const mockEnterControlledMode = jest.fn();
+      const mockSendRating = jest.fn();
+
+      const parentMessage = {
+        id: "parent-1",
+        pseudonym: "Alice",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "User question" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "alice-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const replyMessage = {
+        id: "reply-1",
+        pseudonym: "Event Assistant",
+        parentMessage: "parent-1",
+        createdAt: "2025-10-17T12:01:00Z",
+        body: { text: "Agent reply" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "ea-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const messages = [parentMessage, replyMessage];
+
+      // Reply has been rated
+      const messageRatings = new Map([["reply-1", "Meh"]]);
+      const feedbackConfig = {
+        eligibleMessageIds: new Set(["reply-1"]),
+        messageRatings,
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendRating,
+      };
+
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />,
+      );
+
+      // Check that the reply preview's MessageFeedback receives the initialRating
+      const feedbackElements = screen.getAllByTestId("message-feedback");
+      expect(feedbackElements[0]).toHaveAttribute("data-initial-rating", "Meh");
     });
   });
 });

@@ -137,11 +137,13 @@ export interface ControlledInputConfig {
 /**
  * Feedback configuration for message feedback UI
  * @property {Set<string>} eligibleMessageIds - Set of message IDs that should display feedback UI
+ * @property {Map<string, string>} messageRatings - Map of message IDs to their submitted ratings
  * @property {function} onPopulateFeedbackText - Callback to populate feedback text input
  * @property {function} onSendRating - Callback to send feedback rating
  */
 export interface FeedbackConfig {
   eligibleMessageIds: Set<string>;
+  messageRatings: Map<string, string>;
   onPopulateFeedbackText: (config: ControlledInputConfig) => void;
   onSendRating: (messageId: string, rating: string) => void;
 }

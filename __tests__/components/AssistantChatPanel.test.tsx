@@ -35,10 +35,15 @@ jest.mock("../../components/messages", () => ({
 jest.mock("../../components/MessageFeedback", () => ({
   MessageFeedback: ({
     messageId,
+    initialRating,
     onPopulateFeedbackText,
     onSendFeedbackRating,
   }: any) => (
-    <div data-testid="message-feedback" data-message-id={messageId}>
+    <div
+      data-testid="message-feedback"
+      data-message-id={messageId}
+      data-initial-rating={initialRating}
+    >
       <button
         data-testid="rating-button-3"
         onClick={() => onSendFeedbackRating?.(messageId, 3)}
@@ -624,6 +629,7 @@ describe("AssistantChatPanel", () => {
 
     const feedbackConfig = {
       eligibleMessageIds: new Set(["1"]),
+      messageRatings: new Map(),
       onPopulateFeedbackText: mockEnterControlledMode,
       onSendRating: mockSendFeedbackRating,
     };
@@ -664,6 +670,7 @@ describe("AssistantChatPanel", () => {
 
     const feedbackConfig = {
       eligibleMessageIds: new Set(["1"]),
+      messageRatings: new Map(),
       onPopulateFeedbackText: mockEnterControlledMode,
       onSendRating: mockSendFeedbackRating,
     };
@@ -1447,6 +1454,7 @@ describe("AssistantChatPanel", () => {
 
       const feedbackConfig = {
         eligibleMessageIds: new Set(["1", "3"]), // Only messages 1 and 3 are eligible
+        messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendFeedbackRating,
       };
@@ -1490,6 +1498,7 @@ describe("AssistantChatPanel", () => {
 
       const feedbackConfig = {
         eligibleMessageIds: new Set<string>(), // No eligible messages
+        messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendFeedbackRating,
       };
@@ -1540,6 +1549,7 @@ describe("AssistantChatPanel", () => {
 
       const feedbackConfig = {
         eligibleMessageIds: new Set(["2"]), // Only message 2 is eligible (message 1 excluded by type)
+        messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendFeedbackRating,
       };
@@ -1581,6 +1591,7 @@ describe("AssistantChatPanel", () => {
 
       const feedbackConfig = {
         eligibleMessageIds: new Set(["1"]),
+        messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendFeedbackRating,
       };
@@ -1645,6 +1656,7 @@ describe("AssistantChatPanel", () => {
 
       const feedbackConfig = {
         eligibleMessageIds: new Set<string>(),
+        messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendFeedbackRating,
       };
@@ -1695,6 +1707,7 @@ describe("AssistantChatPanel", () => {
 
       const feedbackConfig = {
         eligibleMessageIds: new Set(["1", "2"]),
+        messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendFeedbackRating,
       };
@@ -1747,6 +1760,7 @@ describe("AssistantChatPanel", () => {
 
       const feedbackConfig = {
         eligibleMessageIds: new Set(["1", "2"]),
+        messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendFeedbackRating,
       };
@@ -1764,6 +1778,44 @@ describe("AssistantChatPanel", () => {
       // Should only have 1 feedback element (for agent message)
       expect(feedbackElements).toHaveLength(1);
       expect(feedbackElements[0]).toHaveAttribute("data-message-id", "2");
+    });
+
+    it("passes initial rating from messageRatings to MessageFeedback", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Event Assistant",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Agent message" },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "ea-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const messageRatings = new Map([["1", "OK"]]);
+      const feedbackConfig = {
+        eligibleMessageIds: new Set(["1"]),
+        messageRatings,
+        onPopulateFeedbackText: mockEnterControlledMode,
+        onSendRating: mockSendFeedbackRating,
+      };
+
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          messages={messages}
+          feedbackConfig={feedbackConfig}
+        />,
+      );
+
+      const feedbackElement = screen.getByTestId("message-feedback");
+      expect(feedbackElement).toHaveAttribute("data-initial-rating", "OK");
     });
   });
 });

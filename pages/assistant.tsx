@@ -65,6 +65,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   >({});
   const [conversationType, setConversationType] = useState<string | null>(null);
   const [feedbackFrequency, setFeedbackFrequency] = useState<number>(1);
+  const [messageRatings, setMessageRatings] = useState<Map<string, string>>(
+    new Map(),
+  );
   const [controlledMode, setControlledMode] =
     useState<ControlledInputConfig | null>(null);
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>("");
@@ -676,6 +679,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     );
     const feedbackText = `/feedback|Rating|${messageId}|${rating}`;
     await sendMessage(feedbackText, false, undefined, true);
+
+    // Update local state to track the rating
+    setMessageRatings((prev) => new Map(prev).set(messageId, rating));
   };
 
   const handlePromptSelect = async (
@@ -773,6 +779,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       assistantMessages,
       feedbackFrequency,
     ),
+    messageRatings,
     onPopulateFeedbackText: enterControlledMode,
     onSendRating: sendFeedbackRating,
   };
@@ -783,6 +790,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       chatMessages,
       feedbackFrequency,
     ),
+    messageRatings,
     onPopulateFeedbackText: enterControlledMode,
     onSendRating: sendFeedbackRating,
   };

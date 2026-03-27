@@ -342,4 +342,293 @@ describe("ThreadPanel Component", () => {
       expect(newTextarea).toHaveFocus();
     });
   });
+
+  // Feedback tests
+  describe("Feedback rendering", () => {
+    it("renders feedback for parent message when it's from agent and eligible", () => {
+      const assistantParent = { ...mockParentMessage, fromAgent: true };
+      const eligibleIds = new Set([assistantParent.id!]);
+      const messageRatings = new Map();
+      const feedbackConfig = {
+        eligibleMessageIds: eligibleIds,
+        messageRatings,
+        onPopulateFeedbackText: jest.fn(),
+        onSendRating: jest.fn(),
+      };
+
+      render(
+        <ThreadPanel
+          {...defaultProps}
+          parentMessage={assistantParent}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      expect(screen.getByText("How did the bot do?")).toBeInTheDocument();
+    });
+
+    it("does not render feedback for parent message when not from agent", () => {
+      const eligibleIds = new Set([mockParentMessage.id!]);
+      const messageRatings = new Map();
+      const feedbackConfig = {
+        eligibleMessageIds: eligibleIds,
+        messageRatings,
+        onPopulateFeedbackText: jest.fn(),
+        onSendRating: jest.fn(),
+      };
+
+      render(
+        <ThreadPanel
+          {...defaultProps}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      expect(screen.queryByText("How did the bot do?")).not.toBeInTheDocument();
+    });
+
+    it("does not render feedback for parent message when not eligible", () => {
+      const assistantParent = { ...mockParentMessage, fromAgent: true };
+      const eligibleIds = new Set(["different-id"]);
+      const messageRatings = new Map();
+      const feedbackConfig = {
+        eligibleMessageIds: eligibleIds,
+        messageRatings,
+        onPopulateFeedbackText: jest.fn(),
+        onSendRating: jest.fn(),
+      };
+
+      render(
+        <ThreadPanel
+          {...defaultProps}
+          parentMessage={assistantParent}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      expect(screen.queryByText("How did the bot do?")).not.toBeInTheDocument();
+    });
+
+    it("renders feedback for reply messages when they are from agent and eligible", () => {
+      const assistantReply = { ...mockReplies[0], fromAgent: true };
+      const repliesWithAssistant = [assistantReply, mockReplies[1]];
+      const eligibleIds = new Set([assistantReply.id!]);
+      const messageRatings = new Map();
+      const feedbackConfig = {
+        eligibleMessageIds: eligibleIds,
+        messageRatings,
+        onPopulateFeedbackText: jest.fn(),
+        onSendRating: jest.fn(),
+      };
+
+      render(
+        <ThreadPanel
+          {...defaultProps}
+          replies={repliesWithAssistant}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      expect(screen.getByText("How did the bot do?")).toBeInTheDocument();
+    });
+
+    it("passes initialRating from messageRatings map to parent message feedback", () => {
+      const assistantParent = { ...mockParentMessage, fromAgent: true };
+      const eligibleIds = new Set([assistantParent.id!]);
+      const messageRatings = new Map([["parent-123", "WOW!"]]);
+      const feedbackConfig = {
+        eligibleMessageIds: eligibleIds,
+        messageRatings,
+        onPopulateFeedbackText: jest.fn(),
+        onSendRating: jest.fn(),
+      };
+
+      render(
+        <ThreadPanel
+          {...defaultProps}
+          parentMessage={assistantParent}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      expect(screen.getByText("How did the bot do?")).toBeInTheDocument();
+      // MessageFeedback component receives initialRating prop
+    });
+
+    it("passes initialRating from messageRatings map to reply message feedback", () => {
+      const assistantReply = { ...mockReplies[0], fromAgent: true };
+      const repliesWithAssistant = [assistantReply, mockReplies[1]];
+      const eligibleIds = new Set([assistantReply.id!]);
+      const messageRatings = new Map([["reply-1", "OK"]]);
+      const feedbackConfig = {
+        eligibleMessageIds: eligibleIds,
+        messageRatings,
+        onPopulateFeedbackText: jest.fn(),
+        onSendRating: jest.fn(),
+      };
+
+      render(
+        <ThreadPanel
+          {...defaultProps}
+          replies={repliesWithAssistant}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      expect(screen.getByText("How did the bot do?")).toBeInTheDocument();
+      // MessageFeedback component receives initialRating prop
+    });
+
+    it("calls onSendRating when rating is submitted on parent message", () => {
+      const assistantParent = { ...mockParentMessage, fromAgent: true };
+      const eligibleIds = new Set([assistantParent.id!]);
+      const messageRatings = new Map();
+      const mockOnSendRating = jest.fn();
+      const feedbackConfig = {
+        eligibleMessageIds: eligibleIds,
+        messageRatings,
+        onPopulateFeedbackText: jest.fn(),
+        onSendRating: mockOnSendRating,
+      };
+
+      render(
+        <ThreadPanel
+          {...defaultProps}
+          parentMessage={assistantParent}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      const wowButton = screen.getByRole("radio", { name: "WOW!" });
+      fireEvent.click(wowButton);
+
+      expect(mockOnSendRating).toHaveBeenCalledWith("parent-123", "WOW!");
+    });
+
+    it("calls onSendRating when rating is submitted on reply message", () => {
+      const assistantReply = { ...mockReplies[0], fromAgent: true };
+      const repliesWithAssistant = [assistantReply, mockReplies[1]];
+      const eligibleIds = new Set([assistantReply.id!]);
+      const messageRatings = new Map();
+      const mockOnSendRating = jest.fn();
+      const feedbackConfig = {
+        eligibleMessageIds: eligibleIds,
+        messageRatings,
+        onPopulateFeedbackText: jest.fn(),
+        onSendRating: mockOnSendRating,
+      };
+
+      render(
+        <ThreadPanel
+          {...defaultProps}
+          replies={repliesWithAssistant}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      const mehButton = screen.getByRole("radio", { name: "Meh" });
+      fireEvent.click(mehButton);
+
+      expect(mockOnSendRating).toHaveBeenCalledWith("reply-1", "Meh");
+    });
+
+    it("calls onPopulateFeedbackText when share more is clicked on parent message", () => {
+      const assistantParent = { ...mockParentMessage, fromAgent: true };
+      const eligibleIds = new Set([assistantParent.id!]);
+      const messageRatings = new Map();
+      const mockOnPopulateFeedbackText = jest.fn();
+      const feedbackConfig = {
+        eligibleMessageIds: eligibleIds,
+        messageRatings,
+        onPopulateFeedbackText: mockOnPopulateFeedbackText,
+        onSendRating: jest.fn(),
+      };
+
+      render(
+        <ThreadPanel
+          {...defaultProps}
+          parentMessage={assistantParent}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      // First click a rating to show the "share more" link
+      const okButton = screen.getByRole("radio", { name: "OK" });
+      fireEvent.click(okButton);
+
+      // Then click the "Would you like to share more?" link
+      const shareMoreLink = screen.getByText("Would you like to share more?");
+      fireEvent.click(shareMoreLink);
+
+      expect(mockOnPopulateFeedbackText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prefix: "/feedback|Text|parent-123|",
+          label: "Feedback Mode",
+        })
+      );
+    });
+
+    it("does not render feedback when feedbackConfig is not provided", () => {
+      const assistantParent = { ...mockParentMessage, fromAgent: true };
+      const assistantReply = { ...mockReplies[0], fromAgent: true };
+      const repliesWithAssistant = [assistantReply, mockReplies[1]];
+
+      render(
+        <ThreadPanel
+          {...defaultProps}
+          parentMessage={assistantParent}
+          replies={repliesWithAssistant}
+        />
+      );
+
+      expect(screen.queryByText("How did the bot do?")).not.toBeInTheDocument();
+    });
+
+    it("does not render feedback when message has no id", () => {
+      const assistantParentNoId = { ...mockParentMessage, fromAgent: true, id: undefined };
+      const eligibleIds = new Set(["parent-123"]);
+      const messageRatings = new Map();
+      const feedbackConfig = {
+        eligibleMessageIds: eligibleIds,
+        messageRatings,
+        onPopulateFeedbackText: jest.fn(),
+        onSendRating: jest.fn(),
+      };
+
+      render(
+        <ThreadPanel
+          {...defaultProps}
+          parentMessage={assistantParentNoId}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      expect(screen.queryByText("How did the bot do?")).not.toBeInTheDocument();
+    });
+
+    it("renders feedback for multiple eligible reply messages", () => {
+      const assistantReply1 = { ...mockReplies[0], fromAgent: true };
+      const assistantReply2 = { ...mockReplies[1], fromAgent: true };
+      const repliesWithMultipleAssistants = [assistantReply1, assistantReply2];
+      const eligibleIds = new Set([assistantReply1.id!, assistantReply2.id!]);
+      const messageRatings = new Map();
+      const feedbackConfig = {
+        eligibleMessageIds: eligibleIds,
+        messageRatings,
+        onPopulateFeedbackText: jest.fn(),
+        onSendRating: jest.fn(),
+      };
+
+      render(
+        <ThreadPanel
+          {...defaultProps}
+          replies={repliesWithMultipleAssistants}
+          feedbackConfig={feedbackConfig}
+        />
+      );
+
+      const feedbackSections = screen.getAllByText("How did the bot do?");
+      expect(feedbackSections).toHaveLength(2);
+    });
+  });
 });

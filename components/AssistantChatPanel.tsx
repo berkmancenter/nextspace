@@ -444,6 +444,9 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                               <div className="mt-0">
                                 <MessageFeedback
                                   messageId={message.id}
+                                  initialRating={feedbackConfig.messageRatings.get(
+                                    message.id,
+                                  )}
                                   onPopulateFeedbackText={
                                     feedbackConfig.onPopulateFeedbackText
                                   }

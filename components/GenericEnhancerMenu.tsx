@@ -63,7 +63,7 @@ export const GenericEnhancerMenu = <T,>({
       elevation={8}
       sx={{
         position: "fixed",
-        top: `${rect.bottom + 8}px`,
+        bottom: `${window.innerHeight - rect.top + 8}px`,
         left: `${leftPos}px`,
         zIndex: 1400,
         maxHeight: 240,

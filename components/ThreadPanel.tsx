@@ -1,10 +1,11 @@
-import React, { FC, useMemo, useEffect, useCallback } from "react";
+import React, { FC, useEffect, useCallback } from "react";
 import { Close, Send, ArrowBack } from "@mui/icons-material";
 import { IconButton, useMediaQuery, useTheme } from "@mui/material";
-import { PseudonymousMessage } from "../types.internal";
+import { PseudonymousMessage, FeedbackConfig } from "../types.internal";
 import { InputEnhancer, ActiveEnhancerState } from "../types/inputEnhancer";
 import { normalizeAssistantPseudonym } from "../utils/Helpers";
 import { GenericEnhancerMenu } from "./GenericEnhancerMenu";
+import { MessageFeedback } from "./MessageFeedback";
 
 interface ThreadPanelProps {
   parentMessage: PseudonymousMessage;
@@ -19,6 +20,7 @@ interface ThreadPanelProps {
   ) => React.ReactNode;
   enhancers: InputEnhancer<any>[];
   botName: string;
+  feedbackConfig?: FeedbackConfig;
 }
 
 export const ThreadPanel: FC<ThreadPanelProps> = ({
@@ -31,6 +33,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
   renderMessageContent,
   enhancers,
   botName,
+  feedbackConfig,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -241,6 +244,23 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
 
               {/* Message bubble */}
               {renderMessageContent(parentMessage)}
+
+              {/* Feedback - rendered below the bubble for Event Assistant messages */}
+              {parentMessage.fromAgent &&
+                parentMessage.id &&
+                feedbackConfig &&
+                feedbackConfig.eligibleMessageIds.has(parentMessage.id) && (
+                  <div className="mt-0" style={{ width: "85%" }}>
+                    <MessageFeedback
+                      messageId={parentMessage.id}
+                      initialRating={feedbackConfig.messageRatings.get(
+                        parentMessage.id,
+                      )}
+                      onPopulateFeedbackText={feedbackConfig.onPopulateFeedbackText}
+                      onSendFeedbackRating={feedbackConfig.onSendRating}
+                    />
+                  </div>
+                )}
             </div>
           </div>
         </div>
@@ -284,6 +304,21 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
 
                 {/* Message bubble */}
                 {renderMessageContent(reply)}
+
+                {/* Feedback - rendered below the bubble for Event Assistant messages */}
+                {reply.fromAgent &&
+                  reply.id &&
+                  feedbackConfig &&
+                  feedbackConfig.eligibleMessageIds.has(reply.id) && (
+                    <div className="mt-0" style={{ width: "85%" }}>
+                      <MessageFeedback
+                        messageId={reply.id}
+                        initialRating={feedbackConfig.messageRatings.get(reply.id)}
+                        onPopulateFeedbackText={feedbackConfig.onPopulateFeedbackText}
+                        onSendFeedbackRating={feedbackConfig.onSendRating}
+                      />
+                    </div>
+                  )}
               </div>
             </div>
           ))}
