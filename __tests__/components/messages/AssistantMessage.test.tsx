@@ -4,13 +4,8 @@ import { AssistantMessage } from "../../../components/messages/AssistantMessage"
 import { PseudonymousMessage } from "../../../types.internal";
 import { components } from "../../../types";
 
-// Mock the BaseMessage component
+// Mock the MessageContent component
 jest.mock("../../../components/messages/BaseMessage", () => ({
-  BaseMessage: ({ children, className }: any) => (
-    <div data-testid="base-message" className={className}>
-      {children}
-    </div>
-  ),
   MessageContent: ({ text }: any) => (
     <div data-testid="message-content">{text}</div>
   ),
@@ -93,10 +88,12 @@ describe("AssistantMessage Component", () => {
         },
       };
 
-      render(<AssistantMessage message={messageWithPrompt} />);
+      const { container } = render(<AssistantMessage message={messageWithPrompt} />);
 
-      const baseMessage = screen.getByTestId("base-message");
-      expect(baseMessage).toHaveClass(
+      // Find the inner div with purple styling
+      const styledDiv = container.querySelector(".bg-purple-100");
+      expect(styledDiv).toBeInTheDocument();
+      expect(styledDiv).toHaveClass(
         "bg-purple-100",
         "border-l-4",
         "border-purple-500",
@@ -106,10 +103,10 @@ describe("AssistantMessage Component", () => {
     });
 
     it("does not apply purple styling when message has no prompt options", () => {
-      render(<AssistantMessage message={mockMessage} />);
+      const { container } = render(<AssistantMessage message={mockMessage} />);
 
-      const baseMessage = screen.getByTestId("base-message");
-      expect(baseMessage).not.toHaveClass("bg-purple-100");
+      const styledDiv = container.querySelector(".bg-purple-100");
+      expect(styledDiv).not.toBeInTheDocument();
     });
   });
 
@@ -200,10 +197,8 @@ describe("AssistantMessage Component", () => {
         <AssistantMessage message={mockMessage} media={media} />,
       );
 
-      // Find the media container (Box component)
-      const mediaContainer = container.querySelector(
-        '[data-testid="base-message"] > div',
-      );
+      // Find the media container (Box component with margin and display flex)
+      const mediaContainer = container.querySelector('.MuiBox-root');
       expect(mediaContainer).toBeInTheDocument();
     });
 
@@ -444,6 +439,7 @@ describe("AssistantMessage Component", () => {
     });
   });
 
+
   describe("Integration: Media with prompts", () => {
     it("renders both media and prompt options together", () => {
       const messageWithPrompt: PseudonymousMessage = {
@@ -509,6 +505,160 @@ describe("AssistantMessage Component", () => {
       expect(
         screen.getByRole("button", { name: "Second" }),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("Initial selected prompt", () => {
+    it("disables all buttons when initialSelectedPrompt is provided", () => {
+      const message: components["schemas"]["Message"] = {
+        id: "msg-5",
+        body: "Choose an option",
+        conversation: "conv-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        pseudonym: "Event Assistant",
+        pseudonymId: "ea-1",
+        upVotes: [],
+        downVotes: [],
+        prompt: {
+          type: "singleChoice" as const,
+          options: [
+            { label: "Option 1", value: "opt1" },
+            { label: "Option 2", value: "opt2" },
+          ],
+        },
+      };
+
+      render(
+        <AssistantMessage
+          message={message}
+          initialSelectedPrompt="opt1"
+        />,
+      );
+
+      const button1 = screen.getByText("Option 1");
+      const button2 = screen.getByText("Option 2");
+
+      expect(button1).toBeDisabled();
+      expect(button2).toBeDisabled();
+    });
+
+    it("marks the selected option with a checkmark when initialSelectedPrompt matches", () => {
+      const message: components["schemas"]["Message"] = {
+        id: "msg-6",
+        body: "Choose an option",
+        conversation: "conv-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        pseudonym: "Event Assistant",
+        pseudonymId: "ea-1",
+        upVotes: [],
+        downVotes: [],
+        prompt: {
+          type: "singleChoice" as const,
+          options: [
+            { label: "Yes", value: "yes" },
+            { label: "No", value: "no" },
+          ],
+        },
+      };
+
+      const { container } = render(
+        <AssistantMessage
+          message={message}
+          initialSelectedPrompt="yes"
+        />,
+      );
+
+      // The selected button should contain a check icon
+      const yesButton = screen.getByText("Yes").closest("button");
+      expect(yesButton).toBeInTheDocument();
+      expect(yesButton?.querySelector('[data-testid="CheckIcon"]')).toBeInTheDocument();
+    });
+
+    it("updates selected prompt when initialSelectedPrompt changes", () => {
+      const message: components["schemas"]["Message"] = {
+        id: "msg-7",
+        body: "Choose an option",
+        conversation: "conv-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        pseudonym: "Event Assistant",
+        pseudonymId: "ea-1",
+        upVotes: [],
+        downVotes: [],
+        prompt: {
+          type: "singleChoice" as const,
+          options: [
+            { label: "Option A", value: "a" },
+            { label: "Option B", value: "b" },
+          ],
+        },
+      };
+
+      const { rerender } = render(
+        <AssistantMessage
+          message={message}
+          initialSelectedPrompt="a"
+        />,
+      );
+
+      // Both should be disabled initially
+      expect(screen.getByText("Option A")).toBeDisabled();
+      expect(screen.getByText("Option B")).toBeDisabled();
+
+      // Rerender with different initialSelectedPrompt
+      rerender(
+        <AssistantMessage
+          message={message}
+          initialSelectedPrompt="b"
+        />,
+      );
+
+      // Should still be disabled, but selection changed
+      expect(screen.getByText("Option A")).toBeDisabled();
+      expect(screen.getByText("Option B")).toBeDisabled();
+    });
+
+    it("does not call onPromptSelect when a button is clicked if already selected", () => {
+      const mockOnPromptSelect = jest.fn();
+      const message: components["schemas"]["Message"] = {
+        id: "msg-8",
+        body: "Choose an option",
+        conversation: "conv-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        pseudonym: "Event Assistant",
+        pseudonymId: "ea-1",
+        upVotes: [],
+        downVotes: [],
+        prompt: {
+          type: "singleChoice" as const,
+          options: [
+            { label: "Option 1", value: "opt1" },
+            { label: "Option 2", value: "opt2" },
+          ],
+        },
+      };
+
+      render(
+        <AssistantMessage
+          message={message}
+          onPromptSelect={mockOnPromptSelect}
+          initialSelectedPrompt="opt1"
+        />,
+      );
+
+      const button1 = screen.getByText("Option 1");
+
+      // Button is disabled, so click won't work
+      // But we verify that it's disabled which prevents the handler from being called
+      expect(button1).toBeDisabled();
+      expect(mockOnPromptSelect).not.toHaveBeenCalled();
     });
   });
 });

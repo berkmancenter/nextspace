@@ -17,12 +17,14 @@ import TokenManagerDefault from "./TokenManager";
  * @property {string} [type] - Optional type for styling (e.g., "moderator_submitted")
  * @property {string} [message] - Optional message ID reference
  * @property {MediaItem[]} [media] - Optional array of media items (images, audio, video)
+ * @property {string} [sourceMessage] - Optional ID of the message this response is based on (for multimodal responses)
  */
 export interface ParsedMessageBody {
   text: string;
   type?: string;
   message?: string;
   media?: MediaItem[];
+  sourceMessage?: string;
 }
 
 /**
@@ -39,6 +41,7 @@ export const parseMessageBody = (body: string | object): ParsedMessageBody => {
       type: obj.type?.toString(),
       message: obj.message?.toString(),
       media: Array.isArray(obj.media) ? obj.media : undefined,
+      sourceMessage: obj.sourceMessage?.toString(),
     };
   }
 

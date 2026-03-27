@@ -38,7 +38,7 @@ interface AssistantChatPanelProps {
   onInputChange?: (value: string) => void;
   onSendMessage: (message: string) => void;
   onExitControlledMode: () => void;
-  onPromptSelect: (prompt: string) => void;
+  onPromptSelect: (prompt: string, promptMessageId?: string) => void;
   userId: string | null;
   showPreferences?: boolean;
   preferenceOptions?: PreferenceOption[];
@@ -142,17 +142,10 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     setPreferencesVisible(false);
   };
 
-  // Collect message IDs that have singleChoice prompts
-  const singleChoicePromptIds = new Set(
-    messages
-      .filter(
-        (msg) =>
-          msg.prompt?.type === "singleChoice" &&
-          msg.prompt?.options &&
-          msg.prompt.options.length > 0,
-      )
-      .map((msg) => msg.id),
-  );
+  // Helper to check if a message is a prompt response
+  const isPromptResponse = (msg: PseudonymousMessage): boolean => {
+    return !!msg.answersPrompt;
+  };
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
@@ -193,11 +186,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
           )}
 
           {messages
-            .filter(
-              (message) =>
-                !message.parentMessage ||
-                !singleChoicePromptIds.has(message.parentMessage),
-            )
+            .filter((message) => !isPromptResponse(message))
             .map((message, i) => {
               const isAssistant = message.fromAgent;
               const isCurrentUser = message.pseudonym === pseudonym;
@@ -216,6 +205,21 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                 message.prompt.type === "singleChoice";
 
               const bodyText = parsed.text;
+
+              // Check for multimodal source context
+              const sourceMessageId = parsed.sourceMessage;
+              const sourceMsg = sourceMessageId
+                ? messages.find((m) => m.id === sourceMessageId)
+                : null;
+              const sourceContextText = sourceMsg
+                ? (() => {
+                    const sourceParsed = parseMessageBody(sourceMsg.body);
+                    const sourceText = sourceParsed.text;
+                    return sourceText.length > 60
+                      ? sourceText.substring(0, 60) + "..."
+                      : sourceText;
+                  })()
+                : null;
 
               if (
                 messageType === "moderator_submitted" ||
@@ -361,31 +365,6 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                         )}
                       </div>
 
-                      {/* Reply context - shows parent message snippet */}
-                      {message.parentMessage &&
-                        (() => {
-                          const parentMsg = messages.find(
-                            (m) => m.id === message.parentMessage,
-                          );
-                          if (!parentMsg) return null;
-
-                          const parentParsed = parseMessageBody(parentMsg.body);
-                          const parentText = parentParsed.text;
-                          const truncatedText =
-                            parentText.length > 60
-                              ? parentText.substring(0, 60) + "..."
-                              : parentText;
-
-                          return (
-                            <div
-                              className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded"
-                              style={{ width: "85%" }}
-                            >
-                              <span className="font-medium">In reply to: </span>
-                              {truncatedText}
-                            </div>
-                          );
-                        })()}
 
                       {/* Message bubble */}
                       {isAssistant ? (
@@ -393,6 +372,12 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                           {hasPromptOptions ? (
                             /* Prompt messages keep their own purple card styling */
                             <div style={{ width: "85%" }}>
+                              {sourceContextText && (
+                                <div className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded">
+                                  <span className="font-medium">In reply to: </span>
+                                  {sourceContextText}
+                                </div>
+                              )}
                               <AssistantMessage
                                 key={`msg-${i}`}
                                 message={{
@@ -403,28 +388,48 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                                 onPromptSelect={onPromptSelect}
                                 onImageClick={handleImageClick}
                                 onMarkmapClick={handleMarkmapClick}
+                                initialSelectedPrompt={
+                                  message.id
+                                    ? (() => {
+                                        const response = messages.find(
+                                          (m) => m.answersPrompt === message.id,
+                                        );
+                                        return response
+                                          ? parseMessageBody(response.body).text
+                                          : undefined;
+                                      })()
+                                    : undefined
+                                }
                               />
                             </div>
                           ) : (
-                            <div
-                              className="rounded-2xl px-2 py-1 text-gray-800 self-start"
-                              style={{
-                                backgroundColor: style.bubbleBg,
-                                width: "85%",
-                                border: "1px solid rgba(0, 0, 0, 0.1)",
-                              }}
-                            >
-                              <AssistantMessage
-                                key={`msg-${i}`}
-                                message={{
-                                  ...message,
-                                  body: bodyText,
+                            <div style={{ width: "85%" }}>
+                              {sourceContextText && (
+                                <div className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded">
+                                  <span className="font-medium">In reply to: </span>
+                                  {sourceContextText}
+                                </div>
+                              )}
+                              <div
+                                className="rounded-2xl px-2 py-1 text-gray-800 self-start"
+                                style={{
+                                  backgroundColor: style.bubbleBg,
+                                  width: "100%",
+                                  border: "1px solid rgba(0, 0, 0, 0.1)",
                                 }}
-                                media={parsed.media}
-                                onPromptSelect={onPromptSelect}
-                                onImageClick={handleImageClick}
-                                onMarkmapClick={handleMarkmapClick}
-                              />
+                              >
+                                <AssistantMessage
+                                  key={`msg-${i}`}
+                                  message={{
+                                    ...message,
+                                    body: bodyText,
+                                  }}
+                                  media={parsed.media}
+                                  onPromptSelect={onPromptSelect}
+                                  onImageClick={handleImageClick}
+                                  onMarkmapClick={handleMarkmapClick}
+                                />
+                              </div>
                             </div>
                           )}
 
