@@ -8,9 +8,9 @@ import { getAvatarStyle } from "../../utils/avatarUtils";
 const darkenColor = (hex: string, percent: number): string => {
   const num = parseInt(hex.replace("#", ""), 16);
   const r = Math.max(0, Math.floor((num >> 16) * (1 - percent)));
-  const g = Math.max(0, Math.floor(((num >> 8) & 0x00FF) * (1 - percent)));
-  const b = Math.max(0, Math.floor((num & 0x0000FF) * (1 - percent)));
-  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+  const g = Math.max(0, Math.floor(((num >> 8) & 0x00ff) * (1 - percent)));
+  const b = Math.max(0, Math.floor((num & 0x0000ff) * (1 - percent)));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
 };
 
 export const SubmittedMessage: FC<MessageProps> = ({ message }) => {
@@ -39,7 +39,7 @@ export const SubmittedMessage: FC<MessageProps> = ({ message }) => {
             component="p"
             className="text-xs text-gray-600 font-bold uppercase"
           >
-            You Asked
+            You Asked Moderator
           </Typography>
         </Box>
 
