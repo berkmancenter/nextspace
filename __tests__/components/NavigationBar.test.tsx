@@ -8,6 +8,7 @@ const baseProps = {
   onTabChange: jest.fn(),
   unseenAssistantCount: 0,
   unseenChatCount: 0,
+  unreadAssistantReplyCount: 0,
   unreadChatReplyCount: 0,
   unseenJargonCount: 0,
   showChat: true,
@@ -438,6 +439,291 @@ describe("NavigationBar", () => {
           !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
       );
       expect(visibleBadges.length).toBe(0);
+    });
+  });
+
+  describe("unreadAssistantReplyCount badge logic", () => {
+    it("shows badge on assistant tab when unreadAssistantReplyCount > 0 even when assistant tab is active", () => {
+      const { container } = render(
+        <NavigationBar
+          {...baseProps}
+          unseenAssistantCount={0}
+          unreadAssistantReplyCount={2}
+          activeTab="assistant"
+        />,
+      );
+
+      // Badge should be visible even though assistant tab is active
+      const badges = container.querySelectorAll(".MuiBadge-badge");
+      const visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      expect(visibleBadges.length).toBeGreaterThan(0);
+    });
+
+    it("shows badge on assistant tab when unseenAssistantCount > 0 and assistant tab is not active", () => {
+      const { container } = render(
+        <NavigationBar
+          {...baseProps}
+          unseenAssistantCount={3}
+          unreadAssistantReplyCount={0}
+          activeTab="chat"
+        />,
+      );
+
+      // Badge should be visible
+      const badges = container.querySelectorAll(".MuiBadge-badge");
+      const visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      expect(visibleBadges.length).toBeGreaterThan(0);
+    });
+
+    it("shows badge on assistant tab when both unseenAssistantCount and unreadAssistantReplyCount > 0 and assistant tab is active", () => {
+      const { container } = render(
+        <NavigationBar
+          {...baseProps}
+          unseenAssistantCount={5}
+          unreadAssistantReplyCount={2}
+          activeTab="assistant"
+        />,
+      );
+
+      // Badge should be visible due to unreadAssistantReplyCount
+      const badges = container.querySelectorAll(".MuiBadge-badge");
+      const visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      expect(visibleBadges.length).toBeGreaterThan(0);
+    });
+
+    it("hides badge on assistant tab when both unseenAssistantCount and unreadAssistantReplyCount are 0 and assistant tab is active", () => {
+      const { container } = render(
+        <NavigationBar
+          {...baseProps}
+          unseenAssistantCount={0}
+          unreadAssistantReplyCount={0}
+          activeTab="assistant"
+        />,
+      );
+
+      // Badge should not be visible
+      const badges = container.querySelectorAll(".MuiBadge-badge");
+      const visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      expect(visibleBadges.length).toBe(0);
+    });
+
+    it("does not show badge on assistant tab when only unreadAssistantReplyCount > 0 and not on assistant tab", () => {
+      const { container } = render(
+        <NavigationBar
+          {...baseProps}
+          unseenAssistantCount={0}
+          unreadAssistantReplyCount={3}
+          activeTab="chat"
+        />,
+      );
+
+      // Badge should NOT be visible because:
+      // - We're not on assistant tab (isActive = false)
+      // - unseenAssistantCount = 0
+      // The condition is: unseen > 0 || (isActive && unreadAssistantReplyCount > 0)
+      // Which evaluates to: 0 > 0 || (false && 3 > 0) = false
+      const badges = container.querySelectorAll(".MuiBadge-badge");
+      const visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      expect(visibleBadges.length).toBe(0);
+    });
+
+    it("special behavior: assistant tab shows badge even when active if unreadAssistantReplyCount > 0", () => {
+      const { container } = render(
+        <NavigationBar
+          {...baseProps}
+          unseenAssistantCount={0}
+          unreadAssistantReplyCount={1}
+          activeTab="assistant"
+        />,
+      );
+
+      // This is the special case: assistant tab badge shows even when active
+      const badges = container.querySelectorAll(".MuiBadge-badge");
+      const visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      expect(visibleBadges.length).toBeGreaterThan(0);
+    });
+
+    it("does not affect other tabs' badge behavior", () => {
+      const { container } = render(
+        <NavigationBar
+          {...baseProps}
+          unseenAssistantCount={0}
+          unseenChatCount={2}
+          unreadAssistantReplyCount={5}
+          activeTab="chat"
+        />,
+      );
+
+      // Chat tab badge should be hidden when active (no unreadChatReplyCount)
+      // Assistant tab badge should NOT be visible because assistant is not active
+      const badges = container.querySelectorAll(".MuiBadge-badge");
+      const visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      // Only chat tab should have visible badge (unseenChatCount > 0 and active, but that's hidden)
+      // Actually unseenChatCount > 0 means it will show even if active
+      expect(visibleBadges.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("badge parity between assistant and chat tabs", () => {
+    it("both assistant and chat tabs show badges when active with unread replies", () => {
+      // Test assistant tab active with unread replies
+      const { container: assistantContainer, unmount: unmountAssistant } = render(
+        <NavigationBar
+          {...baseProps}
+          unseenAssistantCount={0}
+          unseenChatCount={0}
+          unreadAssistantReplyCount={1}
+          unreadChatReplyCount={1}
+          activeTab="assistant"
+        />,
+      );
+
+      let badges = assistantContainer.querySelectorAll(".MuiBadge-badge");
+      let visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      // Assistant is active with unread replies, should show badge
+      expect(visibleBadges.length).toBeGreaterThan(0);
+      unmountAssistant();
+
+      // Test chat tab active with unread replies
+      const { container: chatContainer } = render(
+        <NavigationBar
+          {...baseProps}
+          unseenAssistantCount={0}
+          unseenChatCount={0}
+          unreadAssistantReplyCount={1}
+          unreadChatReplyCount={1}
+          activeTab="chat"
+        />,
+      );
+
+      badges = chatContainer.querySelectorAll(".MuiBadge-badge");
+      visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      // Chat is active with unread replies, should show badge
+      expect(visibleBadges.length).toBeGreaterThan(0);
+    });
+
+    it("both tabs hide badges when active with no unread replies or unseen messages", () => {
+      // Test assistant tab
+      const { container: assistantContainer, unmount: unmountAssistant } = render(
+        <NavigationBar
+          {...baseProps}
+          unseenAssistantCount={0}
+          unseenChatCount={0}
+          unreadAssistantReplyCount={0}
+          unreadChatReplyCount={0}
+          activeTab="assistant"
+        />,
+      );
+
+      let badges = assistantContainer.querySelectorAll(".MuiBadge-badge");
+      let visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      expect(visibleBadges.length).toBe(0);
+      unmountAssistant();
+
+      // Test chat tab
+      const { container: chatContainer } = render(
+        <NavigationBar
+          {...baseProps}
+          unseenAssistantCount={0}
+          unseenChatCount={0}
+          unreadAssistantReplyCount={0}
+          unreadChatReplyCount={0}
+          activeTab="chat"
+        />,
+      );
+
+      badges = chatContainer.querySelectorAll(".MuiBadge-badge");
+      visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      expect(visibleBadges.length).toBe(0);
+    });
+
+    it("both tabs show badges when inactive with unseen messages", () => {
+      const { container } = render(
+        <NavigationBar
+          {...baseProps}
+          unseenAssistantCount={1}
+          unseenChatCount={1}
+          unreadAssistantReplyCount={0}
+          unreadChatReplyCount={0}
+          activeTab="transcript"
+        />,
+      );
+
+      const badges = container.querySelectorAll(".MuiBadge-badge");
+      const visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      // Both assistant and chat should show badges (2 tabs x 2 navs = 4, but checking > 0)
+      expect(visibleBadges.length).toBeGreaterThan(0);
+    });
+
+    it("mirrors the badge logic: assistant behaves like chat for unread replies", () => {
+      // When assistant is active with unread assistant replies
+      const { container: scenario1, unmount: unmount1 } = render(
+        <NavigationBar
+          {...baseProps}
+          unseenAssistantCount={0}
+          unreadAssistantReplyCount={1}
+          activeTab="assistant"
+        />,
+      );
+      let badges = scenario1.querySelectorAll(".MuiBadge-badge");
+      let visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      expect(visibleBadges.length).toBeGreaterThan(0);
+      unmount1();
+
+      // When chat is active with unread chat replies
+      const { container: scenario2 } = render(
+        <NavigationBar
+          {...baseProps}
+          unseenChatCount={0}
+          unreadChatReplyCount={1}
+          activeTab="chat"
+        />,
+      );
+      badges = scenario2.querySelectorAll(".MuiBadge-badge");
+      visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      expect(visibleBadges.length).toBeGreaterThan(0);
     });
   });
 });

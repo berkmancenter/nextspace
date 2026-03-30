@@ -22,6 +22,7 @@ interface NavigationBarProps {
   onTabChange: (tab: NavTab) => void;
   unseenAssistantCount: number;
   unseenChatCount: number;
+  unreadAssistantReplyCount: number;
   unreadChatReplyCount: number;
   unseenJargonCount: number;
   showChat: boolean;
@@ -45,6 +46,7 @@ export function NavigationBar({
   onTabChange,
   unseenAssistantCount,
   unseenChatCount,
+  unreadAssistantReplyCount,
   unreadChatReplyCount,
   unseenJargonCount,
   showChat,
@@ -126,11 +128,13 @@ export function NavigationBar({
     const isActive = activeTab === id;
     const unseen = getUnseenCount(id);
 
-    // For chat tab, show badge if there are unread replies even when active
+    // For chat and assistant tabs, show badge if there are unread replies even when active
     // For other tabs, hide badge when active
-    const shouldShowBadge = id === "chat"
-      ? unseen > 0 || (isActive && unreadChatReplyCount > 0)
-      : unseen > 0 && !isActive;
+    const shouldShowBadge = id === "assistant"
+      ? unseen > 0 || (isActive && unreadAssistantReplyCount > 0)
+      : id === "chat"
+        ? unseen > 0 || (isActive && unreadChatReplyCount > 0)
+        : unseen > 0 && !isActive;
 
     return (
       <button

@@ -49,7 +49,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [activeTab, setActiveTab] = useState<NavTab>("chat");
   const [unseenAssistantCount, setUnseenAssistantCount] = useState<number>(0);
   const [unseenChatCount, setUnseenChatCount] = useState<number>(0);
-  const [unreadReplyCount, setUnreadReplyCount] = useState<number>(0);
+  const [unreadAssistantReplyCount, setUnreadAssistantReplyCount] = useState<number>(0);
+  const [unreadChatReplyCount, setUnreadChatReplyCount] = useState<number>(0);
   const [unseenJargonCount, setUnseenJargonCount] = useState<number>(0);
 
   // Track previous reply counts for chat messages (persists across tab switches)
@@ -91,6 +92,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [preferencesError, setPreferencesError] = useState<string | null>(null);
   // Track messages with unread replies (persists across tab switches)
   const [messagesWithUnreadReplies, setMessagesWithUnreadReplies] = useState<
+    Set<string>
+  >(new Set());
+  // Track assistant messages with unread replies separately
+  const [assistantMessagesWithUnreadReplies, setAssistantMessagesWithUnreadReplies] = useState<
     Set<string>
   >(new Set());
 
@@ -501,7 +506,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
     setChatPreviousReplyCounts(newReplyCounts);
     setMessagesWithUnreadReplies(updatedUnreadSet);
-    setUnreadReplyCount(updatedUnreadSet.size);
+    setUnreadChatReplyCount(updatedUnreadSet.size);
   }, [chatMessages, pseudonym]);
 
   // Track reply count changes for assistant messages
@@ -510,12 +515,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       assistantMessages,
       (r) => r.fromAgent, // Count replies from the agent
       assistantPreviousReplyCounts,
-      messagesWithUnreadReplies,
+      assistantMessagesWithUnreadReplies,
     );
 
     setAssistantPreviousReplyCounts(newReplyCounts);
-    setMessagesWithUnreadReplies(updatedUnreadSet);
-    setUnreadReplyCount(updatedUnreadSet.size);
+    setAssistantMessagesWithUnreadReplies(updatedUnreadSet);
+    setUnreadAssistantReplyCount(updatedUnreadSet.size);
   }, [assistantMessages, pseudonym]);
 
   // Load initial chat messages when chatPasscode becomes available
@@ -906,7 +911,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
             onTabChange={handleTabChange}
             unseenAssistantCount={unseenAssistantCount}
             unseenChatCount={unseenChatCount}
-            unreadChatReplyCount={unreadReplyCount}
+            unreadAssistantReplyCount={unreadAssistantReplyCount}
+            unreadChatReplyCount={unreadChatReplyCount}
             unseenJargonCount={unseenJargonCount}
             showChat={!!chatPasscode}
             showTranscript={!!transcriptPasscode}
@@ -957,7 +963,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                           setMessagesWithUnreadReplies((prev) => {
                             const newSet = new Set(prev);
                             newSet.delete(messageId);
-                            setUnreadReplyCount(newSet.size);
+                            setUnreadChatReplyCount(newSet.size);
                             return newSet;
                           });
                         }}
@@ -989,12 +995,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                         onPreferencesSubmit={handlePreferencesSubmit}
                         preferencesError={preferencesError}
                         feedbackConfig={assistantFeedbackConfig}
-                        messagesWithUnreadReplies={messagesWithUnreadReplies}
+                        messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
                         onMarkAsRead={(messageId) => {
-                          setMessagesWithUnreadReplies((prev) => {
+                          setAssistantMessagesWithUnreadReplies((prev) => {
                             const newSet = new Set(prev);
                             newSet.delete(messageId);
-                            setUnreadReplyCount(newSet.size);
+                            setUnreadAssistantReplyCount(newSet.size);
                             return newSet;
                           });
                         }}
