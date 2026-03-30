@@ -58,6 +58,7 @@ interface GroupChatPanelProps {
   feedbackConfig?: FeedbackConfig;
   messagesWithUnreadReplies?: Set<string>;
   onMarkAsRead?: (messageId: string) => void;
+  waitingForResponse?: boolean;
 }
 
 export const GroupChatPanel: FC<GroupChatPanelProps> = ({
@@ -73,6 +74,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   feedbackConfig,
   messagesWithUnreadReplies = new Set(),
   onMarkAsRead,
+  waitingForResponse = false,
 }) => {
   // State for tracking which thread is open in split view
   const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(
@@ -132,6 +134,11 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
 
   // Auto-scroll based on parent messages only (not threaded replies)
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(parentMessages);
+
+  // Determine if we're waiting for a threaded reply
+  const lastMessage = messages[messages.length - 1];
+  const waitingForThreadedReply =
+    waitingForResponse && lastMessage?.parentMessage;
 
   // Helper to render avatar for chat mode
   const renderAvatar = (message: PseudonymousMessage) => {
@@ -317,6 +324,18 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                 />
               );
             })}
+
+            {/* Bot loading indicator - appears after last user message (only for main chat) */}
+            {waitingForResponse &&
+              !waitingForThreadedReply &&
+              parentMessages.length > 0 && (
+                <div className="relative z-10 flex items-center gap-1 mt-2 mb-1">
+                  <BotIcon size={32} color="#4b5563" bouncing={true} />
+                  <span className="text-xs text-gray-500 italic">
+                    thinking...
+                  </span>
+                </div>
+              )}
             {/* Scroll target */}
             <div ref={messagesEndRef} className="h-2" />
           </div>
@@ -328,11 +347,12 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             pseudonym={pseudonym}
             enhancers={enhancers}
             onSendMessage={onSendMessage}
-            waitingForResponse={false}
+            waitingForResponse={waitingForResponse && !waitingForThreadedReply}
             controlledMode={controlledMode || null}
             onExitControlledMode={onExitControlledMode || (() => {})}
             inputValue={inputValue}
             onInputChange={onInputChange}
+            disableWhileWaiting={false}
           />
         </div>
       </div>
@@ -351,6 +371,12 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             enhancers={enhancers}
             botName={botName}
             feedbackConfig={feedbackConfig}
+            waitingForResponse={
+              !!(
+                waitingForThreadedReply &&
+                lastMessage?.parentMessage === selectedThreadId
+              )
+            }
           />
         </div>
       )}

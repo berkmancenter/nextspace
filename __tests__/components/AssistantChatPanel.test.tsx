@@ -1825,4 +1825,280 @@ describe("AssistantChatPanel", () => {
       expect(feedbackElement).toHaveAttribute("data-initial-rating", "OK");
     });
   });
+
+  describe("Threaded Replies", () => {
+    it("shows thinking bot icon in main chat when waiting for non-threaded response", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "test-user",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "User question" },
+          channels: ["user"],
+          conversation: "conv-1",
+          pseudonymId: "tu-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const { container } = render(
+        <AssistantChatPanel
+          {...baseProps}
+          messages={messages}
+          waitingForResponse={true}
+        />,
+      );
+
+      // Should show thinking indicator with bouncing bot icon
+      const bouncingIcon = container.querySelector(".animate-bounce");
+      expect(bouncingIcon).toBeInTheDocument();
+      expect(screen.getByText("thinking...")).toBeInTheDocument();
+    });
+
+    it("does not show thinking bot icon in main chat when waiting for threaded reply", () => {
+      const parentMessage = {
+        id: "msg1",
+        pseudonym: "test-user",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "Parent message" },
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "tu-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const userReply = {
+        id: "reply1",
+        pseudonym: "test-user",
+        createdAt: "2025-10-17T12:01:00Z",
+        body: { text: "Reply in thread" },
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "tu-1",
+        fromAgent: false,
+        parentMessage: "msg1",
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const { container } = render(
+        <AssistantChatPanel
+          {...baseProps}
+          messages={[parentMessage, userReply]}
+          waitingForResponse={true}
+        />,
+      );
+
+      // Main chat should NOT show thinking indicator when waiting for threaded reply
+      const bouncingIcons = container.querySelectorAll(".animate-bounce");
+      expect(bouncingIcons.length).toBe(0);
+      expect(screen.queryByText("thinking...")).not.toBeInTheDocument();
+    });
+
+    it("organizes messages into parent messages and replies correctly", () => {
+      const parentMessage = {
+        id: "msg1",
+        pseudonym: "test-user",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "Parent message" },
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "tu-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const reply1 = {
+        id: "reply1",
+        pseudonym: "Event Assistant",
+        createdAt: "2025-10-17T12:01:00Z",
+        body: { text: "First reply" },
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "ea-1",
+        fromAgent: true,
+        parentMessage: "msg1",
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const reply2 = {
+        id: "reply2",
+        pseudonym: "test-user",
+        createdAt: "2025-10-17T12:02:00Z",
+        body: { text: "Second reply" },
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "tu-1",
+        fromAgent: false,
+        parentMessage: "msg1",
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          messages={[parentMessage, reply1, reply2]}
+        />,
+      );
+
+      // Parent message should be visible in main view
+      expect(screen.getByText("Parent message")).toBeInTheDocument();
+
+      // First reply should be shown in preview
+      expect(screen.getByText("First reply")).toBeInTheDocument();
+
+      // Should show "+1 more reply" indicator for the second reply
+      expect(screen.getByText("+ 1 more reply")).toBeInTheDocument();
+    });
+
+    it("filters out prompt response messages from parent messages", () => {
+      const promptMessage = {
+        id: "prompt1",
+        pseudonym: "Event Assistant",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "Choose an option:" },
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "ea-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+        prompt: {
+          type: "singleChoice" as const,
+          options: [
+            { label: "Option A", value: "a" },
+            { label: "Option B", value: "b" },
+          ],
+        },
+      };
+
+      const promptResponse = {
+        id: "response1",
+        pseudonym: "test-user",
+        createdAt: "2025-10-17T12:01:00Z",
+        body: { text: "Option A" },
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "tu-1",
+        fromAgent: false,
+        answersPrompt: "prompt1",
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          messages={[promptMessage, promptResponse]}
+        />,
+      );
+
+      // Prompt should be visible
+      expect(screen.getByText("Choose an option:")).toBeInTheDocument();
+
+      // Response should be filtered out from parent messages
+      expect(screen.queryByText("Option A")).not.toBeInTheDocument();
+    });
+
+    it("sorts replies by creation time", () => {
+      const parentMessage = {
+        id: "msg1",
+        pseudonym: "test-user",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "Parent" },
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "tu-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const reply3 = {
+        id: "reply3",
+        pseudonym: "test-user",
+        createdAt: "2025-10-17T12:03:00Z",
+        body: { text: "Third" },
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "tu-1",
+        fromAgent: false,
+        parentMessage: "msg1",
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const reply1 = {
+        id: "reply1",
+        pseudonym: "Event Assistant",
+        createdAt: "2025-10-17T12:01:00Z",
+        body: { text: "First" },
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "ea-1",
+        fromAgent: true,
+        parentMessage: "msg1",
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const reply2 = {
+        id: "reply2",
+        pseudonym: "test-user",
+        createdAt: "2025-10-17T12:02:00Z",
+        body: { text: "Second" },
+        channels: ["user"],
+        conversation: "conv-1",
+        pseudonymId: "tu-1",
+        fromAgent: false,
+        parentMessage: "msg1",
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          messages={[parentMessage, reply3, reply1, reply2]}
+        />,
+      );
+
+      // First reply (chronologically) should be shown in preview
+      expect(screen.getByText("First")).toBeInTheDocument();
+
+      // Should show "+2 more replies" indicator for the remaining replies
+      expect(screen.getByText("+ 2 more replies")).toBeInTheDocument();
+    });
+  });
 });
