@@ -29,6 +29,13 @@ jest.mock("../../components/messages", () => ({
         : message.body?.text || "";
     return <div data-testid="moderator-submitted-message">{messageText}</div>;
   },
+  UserMessage: ({ message }: any) => {
+    const messageText =
+      typeof message.body === "string"
+        ? message.body
+        : message.body?.text || "";
+    return <div data-testid="user-message">{messageText}</div>;
+  },
 }));
 
 // Mock MessageFeedback component

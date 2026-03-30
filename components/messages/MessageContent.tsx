@@ -6,28 +6,6 @@ import { MarkmapView } from "../MarkmapView";
 import { parseMessageBody } from "../../utils/Helpers";
 
 /**
- * Props for BaseMessage component
- */
-interface BaseMessageProps {
-  children: React.ReactNode;
-  className?: string;
-}
-
-/**
- * BaseMessage component - provides common wrapper and styling
- */
-export const BaseMessage: FC<BaseMessageProps> = ({
-  children,
-  className = "",
-}) => {
-  return (
-    <Box display="flex" flexDirection="column" rowGap=".5rem">
-      <div className={`block w-full my-1 ${className}`}>{children}</div>
-    </Box>
-  );
-};
-
-/**
  * Props for MessageContent component
  */
 interface MessageContentProps {

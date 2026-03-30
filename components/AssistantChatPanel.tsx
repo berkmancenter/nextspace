@@ -4,6 +4,7 @@ import {
   AssistantMessage,
   SubmittedMessage,
   ModeratorSubmittedMessage,
+  UserMessage,
 } from "../components/messages";
 import { MessageFeedback } from "./MessageFeedback";
 import { MessageInput } from "./MessageInput";
@@ -159,7 +160,8 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     .filter((m) => !isPromptResponse(m));
 
   // Auto-scroll based on parent messages only (not threaded replies)
-  const { messagesEndRef, messagesContainerRef } = useAutoScroll(parentMessages);
+  const { messagesEndRef, messagesContainerRef } =
+    useAutoScroll(parentMessages);
 
   const threadMap = new Map<string, PseudonymousMessage[]>();
   messages
@@ -177,7 +179,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   threadMap.forEach((replies) => {
     replies.sort(
       (a, b) =>
-        new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()
+        new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime(),
     );
   });
 
@@ -206,7 +208,8 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
 
   // Determine if we're waiting for a threaded reply
   const lastMessage = messages[messages.length - 1];
-  const waitingForThreadedReply = waitingForResponse && lastMessage?.parentMessage;
+  const waitingForThreadedReply =
+    waitingForResponse && lastMessage?.parentMessage;
 
   // Create enhancers for thread input (slash commands only)
   const threadEnhancers = [];
@@ -312,7 +315,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                 msg.id
                   ? (() => {
                       const response = messages.find(
-                        (m) => m.answersPrompt === msg.id
+                        (m) => m.answersPrompt === msg.id,
                       );
                       return response
                         ? parseMessageBody(response.body).text
@@ -357,18 +360,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     }
 
     // User messages
-    return (
-      <div
-        className="rounded-2xl px-2 py-1 text-gray-800 self-start"
-        style={{
-          backgroundColor: style.bubbleBg,
-          width: "85%",
-          border: "1px solid rgba(0, 0, 0, 0.1)",
-        }}
-      >
-        {parsed.text}
-      </div>
-    );
+    return <UserMessage message={msg} backgroundColor={style.bubbleBg} />;
   };
 
   return (
@@ -384,81 +376,89 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
           ref={messagesContainerRef}
           className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-2 pr-2 md:px-8 pt-2 bg-gray-100"
         >
-        <div
-          className="flex flex-col items-start gap-4 pb-2"
-          aria-live="assertive"
-        >
-          {/* Panel title and subtitle */}
-          <div className="w-full pt-4 pb-2">
-            <h2 className="text-xl font-bold uppercase tracking-wide text-gray-900">
-              Welcome to&nbsp;
-              <span className="text-medium-slate-blue">
-                {eventName || "Your Event"}
-              </span>
-              &nbsp;
-            </h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Ask {botName} any questions about the event — this conversation is
-              private.
-            </p>
-          </div>
-
-          {/* Preferences Banner */}
-          {preferencesVisible && preferenceOptions.length > 0 && (
-            <div className="w-full">
-              <PreferencesBanner
-                options={preferenceOptions}
-                onSubmit={handlePreferencesSubmit}
-                onDismiss={handlePreferencesDismiss}
-                error={preferencesError}
-              />
+          <div
+            className="flex flex-col items-start gap-4 pb-2"
+            aria-live="assertive"
+          >
+            {/* Panel title and subtitle */}
+            <div className="w-full pt-4 pb-2">
+              <h2 className="text-xl font-bold uppercase tracking-wide text-gray-900">
+                Welcome to&nbsp;
+                <span className="text-medium-slate-blue">
+                  {eventName || "Your Event"}
+                </span>
+                &nbsp;
+              </h2>
+              <p className="text-sm text-gray-500 mt-0.5">
+                Ask {botName} any questions about the event — this conversation
+                is private.
+              </p>
             </div>
-          )}
 
-          {parentMessages.map((message, i) => {
-            const replies = threadMap.get(message.id!) || [];
+            {/* Preferences Banner */}
+            {preferencesVisible && preferenceOptions.length > 0 && (
+              <div className="w-full">
+                <PreferencesBanner
+                  options={preferenceOptions}
+                  onSubmit={handlePreferencesSubmit}
+                  onDismiss={handlePreferencesDismiss}
+                  error={preferencesError}
+                />
+              </div>
+            )}
 
-            // Calculate if we should show timestamp
-            const showTimestamp = (() => {
-              if (i === 0) return true;
-              const prevDate = new Date(parentMessages[i - 1].createdAt!);
-              const currDate = new Date(message.createdAt!);
+            {parentMessages.map((message, i) => {
+              const replies = threadMap.get(message.id!) || [];
+
+              // Calculate if we should show timestamp
+              const showTimestamp = (() => {
+                if (i === 0) return true;
+                const prevDate = new Date(parentMessages[i - 1].createdAt!);
+                const currDate = new Date(message.createdAt!);
+                return (
+                  prevDate.getHours() !== currDate.getHours() ||
+                  prevDate.getMinutes() !== currDate.getMinutes()
+                );
+              })();
+
               return (
-                prevDate.getHours() !== currDate.getHours() ||
-                prevDate.getMinutes() !== currDate.getMinutes()
+                <ThreadedMessage
+                  key={`msg-${message.id}`}
+                  message={message}
+                  replies={replies}
+                  pseudonym={pseudonym}
+                  onOpenThread={handleOpenThread}
+                  onMarkAsRead={handleMarkAsRead}
+                  botName={botName}
+                  renderAvatar={renderAvatar}
+                  renderMessageContent={renderMessageContent}
+                  feedbackConfig={feedbackConfig}
+                  showTimestamp={showTimestamp}
+                  isThreadOpen={selectedThreadId === message.id}
+                  hasUnreadReplies={
+                    message.id
+                      ? messagesWithUnreadReplies.has(message.id)
+                      : false
+                  }
+                />
               );
-            })();
+            })}
 
-            return (
-              <ThreadedMessage
-                key={`msg-${message.id}`}
-                message={message}
-                replies={replies}
-                pseudonym={pseudonym}
-                onOpenThread={handleOpenThread}
-                onMarkAsRead={handleMarkAsRead}
-                botName={botName}
-                renderAvatar={renderAvatar}
-                renderMessageContent={renderMessageContent}
-                feedbackConfig={feedbackConfig}
-                showTimestamp={showTimestamp}
-                isThreadOpen={selectedThreadId === message.id}
-                hasUnreadReplies={message.id ? messagesWithUnreadReplies.has(message.id) : false}
-              />
-            );
-          })}
-
-          {/* Bot loading indicator - appears after last user message (only for main chat) */}
-          {waitingForResponse && !waitingForThreadedReply && parentMessages.length > 0 && (
-            <div className="relative z-10 flex items-center gap-1 mt-2 mb-1">
-              <BotIcon size={32} color="#4b5563" bouncing={true} />
-              <span className="text-xs text-gray-500 italic">thinking...</span>
-            </div>
-          )}
-          {/* Scroll target */}
-          <div ref={messagesEndRef} className="h-2" />
+            {/* Bot loading indicator - appears after last user message (only for main chat) */}
+            {waitingForResponse &&
+              !waitingForThreadedReply &&
+              parentMessages.length > 0 && (
+                <div className="relative z-10 flex items-center gap-1 mt-2 mb-1">
+                  <BotIcon size={32} color="#4b5563" bouncing={true} />
+                  <span className="text-xs text-gray-500 italic">
+                    thinking...
+                  </span>
+                </div>
+              )}
+            {/* Scroll target */}
+            <div ref={messagesEndRef} className="h-2" />
+          </div>
         </div>
-      </div>
 
         {/* MessageInput*/}
         <div className="flex-shrink-0">
@@ -489,7 +489,12 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
             enhancers={threadEnhancers}
             botName={botName}
             feedbackConfig={feedbackConfig}
-            waitingForResponse={!!(waitingForThreadedReply && lastMessage?.parentMessage === selectedThreadId)}
+            waitingForResponse={
+              !!(
+                waitingForThreadedReply &&
+                lastMessage?.parentMessage === selectedThreadId
+              )
+            }
           />
         </div>
       )}

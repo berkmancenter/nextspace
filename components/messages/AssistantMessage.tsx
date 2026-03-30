@@ -1,7 +1,7 @@
 import { FC, useState, useEffect } from "react";
 import { Box, Button, alpha } from "@mui/material";
 import { Check } from "@mui/icons-material";
-import { MessageContent } from "./BaseMessage";
+import { MessageContent } from "./MessageContent";
 import { MessageProps, MediaItem } from "../../types.internal";
 
 export interface AssistantMessageProps extends MessageProps {
