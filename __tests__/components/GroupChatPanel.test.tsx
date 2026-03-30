@@ -1790,4 +1790,299 @@ describe("GroupChatPanel", () => {
       expect(feedbackElements[0]).toHaveAttribute("data-initial-rating", "Meh");
     });
   });
+
+  describe("Thread organization and reply count logic", () => {
+    it("correctly separates parent messages from replies", () => {
+      const messages = [
+        {
+          id: "parent-1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Parent message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "reply-1",
+          pseudonym: "Bob",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "Reply to parent" },
+          parentMessage: "parent-1",
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "bob-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      // Parent message should be visible
+      expect(screen.getByText("Parent message")).toBeInTheDocument();
+
+      // Reply should be shown as a preview under the parent
+      expect(screen.getByText("Reply to parent")).toBeInTheDocument();
+    });
+
+    it("builds threadMap correctly with multiple replies to same parent", () => {
+      const messages = [
+        {
+          id: "parent-1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Question" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "reply-1",
+          pseudonym: "Bob",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "First reply" },
+          parentMessage: "parent-1",
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "bob-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "reply-2",
+          pseudonym: "Charlie",
+          createdAt: "2025-10-17T12:02:00Z",
+          body: { text: "Second reply" },
+          parentMessage: "parent-1",
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "charlie-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      // First reply should be shown in preview
+      expect(screen.getByText("First reply")).toBeInTheDocument();
+
+      // Should show "+1 more reply" indicator
+      expect(screen.getByText("+ 1 more reply")).toBeInTheDocument();
+    });
+
+    it("sorts replies by createdAt timestamp in threadMap", () => {
+      const messages = [
+        {
+          id: "parent-1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Question" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        // Add replies in non-chronological order
+        {
+          id: "reply-3",
+          pseudonym: "David",
+          createdAt: "2025-10-17T12:03:00Z",
+          body: { text: "Third reply" },
+          parentMessage: "parent-1",
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "david-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "reply-1",
+          pseudonym: "Bob",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "First reply" },
+          parentMessage: "parent-1",
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "bob-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "reply-2",
+          pseudonym: "Charlie",
+          createdAt: "2025-10-17T12:02:00Z",
+          body: { text: "Second reply" },
+          parentMessage: "parent-1",
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "charlie-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      // The first reply (chronologically) should be shown in the preview
+      expect(screen.getByText("First reply")).toBeInTheDocument();
+
+      // Should show "+2 more replies" since there are 3 total replies
+      expect(screen.getByText("+ 2 more replies")).toBeInTheDocument();
+    });
+
+    it("handles multiple parent messages with their own replies", () => {
+      const messages = [
+        {
+          id: "parent-1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "First question" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "parent-2",
+          pseudonym: "Bob",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "Second question" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "bob-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "reply-1-1",
+          pseudonym: "Charlie",
+          createdAt: "2025-10-17T12:02:00Z",
+          body: { text: "Reply to first" },
+          parentMessage: "parent-1",
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "charlie-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "reply-2-1",
+          pseudonym: "David",
+          createdAt: "2025-10-17T12:03:00Z",
+          body: { text: "Reply to second" },
+          parentMessage: "parent-2",
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "david-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      // Both parent messages should be visible
+      expect(screen.getByText("First question")).toBeInTheDocument();
+      expect(screen.getByText("Second question")).toBeInTheDocument();
+
+      // Each reply should be under its respective parent
+      expect(screen.getByText("Reply to first")).toBeInTheDocument();
+      expect(screen.getByText("Reply to second")).toBeInTheDocument();
+    });
+
+    it("passes messagesWithUnreadReplies to ThreadedMessage components", () => {
+      const messages = [
+        {
+          id: "parent-1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "Parent with unread replies" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "parent-2",
+          pseudonym: "Bob",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "Parent without unread replies" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "bob-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const messagesWithUnreadReplies = new Set(["parent-1"]);
+
+      const { container } = render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={messages}
+          messagesWithUnreadReplies={messagesWithUnreadReplies}
+          onMarkAsRead={jest.fn()}
+        />
+      );
+
+      // Both messages should be rendered
+      expect(screen.getByText("Parent with unread replies")).toBeInTheDocument();
+      expect(screen.getByText("Parent without unread replies")).toBeInTheDocument();
+    });
+  });
 });

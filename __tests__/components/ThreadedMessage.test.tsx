@@ -497,4 +497,300 @@ describe("ThreadedMessage Component", () => {
     const svgs = container.querySelectorAll("svg");
     expect(svgs.length).toBeGreaterThan(0);
   });
+
+  describe("Reply count calculation logic", () => {
+    it("calculates reply count from replies array length", () => {
+      const replies: PseudonymousMessage[] = [
+        {
+          id: "r1",
+          body: { text: "Reply 1" },
+          pseudonym: "User2",
+          conversation: "conv-1",
+          pseudonymId: "user2-id",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+          channels: ["chat"],
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: "r2",
+          body: { text: "Reply 2" },
+          pseudonym: "User3",
+          conversation: "conv-1",
+          pseudonymId: "user3-id",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+          channels: ["chat"],
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: "r3",
+          body: { text: "Reply 3" },
+          pseudonym: "User4",
+          conversation: "conv-1",
+          pseudonymId: "user4-id",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+          channels: ["chat"],
+          createdAt: new Date().toISOString(),
+        },
+      ];
+
+      render(<ThreadedMessage {...defaultProps} replies={replies} />);
+
+      // Should show first reply preview and "+ 2 more replies"
+      expect(screen.getByText("Reply 1")).toBeInTheDocument();
+      expect(screen.getByText("+ 2 more replies")).toBeInTheDocument();
+    });
+
+    it("uses message.replyCount as fallback when replies array is empty", () => {
+      const messageWithReplyCount = { ...mockMessage, replyCount: 3 };
+      render(<ThreadedMessage {...defaultProps} message={messageWithReplyCount} replies={[]} />);
+
+      // No preview should be shown since replies array is empty
+      // but replyCount would be used internally (count = 3)
+      expect(screen.queryByText(/more reply|more replies/)).not.toBeInTheDocument();
+    });
+
+    it("prefers replies array length over message.replyCount", () => {
+      const messageWithReplyCount = { ...mockMessage, replyCount: 10 };
+      const replies = [mockReplies[0]]; // Only 1 reply
+
+      render(<ThreadedMessage {...defaultProps} message={messageWithReplyCount} replies={replies} />);
+
+      // Should not show "more replies" text since there's only 1 reply
+      expect(screen.queryByText(/more reply|more replies/)).not.toBeInTheDocument();
+    });
+
+    it("returns 0 when both replies array is empty and replyCount is undefined", () => {
+      const messageWithoutReplyCount = { ...mockMessage, replyCount: undefined };
+      render(<ThreadedMessage {...defaultProps} message={messageWithoutReplyCount} replies={[]} />);
+
+      // No replies section should be visible
+      expect(screen.queryByText(/more reply|more replies/)).not.toBeInTheDocument();
+      // No border-l-2 (reply preview section) should be present
+      const { container } = render(<ThreadedMessage {...defaultProps} message={messageWithoutReplyCount} replies={[]} />);
+      expect(container.querySelector(".border-l-2")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Unread replies indicator", () => {
+    it("shows unread indicator when hasUnreadReplies is true and thread is closed", () => {
+      const { container } = render(
+        <ThreadedMessage {...defaultProps} replies={mockReplies} hasUnreadReplies={true} isThreadOpen={false} />
+      );
+
+      // Check for the purple dot indicator (it's an absolute positioned div)
+      const borderContainer = container.querySelector(".border-l-2");
+      expect(borderContainer).toBeInTheDocument();
+
+      // Check for the absolute positioned unread indicator inside it
+      const unreadIndicator = borderContainer?.querySelector(".absolute");
+      expect(unreadIndicator).toBeInTheDocument();
+    });
+
+    it("hides unread indicator when thread is open", () => {
+      const { container } = render(
+        <ThreadedMessage {...defaultProps} replies={mockReplies} hasUnreadReplies={true} isThreadOpen={true} />
+      );
+
+      // Border container should exist (reply preview)
+      const borderContainer = container.querySelector(".border-l-2");
+      expect(borderContainer).toBeInTheDocument();
+
+      // But unread dot should not be visible when thread is open
+      const unreadIndicator = borderContainer?.querySelector(".absolute.-left-\\[5px\\]");
+      expect(unreadIndicator).not.toBeInTheDocument();
+    });
+
+    it("does not show unread indicator when hasUnreadReplies is false", () => {
+      const { container } = render(
+        <ThreadedMessage {...defaultProps} replies={mockReplies} hasUnreadReplies={false} isThreadOpen={false} />
+      );
+
+      const borderContainer = container.querySelector(".border-l-2");
+      expect(borderContainer).toBeInTheDocument();
+
+      // Unread dot should not be present
+      const unreadIndicator = borderContainer?.querySelector(".absolute.-left-\\[5px\\]");
+      expect(unreadIndicator).not.toBeInTheDocument();
+    });
+
+    it("makes additional replies button bold when hasUnreadReplies is true", () => {
+      render(
+        <ThreadedMessage {...defaultProps} replies={mockReplies} hasUnreadReplies={true} isThreadOpen={false} />
+      );
+
+      const moreRepliesButton = screen.getByLabelText("View 1 more reply");
+      expect(moreRepliesButton.className).toContain("font-bold");
+    });
+
+    it("makes additional replies button medium weight when hasUnreadReplies is false", () => {
+      render(
+        <ThreadedMessage {...defaultProps} replies={mockReplies} hasUnreadReplies={false} isThreadOpen={false} />
+      );
+
+      const moreRepliesButton = screen.getByLabelText("View 1 more reply");
+      expect(moreRepliesButton.className).toContain("font-medium");
+      expect(moreRepliesButton.className).not.toContain("font-bold");
+    });
+  });
+
+  describe("IntersectionObserver and mark as read", () => {
+    let intersectionObserverCallback: IntersectionObserverCallback;
+    const mockOnMarkAsRead = jest.fn();
+
+    // Helper to create a complete IntersectionObserverEntry
+    const createMockEntry = (isIntersecting: boolean): IntersectionObserverEntry => {
+      const target = document.createElement("div");
+      return {
+        isIntersecting,
+        target,
+        boundingClientRect: {} as DOMRectReadOnly,
+        intersectionRatio: isIntersecting ? 1 : 0,
+        intersectionRect: {} as DOMRectReadOnly,
+        rootBounds: null,
+        time: Date.now(),
+      };
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      mockOnMarkAsRead.mockClear();
+
+      // Mock IntersectionObserver
+      global.IntersectionObserver = jest.fn((callback) => {
+        intersectionObserverCallback = callback;
+        return {
+          observe: jest.fn(),
+          unobserve: jest.fn(),
+          disconnect: jest.fn(),
+          root: null,
+          rootMargin: "",
+          thresholds: [0.5],
+          takeRecords: jest.fn(),
+        };
+      }) as any;
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("sets up IntersectionObserver when message has unread replies", () => {
+      render(
+        <ThreadedMessage
+          {...defaultProps}
+          replies={mockReplies}
+          hasUnreadReplies={true}
+          onMarkAsRead={mockOnMarkAsRead}
+        />
+      );
+
+      expect(global.IntersectionObserver).toHaveBeenCalled();
+    });
+
+    it("does not call onMarkAsRead immediately when message becomes visible for the first time", () => {
+      render(
+        <ThreadedMessage
+          {...defaultProps}
+          replies={mockReplies}
+          hasUnreadReplies={true}
+          onMarkAsRead={mockOnMarkAsRead}
+        />
+      );
+
+      // Simulate message becoming visible
+      const entry = createMockEntry(true);
+
+      intersectionObserverCallback([entry], {} as IntersectionObserver);
+
+      // Fast forward time
+      jest.advanceTimersByTime(1000);
+
+      // Should NOT be called because hasBeenScrolledOutRef is false
+      expect(mockOnMarkAsRead).not.toHaveBeenCalled();
+    });
+
+    it("calls onMarkAsRead after 1 second when message becomes visible after being scrolled out", () => {
+      render(
+        <ThreadedMessage
+          {...defaultProps}
+          replies={mockReplies}
+          hasUnreadReplies={true}
+          onMarkAsRead={mockOnMarkAsRead}
+        />
+      );
+
+      // First, simulate message going out of view (scrolled out)
+      const exitEntry = createMockEntry(false);
+
+      intersectionObserverCallback([exitEntry], {} as IntersectionObserver);
+
+      // Then, simulate message coming back into view
+      const entryEntry = createMockEntry(true);
+
+      intersectionObserverCallback([entryEntry], {} as IntersectionObserver);
+
+      // Fast forward time
+      jest.advanceTimersByTime(1000);
+
+      // Should be called with message ID
+      expect(mockOnMarkAsRead).toHaveBeenCalledWith(mockMessage.id);
+    });
+
+    it("cancels timer when message becomes invisible before 1 second", () => {
+      render(
+        <ThreadedMessage
+          {...defaultProps}
+          replies={mockReplies}
+          hasUnreadReplies={true}
+          onMarkAsRead={mockOnMarkAsRead}
+        />
+      );
+
+      // Scroll out
+      const exitEntry = createMockEntry(false);
+      intersectionObserverCallback([exitEntry], {} as IntersectionObserver);
+
+      // Come back into view
+      const entryEntry = createMockEntry(true);
+      intersectionObserverCallback([entryEntry], {} as IntersectionObserver);
+
+      // Fast forward 500ms (not enough)
+      jest.advanceTimersByTime(500);
+
+      // Go out of view again
+      intersectionObserverCallback([exitEntry], {} as IntersectionObserver);
+
+      // Fast forward remaining time
+      jest.advanceTimersByTime(600);
+
+      // Should NOT be called because timer was cancelled
+      expect(mockOnMarkAsRead).not.toHaveBeenCalled();
+    });
+
+    it("does not set up observer when onMarkAsRead is not provided", () => {
+      render(
+        <ThreadedMessage
+          {...defaultProps}
+          replies={mockReplies}
+          hasUnreadReplies={true}
+          onMarkAsRead={undefined}
+        />
+      );
+
+      // Observer should not be set up
+      expect(global.IntersectionObserver).not.toHaveBeenCalled();
+    });
+  });
 });

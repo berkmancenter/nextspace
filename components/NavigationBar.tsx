@@ -22,6 +22,7 @@ interface NavigationBarProps {
   onTabChange: (tab: NavTab) => void;
   unseenAssistantCount: number;
   unseenChatCount: number;
+  unreadChatReplyCount: number;
   unseenJargonCount: number;
   showChat: boolean;
   showTranscript: boolean;
@@ -44,6 +45,7 @@ export function NavigationBar({
   onTabChange,
   unseenAssistantCount,
   unseenChatCount,
+  unreadChatReplyCount,
   unseenJargonCount,
   showChat,
   showTranscript,
@@ -124,6 +126,12 @@ export function NavigationBar({
     const isActive = activeTab === id;
     const unseen = getUnseenCount(id);
 
+    // For chat tab, show badge if there are unread replies even when active
+    // For other tabs, hide badge when active
+    const shouldShowBadge = id === "chat"
+      ? unseen > 0 || (isActive && unreadChatReplyCount > 0)
+      : unseen > 0 && !isActive;
+
     return (
       <button
         onClick={() => onTabChange(id)}
@@ -143,7 +151,7 @@ export function NavigationBar({
         <Badge
           color="secondary"
           variant="dot"
-          invisible={unseen === 0 || isActive}
+          invisible={!shouldShowBadge}
           sx={{ "& .MuiBadge-badge": { right: -2, top: 2 } }}
         >
           {renderIcon(id, ActiveIcon, InactiveIcon, isActive, size)}

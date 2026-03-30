@@ -1,4 +1,4 @@
-import React, { FC, useState, useRef } from "react";
+import React, { FC, useState, useRef, useEffect } from "react";
 import { Reply, ChatBubbleOutline, ChevronRight } from "@mui/icons-material";
 import { IconButton } from "@mui/material";
 import { PseudonymousMessage, FeedbackConfig } from "../types.internal";
@@ -10,6 +10,7 @@ interface ThreadedMessageProps {
   replies: PseudonymousMessage[];
   pseudonym: string | null;
   onOpenThread?: (messageId: string) => void;
+  onMarkAsRead?: (messageId: string) => void;
   botName: string;
   renderAvatar: (msg: PseudonymousMessage) => React.ReactNode;
   renderMessageContent: (
@@ -19,6 +20,7 @@ interface ThreadedMessageProps {
   feedbackConfig?: FeedbackConfig;
   showTimestamp: boolean;
   isThreadOpen?: boolean;
+  hasUnreadReplies?: boolean;
 }
 
 export const ThreadedMessage: FC<ThreadedMessageProps> = ({
@@ -26,15 +28,21 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
   replies,
   pseudonym,
   onOpenThread,
+  onMarkAsRead,
   botName,
   renderAvatar,
   renderMessageContent,
   feedbackConfig,
   showTimestamp,
   isThreadOpen = false,
+  hasUnreadReplies = false,
 }) => {
   const [showReplyButton, setShowReplyButton] = useState(false);
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const messageRef = useRef<HTMLDivElement>(null);
+  const visibilityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasBeenScrolledOutRef = useRef<boolean>(false);
+  const isCurrentlyVisibleRef = useRef<boolean>(false);
 
   const isCurrentUser = message.pseudonym === pseudonym;
   const isAssistant = message.fromAgent;
@@ -68,8 +76,79 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
     setShowReplyButton(false);
   };
 
+  // IntersectionObserver to detect when message with unread replies is visible
+  useEffect(() => {
+    if (!message.id || !onMarkAsRead) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          isCurrentlyVisibleRef.current = entry.isIntersecting;
+
+          if (entry.isIntersecting && hasUnreadReplies) {
+            // Only start the timer if this message has been scrolled out of view at least once
+            if (hasBeenScrolledOutRef.current) {
+              visibilityTimerRef.current = setTimeout(() => {
+                onMarkAsRead(message.id!);
+              }, 1000);
+            }
+          } else {
+            // Mark that this message has been scrolled out of view
+            if (!entry.isIntersecting && hasUnreadReplies) {
+              hasBeenScrolledOutRef.current = true;
+            }
+
+            // Clear timer if message becomes invisible before 1 second
+            if (visibilityTimerRef.current) {
+              clearTimeout(visibilityTimerRef.current);
+              visibilityTimerRef.current = null;
+            }
+          }
+        });
+      },
+      {
+        threshold: 0.5, // Trigger when at least 50% of the message is visible
+      }
+    );
+
+    if (messageRef.current) {
+      observer.observe(messageRef.current);
+    }
+
+    return () => {
+      if (visibilityTimerRef.current) {
+        clearTimeout(visibilityTimerRef.current);
+      }
+      observer.disconnect();
+    };
+  }, [hasUnreadReplies, message.id, onMarkAsRead]);
+
+  // When hasUnreadReplies changes to true, check if message is already visible
+  useEffect(() => {
+    if (hasUnreadReplies && message.id && onMarkAsRead) {
+      // Reset the scrolled-out tracking
+      hasBeenScrolledOutRef.current = false;
+
+      // If the message is currently visible, start the timer immediately
+      if (isCurrentlyVisibleRef.current) {
+        visibilityTimerRef.current = setTimeout(() => {
+          onMarkAsRead(message.id!);
+        }, 1000);
+      }
+    }
+
+    return () => {
+      if (visibilityTimerRef.current) {
+        clearTimeout(visibilityTimerRef.current);
+        visibilityTimerRef.current = null;
+      }
+    };
+  }, [hasUnreadReplies, message.id, onMarkAsRead]);
+
   return (
-    <div className="w-full">
+    <div ref={messageRef} className="w-full">
       {/* Timestamp */}
       {showTimestamp && (
         <div className="flex justify-center my-1">
@@ -160,7 +239,19 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
 
           {/* First reply preview - always left-aligned */}
           {replies.length > 0 && replies[0] && (
-            <div className="border-l-2 border-gray-300 pl-3 mt-2 w-full">
+            <div className="border-l-2 border-gray-300 pl-3 mt-2 w-full relative">
+              {/* Unread indicator - dot */}
+              {hasUnreadReplies && !isThreadOpen && (
+                <div
+                  className="absolute -left-[5px] top-2"
+                  style={{
+                    width: "10px",
+                    height: "10px",
+                    borderRadius: "50%",
+                    backgroundColor: "#7C3AED",
+                  }}
+                />
+              )}
               <div className="flex gap-1.5 flex-row">
                 {/* Avatar */}
                 {renderAvatar(replies[0])}
@@ -201,7 +292,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
               {replyCount > 1 && (
                 <button
                   onClick={() => onOpenThread?.(message.id!)}
-                  className="mt-2 -ml-3 px-3 py-2 text-xs text-gray-600 font-medium hover:bg-white transition-colors cursor-pointer flex items-center justify-between w-[calc(100%+0.75rem)] group"
+                  className={`mt-2 -ml-3 px-3 py-2 text-xs text-gray-600 hover:bg-white transition-colors cursor-pointer flex items-center justify-between w-[calc(100%+0.75rem)] group ${hasUnreadReplies && !isThreadOpen ? "font-bold" : "font-medium"}`}
                   aria-label={`View ${replyCount - 1} more ${replyCount - 1 === 1 ? "reply" : "replies"}`}
                 >
                   <div className="flex items-center gap-1">

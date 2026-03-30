@@ -48,7 +48,13 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [activeTab, setActiveTab] = useState<NavTab>("chat");
   const [unseenAssistantCount, setUnseenAssistantCount] = useState<number>(0);
   const [unseenChatCount, setUnseenChatCount] = useState<number>(0);
+  const [unreadReplyCount, setUnreadReplyCount] = useState<number>(0);
   const [unseenJargonCount, setUnseenJargonCount] = useState<number>(0);
+
+  // Track previous reply counts for chat messages (persists across tab switches)
+  const [chatPreviousReplyCounts, setChatPreviousReplyCounts] = useState<
+    Map<string, number>
+  >(new Map());
   const [assistantMessages, setAssistantMessages] = useState<
     PseudonymousMessage[]
   >([]);
@@ -78,6 +84,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [chatInputValue, setChatInputValue] = useState<string>("");
   const [showPreferences, setShowPreferences] = useState<boolean>(true);
   const [preferencesError, setPreferencesError] = useState<string | null>(null);
+  // Track messages with unread replies (persists across tab switches)
+  const [messagesWithUnreadReplies, setMessagesWithUnreadReplies] = useState<
+    Set<string>
+  >(new Set());
 
   const preferenceOptions = [
     {
@@ -423,6 +433,46 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     return combinedMessages;
   };
 
+  // Track reply count changes for chat messages
+  useEffect(() => {
+    // Build thread map
+    const threadMap = new Map<string, PseudonymousMessage[]>();
+    chatMessages
+      .filter((m) => m.parentMessage)
+      .forEach((reply) => {
+        const parentId = reply.parentMessage!;
+        if (!threadMap.has(parentId)) {
+          threadMap.set(parentId, []);
+        }
+        threadMap.get(parentId)!.push(reply);
+      });
+
+    const newUnreadSet = new Set(messagesWithUnreadReplies);
+    const newReplyCounts = new Map<string, number>();
+
+    threadMap.forEach((replies, parentId) => {
+      // Only count replies from other people (not from current user)
+      const repliesFromOthers = replies.filter(
+        (r) => r.pseudonym !== pseudonym,
+      );
+      const currentCount = repliesFromOthers.length;
+      const previousCount = chatPreviousReplyCounts.get(parentId);
+
+      newReplyCounts.set(parentId, currentCount);
+
+      // Only mark as unread if:
+      // 1. We had a previous count for this parent (not first time seeing it)
+      // 2. Count increased (meaning someone else replied)
+      if (previousCount !== undefined && currentCount > previousCount) {
+        newUnreadSet.add(parentId);
+      }
+    });
+
+    setChatPreviousReplyCounts(newReplyCounts);
+    setMessagesWithUnreadReplies(newUnreadSet);
+    setUnreadReplyCount(newUnreadSet.size);
+  }, [chatMessages, pseudonym]);
+
   // Load initial chat messages when chatPasscode becomes available
   useEffect(() => {
     if (!chatPasscode || !router.query.conversationId) return;
@@ -761,6 +811,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       setUnseenAssistantCount(0);
     } else if (tab === "chat") {
       setUnseenChatCount(0);
+      // Note: unreadReplyCount is managed by GroupChatPanel visibility logic
     } else if (tab === "jargon") {
       setUnseenJargonCount(0);
     }
@@ -810,6 +861,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
             onTabChange={handleTabChange}
             unseenAssistantCount={unseenAssistantCount}
             unseenChatCount={unseenChatCount}
+            unreadChatReplyCount={unreadReplyCount}
             unseenJargonCount={unseenJargonCount}
             showChat={!!chatPasscode}
             showTranscript={!!transcriptPasscode}
@@ -852,6 +904,15 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                         controlledMode={controlledMode}
                         onExitControlledMode={exitControlledMode}
                         feedbackConfig={chatFeedbackConfig}
+                        messagesWithUnreadReplies={messagesWithUnreadReplies}
+                        onMarkAsRead={(messageId) => {
+                          setMessagesWithUnreadReplies((prev) => {
+                            const newSet = new Set(prev);
+                            newSet.delete(messageId);
+                            setUnreadReplyCount(newSet.size);
+                            return newSet;
+                          });
+                        }}
                       />
                     ) : activeTab === "jargon" ? (
                       <JargonChatPanel

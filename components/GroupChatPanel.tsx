@@ -112,6 +112,8 @@ interface GroupChatPanelProps {
   controlledMode?: ControlledInputConfig | null;
   onExitControlledMode?: () => void;
   feedbackConfig?: FeedbackConfig;
+  messagesWithUnreadReplies?: Set<string>;
+  onMarkAsRead?: (messageId: string) => void;
 }
 
 export const GroupChatPanel: FC<GroupChatPanelProps> = ({
@@ -125,6 +127,8 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   controlledMode,
   onExitControlledMode,
   feedbackConfig,
+  messagesWithUnreadReplies = new Set(),
+  onMarkAsRead,
 }) => {
   // State for tracking which thread is open in split view
   const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(
@@ -180,6 +184,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
 
     return { parentMessages: parents, threadMap: map };
   }, [messages]);
+
 
   // Auto-scroll based on parent messages only (not threaded replies)
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(parentMessages);
@@ -278,6 +283,11 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     setSelectedThreadId(messageId);
   };
 
+  // Handler for marking a message as read (called after 1 second of visibility)
+  const handleMarkAsRead = (messageId: string) => {
+    onMarkAsRead?.(messageId);
+  };
+
   // Handler for closing thread split view
   const handleCloseThread = () => {
     setSelectedThreadId(null);
@@ -341,12 +351,14 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                   replies={threadMap.get(message.id!) || []}
                   pseudonym={pseudonym}
                   onOpenThread={handleOpenThread}
+                  onMarkAsRead={handleMarkAsRead}
                   botName={botName}
                   renderAvatar={renderAvatar}
                   renderMessageContent={renderMessageContent}
                   feedbackConfig={feedbackConfig}
                   showTimestamp={showTimestamp}
                   isThreadOpen={selectedThreadId === message.id}
+                  hasUnreadReplies={message.id ? messagesWithUnreadReplies.has(message.id) : false}
                 />
               );
             })}
