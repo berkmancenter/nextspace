@@ -5,7 +5,7 @@ import { PseudonymousMessage } from "../../../types.internal";
 import { components } from "../../../types";
 
 // Mock the MessageContent component
-jest.mock("../../../components/messages/BaseMessage", () => ({
+jest.mock("../../../components/messages/MessageContent", () => ({
   MessageContent: ({ text }: any) => (
     <div data-testid="message-content">{text}</div>
   ),

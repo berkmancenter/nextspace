@@ -1,10 +1,10 @@
 import React, { FC, useMemo } from "react";
-import Linkify from "linkify-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { MessageInput } from "./MessageInput";
 import { ThreadedMessage } from "./ThreadedMessage";
 import { ThreadPanel } from "./ThreadPanel";
+import { UserMessage } from "./messages/UserMessage";
 import {
   PseudonymousMessage,
   ControlledInputConfig,
@@ -18,62 +18,6 @@ import {
   normalizeAssistantPseudonym,
   parseMessageBody,
 } from "../utils/Helpers";
-import { MENTION_DISPLAY_REGEX } from "../utils/mentionRegex";
-
-/**
- * Parse message text and highlight @mentions with linkification.
- * When a contributors list is provided the regex matches only known handles
- * (longest first, so "Bob Smith" is preferred over "Bob").
- * Falls back to the generic greedy display regex when no list is available.
- */
-const renderMessageWithMentions = (
-  text: string,
-  contributors?: string[],
-): React.ReactNode => {
-  let splitPattern: RegExp;
-
-  if (contributors && contributors.length > 0) {
-    // Sort longest-first so multi-word handles are tried before shorter ones
-    const escaped = [...contributors]
-      .sort((a, b) => b.length - a.length)
-      .map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-    splitPattern = new RegExp(`(@(?:${escaped.join("|")}))`, "gi");
-  } else {
-    splitPattern = new RegExp(`(${MENTION_DISPLAY_REGEX.source})`, "g");
-  }
-
-  const parts = text.split(splitPattern);
-
-  return parts.map((part, index) => {
-    // Check if this part is a mention
-    if (part.startsWith("@")) {
-      return (
-        <span
-          key={index}
-          className="font-semibold"
-          style={{ color: "#7C3AED" }}
-        >
-          {part}
-        </span>
-      );
-    }
-    // Apply linkification to non-mention text
-    return (
-      <Linkify
-        key={index}
-        options={{
-          attributes: {
-            class: "text-medium-slate-blue",
-            target: "_blank",
-            rel: "noopener noreferrer",
-          },
-        }}
-      >
-        {part}
-      </Linkify>
-    );
-  });
-};
 
 /**
  * Render assistant message with markdown support
@@ -225,6 +169,19 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
       ? getAssistantAvatarStyle()
       : getAvatarStyle(message.pseudonym || "", isCurrentUser);
 
+    // User messages - use UserMessage component
+    if (!isAssistant) {
+      return (
+        <UserMessage
+          message={message}
+          contributors={contributors}
+          backgroundColor={style.bubbleBg}
+          isHovered={isHovered}
+        />
+      );
+    }
+
+    // Assistant messages
     return (
       <div
         className="rounded-2xl px-2 py-1 text-gray-800 self-start"
@@ -234,9 +191,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
           border: "1px solid rgba(0, 0, 0, 0.1)",
         }}
       >
-        {isAssistant
-          ? renderAssistantMessage(parsed.text)
-          : renderMessageWithMentions(parsed.text, contributors)}
+        {renderAssistantMessage(parsed.text)}
 
         {/* Render media items */}
         {parsed.media && parsed.media.length > 0 && (

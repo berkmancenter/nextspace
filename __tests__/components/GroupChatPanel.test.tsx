@@ -682,7 +682,7 @@ describe("GroupChatPanel", () => {
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       expect(screen.getByText("Check out this image")).toBeInTheDocument();
-      const image = screen.getByAltText("Visual response");
+      const image = screen.getByAltText("Uploaded image");
       expect(image).toHaveAttribute(
         "src",
         "data:image/png;base64,base64imagedata",
@@ -728,7 +728,7 @@ describe("GroupChatPanel", () => {
 
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-      const images = screen.getAllByAltText("Visual response");
+      const images = screen.getAllByAltText("Uploaded image");
       expect(images).toHaveLength(3);
       expect(images[0]).toHaveAttribute(
         "src",
@@ -773,7 +773,7 @@ describe("GroupChatPanel", () => {
 
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-      const image = screen.getByAltText("Visual response");
+      const image = screen.getByAltText("Uploaded image");
       expect(image).toHaveStyle({
         maxWidth: "100%",
         height: "auto",
@@ -806,7 +806,7 @@ describe("GroupChatPanel", () => {
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       expect(screen.getByText("No media here")).toBeInTheDocument();
-      expect(screen.queryByAltText("Visual response")).not.toBeInTheDocument();
+      expect(screen.queryByAltText("Uploaded image")).not.toBeInTheDocument();
     });
 
     it("does not render media when media is not an array", () => {
@@ -833,7 +833,7 @@ describe("GroupChatPanel", () => {
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       expect(screen.getByText("Invalid media")).toBeInTheDocument();
-      expect(screen.queryByAltText("Visual response")).not.toBeInTheDocument();
+      expect(screen.queryByAltText("Uploaded image")).not.toBeInTheDocument();
     });
 
     it("only renders image type media, ignoring audio and video", () => {
@@ -876,7 +876,7 @@ describe("GroupChatPanel", () => {
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       // Only the image should be rendered
-      const images = screen.getAllByAltText("Visual response");
+      const images = screen.getAllByAltText("Uploaded image");
       expect(images).toHaveLength(1);
       expect(images[0]).toHaveAttribute(
         "src",
@@ -972,8 +972,10 @@ describe("GroupChatPanel", () => {
       expect(screen.getByText("First image")).toBeInTheDocument();
       expect(screen.getByText("Second image")).toBeInTheDocument();
 
-      const images = screen.getAllByAltText("Visual response");
-      expect(images).toHaveLength(2);
+      // Alice's user message has "Uploaded image" alt text
+      expect(screen.getByAltText("Uploaded image")).toBeInTheDocument();
+      // Event Assistant's message has "Visual response" alt text
+      expect(screen.getByAltText("Visual response")).toBeInTheDocument();
     });
 
     it("renders message without media alongside messages with media", () => {
@@ -1022,7 +1024,7 @@ describe("GroupChatPanel", () => {
       expect(screen.getByText("Just text")).toBeInTheDocument();
       expect(screen.getByText("Text with image")).toBeInTheDocument();
 
-      const images = screen.getAllByAltText("Visual response");
+      const images = screen.getAllByAltText("Uploaded image");
       expect(images).toHaveLength(1);
     });
 
@@ -1066,7 +1068,7 @@ describe("GroupChatPanel", () => {
           <GroupChatPanel {...baseProps} messages={messages} />,
         );
 
-        const image = screen.getByAltText("Visual response");
+        const image = screen.getByAltText("Uploaded image");
         expect(image).toHaveAttribute(
           "src",
           `data:${mimeType};base64,testdata`,
@@ -1106,7 +1108,7 @@ describe("GroupChatPanel", () => {
 
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-      const image = screen.getByAltText("Visual response");
+      const image = screen.getByAltText("Uploaded image");
       expect(image).toHaveAttribute(
         "src",
         `data:image/png;base64,${longBase64}`,

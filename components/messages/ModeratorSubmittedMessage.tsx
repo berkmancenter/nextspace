@@ -1,13 +1,13 @@
 import { FC } from "react";
 import { Box, Typography } from "@mui/material";
 import { CheckCircleOutline } from "@mui/icons-material";
-import { BaseMessage, MessageContent } from "./BaseMessage";
+import { MessageContent } from "./MessageContent";
 import { MessageProps } from "../../types.internal";
 
 export const ModeratorSubmittedMessage: FC<MessageProps> = ({ message }) => {
   return (
-    <BaseMessage>
-      <div className="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-3">
+    <Box display="flex" flexDirection="column" rowGap=".5rem">
+      <div className="block w-full my-1 bg-blue-50 border-l-4 border-blue-500 rounded-lg p-3">
         <Box display="flex" alignItems="center" gap="8px" marginBottom="8px">
           <CheckCircleOutline
             sx={{
@@ -26,6 +26,6 @@ export const ModeratorSubmittedMessage: FC<MessageProps> = ({ message }) => {
 
         <MessageContent text={message.body as string} />
       </div>
-    </BaseMessage>
+    </Box>
   );
 };

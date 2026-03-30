@@ -1,6 +1,6 @@
 import { FC } from "react";
 import { Box, Typography } from "@mui/material";
-import { BaseMessage, MessageContent } from "./BaseMessage";
+import { MessageContent } from "./MessageContent";
 import { MessageProps } from "../../types.internal";
 import { getAvatarStyle } from "../../utils/avatarUtils";
 
@@ -19,9 +19,9 @@ export const SubmittedMessage: FC<MessageProps> = ({ message }) => {
   const borderColor = darkenColor(style.avatarBg, 0.2);
 
   return (
-    <BaseMessage>
+    <Box display="flex" flexDirection="column" rowGap=".5rem">
       <div
-        className="border-l-4 rounded-lg p-3"
+        className="block w-full my-1 border-l-4 rounded-lg p-3"
         style={{
           backgroundColor: style.avatarBg,
           borderLeftColor: borderColor,
@@ -45,6 +45,6 @@ export const SubmittedMessage: FC<MessageProps> = ({ message }) => {
 
         <MessageContent text={message.body as string} />
       </div>
-    </BaseMessage>
+    </Box>
   );
 };

@@ -1,7 +1,7 @@
 import { FC, useState, useEffect } from "react";
 import { Box } from "@mui/material";
 import { CheckCircle, CheckCircleOutline } from "@mui/icons-material";
-import { MessageContent } from "./BaseMessage";
+import { MessageContent } from "./MessageContent";
 import { MessageProps } from "../../types.internal";
 
 export const BackchannelMessage: FC<MessageProps> = ({ message }) => {

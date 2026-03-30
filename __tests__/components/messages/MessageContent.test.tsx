@@ -1,9 +1,6 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
-import {
-  BaseMessage,
-  MessageContent,
-} from "../../../components/messages/BaseMessage";
+import { MessageContent } from "../../../components/messages/MessageContent";
 import { MarkmapView } from "../../../components/MarkmapView";
 
 // Mock MarkmapView component
@@ -12,44 +9,6 @@ jest.mock("../../../components/MarkmapView", () => ({
     <div data-testid="markmap-view">{markdown}</div>
   )),
 }));
-
-describe("BaseMessage Component", () => {
-  it("renders children with default classes", () => {
-    const { container } = render(
-      <BaseMessage>
-        <div>Test content</div>
-      </BaseMessage>
-    );
-
-    expect(screen.getByText("Test content")).toBeInTheDocument();
-    expect(container.querySelector(".w-full")).toBeInTheDocument();
-    expect(container.querySelector(".my-1")).toBeInTheDocument();
-  });
-
-  it("applies custom className", () => {
-    const { container } = render(
-      <BaseMessage className="custom-class bg-red-500">
-        <div>Test</div>
-      </BaseMessage>
-    );
-
-    expect(container.querySelector(".custom-class")).toBeInTheDocument();
-    expect(container.querySelector(".bg-red-500")).toBeInTheDocument();
-  });
-
-  it("wraps content in Box with flex column", () => {
-    const { container } = render(
-      <BaseMessage>
-        <div>Content</div>
-      </BaseMessage>
-    );
-
-    // Check for MUI Box component (rendered as div)
-    const boxElement =
-      container.querySelector('[class*="MuiBox"]') || container.firstChild;
-    expect(boxElement).toBeInTheDocument();
-  });
-});
 
 describe("MessageContent Component", () => {
   it("displays feedback messages with special styling", () => {
