@@ -38,6 +38,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
   hasUnreadReplies = false,
 }) => {
   const [showReplyButton, setShowReplyButton] = useState(false);
+  const [isReplyIndicatorPressed, setIsReplyIndicatorPressed] = useState(false);
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const messageRef = useRef<HTMLDivElement>(null);
   const visibilityTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -291,8 +292,15 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
               {/* Clickable indicator for additional replies */}
               {replyCount > 1 && (
                 <button
-                  onClick={() => onOpenThread?.(message.id!)}
-                  className={`mt-2 -ml-3 px-3 py-2 text-xs text-gray-600 hover:bg-white transition-colors cursor-pointer flex items-center justify-between w-[calc(100%+0.75rem)] group ${hasUnreadReplies && !isThreadOpen ? "font-bold" : "font-medium"}`}
+                  onClick={() => {
+                    if (isReplyIndicatorPressed) {
+                      onOpenThread?.(message.id!);
+                      setIsReplyIndicatorPressed(false);
+                    } else {
+                      setIsReplyIndicatorPressed(true);
+                    }
+                  }}
+                  className={`mt-2 -ml-3 px-3 py-2 text-xs text-gray-600 hover:bg-white active:bg-white transition-colors cursor-pointer flex items-center justify-between w-[calc(100%+0.75rem)] group ${isReplyIndicatorPressed ? "bg-white" : ""} ${hasUnreadReplies && !isThreadOpen ? "font-bold" : "font-medium"}`}
                   aria-label={`View ${replyCount - 1} more ${replyCount - 1 === 1 ? "reply" : "replies"}`}
                 >
                   <div className="flex items-center gap-1">
@@ -304,7 +312,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                   </div>
                   <ChevronRight
                     sx={{ fontSize: 16 }}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    className={`transition-opacity ${isReplyIndicatorPressed ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                   />
                 </button>
               )}

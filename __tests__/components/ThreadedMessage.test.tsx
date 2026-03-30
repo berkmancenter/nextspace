@@ -180,11 +180,16 @@ describe("ThreadedMessage Component", () => {
     expect(screen.getByText("+ 2 more replies")).toBeInTheDocument();
   });
 
-  it("calls onOpenThread when clicking on additional replies count", () => {
+  it("calls onOpenThread when clicking on additional replies count twice", () => {
     render(<ThreadedMessage {...defaultProps} replies={mockReplies} />);
     const moreRepliesButton = screen.getByText("+ 1 more reply");
-    fireEvent.click(moreRepliesButton);
 
+    // First click activates the indicator
+    fireEvent.click(moreRepliesButton);
+    expect(mockOnOpenThread).not.toHaveBeenCalled();
+
+    // Second click opens the thread
+    fireEvent.click(moreRepliesButton);
     expect(mockOnOpenThread).toHaveBeenCalledWith(mockMessage.id);
   });
 
@@ -642,6 +647,60 @@ describe("ThreadedMessage Component", () => {
       const moreRepliesButton = screen.getByLabelText("View 1 more reply");
       expect(moreRepliesButton.className).toContain("font-medium");
       expect(moreRepliesButton.className).not.toContain("font-bold");
+    });
+  });
+
+  describe("Reply indicator mobile press state", () => {
+    it("shows white background and chevron on first click", () => {
+      const { container } = render(<ThreadedMessage {...defaultProps} replies={mockReplies} />);
+      const moreRepliesButton = screen.getByLabelText("View 1 more reply");
+
+      fireEvent.click(moreRepliesButton);
+
+      // Button should have bg-white class after first click
+      expect(moreRepliesButton.classList.contains("bg-white")).toBe(true);
+
+      // Chevron should be visible (opacity-100)
+      const chevronIcon = container.querySelector(".opacity-100");
+      expect(chevronIcon).toBeInTheDocument();
+    });
+
+    it("does not open thread on first click", () => {
+      render(<ThreadedMessage {...defaultProps} replies={mockReplies} />);
+      const moreRepliesButton = screen.getByLabelText("View 1 more reply");
+
+      fireEvent.click(moreRepliesButton);
+
+      // Thread should not open on first click
+      expect(mockOnOpenThread).not.toHaveBeenCalled();
+    });
+
+    it("opens thread on second click", () => {
+      render(<ThreadedMessage {...defaultProps} replies={mockReplies} />);
+      const moreRepliesButton = screen.getByLabelText("View 1 more reply");
+
+      // First click to activate
+      fireEvent.click(moreRepliesButton);
+      expect(mockOnOpenThread).not.toHaveBeenCalled();
+
+      // Second click to open thread
+      fireEvent.click(moreRepliesButton);
+      expect(mockOnOpenThread).toHaveBeenCalledWith(mockMessage.id);
+    });
+
+    it("removes white background after opening thread", () => {
+      render(<ThreadedMessage {...defaultProps} replies={mockReplies} />);
+      const moreRepliesButton = screen.getByLabelText("View 1 more reply");
+
+      // First click to activate
+      fireEvent.click(moreRepliesButton);
+      expect(moreRepliesButton.classList.contains("bg-white")).toBe(true);
+
+      // Second click to open thread
+      fireEvent.click(moreRepliesButton);
+
+      // White background should be removed after opening
+      expect(moreRepliesButton.classList.contains("bg-white")).toBe(false);
     });
   });
 
