@@ -44,6 +44,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   const [localError, setLocalError] = useState<string | null>(null);
   const [waitingForResponse, setWaitingForResponse] = useState(false);
+  const [waitingForChatResponse, setWaitingForChatResponse] = useState(false);
 
   const [activeTab, setActiveTab] = useState<NavTab>("chat");
   const [unseenAssistantCount, setUnseenAssistantCount] = useState<number>(0);
@@ -194,11 +195,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         }
       }
 
-      if (
-        data.fromAgent &&
-        (!data.channels || !data.channels.includes("chat"))
-      ) {
-        setWaitingForResponse(false);
+      if (data.fromAgent) {
+        if (data.channels && data.channels.includes("chat")) {
+          setWaitingForChatResponse(false);
+        } else {
+          setWaitingForResponse(false);
+        }
       }
     };
 
@@ -716,14 +718,14 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       }
     }
 
-    // Only set waitingForResponse for assistant mode regular messages, not controlled mode messages
-    // (controlled mode messages like feedback don't generate responses, and chat mode has no assistant)
-    if (
-      shouldWaitForResponse &&
-      !controlledMode &&
-      effectiveTab === "assistant"
-    ) {
-      setWaitingForResponse(true);
+    // Set waiting state for assistant or chat mode messages
+    if (shouldWaitForResponse && !controlledMode) {
+      if (effectiveTab === "assistant") {
+        setWaitingForResponse(true);
+      } else if (effectiveTab === "chat") {
+        // Set waiting for chat response when mentioning the bot
+        setWaitingForChatResponse(true);
+      }
     }
 
     await SendData("messages", {
@@ -941,13 +943,16 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                         botName={botName}
                         inputValue={chatInputValue}
                         onInputChange={setChatInputValue}
-                        onSendMessage={(msg, parentMessageId) =>
-                          sendMessage(msg, false, parentMessageId)
-                        }
+                        onSendMessage={(msg, parentMessageId) => {
+                          // Wait for response if message mentions the bot
+                          const mentionsBot = msg.includes(`@${botName}`);
+                          sendMessage(msg, mentionsBot, parentMessageId);
+                        }}
                         controlledMode={controlledMode}
                         onExitControlledMode={exitControlledMode}
                         feedbackConfig={chatFeedbackConfig}
                         messagesWithUnreadReplies={messagesWithUnreadReplies}
+                        waitingForResponse={waitingForChatResponse}
                         onMarkAsRead={(messageId) => {
                           setMessagesWithUnreadReplies((prev) => {
                             const newSet = new Set(prev);

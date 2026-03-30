@@ -631,4 +631,117 @@ describe("ThreadPanel Component", () => {
       expect(feedbackSections).toHaveLength(2);
     });
   });
+
+  describe("Thinking Bot Icon", () => {
+    it("shows thinking bot icon when waitingForResponse is true", () => {
+      const { container } = render(
+        <ThreadPanel {...defaultProps} waitingForResponse={true} />
+      );
+
+      // Check for bouncing bot icon
+      const bouncingIcon = container.querySelector(".animate-bounce");
+      expect(bouncingIcon).toBeInTheDocument();
+
+      // Check for "thinking..." text
+      expect(screen.getByText("thinking...")).toBeInTheDocument();
+    });
+
+    it("does not show thinking bot icon when waitingForResponse is false", () => {
+      const { container} = render(
+        <ThreadPanel {...defaultProps} waitingForResponse={false} />
+      );
+
+      const bouncingIcon = container.querySelector(".animate-bounce");
+      expect(bouncingIcon).not.toBeInTheDocument();
+      expect(screen.queryByText("thinking...")).not.toBeInTheDocument();
+    });
+
+    it("shows thinking bot icon below existing replies", () => {
+      const { container } = render(
+        <ThreadPanel {...defaultProps} waitingForResponse={true} />
+      );
+
+      // All replies should be visible
+      expect(screen.getByTestId(`message-${mockReplies[0].id}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`message-${mockReplies[1].id}`)).toBeInTheDocument();
+
+      // Thinking indicator should also be visible
+      expect(screen.getByText("thinking...")).toBeInTheDocument();
+      const bouncingIcon = container.querySelector(".animate-bounce");
+      expect(bouncingIcon).toBeInTheDocument();
+    });
+
+    it("auto-scrolls to bottom when thinking indicator appears", async () => {
+      const { rerender } = render(<ThreadPanel {...defaultProps} />);
+
+      // Update to show waiting state
+      rerender(<ThreadPanel {...defaultProps} waitingForResponse={true} />);
+
+      // Verify thinking indicator appears
+      await waitFor(() => {
+        expect(screen.getByText("thinking...")).toBeInTheDocument();
+      });
+    });
+
+    it("removes thinking indicator when response arrives", async () => {
+      const { rerender, container } = render(
+        <ThreadPanel {...defaultProps} waitingForResponse={true} />
+      );
+
+      // Verify thinking indicator is shown
+      expect(screen.getByText("thinking...")).toBeInTheDocument();
+      let bouncingIcon = container.querySelector(".animate-bounce");
+      expect(bouncingIcon).toBeInTheDocument();
+
+      // Add a new reply and remove waiting state
+      const newReply: PseudonymousMessage = {
+        id: "reply-3",
+        body: { text: "Bot reply" },
+        pseudonym: "Test Bot",
+        conversation: "conv-1",
+        pseudonymId: "bot-id",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+        channels: ["chat"],
+        createdAt: new Date().toISOString(),
+      };
+
+      const updatedReplies = [...mockReplies, newReply];
+
+      rerender(
+        <ThreadPanel
+          {...defaultProps}
+          replies={updatedReplies}
+          waitingForResponse={false}
+        />
+      );
+
+      // Verify thinking indicator is removed
+      await waitFor(() => {
+        expect(screen.queryByText("thinking...")).not.toBeInTheDocument();
+      });
+      bouncingIcon = container.querySelector(".animate-bounce");
+      expect(bouncingIcon).not.toBeInTheDocument();
+
+      // Verify new reply is displayed
+      expect(screen.getByText("Bot reply")).toBeInTheDocument();
+    });
+
+    it("shows thinking indicator above reply input area", () => {
+      const { container } = render(
+        <ThreadPanel {...defaultProps} waitingForResponse={true} />
+      );
+
+      // Both thinking indicator and reply input should be present
+      expect(screen.getByText("thinking...")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Reply...")).toBeInTheDocument();
+
+      // Thinking indicator should be in the scrollable area, not in the input area
+      const bouncingIcon = container.querySelector(".animate-bounce");
+      expect(bouncingIcon).toBeInTheDocument();
+    });
+  });
 });

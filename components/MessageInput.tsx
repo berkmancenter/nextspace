@@ -23,6 +23,7 @@ interface MessageInputProps {
   onExitControlledMode: () => void;
   inputValue?: string;
   onInputChange?: (value: string) => void;
+  disableWhileWaiting?: boolean;
 }
 
 export const MessageInput: FC<MessageInputProps> = ({
@@ -34,6 +35,7 @@ export const MessageInput: FC<MessageInputProps> = ({
   onExitControlledMode,
   inputValue,
   onInputChange,
+  disableWhileWaiting = true,
 }) => {
   const [internalValue, setInternalValue] = useState("");
   const isControlled = inputValue !== undefined && onInputChange !== undefined;
@@ -122,7 +124,8 @@ export const MessageInput: FC<MessageInputProps> = ({
 
   /** Send message */
   const handleSend = () => {
-    if (currentMessage && currentMessage.length > 0 && !waitingForResponse) {
+    const canSend = disableWhileWaiting ? !waitingForResponse : true;
+    if (currentMessage && currentMessage.length > 0 && canSend) {
       onSendMessage(currentMessage);
       setCurrentMessage("");
     }
@@ -135,10 +138,11 @@ export const MessageInput: FC<MessageInputProps> = ({
       enterUsedForCommandRef.current = false;
       return;
     }
+    const canSend = disableWhileWaiting ? !waitingForResponse : true;
     if (
       e.key === "Enter" &&
       currentMessage.length > 0 &&
-      !waitingForResponse &&
+      canSend &&
       !activeEnhancer
     ) {
       e.preventDefault();
@@ -315,7 +319,7 @@ export const MessageInput: FC<MessageInputProps> = ({
                 <IconButton
                   onClick={handleSend}
                   aria-label="send message"
-                  disabled={!currentMessage || waitingForResponse}
+                  disabled={!currentMessage || (disableWhileWaiting && waitingForResponse)}
                   sx={{ padding: 0 }}
                 >
                   <Send

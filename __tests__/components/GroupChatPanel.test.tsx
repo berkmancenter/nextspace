@@ -2087,4 +2087,265 @@ describe("GroupChatPanel", () => {
       expect(screen.getByText("Parent without unread replies")).toBeInTheDocument();
     });
   });
+
+  describe("Thinking Bot Icon", () => {
+    it("shows thinking bot icon when waiting for non-threaded response", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "User message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const { container } = render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={messages}
+          waitingForResponse={true}
+        />
+      );
+
+      // Should show thinking indicator with bouncing bot icon
+      const bouncingIcon = container.querySelector(".animate-bounce");
+      expect(bouncingIcon).toBeInTheDocument();
+      expect(screen.getByText("thinking...")).toBeInTheDocument();
+    });
+
+    it("does not show thinking bot icon when waitingForResponse is false", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "User message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const { container } = render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={messages}
+          waitingForResponse={false}
+        />
+      );
+
+      const bouncingIcon = container.querySelector(".animate-bounce");
+      expect(bouncingIcon).not.toBeInTheDocument();
+      expect(screen.queryByText("thinking...")).not.toBeInTheDocument();
+    });
+
+    it("does not show thinking bot icon in main chat when waiting for threaded reply", () => {
+      const parentMessage = {
+        id: "parent-1",
+        pseudonym: "Alice",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "Parent message" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "alice-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const userReply = {
+        id: "reply-1",
+        pseudonym: "Alice",
+        createdAt: "2025-10-17T12:01:00Z",
+        body: { text: "User reply in thread" },
+        parentMessage: "parent-1",
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "alice-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const { container } = render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[parentMessage, userReply]}
+          waitingForResponse={true}
+        />
+      );
+
+      // Main chat should NOT show thinking indicator when waiting for threaded reply
+      const bouncingIcons = container.querySelectorAll(".animate-bounce");
+      expect(bouncingIcons.length).toBe(0);
+      expect(screen.queryByText("thinking...")).not.toBeInTheDocument();
+    });
+
+    it("shows thinking bot icon below the last parent message", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "First message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        {
+          id: "2",
+          pseudonym: "Bob",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "Second message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "bob-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const { container } = render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={messages}
+          waitingForResponse={true}
+        />
+      );
+
+      // Both messages should be visible
+      expect(screen.getByText("First message")).toBeInTheDocument();
+      expect(screen.getByText("Second message")).toBeInTheDocument();
+
+      // Thinking indicator should also be visible
+      expect(screen.getByText("thinking...")).toBeInTheDocument();
+      const bouncingIcon = container.querySelector(".animate-bounce");
+      expect(bouncingIcon).toBeInTheDocument();
+    });
+
+    it("removes thinking indicator when bot response arrives", async () => {
+      const initialMessages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "User question" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      const { rerender, container } = render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={initialMessages}
+          waitingForResponse={true}
+        />
+      );
+
+      // Verify thinking indicator is shown
+      expect(screen.getByText("thinking...")).toBeInTheDocument();
+      let bouncingIcon = container.querySelector(".animate-bounce");
+      expect(bouncingIcon).toBeInTheDocument();
+
+      // Add bot response and remove waiting state
+      const messagesWithResponse = [
+        ...initialMessages,
+        {
+          id: "2",
+          pseudonym: "Berkie",
+          createdAt: "2025-10-17T12:01:00Z",
+          body: { text: "Bot response" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "berkie-1",
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      rerender(
+        <GroupChatPanel
+          {...baseProps}
+          messages={messagesWithResponse}
+          waitingForResponse={false}
+        />
+      );
+
+      // Verify thinking indicator is removed
+      await waitFor(() => {
+        expect(screen.queryByText("thinking...")).not.toBeInTheDocument();
+      });
+      bouncingIcon = container.querySelector(".animate-bounce");
+      expect(bouncingIcon).not.toBeInTheDocument();
+
+      // Verify bot response is displayed
+      expect(screen.getByText("Bot response")).toBeInTheDocument();
+    });
+
+    it("shows thinking indicator above message input area", () => {
+      const messages = [
+        {
+          id: "1",
+          pseudonym: "Alice",
+          createdAt: "2025-10-17T12:00:00Z",
+          body: { text: "User message" },
+          channels: ["chat"],
+          conversation: "conv-1",
+          pseudonymId: "alice-1",
+          fromAgent: false,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={messages}
+          waitingForResponse={true}
+        />
+      );
+
+      // Both thinking indicator and message input should be present
+      expect(screen.getByText("thinking...")).toBeInTheDocument();
+      expect(screen.getByTestId("message-input")).toBeInTheDocument();
+    });
+  });
 });

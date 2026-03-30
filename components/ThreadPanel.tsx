@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useCallback } from "react";
+import React, { FC, useEffect, useCallback, useRef } from "react";
 import { Close, Send, ArrowBack } from "@mui/icons-material";
 import { IconButton, useMediaQuery, useTheme } from "@mui/material";
 import { PseudonymousMessage, FeedbackConfig } from "../types.internal";
@@ -6,6 +6,7 @@ import { InputEnhancer, ActiveEnhancerState } from "../types/inputEnhancer";
 import { normalizeAssistantPseudonym } from "../utils/Helpers";
 import { GenericEnhancerMenu } from "./GenericEnhancerMenu";
 import { MessageFeedback } from "./MessageFeedback";
+import { BotIcon } from "./BotIcon";
 
 interface ThreadPanelProps {
   parentMessage: PseudonymousMessage;
@@ -21,6 +22,7 @@ interface ThreadPanelProps {
   enhancers: InputEnhancer<any>[];
   botName: string;
   feedbackConfig?: FeedbackConfig;
+  waitingForResponse?: boolean;
 }
 
 export const ThreadPanel: FC<ThreadPanelProps> = ({
@@ -34,12 +36,14 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
   enhancers,
   botName,
   feedbackConfig,
+  waitingForResponse = false,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [isReplying, setIsReplying] = React.useState(true); // Start with reply input open
   const [replyText, setReplyText] = React.useState("");
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const threadContentRef = useRef<HTMLDivElement>(null);
   const [activeEnhancer, setActiveEnhancer] =
     React.useState<ActiveEnhancerState<any> | null>(null);
   const enterUsedForCommandRef = React.useRef(false);
@@ -50,6 +54,17 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
       textareaRef.current.focus();
     }
   }, [isReplying]);
+
+  // Auto-scroll to bottom when new replies come in
+  useEffect(() => {
+    if (threadContentRef.current) {
+      requestAnimationFrame(() => {
+        if (threadContentRef.current) {
+          threadContentRef.current.scrollTop = threadContentRef.current.scrollHeight;
+        }
+      });
+    }
+  }, [replies.length, waitingForResponse]);
 
   /** Detect triggers for the current value */
   const detectTriggersForValue = useCallback(
@@ -214,7 +229,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
       </div>
 
       {/* Thread content - scrollable */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div ref={threadContentRef} className="flex-1 overflow-y-auto px-4 py-4">
         {/* Parent message - always left-aligned in thread view */}
         <div className="mb-6">
           <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
@@ -323,6 +338,14 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
             </div>
           ))}
         </div>
+
+        {/* Bot loading indicator - appears when waiting for threaded reply */}
+        {waitingForResponse && (
+          <div className="flex items-center gap-1 mt-4">
+            <BotIcon size={32} color="#4b5563" bouncing={true} />
+            <span className="text-xs text-gray-500 italic">thinking...</span>
+          </div>
+        )}
 
         {/* Reply action area - directly below messages */}
         <div className="pt-4">
