@@ -4,7 +4,7 @@ import { SubmittedMessage } from "../../../components/messages/SubmittedMessage"
 import { components } from "../../../types";
 
 describe("SubmittedMessage Component", () => {
-  it("renders submitted message with YOU ASKED header", () => {
+  it("renders submitted message with YOU ASKED MODERATOR header", () => {
     const message: components["schemas"]["Message"] = {
       id: "msg-1",
       body: "User submitted question",
@@ -22,7 +22,7 @@ describe("SubmittedMessage Component", () => {
     render(<SubmittedMessage message={message} />);
 
     expect(screen.getByText("User submitted question")).toBeInTheDocument();
-    expect(screen.getByText("You Asked")).toBeInTheDocument();
+    expect(screen.getByText("You Asked Moderator")).toBeInTheDocument();
   });
 
   it("applies avatar background and left border styling", () => {
