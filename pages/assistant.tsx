@@ -55,6 +55,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [chatPreviousReplyCounts, setChatPreviousReplyCounts] = useState<
     Map<string, number>
   >(new Map());
+  // Track previous reply counts for assistant messages (persists across tab switches)
+  const [assistantPreviousReplyCounts, setAssistantPreviousReplyCounts] = useState<
+    Map<string, number>
+  >(new Map());
   const [assistantMessages, setAssistantMessages] = useState<
     PseudonymousMessage[]
   >([]);
@@ -433,11 +437,26 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     return combinedMessages;
   };
 
-  // Track reply count changes for chat messages
-  useEffect(() => {
+  /**
+   * Helper function to track reply count changes and identify unread messages
+   * @param messages - Array of messages to process
+   * @param replyFilter - Function to filter which replies should be counted
+   * @param previousReplyCounts - Map of previous reply counts per parent message
+   * @param currentUnreadSet - Current set of unread message IDs
+   * @returns Object with new reply counts and updated unread set
+   */
+  const trackReplyCountChanges = (
+    messages: PseudonymousMessage[],
+    replyFilter: (reply: PseudonymousMessage) => boolean,
+    previousReplyCounts: Map<string, number>,
+    currentUnreadSet: Set<string>,
+  ): {
+    newReplyCounts: Map<string, number>;
+    updatedUnreadSet: Set<string>;
+  } => {
     // Build thread map
     const threadMap = new Map<string, PseudonymousMessage[]>();
-    chatMessages
+    messages
       .filter((m) => m.parentMessage)
       .forEach((reply) => {
         const parentId = reply.parentMessage!;
@@ -447,31 +466,55 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         threadMap.get(parentId)!.push(reply);
       });
 
-    const newUnreadSet = new Set(messagesWithUnreadReplies);
+    const updatedUnreadSet = new Set(currentUnreadSet);
     const newReplyCounts = new Map<string, number>();
 
     threadMap.forEach((replies, parentId) => {
-      // Only count replies from other people (not from current user)
-      const repliesFromOthers = replies.filter(
-        (r) => r.pseudonym !== pseudonym,
-      );
-      const currentCount = repliesFromOthers.length;
-      const previousCount = chatPreviousReplyCounts.get(parentId);
+      // Filter replies based on the provided filter function
+      const countableReplies = replies.filter(replyFilter);
+      const currentCount = countableReplies.length;
+      const previousCount = previousReplyCounts.get(parentId);
 
       newReplyCounts.set(parentId, currentCount);
 
       // Only mark as unread if:
       // 1. We had a previous count for this parent (not first time seeing it)
-      // 2. Count increased (meaning someone else replied)
+      // 2. Count increased (meaning a new reply arrived)
       if (previousCount !== undefined && currentCount > previousCount) {
-        newUnreadSet.add(parentId);
+        updatedUnreadSet.add(parentId);
       }
     });
 
+    return { newReplyCounts, updatedUnreadSet };
+  };
+
+  // Track reply count changes for chat messages
+  useEffect(() => {
+    const { newReplyCounts, updatedUnreadSet } = trackReplyCountChanges(
+      chatMessages,
+      (r) => r.pseudonym !== pseudonym, // Count replies from other people
+      chatPreviousReplyCounts,
+      messagesWithUnreadReplies,
+    );
+
     setChatPreviousReplyCounts(newReplyCounts);
-    setMessagesWithUnreadReplies(newUnreadSet);
-    setUnreadReplyCount(newUnreadSet.size);
+    setMessagesWithUnreadReplies(updatedUnreadSet);
+    setUnreadReplyCount(updatedUnreadSet.size);
   }, [chatMessages, pseudonym]);
+
+  // Track reply count changes for assistant messages
+  useEffect(() => {
+    const { newReplyCounts, updatedUnreadSet } = trackReplyCountChanges(
+      assistantMessages,
+      (r) => r.fromAgent, // Count replies from the agent
+      assistantPreviousReplyCounts,
+      messagesWithUnreadReplies,
+    );
+
+    setAssistantPreviousReplyCounts(newReplyCounts);
+    setMessagesWithUnreadReplies(updatedUnreadSet);
+    setUnreadReplyCount(updatedUnreadSet.size);
+  }, [assistantMessages, pseudonym]);
 
   // Load initial chat messages when chatPasscode becomes available
   useEffect(() => {
@@ -941,6 +984,15 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                         onPreferencesSubmit={handlePreferencesSubmit}
                         preferencesError={preferencesError}
                         feedbackConfig={assistantFeedbackConfig}
+                        messagesWithUnreadReplies={messagesWithUnreadReplies}
+                        onMarkAsRead={(messageId) => {
+                          setMessagesWithUnreadReplies((prev) => {
+                            const newSet = new Set(prev);
+                            newSet.delete(messageId);
+                            setUnreadReplyCount(newSet.size);
+                            return newSet;
+                          });
+                        }}
                       />
                     )
                   ) : (
