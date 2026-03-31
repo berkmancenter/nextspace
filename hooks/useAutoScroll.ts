@@ -7,6 +7,7 @@ import { useRef, useEffect } from "react";
 export function useAutoScroll<T extends any[]>(messages: T) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const prevLengthRef = useRef(0);
 
   const scrollToBottom = () => {
     if (messagesContainerRef.current) {
@@ -16,10 +17,15 @@ export function useAutoScroll<T extends any[]>(messages: T) {
   };
 
   useEffect(() => {
-    if (messages.length > 0) {
+    const currentLength = messages.length;
+
+    // Only scroll if the length actually increased
+    if (currentLength > prevLengthRef.current && currentLength > 0) {
       scrollToBottom();
     }
-  }, [messages]);
+
+    prevLengthRef.current = currentLength;
+  }, [messages.length]);
 
   return { messagesEndRef, messagesContainerRef, scrollToBottom };
 }

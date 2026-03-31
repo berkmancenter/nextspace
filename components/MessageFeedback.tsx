@@ -39,6 +39,7 @@ const VisuallyHidden: FC<{ children: React.ReactNode }> = ({ children }) => (
  */
 interface MessageFeedbackProps {
   messageId?: string;
+  initialRating?: string;
   onPopulateFeedbackText?: (config: ControlledInputConfig) => void;
   onSendFeedbackRating?: (messageId: string, rating: string) => void;
 }
@@ -51,10 +52,13 @@ interface MessageFeedbackProps {
  */
 export const MessageFeedback: FC<MessageFeedbackProps> = ({
   messageId,
+  initialRating,
   onPopulateFeedbackText,
   onSendFeedbackRating,
 }) => {
-  const [selectedFeedback, setSelectedFeedback] = useState<string | null>(null);
+  const [selectedFeedback, setSelectedFeedback] = useState<string | null>(
+    initialRating || null,
+  );
   const [announcement, setAnnouncement] = useState<string>("");
   const [focusedButton, setFocusedButton] = useState<number>(0);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -113,6 +117,13 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
       return () => clearTimeout(timer);
     }
   }, [announcement]);
+
+  // Sync internal state with prop changes to keep feedback in sync across panels
+  useEffect(() => {
+    if (initialRating !== undefined) {
+      setSelectedFeedback(initialRating);
+    }
+  }, [initialRating]);
 
   const handleSayMoreClick = () => {
     if (!messageId || !onPopulateFeedbackText) return;

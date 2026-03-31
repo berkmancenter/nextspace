@@ -196,4 +196,90 @@ describe("MessageFeedback Component", () => {
     const svgs = container.querySelectorAll("svg");
     expect(svgs.length).toBeGreaterThan(0);
   });
+
+  it("renders with initial rating pre-selected", () => {
+    const mockPopulateFeedback = jest.fn();
+    const mockSendRating = jest.fn();
+
+    render(
+      <MessageFeedback
+        messageId="msg-123"
+        initialRating="OK"
+        onPopulateFeedbackText={mockPopulateFeedback}
+        onSendFeedbackRating={mockSendRating}
+      />
+    );
+
+    // The OK button should be checked
+    const okButton = screen.getByRole("radio", { name: "OK" });
+    expect(okButton).toHaveAttribute("aria-checked", "true");
+
+    // All buttons should be disabled when initialized with a rating
+    expect(screen.getByRole("radio", { name: "No" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "Meh" })).toBeDisabled();
+    expect(okButton).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "WOW!" })).toBeDisabled();
+  });
+
+  it("shows 'Say more' message when initialized with a rating", () => {
+    const mockPopulateFeedback = jest.fn();
+    const mockSendRating = jest.fn();
+
+    render(
+      <MessageFeedback
+        messageId="msg-123"
+        initialRating="Meh"
+        onPopulateFeedbackText={mockPopulateFeedback}
+        onSendFeedbackRating={mockSendRating}
+      />
+    );
+
+    // The "Say more" message should be visible immediately
+    expect(screen.getByText("Thank you for your input!")).toBeInTheDocument();
+    expect(
+      screen.getByText("Would you like to share more?")
+    ).toBeInTheDocument();
+  });
+
+  it("does not call onSendFeedbackRating when initialized with a rating", () => {
+    const mockPopulateFeedback = jest.fn();
+    const mockSendRating = jest.fn();
+
+    render(
+      <MessageFeedback
+        messageId="msg-123"
+        initialRating="WOW!"
+        onPopulateFeedbackText={mockPopulateFeedback}
+        onSendFeedbackRating={mockSendRating}
+      />
+    );
+
+    // onSendFeedbackRating should not be called during initial render
+    expect(mockSendRating).not.toHaveBeenCalled();
+  });
+
+  it("does not allow changing rating when initialized with one", () => {
+    const mockPopulateFeedback = jest.fn();
+    const mockSendRating = jest.fn();
+
+    render(
+      <MessageFeedback
+        messageId="msg-123"
+        initialRating="OK"
+        onPopulateFeedbackText={mockPopulateFeedback}
+        onSendFeedbackRating={mockSendRating}
+      />
+    );
+
+    // Try to click a different button
+    const noButton = screen.getByRole("radio", { name: "No" });
+    fireEvent.click(noButton);
+
+    // onSendFeedbackRating should not be called
+    expect(mockSendRating).not.toHaveBeenCalled();
+
+    // OK should still be checked
+    const okButton = screen.getByRole("radio", { name: "OK" });
+    expect(okButton).toHaveAttribute("aria-checked", "true");
+  });
 });

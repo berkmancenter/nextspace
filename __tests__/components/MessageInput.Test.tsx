@@ -209,7 +209,7 @@ describe("MessageInput Component", () => {
       await user.type(input, "/mod ");
 
       await waitFor(() => {
-        expect(screen.queryByText("/mod")).not.toBeInTheDocument();
+        expect(screen.queryByText("Submit a question to the moderator")).not.toBeInTheDocument();
       });
     });
 
@@ -253,7 +253,7 @@ describe("MessageInput Component", () => {
 
       await waitFor(() => {
         expect(input.value).toBe("/mod ");
-        expect(screen.queryByText("/mod")).not.toBeInTheDocument();
+        expect(screen.queryByText("Submit a question to the moderator")).not.toBeInTheDocument();
       });
     });
 
@@ -367,7 +367,7 @@ describe("MessageInput Component", () => {
 
       await waitFor(() => {
         expect(input.value).toBe("/mod ");
-        expect(screen.queryByText("/mod")).not.toBeInTheDocument();
+        expect(screen.queryByText("Submit a question to the moderator")).not.toBeInTheDocument();
       });
 
       // Message should not have been sent yet
