@@ -184,7 +184,7 @@ describe("ThreadedMessage Component", () => {
     render(<ThreadedMessage {...defaultProps} replies={mockReplies} />);
     const moreRepliesButton = screen.getByText("+ 1 more reply");
 
-    // First click activates the indicator
+    // First click shows the expand button
     fireEvent.click(moreRepliesButton);
     expect(mockOnOpenThread).not.toHaveBeenCalled();
 
@@ -650,14 +650,14 @@ describe("ThreadedMessage Component", () => {
     });
   });
 
-  describe("Reply indicator mobile press state", () => {
-    it("shows white background and chevron on first click", () => {
+  describe("Reply indicator hover and touch state", () => {
+    it("shows white background and chevron on mouse enter", () => {
       const { container } = render(<ThreadedMessage {...defaultProps} replies={mockReplies} />);
       const moreRepliesButton = screen.getByLabelText("View 1 more reply");
 
-      fireEvent.click(moreRepliesButton);
+      fireEvent.mouseEnter(moreRepliesButton);
 
-      // Button should have bg-white class after first click
+      // Button should have bg-white class on hover
       expect(moreRepliesButton.classList.contains("bg-white")).toBe(true);
 
       // Chevron should be visible (opacity-100)
@@ -665,42 +665,64 @@ describe("ThreadedMessage Component", () => {
       expect(chevronIcon).toBeInTheDocument();
     });
 
-    it("does not open thread on first click", () => {
+    it("removes white background on mouse leave", () => {
       render(<ThreadedMessage {...defaultProps} replies={mockReplies} />);
       const moreRepliesButton = screen.getByLabelText("View 1 more reply");
 
-      fireEvent.click(moreRepliesButton);
+      fireEvent.mouseEnter(moreRepliesButton);
+      expect(moreRepliesButton.classList.contains("bg-white")).toBe(true);
 
-      // Thread should not open on first click
-      expect(mockOnOpenThread).not.toHaveBeenCalled();
+      fireEvent.mouseLeave(moreRepliesButton);
+      expect(moreRepliesButton.classList.contains("bg-white")).toBe(false);
+    });
+
+    it("shows white background on touch start", () => {
+      render(<ThreadedMessage {...defaultProps} replies={mockReplies} />);
+      const moreRepliesButton = screen.getByLabelText("View 1 more reply");
+
+      fireEvent.touchStart(moreRepliesButton);
+
+      // Button should have bg-white class on touch
+      expect(moreRepliesButton.classList.contains("bg-white")).toBe(true);
+    });
+
+    it("removes white background on touch end", () => {
+      render(<ThreadedMessage {...defaultProps} replies={mockReplies} />);
+      const moreRepliesButton = screen.getByLabelText("View 1 more reply");
+
+      fireEvent.touchStart(moreRepliesButton);
+      expect(moreRepliesButton.classList.contains("bg-white")).toBe(true);
+
+      fireEvent.touchEnd(moreRepliesButton);
+      expect(moreRepliesButton.classList.contains("bg-white")).toBe(false);
     });
 
     it("opens thread on second click", () => {
       render(<ThreadedMessage {...defaultProps} replies={mockReplies} />);
       const moreRepliesButton = screen.getByLabelText("View 1 more reply");
 
-      // First click to activate
+      // First click shows expand button
       fireEvent.click(moreRepliesButton);
       expect(mockOnOpenThread).not.toHaveBeenCalled();
 
-      // Second click to open thread
+      // Second click opens thread
       fireEvent.click(moreRepliesButton);
       expect(mockOnOpenThread).toHaveBeenCalledWith(mockMessage.id);
     });
 
-    it("removes white background after opening thread", () => {
-      render(<ThreadedMessage {...defaultProps} replies={mockReplies} />);
+    it("shows chevron persistently after first click", () => {
+      const { container } = render(<ThreadedMessage {...defaultProps} replies={mockReplies} />);
       const moreRepliesButton = screen.getByLabelText("View 1 more reply");
 
-      // First click to activate
-      fireEvent.click(moreRepliesButton);
-      expect(moreRepliesButton.classList.contains("bg-white")).toBe(true);
+      // Initially chevron should be hidden (opacity-0)
+      let chevronIcon = container.querySelector(".transition-opacity");
+      expect(chevronIcon?.classList.contains("opacity-0")).toBe(true);
 
-      // Second click to open thread
+      // First click should show the chevron persistently
       fireEvent.click(moreRepliesButton);
 
-      // White background should be removed after opening
-      expect(moreRepliesButton.classList.contains("bg-white")).toBe(false);
+      chevronIcon = container.querySelector(".transition-opacity");
+      expect(chevronIcon?.classList.contains("opacity-100")).toBe(true);
     });
   });
 

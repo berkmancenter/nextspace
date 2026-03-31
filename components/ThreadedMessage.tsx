@@ -39,6 +39,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
 }) => {
   const [showReplyButton, setShowReplyButton] = useState(false);
   const [isReplyIndicatorPressed, setIsReplyIndicatorPressed] = useState(false);
+  const [showExpandButton, setShowExpandButton] = useState(false);
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const messageRef = useRef<HTMLDivElement>(null);
   const visibilityTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -111,7 +112,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
       },
       {
         threshold: 0.5, // Trigger when at least 50% of the message is visible
-      }
+      },
     );
 
     if (messageRef.current) {
@@ -166,7 +167,8 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
       <div
         className={`flex gap-1.5 mb-1 flex-row transition-colors ${isThreadOpen ? "bg-blue-50 border-l-4 border-blue-400 pl-2 py-2 -ml-2 rounded-r-lg" : ""}`}
         style={{
-          backgroundColor: showReplyButton && !isThreadOpen ? "white" : undefined,
+          backgroundColor:
+            showReplyButton && !isThreadOpen ? "white" : undefined,
           marginLeft: showReplyButton && !isThreadOpen ? "-8px" : undefined,
           marginRight: showReplyButton && !isThreadOpen ? "-8px" : undefined,
           marginTop: showReplyButton && !isThreadOpen ? "-4px" : undefined,
@@ -281,7 +283,9 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                           initialRating={feedbackConfig.messageRatings.get(
                             replies[0].id,
                           )}
-                          onPopulateFeedbackText={feedbackConfig.onPopulateFeedbackText}
+                          onPopulateFeedbackText={
+                            feedbackConfig.onPopulateFeedbackText
+                          }
                           onSendFeedbackRating={feedbackConfig.onSendRating}
                         />
                       </div>
@@ -293,13 +297,25 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
               {replyCount > 1 && (
                 <button
                   onClick={() => {
-                    if (isReplyIndicatorPressed) {
+                    if (showExpandButton) {
+                      // Second tap/click - open the thread
                       onOpenThread?.(message.id!);
-                      setIsReplyIndicatorPressed(false);
+                      setShowExpandButton(false);
                     } else {
-                      setIsReplyIndicatorPressed(true);
+                      // First tap/click - show the expand button
+                      setShowExpandButton(true);
                     }
                   }}
+                  onMouseEnter={() => {
+                    setIsReplyIndicatorPressed(true);
+                    setShowExpandButton(true);
+                  }}
+                  onMouseLeave={() => {
+                    setIsReplyIndicatorPressed(false);
+                    setShowExpandButton(false);
+                  }}
+                  onTouchStart={() => setIsReplyIndicatorPressed(true)}
+                  onTouchEnd={() => setIsReplyIndicatorPressed(false)}
                   className={`mt-2 -ml-3 px-3 py-2 text-xs text-gray-600 hover:bg-white active:bg-white transition-colors cursor-pointer flex items-center justify-between w-[calc(100%+0.75rem)] group ${isReplyIndicatorPressed ? "bg-white" : ""} ${hasUnreadReplies && !isThreadOpen ? "font-bold" : "font-medium"}`}
                   aria-label={`View ${replyCount - 1} more ${replyCount - 1 === 1 ? "reply" : "replies"}`}
                 >
@@ -312,7 +328,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                   </div>
                   <ChevronRight
                     sx={{ fontSize: 16 }}
-                    className={`transition-opacity ${isReplyIndicatorPressed ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                    className={`transition-opacity ${showExpandButton ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                   />
                 </button>
               )}
