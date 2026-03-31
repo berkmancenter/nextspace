@@ -36,6 +36,15 @@ jest.mock("../../components/messages", () => ({
         : message.body?.text || "";
     return <div data-testid="user-message">{messageText}</div>;
   },
+  JargonClarificationMessage: ({ message }: any) => {
+    const body = typeof message.body === "object" ? message.body : {};
+    return (
+      <div data-testid="jargon-clarification-message">
+        {body.sourceText && <div>{body.sourceText}</div>}
+        {body.text && <div>{body.text}</div>}
+      </div>
+    );
+  },
 }));
 
 // Mock MessageFeedback component

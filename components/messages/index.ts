@@ -3,3 +3,4 @@ export { BackchannelMessage } from "./BackchannelMessage";
 export { SubmittedMessage } from "./SubmittedMessage";
 export { ModeratorSubmittedMessage } from "./ModeratorSubmittedMessage";
 export { UserMessage } from "./UserMessage";
+export { JargonClarificationMessage } from "./JargonClarificationMessage";
