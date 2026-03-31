@@ -5,8 +5,8 @@ import {
   SubmittedMessage,
   ModeratorSubmittedMessage,
   UserMessage,
+  JargonClarificationMessage,
 } from "../components/messages";
-import { MessageFeedback } from "./MessageFeedback";
 import { MessageInput } from "./MessageInput";
 import {
   SlashCommand,
@@ -19,10 +19,7 @@ import {
 } from "../types.internal";
 import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
 import { useAutoScroll } from "../hooks/useAutoScroll";
-import {
-  normalizeAssistantPseudonym,
-  parseMessageBody,
-} from "../utils/Helpers";
+import { parseMessageBody } from "../utils/Helpers";
 import { BotIcon } from "./BotIcon";
 import { PreferencesBanner, PreferenceOption } from "./PreferencesBanner";
 import { MediaLightbox } from "./MediaLightbox";
@@ -269,6 +266,11 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
             : sourceText;
         })()
       : null;
+
+    // Jargon clarification messages
+    if (messageType === "jargon_clarification") {
+      return <JargonClarificationMessage message={msg} />;
+    }
 
     // Moderator submitted messages
     if (

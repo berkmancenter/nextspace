@@ -1,8 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/router";
 
 import { AssistantChatPanel } from "../components/AssistantChatPanel";
-import { JargonChatPanel } from "../components/JargonChatPanel";
 import { GroupChatPanel } from "../components/GroupChatPanel";
 import { SlashCommand } from "../components/enhancers/slashCommandEnhancer";
 import {
@@ -36,6 +35,55 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
+/**
+ * Fetches threaded replies for messages and inserts them into the message array.
+ * Defined outside component since it doesn't depend on component state/props.
+ */
+async function fetchAndInsertReplies(
+  messages: PseudonymousMessage[],
+): Promise<PseudonymousMessage[]> {
+  // Collect all messages with replies
+  const messagesWithReplies = messages.filter(
+    (msg) => msg.replyCount && msg.replyCount > 0,
+  );
+
+  if (messagesWithReplies.length === 0) {
+    return messages;
+  }
+
+  // Fetch all replies in parallel
+  const repliesPromises = messagesWithReplies.map(async (msg) => {
+    try {
+      const replies = await RetrieveData(
+        `messages/${msg.id}/replies`,
+        Api.get().getAccessToken(),
+      );
+      if ("error" in replies) {
+        console.error(
+          `Error fetching replies for message ${msg.id}: ${replies.message?.message}`,
+        );
+        return [];
+      }
+      return Array.isArray(replies) ? replies : [];
+    } catch (error) {
+      console.error(`Error fetching replies for message ${msg.id}:`, error);
+      return [];
+    }
+  });
+
+  const allRepliesArrays = await Promise.all(repliesPromises);
+  const allReplies = allRepliesArrays.flat();
+
+  // Combine original messages with replies and sort by createdAt
+  const combinedMessages = [...messages, ...allReplies].sort((a, b) => {
+    const dateA = new Date(a.createdAt!).getTime();
+    const dateB = new Date(b.createdAt!).getTime();
+    return dateA - dateB;
+  });
+
+  return combinedMessages;
+}
+
 function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const router = useRouter();
 
@@ -51,7 +99,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [unseenChatCount, setUnseenChatCount] = useState<number>(0);
   const [unreadAssistantReplyCount, setUnreadAssistantReplyCount] = useState<number>(0);
   const [unreadChatReplyCount, setUnreadChatReplyCount] = useState<number>(0);
-  const [unseenJargonCount, setUnseenJargonCount] = useState<number>(0);
 
   // Track previous reply counts for chat messages (persists across tab switches)
   const [chatPreviousReplyCounts, setChatPreviousReplyCounts] = useState<
@@ -65,9 +112,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     PseudonymousMessage[]
   >([]);
   const [chatMessages, setChatMessages] = useState<PseudonymousMessage[]>([]);
-  const [jargonMessages, setJargonMessages] = useState<PseudonymousMessage[]>(
-    [],
-  );
   const [agentId, setAgentId] = useState<string | null>(null);
   const [jargonFilterAgentId, setJargonFilterAgentId] = useState<string | null>(
     null,
@@ -183,14 +227,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         // Increment counter if NOT viewing chat tab
         if (activeTabRef.current !== "chat") {
           setUnseenChatCount((prev) => prev + 1);
-        }
-      } else if (
-        jargonFilterAgentId &&
-        data.channels?.some((c) => c.includes(jargonFilterAgentId))
-      ) {
-        setJargonMessages((prev) => [...prev, data]);
-        if (activeTabRef.current !== "jargon") {
-          setUnseenJargonCount((prev) => prev + 1);
         }
       } else if (!data.channels || !data.channels.includes("transcript")) {
         setAssistantMessages((prev) => [...prev, data]);
@@ -398,51 +434,47 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     router.query.conversationId,
   ]);
 
-  // Helper function to fetch replies for messages and insert them into the array
-  const fetchAndInsertReplies = async (
-    messages: PseudonymousMessage[],
-  ): Promise<PseudonymousMessage[]> => {
-    // Collect all messages with replies
-    const messagesWithReplies = messages.filter(
-      (msg) => msg.replyCount && msg.replyCount > 0,
-    );
+  /**
+   * Helper function to fetch all assistant messages (direct + jargon filter)
+   * and their threaded replies
+   */
+  const fetchAllAssistantMessages = useCallback(async (): Promise<void> => {
+    if (!userId || !agentId || !router.query.conversationId) return;
 
-    if (messagesWithReplies.length === 0) {
-      return messages;
-    }
+    try {
+      const directChannelName = `direct-${userId}-${agentId}`;
+      const assistantMessages = await RetrieveData(
+        `messages/${router.query.conversationId}?channel=${directChannelName}`,
+        Api.get().getAccessToken(),
+      );
 
-    // Fetch all replies in parallel
-    const repliesPromises = messagesWithReplies.map(async (msg) => {
-      try {
-        const replies = await RetrieveData(
-          `messages/${msg.id}/replies`,
+      let allMessages = Array.isArray(assistantMessages) ? assistantMessages : [];
+
+      // Fetch jargon filter agent's messages, if enabled
+      if (jargonFilterAgentId) {
+        const jargonChannelName = `direct-${userId}-${jargonFilterAgentId}`;
+        const jargonMessages = await RetrieveData(
+          `messages/${router.query.conversationId}?channel=${jargonChannelName}`,
           Api.get().getAccessToken(),
         );
-        if ("error" in replies) {
-          console.error(
-            `Error fetching replies for message ${msg.id}: ${replies.message?.message}`,
-          );
-          return [];
+        if (Array.isArray(jargonMessages)) {
+          allMessages = [...allMessages, ...jargonMessages];
         }
-        return Array.isArray(replies) ? replies : [];
-      } catch (error) {
-        console.error(`Error fetching replies for message ${msg.id}:`, error);
-        return [];
       }
-    });
 
-    const allRepliesArrays = await Promise.all(repliesPromises);
-    const allReplies = allRepliesArrays.flat();
+      // Sort all messages by creation time
+      allMessages.sort((a, b) =>
+        new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()
+      );
 
-    // Combine original messages with replies and sort by createdAt
-    const combinedMessages = [...messages, ...allReplies].sort((a, b) => {
-      const dateA = new Date(a.createdAt!).getTime();
-      const dateB = new Date(b.createdAt!).getTime();
-      return dateA - dateB;
-    });
-
-    return combinedMessages;
-  };
+      if (allMessages.length > 0) {
+        const messagesWithReplies = await fetchAndInsertReplies(allMessages);
+        setAssistantMessages(messagesWithReplies);
+      }
+    } catch (error) {
+      console.error("Error fetching assistant messages:", error);
+    }
+  }, [userId, agentId, jargonFilterAgentId, router.query.conversationId]);
 
   /**
    * Helper function to track reply count changes and identify unread messages
@@ -588,38 +620,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   // Load initial assistant messages when userId and agentId become available
   useEffect(() => {
-    if (!userId || !agentId || !router.query.conversationId) return;
-
-    const fetchInitialAssistantMessages = async () => {
-      try {
-        const directChannelName = `direct-${userId}-${agentId}`;
-        const assistantMessages = await RetrieveData(
-          `messages/${router.query.conversationId}?channel=${directChannelName}`,
-          Api.get().getAccessToken(),
-        );
-
-        // Fetches jargon filter agent's messages, if enabled
-        if (jargonFilterAgentId) {
-          const jargonChannelName = `direct-${userId}-${jargonFilterAgentId}`;
-          const jargonMessages = await RetrieveData(
-            `messages/${router.query.conversationId}?channel=${jargonChannelName}`,
-            Api.get().getAccessToken(),
-          );
-          if (Array.isArray(jargonMessages)) setJargonMessages(jargonMessages);
-        }
-
-        if (Array.isArray(assistantMessages)) {
-          const messagesWithReplies =
-            await fetchAndInsertReplies(assistantMessages);
-          setAssistantMessages(messagesWithReplies);
-        }
-      } catch (error) {
-        console.error("Error fetching initial assistant messages:", error);
-      }
-    };
-
-    fetchInitialAssistantMessages();
-  }, [userId, agentId, jargonFilterAgentId, router.query.conversationId]);
+    fetchAllAssistantMessages();
+  }, [fetchAllAssistantMessages]);
 
   // Re-fetch all message history when the socket reconnects after a significant
   // gap (user was on another tab/app for a while). Fills any messages missed
@@ -640,34 +642,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         .catch((err) => console.error("Error re-fetching chat messages:", err));
     }
 
-    if (userId && agentId) {
-      const directChannelName = `direct-${userId}-${agentId}`;
-      RetrieveData(
-        `messages/${router.query.conversationId}?channel=${directChannelName}`,
-        Api.get().getAccessToken(),
-      )
-        .then((msgs) => {
-          if (Array.isArray(msgs)) setAssistantMessages(msgs);
-        })
-        .catch((err) =>
-          console.error("Error re-fetching assistant messages:", err),
-        );
-    }
-
-    if (jargonFilterAgentId) {
-      const jargonChannelName = `direct-${userId}-${jargonFilterAgentId}`;
-      RetrieveData(
-        `messages/${router.query.conversationId}?channel=${jargonChannelName}`,
-        Api.get().getAccessToken(),
-      )
-        .then((jargonMessages) => {
-          if (Array.isArray(jargonMessages)) setJargonMessages(jargonMessages);
-        })
-        .catch(() => {
-          console.error("Error re-fetching jargon filter agent messages.");
-        });
-    }
-  }, [lastReconnectTime, jargonFilterAgentId]);
+    fetchAllAssistantMessages();
+  }, [lastReconnectTime, router.query.conversationId, chatPasscode, fetchAllAssistantMessages]);
 
   async function sendMessage(
     message: string,
@@ -687,6 +663,19 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       effectiveTab === "chat"
         ? [{ name: "chat", passcode: chatPasscode }]
         : [{ name: `direct-${userId}-${agentId}` }];
+
+    // If replying to a message in assistant tab, check if parent came from jargon filter agent
+    // and use that channel instead
+    if (effectiveTab !== "chat" && parentMessageId && jargonFilterAgentId) {
+      const parentMessage = assistantMessages.find((m) => m.id === parentMessageId);
+      if (
+        parentMessage?.channels?.some((c) =>
+          c.includes(jargonFilterAgentId)
+        )
+      ) {
+        channels = [{ name: `direct-${userId}-${jargonFilterAgentId}` }];
+      }
+    }
 
     // Prepend prefix if in controlled mode
     const finalMessage = controlledMode
@@ -862,8 +851,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     } else if (tab === "chat") {
       setUnseenChatCount(0);
       // Note: unreadReplyCount is managed by GroupChatPanel visibility logic
-    } else if (tab === "jargon") {
-      setUnseenJargonCount(0);
     }
     // Track tab switch analytics (transcript treated as a nav destination)
     trackConversationEvent(
@@ -913,12 +900,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
             unseenChatCount={unseenChatCount}
             unreadAssistantReplyCount={unreadAssistantReplyCount}
             unreadChatReplyCount={unreadChatReplyCount}
-            unseenJargonCount={unseenJargonCount}
             showChat={!!chatPasscode}
             showTranscript={!!transcriptPasscode}
-            showJargon={
-              !!jargonFilterAgentId && !!userPreferences.jargonClarification
-            }
             botName={botName}
           />
 
@@ -967,11 +950,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                             return newSet;
                           });
                         }}
-                      />
-                    ) : activeTab === "jargon" ? (
-                      <JargonChatPanel
-                        messages={jargonMessages}
-                        eventName={eventName}
                       />
                     ) : (
                       <AssistantChatPanel

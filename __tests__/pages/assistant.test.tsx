@@ -160,6 +160,15 @@ jest.mock("../../components/messages", () => ({
         : message.body?.text || "";
     return <div data-testid="user-message">{messageText}</div>;
   },
+  JargonClarificationMessage: ({ message }: any) => {
+    const body = typeof message.body === "object" ? message.body : {};
+    return (
+      <div data-testid="jargon-clarification-message">
+        {body.sourceText && <div>{body.sourceText}</div>}
+        {body.text && <div>{body.text}</div>}
+      </div>
+    );
+  },
 }));
 
 // Mock CheckAuthHeader and createConversationFromData
@@ -1861,7 +1870,7 @@ describe("EventAssistantRoom", () => {
   });
 
   describe("Jargon message routing", () => {
-    it("routes jargon clarification messages to the jargon tab when jargonFilterAgentId is set", async () => {
+    it("displays jargon clarification messages inline in the assistant panel when jargonFilterAgentId is set", async () => {
       const conversationWithJargon = {
         agents: [
           { id: "agent-123", agentType: "eventAssistantPlus" },
@@ -1916,14 +1925,22 @@ describe("EventAssistantRoom", () => {
         downVotes: [],
       };
 
+      // Switch to assistant tab before receiving the message
+      await waitFor(() => {
+        const assistantTabs = screen.queryAllByLabelText(/Berkie|Assistant/i);
+        expect(assistantTabs.length).toBeGreaterThan(0);
+      });
+
+      const assistantTab = screen.getAllByLabelText(/Berkie|Assistant/i)[0];
+      await userEvent.click(assistantTab);
+
       act(() => {
         messageHandler(jargonMessage);
       });
 
-      // The jargon tab should now show the message — switch to it and verify
+      // Verify the jargon clarification content appears inline in the assistant panel
       await waitFor(() => {
-        const jargonTab = screen.queryAllByLabelText("Jargon Filter");
-        expect(jargonTab.length).toBeGreaterThan(0);
+        expect(screen.getByText("An SLO is a reliability target.")).toBeInTheDocument();
       });
     });
   });
