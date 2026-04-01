@@ -72,6 +72,7 @@ describe("JargonClarificationMessage", () => {
     });
     render(<JargonClarificationMessage message={message} />);
     expect(screen.queryByText(/Summary/)).not.toBeInTheDocument();
+    expect(screen.queryByText("This is a summary of the discussion.")).not.toBeInTheDocument();
     expect(screen.getByText(/A reliability target/, { exact: false })).toBeInTheDocument();
   });
 

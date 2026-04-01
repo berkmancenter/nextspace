@@ -40,7 +40,7 @@ export const JargonClarificationMessage: FC<MessageProps> = ({ message }) => {
               }}
             >
               {/* Strip legacy summary section from older messages that were saved with it */}
-              {parsed.text?.replace(/\*\*Summary:\*\*[\s\S]*?\n\n/, "")}
+              {parsed.text?.replace(/\*\*Summary:\*\*[\s\S]*?\n\n[\s\S]*?\n\n/, "")}
             </Markdown>
           </div>
         </div>
