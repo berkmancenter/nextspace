@@ -61,4 +61,31 @@ describe("JargonClarificationMessage", () => {
     // Original section should not appear
     expect(screen.queryByText(/original/i)).not.toBeInTheDocument();
   });
+
+  it("strips the legacy summary section from older messages", () => {
+    const message = makeJargonMessage({
+      body: {
+        type: "jargon_clarification",
+        text: "**Summary:**\n\nThis is a summary of the discussion.\n\n- **SLO** — A reliability target.\n- **error budget** — The allowed failure rate.",
+        sourceText: "Our SLOs are defined in terms of error budget.",
+      },
+    });
+    render(<JargonClarificationMessage message={message} />);
+    expect(screen.queryByText(/Summary/)).not.toBeInTheDocument();
+    expect(screen.queryByText("This is a summary of the discussion.")).not.toBeInTheDocument();
+    expect(screen.getByText(/A reliability target/, { exact: false })).toBeInTheDocument();
+  });
+
+  it("renders new jargon filter messages without the summary section", () => {
+    const message = makeJargonMessage({
+      body: {
+        type: "jargon_clarification",
+        text: "- **SLO** — A reliability target.\n- **error budget** — The allowed failure rate.",
+        sourceText: "Our SLOs are defined in terms of error budget.",
+      },
+    });
+    render(<JargonClarificationMessage message={message} />);
+    expect(screen.queryByText(/Summary/)).not.toBeInTheDocument();
+    expect(screen.getByText(/A reliability target/, { exact: false })).toBeInTheDocument();
+  });
 });
