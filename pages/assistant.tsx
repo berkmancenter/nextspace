@@ -5,6 +5,7 @@ import { AssistantChatPanel } from "../components/AssistantChatPanel";
 import { GroupChatPanel } from "../components/GroupChatPanel";
 import { ResourcesPanel } from "../components/ResourcesPanel";
 import { SlashCommand } from "../components/enhancers/slashCommandEnhancer";
+import { allSlashCommands } from "../content/slashCommands";
 import {
   Api,
   RetrieveData,
@@ -182,38 +183,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   // Combine session and local errors
   const errorMessage = sessionError || localError;
-
-  // Available slash commands
-  // Commands can optionally specify which conversation types they're available for
-  const allSlashCommands: SlashCommand[] = [
-    {
-      command: "mod",
-      description: "Submit a question to the moderator",
-      value: "/mod ",
-      conversationTypes: ["eventAssistantPlus", "eventAssistantPlusProactive"],
-    },
-    {
-      command: "mindmap",
-      description:
-        "Create a visual mind map of the key topics discussed in the event",
-      value: "/mindmap ",
-      conversationTypes: [
-        "eventAssistant",
-        "eventAssistantPlus",
-        "eventAssistantPlusProactive",
-      ],
-    },
-    {
-      command: "visual",
-      description: "Request a visual response (image) to a question",
-      value: "/visual ",
-      conversationTypes: [
-        "eventAssistant",
-        "eventAssistantPlus",
-        "eventAssistantPlusProactive",
-      ],
-    },
-  ];
 
   // Filter commands based on current conversation type
   const slashCommands = allSlashCommands.filter((cmd) => {
