@@ -11,6 +11,7 @@ import FeedbackOutlinedIcon from "@mui/icons-material/FeedbackOutlined";
 
 import { AuthType, HeaderProps, PageName } from "../types.internal";
 import Logo from "./Logo";
+import { HelpIconButton } from "./HelpIconButton";
 import { Close, Menu } from "@mui/icons-material";
 import { useRouter } from "next/router";
 import { Api } from "../utils";
@@ -173,6 +174,7 @@ export const Header = ({
         <Box className="hidden lg:flex flex-row justify-end grow-1 gap-x-6">
           {NavItems()}
         </Box>
+        <HelpIconButton />
       </Toolbar>
     </div>
   );
