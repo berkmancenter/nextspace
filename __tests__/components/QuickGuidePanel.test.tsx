@@ -3,6 +3,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { QuickGuideIconButton } from "../../components/QuickGuideIconButton";
+import { QuickGuidePanelContent } from "../../components/QuickGuidePanel";
+import { ConversationTypeProvider } from "../../context/ConversationTypeContext";
 
 // Control the desktop/mobile breakpoint in tests
 jest.mock("@mui/material", () => ({
@@ -123,5 +125,42 @@ describe("QuickGuidePanel — mobile (Dialog)", () => {
     const container = await openPanel();
     const results = await axe(container);
     expect(results).toHaveNoViolations();
+  });
+});
+
+describe("QuickGuidePanelContent — command filtering by conversation type", () => {
+  function renderContent(conversationType: string | null) {
+    return render(
+      <ConversationTypeProvider initialValue={conversationType}>
+        <QuickGuidePanelContent headingId="test-heading" />
+      </ConversationTypeProvider>
+    );
+  }
+
+  it("hides the commands section and its heading when conversation type is not yet known", () => {
+    renderContent(null);
+    expect(screen.queryByText("Slash Commands & Features")).not.toBeInTheDocument();
+    expect(screen.queryByText("/mod")).not.toBeInTheDocument();
+    expect(screen.queryByText("/mindmap")).not.toBeInTheDocument();
+    expect(screen.queryByText("/visual")).not.toBeInTheDocument();
+  });
+
+  it("hides commands not available for the current conversation type", () => {
+    // eventAssistant does not include /mod (restricted to Plus variants)
+    renderContent("eventAssistant");
+    expect(screen.queryByText("/mod")).not.toBeInTheDocument();
+  });
+
+  it("shows commands available for the current conversation type", () => {
+    renderContent("eventAssistant");
+    expect(screen.getByText("/mindmap")).toBeInTheDocument();
+    expect(screen.getByText("/visual")).toBeInTheDocument();
+  });
+
+  it("shows all restricted commands when the type includes them", () => {
+    renderContent("eventAssistantPlus");
+    expect(screen.getByText("/mod")).toBeInTheDocument();
+    expect(screen.getByText("/mindmap")).toBeInTheDocument();
+    expect(screen.getByText("/visual")).toBeInTheDocument();
   });
 });

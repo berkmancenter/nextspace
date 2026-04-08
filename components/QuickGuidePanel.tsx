@@ -4,6 +4,7 @@ import { Box, Divider, Typography } from "@mui/material";
 
 import { allSlashCommands } from "../content/slashCommands";
 import { getRecentEntries } from "../content/whatsNew";
+import { useConversationType } from "../context/ConversationTypeContext";
 
 interface QuickGuidePanelContentProps {
   /** ID of the heading element, used by aria-labelledby on the dialog wrapper. */
@@ -22,6 +23,16 @@ interface QuickGuidePanelContentProps {
  */
 export const QuickGuidePanelContent = ({ headingId, showHeading = true }: QuickGuidePanelContentProps) => {
   const recentEntries = getRecentEntries();
+  const conversationType = useConversationType();
+
+  // Filter to commands available for this event type once it's known.
+  // Hidden entirely while the conversation type is still loading.
+  const visibleCommands = conversationType
+    ? allSlashCommands.filter((cmd) => {
+        if (!cmd.conversationTypes || cmd.conversationTypes.length === 0) return true;
+        return cmd.conversationTypes.includes(conversationType);
+      })
+    : null;
 
   return (
     <Box sx={{ p: 3 }}>
@@ -68,7 +79,8 @@ export const QuickGuidePanelContent = ({ headingId, showHeading = true }: QuickG
         </Box>
       )}
 
-      {/* Slash commands reference */}
+      {/* Slash commands reference — hidden until conversation type is known */}
+      {visibleCommands && (
       <Box component="section" aria-labelledby="quick-guide-commands-heading">
         <Typography
           id="quick-guide-commands-heading"
@@ -79,7 +91,7 @@ export const QuickGuidePanelContent = ({ headingId, showHeading = true }: QuickG
           Slash Commands &amp; Features
         </Typography>
         <Divider sx={{ mb: 1.5 }} />
-        {allSlashCommands.map((cmd) => (
+        {visibleCommands.map((cmd) => (
           <Box key={cmd.command} sx={{ mb: 1.5 }}>
             <Typography variant="body2" fontWeight="medium">
               /{cmd.command}
@@ -87,14 +99,10 @@ export const QuickGuidePanelContent = ({ headingId, showHeading = true }: QuickG
             <Typography variant="body2" color="text.secondary">
               {cmd.description}
             </Typography>
-            {cmd.conversationTypes && cmd.conversationTypes.length > 0 && (
-              <Typography variant="caption" color="text.disabled">
-                Available in: {cmd.conversationTypes.join(", ")}
-              </Typography>
-            )}
           </Box>
         ))}
       </Box>
+      )}
     </Box>
   );
 };
