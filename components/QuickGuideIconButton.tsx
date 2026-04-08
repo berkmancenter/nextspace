@@ -13,7 +13,7 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import { TransitionProps } from "@mui/material/transitions";
-import HelpOutlineOutlinedIcon from "@mui/icons-material/HelpOutlineOutlined";
+import TipsAndUpdatesOutlinedIcon from "@mui/icons-material/TipsAndUpdatesOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import { useRouter } from "next/router";
 
@@ -62,11 +62,12 @@ export const QuickGuideIconButton = ({ showLabel = false }: QuickGuideIconButton
 
   const trigger = showLabel ? (
     <Button
+      ref={iconRef}
       onClick={open}
       aria-label="Open quick guide"
       aria-haspopup="dialog"
       aria-expanded={isOpen}
-      startIcon={<HelpOutlineOutlinedIcon />}
+      startIcon={<TipsAndUpdatesOutlinedIcon />}
       sx={{
         textTransform: "capitalize",
         justifyContent: "flex-start",
@@ -87,7 +88,7 @@ export const QuickGuideIconButton = ({ showLabel = false }: QuickGuideIconButton
       aria-expanded={isOpen}
       sx={{ "&:hover": { color: "#4845d2" } }}
     >
-      <HelpOutlineOutlinedIcon />
+      <TipsAndUpdatesOutlinedIcon />
     </IconButton>
   );
 

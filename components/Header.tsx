@@ -174,7 +174,7 @@ export const Header = ({
         </div>
         <Box className="hidden lg:flex flex-row justify-end grow-1 gap-x-6 items-center">
           {NavItems()}
-          {router.asPath.includes("conversationId") && <QuickGuideIconButton />}
+          {router.asPath.includes("conversationId") && <QuickGuideIconButton showLabel />}
         </Box>
       </Toolbar>
     </div>
