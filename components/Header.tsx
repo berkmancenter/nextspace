@@ -172,10 +172,10 @@ export const Header = ({
             </List>
           </Drawer>
         </div>
-        <Box className="hidden lg:flex flex-row justify-end grow-1 gap-x-6 items-center">
+        <div className="hidden lg:flex flex-row justify-end grow-1 gap-x-6 items-center">
           {NavItems()}
           {router.asPath.includes("conversationId") && <QuickGuideIconButton showLabel />}
-        </Box>
+        </div>
       </Toolbar>
     </div>
   );
