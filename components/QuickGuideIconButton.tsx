@@ -143,6 +143,14 @@ export const QuickGuideIconButton = ({ showLabel = false }: QuickGuideIconButton
               zIndex: 1, // prevents scrolled content bleeding through the arrow protrusion
             }}
           >
+            <IconButton
+              onClick={close}
+              aria-label="Close quick guide"
+              size="small"
+              sx={{ position: "absolute", top: 8, right: 8, zIndex: 2 }}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
             <QuickGuidePanelContent headingId={headingId} />
           </Box>
         </Popover>
