@@ -3,6 +3,7 @@ import React, { useRef, useState, useId, useEffect } from "react";
 import {
   AppBar,
   Box,
+  Button,
   Dialog,
   IconButton,
   Popover,
@@ -16,7 +17,7 @@ import HelpOutlineOutlinedIcon from "@mui/icons-material/HelpOutlineOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import { useRouter } from "next/router";
 
-import { HelpPanelContent } from "./HelpPanel";
+import { QuickGuidePanelContent } from "./QuickGuidePanel";
 
 const SlideUp = React.forwardRef(function SlideUp(
   props: TransitionProps & { children: React.ReactElement },
@@ -25,13 +26,21 @@ const SlideUp = React.forwardRef(function SlideUp(
   return <Slide direction="up" ref={ref} {...props} />;
 });
 
+interface QuickGuideIconButtonProps {
+  /**
+   * When true, renders as a labelled Button matching the Header nav item style.
+   * Use inside the mobile Drawer. Defaults to false (icon-only IconButton).
+   */
+  showLabel?: boolean;
+}
+
 /**
- * The Help icon button rendered in the Header.
+ * The Quick Guide icon button rendered in the Header.
  * On desktop (≥ 1024px) it opens an anchored Popover with a CSS arrow.
  * On mobile it opens a full-screen Dialog that slides up.
  * Owns open/close state only — no localStorage, no badge, no tracking.
  */
-export const HelpIconButton = () => {
+export const QuickGuideIconButton = ({ showLabel = false }: QuickGuideIconButtonProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const iconRef = useRef<HTMLButtonElement>(null);
   const headingId = useId();
@@ -51,11 +60,29 @@ export const HelpIconButton = () => {
     };
   }, [router.events]);
 
-  const trigger = (
+  const trigger = showLabel ? (
+    <Button
+      onClick={open}
+      aria-label="Open quick guide"
+      aria-haspopup="dialog"
+      aria-expanded={isOpen}
+      startIcon={<HelpOutlineOutlinedIcon />}
+      sx={{
+        textTransform: "capitalize",
+        justifyContent: "flex-start",
+        "&:hover": { color: "#4845d2" },
+        fontSize: "1rem",
+        color: "grey",
+        backgroundColor: "transparent",
+      }}
+    >
+      Quick Guide
+    </Button>
+  ) : (
     <IconButton
       ref={iconRef}
       onClick={open}
-      aria-label="Help and what's new"
+      aria-label="Open quick guide"
       aria-haspopup="dialog"
       aria-expanded={isOpen}
       sx={{ "&:hover": { color: "#4845d2" } }}
@@ -115,7 +142,7 @@ export const HelpIconButton = () => {
               zIndex: 1, // prevents scrolled content bleeding through the arrow protrusion
             }}
           >
-            <HelpPanelContent headingId={headingId} />
+            <QuickGuidePanelContent headingId={headingId} />
           </Box>
         </Popover>
       </>
@@ -132,7 +159,7 @@ export const HelpIconButton = () => {
         TransitionComponent={SlideUp}
         aria-labelledby={headingId}
       >
-        <AppBar sx={{ position: "relative" }}>
+        <AppBar sx={{ position: "relative", bgcolor: "#4845D2" }}>
           <Toolbar>
             <Typography
               id={headingId}
@@ -140,13 +167,13 @@ export const HelpIconButton = () => {
               fontWeight="bold"
               sx={{ flex: 1 }}
             >
-              Help
+              Quick Guide
             </Typography>
             <IconButton
               edge="end"
               color="inherit"
               onClick={close}
-              aria-label="Close help"
+              aria-label="Close quick guide"
             >
               <CloseIcon />
             </IconButton>
@@ -159,7 +186,7 @@ export const HelpIconButton = () => {
             padding: "32px 24px",
           }}
         >
-          <HelpPanelContent headingId={headingId} showHeading={false} />
+          <QuickGuidePanelContent headingId={headingId} showHeading={false} />
         </Box>
       </Dialog>
     </>

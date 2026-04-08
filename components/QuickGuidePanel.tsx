@@ -5,22 +5,22 @@ import { Box, Divider, Typography } from "@mui/material";
 import { allSlashCommands } from "../content/slashCommands";
 import { getRecentEntries } from "../content/whatsNew";
 
-interface HelpPanelContentProps {
+interface QuickGuidePanelContentProps {
   /** ID of the heading element, used by aria-labelledby on the dialog wrapper. */
   headingId: string;
   /**
-   * Whether to render the "Help" heading inside the panel.
+   * Whether to render the "Quick Guide" heading inside the panel.
    * Set to false on mobile where the Dialog AppBar already provides the heading.
    */
   showHeading?: boolean;
 }
 
 /**
- * The content rendered inside the Help panel.
- * Stateless — owns no open/close logic. Consumed by HelpIconButton inside
+ * The content rendered inside the Quick Guide panel.
+ * Stateless — owns no open/close logic. Consumed by QuickGuideIconButton inside
  * both the desktop Popover and the mobile Dialog.
  */
-export const HelpPanelContent = ({ headingId, showHeading = true }: HelpPanelContentProps) => {
+export const QuickGuidePanelContent = ({ headingId, showHeading = true }: QuickGuidePanelContentProps) => {
   const recentEntries = getRecentEntries();
 
   return (
@@ -32,7 +32,7 @@ export const HelpPanelContent = ({ headingId, showHeading = true }: HelpPanelCon
           fontWeight="bold"
           gutterBottom
         >
-          Help
+          Quick Guide
         </Typography>
       )}
 
@@ -45,9 +45,9 @@ export const HelpPanelContent = ({ headingId, showHeading = true }: HelpPanelCon
 
       {/* What's New — hidden when no entries fall within the rolling window */}
       {recentEntries.length > 0 && (
-        <Box component="section" aria-labelledby="help-whats-new-heading">
+        <Box component="section" aria-labelledby="quick-guide-whats-new-heading">
           <Typography
-            id="help-whats-new-heading"
+            id="quick-guide-whats-new-heading"
             variant="subtitle2"
             fontWeight="bold"
             sx={{ mt: 2, position: "sticky", top: 0, bgcolor: "background.paper", pt: 1, pb: 0.5 }}
@@ -69,9 +69,9 @@ export const HelpPanelContent = ({ headingId, showHeading = true }: HelpPanelCon
       )}
 
       {/* Slash commands reference */}
-      <Box component="section" aria-labelledby="help-commands-heading">
+      <Box component="section" aria-labelledby="quick-guide-commands-heading">
         <Typography
-          id="help-commands-heading"
+          id="quick-guide-commands-heading"
           variant="subtitle2"
           fontWeight="bold"
           sx={{ mt: 2, position: "sticky", top: 0, bgcolor: "background.paper", pt: 1, pb: 0.5 }}
