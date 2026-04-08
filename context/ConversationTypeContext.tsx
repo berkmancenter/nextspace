@@ -26,9 +26,9 @@ export function ConversationTypeProvider({
 }) {
   const [type, setType] = useState<string | null>(initialValue);
   return (
-    <SetterContext value={setType}>
-      <ValueContext value={type}>{children}</ValueContext>
-    </SetterContext>
+    <SetterContext.Provider value={setType}>
+      <ValueContext.Provider value={type}>{children}</ValueContext.Provider>
+    </SetterContext.Provider>
   );
 }
 
