@@ -11,7 +11,7 @@ import FeedbackOutlinedIcon from "@mui/icons-material/FeedbackOutlined";
 
 import { AuthType, HeaderProps, PageName } from "../types.internal";
 import Logo from "./Logo";
-import { HelpIconButton } from "./HelpIconButton";
+import { QuickGuideIconButton } from "./QuickGuideIconButton";
 import { Close, Menu } from "@mui/icons-material";
 import { useRouter } from "next/router";
 import { Api } from "../utils";
@@ -168,13 +168,14 @@ export const Header = ({
             </Box>
             <List sx={{ margin: 3 }} className="flex flex-col">
               {NavItems()}
+              {router.asPath.includes("conversationId") && <QuickGuideIconButton showLabel />}
             </List>
           </Drawer>
         </div>
-        <Box className="hidden lg:flex flex-row justify-end grow-1 gap-x-6">
+        <Box className="hidden lg:flex flex-row justify-end grow-1 gap-x-6 items-center">
           {NavItems()}
+          {router.asPath.includes("conversationId") && <QuickGuideIconButton />}
         </Box>
-        <HelpIconButton />
       </Toolbar>
     </div>
   );
