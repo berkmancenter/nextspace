@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import EventAssistantRoom from "../../pages/assistant";
 import { RetrieveData, SendData } from "../../utils";
 import { createConversationFromData } from "../../utils/Helpers";
+import { ConversationTypeProvider } from "../../context/ConversationTypeContext";
 
 // Mock next/router
 const mockPush = jest.fn();
@@ -472,7 +473,11 @@ describe("EventAssistantRoom", () => {
       });
 
       await act(async () => {
-        render(<EventAssistantRoom authType={"guest"} />);
+        render(
+          <ConversationTypeProvider>
+            <EventAssistantRoom authType={"guest"} />
+          </ConversationTypeProvider>
+        );
       });
 
       // Wait for conversation data to load (RetrieveData called for conversations/)
@@ -535,7 +540,11 @@ describe("EventAssistantRoom", () => {
       });
 
       await act(async () => {
-        render(<EventAssistantRoom authType={"guest"} />);
+        render(
+          <ConversationTypeProvider>
+            <EventAssistantRoom authType={"guest"} />
+          </ConversationTypeProvider>
+        );
       });
 
       await waitFor(() => {
