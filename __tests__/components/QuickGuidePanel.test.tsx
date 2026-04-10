@@ -128,39 +128,99 @@ describe("QuickGuidePanel — mobile (Dialog)", () => {
   });
 });
 
-describe("QuickGuidePanelContent — command filtering by conversation type", () => {
-  function renderContent(conversationType: string | null) {
-    return render(
-      <ConversationTypeProvider initialValue={conversationType}>
-        <QuickGuidePanelContent headingId="test-heading" />
-      </ConversationTypeProvider>
-    );
-  }
+// ---------------------------------------------------------------------------
+// Shared helper — renders QuickGuidePanelContent with the given conversation
+// type and optional bot name pre-loaded into context.
+// ---------------------------------------------------------------------------
+function renderContent(
+  conversationType: string | null,
+  { botName }: { botName?: string } = {}
+) {
+  return render(
+    <ConversationTypeProvider
+      initialValue={conversationType}
+      initialBotName={botName}
+    >
+      <QuickGuidePanelContent headingId="test-heading" />
+    </ConversationTypeProvider>
+  );
+}
 
-  it("hides the commands section and its heading when conversation type is not yet known", () => {
+describe("QuickGuidePanelContent — What's New section", () => {
+  const realDateNow = Date.now;
+
+  afterEach(() => {
+    Date.now = realDateNow;
+  });
+
+  it("shows the What's New section when entries fall within the window", () => {
+    // Pin now to the release date of the Quick Guide entry (2026-04-09)
+    Date.now = jest.fn(() => new Date("2026-04-09").getTime());
     renderContent(null);
-    expect(screen.queryByText("Slash Commands & Features")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /what's new/i })).toBeInTheDocument();
+  });
+
+  it("hides the What's New section when no entries fall within the window", () => {
+    // Pin now far beyond the 14-day window of all current entries
+    Date.now = jest.fn(() => new Date("2026-06-01").getTime());
+    renderContent(null);
+    expect(screen.queryByRole("region", { name: /what's new/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("QuickGuidePanelContent — features section", () => {
+  it("hides the features section when conversation type is not yet known", () => {
+    renderContent(null);
+    expect(screen.queryByRole("region", { name: /features/i })).not.toBeInTheDocument();
     expect(screen.queryByText("/mod")).not.toBeInTheDocument();
     expect(screen.queryByText("/mindmap")).not.toBeInTheDocument();
     expect(screen.queryByText("/visual")).not.toBeInTheDocument();
+    expect(screen.queryByText("Jargon Filter")).not.toBeInTheDocument();
   });
 
-  it("hides commands not available for the current conversation type", () => {
-    // eventAssistant does not include /mod (restricted to Plus variants)
+  it("hides /mod for event types that don't include it", () => {
+    // /mod is restricted to Plus variants only
     renderContent("eventAssistant");
     expect(screen.queryByText("/mod")).not.toBeInTheDocument();
   });
 
-  it("shows commands available for the current conversation type", () => {
+  it("shows slash commands available for the current event type", () => {
     renderContent("eventAssistant");
     expect(screen.getByText("/mindmap")).toBeInTheDocument();
     expect(screen.getByText("/visual")).toBeInTheDocument();
   });
 
-  it("shows all restricted commands when the type includes them", () => {
+  it("shows all slash commands when the event type includes them all", () => {
     renderContent("eventAssistantPlus");
     expect(screen.getByText("/mod")).toBeInTheDocument();
     expect(screen.getByText("/mindmap")).toBeInTheDocument();
     expect(screen.getByText("/visual")).toBeInTheDocument();
+  });
+
+  it("shows the preference note beneath the /visual command", () => {
+    renderContent("eventAssistant");
+    expect(
+      screen.getByText(/Requires the "Visuals" preference/i)
+    ).toBeInTheDocument();
+  });
+
+  it("shows assistant features for the current event type", () => {
+    renderContent("eventAssistant");
+    expect(screen.getByText("Jargon Filter")).toBeInTheDocument();
+  });
+
+  it("hides assistant features when conversation type is not yet known", () => {
+    renderContent(null);
+    expect(screen.queryByText("Jargon Filter")).not.toBeInTheDocument();
+  });
+
+  it("uses the bot name from context as the assistant subsection label", () => {
+    renderContent("eventAssistant", { botName: "Sparkle" });
+    expect(screen.getByText("Sparkle")).toBeInTheDocument();
+  });
+
+  it("falls back to 'Berkie' when no bot name is set in context", () => {
+    renderContent("eventAssistant");
+    expect(screen.getByText("Berkie")).toBeInTheDocument();
   });
 });
