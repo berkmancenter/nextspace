@@ -29,6 +29,7 @@ import {
 import { useAnalytics } from "../hooks/useAnalytics";
 import {
   useConversationType,
+  useSetBotName,
   useSetConversationType,
 } from "../context/ConversationTypeContext";
 import { AuthType } from "../types.internal";
@@ -132,11 +133,13 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   >({});
   const conversationType = useConversationType();
   const setConversationType = useSetConversationType();
+  const setBotNameContext = useSetBotName();
 
-  /* Clear the shared conversation type when the event changes so the Quick
-     Guide doesn't show stale commands while the new conversation loads. */
+  /* Clear the shared conversation type and bot name when the event changes so
+     the Quick Guide doesn't show stale values while the new conversation loads. */
   useEffect(() => {
     setConversationType(null);
+    setBotNameContext("Berkie");
   }, [router.query.conversationId]);
   const [feedbackFrequency, setFeedbackFrequency] = useState<number>(1);
   const [messageRatings, setMessageRatings] = useState<Map<string, string>>(
@@ -284,6 +287,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       try {
         const config = await Api.get().GetConfig();
         setBotName(config.conversationBotName);
+        setBotNameContext(config.conversationBotName);
 
         const conversationData = await RetrieveData(
           `conversations/${router.query.conversationId}`,
@@ -323,9 +327,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
         // Override botName from the first agent's agentConfig if available,
         // falling back to config.conversationBotName
-        setBotName(
-          resolveConversationBotName(conversation, config.conversationBotName),
+        const resolvedBotName = resolveConversationBotName(
+          conversation,
+          config.conversationBotName,
         );
+        setBotName(resolvedBotName);
+        setBotNameContext(resolvedBotName);
 
         // Get transcript and chat passcodes if channel query param exists
         if (router.query.channel) {
