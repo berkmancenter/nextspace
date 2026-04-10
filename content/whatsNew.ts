@@ -1,33 +1,53 @@
 import { WhatsNewEntry } from "../types.internal";
 
 /**
- * User-facing "What's New" entries for the Help panel.
- * Add a new entry here when shipping a user-visible feature.
- * Entries with a future releasedAt date or older than the window are hidden automatically.
+ * User-facing "What's New" entries shown in the Quick Guide panel.
  *
- * releasedAt must be a valid ISO date string (e.g. "2026-04-01").
- * Invalid values are caught by the whatsNew entry validation test.
+ * ## Adding an entry
+ * When shipping any user-visible feature, add an object here:
+ *
+ *   {
+ *     title: "Short feature name",           // shown in bold
+ *     body: "One or two sentence summary.",  // shown beneath the title
+ *     releasedAt: "YYYY-MM-DD",              // UTC calendar date — no timezone concerns
+ *   }
+ *
+ * Entries are visible for 14 days from `releasedAt`, then hidden automatically.
+ * Future-dated entries are hidden until that date arrives, so you can merge
+ * and deploy ahead of a release without exposing the entry early.
+ *
+ * Keep entries concise — users read these mid-session.
  */
-export const whatsNewEntries: WhatsNewEntry[] = [];
+export const whatsNewEntries: WhatsNewEntry[] = [
+  {
+    title: "Quick Guide",
+    body: "A new reference panel in the nav gives you instant access to available slash commands and recent updates — without leaving your session.",
+    releasedAt: "2026-04-09",
+  },
+];
 
 /**
  * Returns entries released within the last `windowDays` days, excluding future-dated
  * entries, sorted newest-first.
+ *
+ * Comparison is purely date-based (no time component) using UTC calendar days,
+ * so developers can enter any YYYY-MM-DD date without worrying about timezones.
  */
 export function getRecentEntries(
   windowDays = 14,
   entries = whatsNewEntries
 ): WhatsNewEntry[] {
-  const now = Date.now();
-  const cutoff = now - windowDays * 24 * 60 * 60 * 1000; // e.g. 14 days ago in ms
+  // Use Date.now() explicitly so tests can mock it; new Date() reads the real clock.
+  const todayStr = new Date(Date.now()).toISOString().slice(0, 10); // today in UTC, YYYY-MM-DD
 
+  // Cutoff date: windowDays before today in UTC
+  const cutoffDate = new Date(Date.now());
+  cutoffDate.setUTCDate(cutoffDate.getUTCDate() - windowDays);
+  const cutoffStr = cutoffDate.toISOString().slice(0, 10);
+
+  // YYYY-MM-DD strings sort lexicographically in chronological order,
+  // so string comparison is equivalent to date comparison here.
   return entries
-    .filter((entry) => {
-      const ts = new Date(entry.releasedAt).getTime();
-      return ts <= now && ts >= cutoff;
-    })
-    .sort(
-      (a, b) =>
-        new Date(b.releasedAt).getTime() - new Date(a.releasedAt).getTime()
-    );
+    .filter((entry) => entry.releasedAt <= todayStr && entry.releasedAt >= cutoffStr)
+    .sort((a, b) => b.releasedAt.localeCompare(a.releasedAt));
 }
