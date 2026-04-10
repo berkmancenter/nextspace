@@ -111,7 +111,7 @@ export const QuickGuideIconButton = ({ showLabel = false }: QuickGuideIconButton
               sx: {
                 mt: 1.5,
                 overflow: "visible", // required — the arrow pseudo-element clips without this
-                width: 380,
+                width: 500,
                 border: "1px solid",
                 borderColor: "grey.300",
                 borderRadius: "8px",
@@ -136,7 +136,7 @@ export const QuickGuideIconButton = ({ showLabel = false }: QuickGuideIconButton
         >
           <Box
             sx={{
-              maxHeight: "calc(100vh - 120px)",
+              maxHeight: "min(560px, calc(100vh - 100px))",
               overflowY: "auto",
               borderRadius: "8px",
               position: "relative",
@@ -188,13 +188,7 @@ export const QuickGuideIconButton = ({ showLabel = false }: QuickGuideIconButton
             </IconButton>
           </Toolbar>
         </AppBar>
-        <Box
-          sx={{
-            overflowY: "auto",
-            borderRadius: "16px",
-            padding: "32px 24px",
-          }}
-        >
+        <Box sx={{ overflowY: "auto" }}>
           <QuickGuidePanelContent headingId={headingId} showHeading={false} />
         </Box>
       </Dialog>

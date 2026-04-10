@@ -21,7 +21,7 @@ import { WhatsNewEntry } from "../types.internal";
 export const whatsNewEntries: WhatsNewEntry[] = [
   {
     title: "Quick Guide",
-    body: "A new reference panel in the nav gives you instant access to available slash commands and recent updates — without leaving your session.",
+    body: "This is it — a reference panel in the nav giving you quick access to available slash commands and recent updates at any time during an event.",
     releasedAt: "2026-04-09",
   },
 ];
