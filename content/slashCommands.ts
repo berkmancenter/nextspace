@@ -1,36 +1,23 @@
 import { SlashCommand } from "../components/enhancers/slashCommandEnhancer";
+import { allFeatures, SlashCommandFeature } from "./features";
 
 /**
- * All available slash commands.
- * This is the single source of truth — the chat input and the Help panel both read from here.
- * Commands can optionally restrict availability to specific conversation types via conversationTypes.
+ * All available slash commands, used by the chat input autocomplete.
+ * Derived automatically from `content/features.ts` — do not edit this array directly.
+ *
+ * ## Adding a new slash command
+ * 1. Add a `SlashCommandFeature` entry in `content/features.ts`.
+ *    This array updates itself; no changes needed here.
+ * 2. Add a `WhatsNewEntry` in `content/whatsNew.ts` so users learn about it.
+ *
+ * `value` defaults to `/<command> ` (with a trailing space so the cursor lands
+ * after the command, ready to type). This covers all current commands.
  */
-export const allSlashCommands: SlashCommand[] = [
-  {
-    command: "mod",
-    description: "Submit a question to the moderator",
-    value: "/mod ",
-    conversationTypes: ["eventAssistantPlus", "eventAssistantPlusProactive"],
-  },
-  {
-    command: "mindmap",
-    description:
-      "Create a visual mind map of the key topics discussed in the event",
-    value: "/mindmap ",
-    conversationTypes: [
-      "eventAssistant",
-      "eventAssistantPlus",
-      "eventAssistantPlusProactive",
-    ],
-  },
-  {
-    command: "visual",
-    description: "Request a visual response (image) to a question",
-    value: "/visual ",
-    conversationTypes: [
-      "eventAssistant",
-      "eventAssistantPlus",
-      "eventAssistantPlusProactive",
-    ],
-  },
-];
+export const allSlashCommands: SlashCommand[] = allFeatures
+  .filter((f): f is SlashCommandFeature => f.type === "slashCommand")
+  .map((f) => ({
+    command: f.command,
+    description: f.description,
+    value: `/${f.command} `,
+    conversationTypes: f.conversationTypes,
+  }));

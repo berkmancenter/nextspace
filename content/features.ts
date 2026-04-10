@@ -82,7 +82,7 @@ export const allFeatures: AnyFeature[] = [
     type: "assistant",
     name: "Jargon Filter",
     description:
-      'Berkie automatically explains jargon and technical terms used by speakers. Enable it by turning on "Jargon Clarification" in your event settings.',
+      'Automatically explains jargon and technical terms used by speakers. Enable it by turning on "Jargon Clarification" in your event settings.',
     conversationTypes: [
       "eventAssistant",
       "eventAssistantPlus",
