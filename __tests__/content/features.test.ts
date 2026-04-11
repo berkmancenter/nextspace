@@ -1,4 +1,10 @@
-import { allFeatures, SlashCommandFeature, AssistantFeature } from "../../content/features";
+import {
+  allFeatures,
+  isFeatureAvailableFor,
+  SlashCommandFeature,
+  AssistantFeature,
+  AnyFeature,
+} from "../../content/features";
 
 describe("allFeatures", () => {
   it("has no entries with an invalid type", () => {
@@ -43,5 +49,48 @@ describe("allFeatures", () => {
       .map((f) => f.command);
     const unique = new Set(commands);
     expect(unique.size).toBe(commands.length);
+  });
+
+  it("has no entries without an explicit, non-empty conversationTypes array", () => {
+    allFeatures.forEach((feature) => {
+      expect(feature.conversationTypes).toBeDefined();
+      expect(feature.conversationTypes.length).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe("isFeatureAvailableFor", () => {
+  const base = {
+    type: "slashCommand" as const,
+    command: "test",
+    description: "Test command",
+  };
+
+  it("returns true when the conversation type is in the list", () => {
+    const feature: AnyFeature = {
+      ...base,
+      conversationTypes: ["eventAssistant", "eventAssistantPlus"],
+    };
+    expect(isFeatureAvailableFor(feature, "eventAssistant")).toBe(true);
+  });
+
+  it("returns false when the conversation type is not in the list", () => {
+    const feature: AnyFeature = {
+      ...base,
+      conversationTypes: ["eventAssistantPlus"],
+    };
+    expect(isFeatureAvailableFor(feature, "eventAssistant")).toBe(false);
+  });
+
+  it("returns false when conversationTypes is an empty array", () => {
+    /* Empty array is treated as unscoped — hidden rather than shown everywhere. */
+    const feature: AnyFeature = { ...base, conversationTypes: [] };
+    expect(isFeatureAvailableFor(feature, "eventAssistant")).toBe(false);
+  });
+
+  it("returns false when conversationTypes is omitted entirely", () => {
+    /* Runtime guard for JS callers that bypass the required field. */
+    const feature = { ...base } as unknown as AnyFeature;
+    expect(isFeatureAvailableFor(feature, "eventAssistant")).toBe(false);
   });
 });

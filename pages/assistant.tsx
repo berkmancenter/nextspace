@@ -200,9 +200,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   // Filter commands based on current conversation type
   const slashCommands = allSlashCommands.filter((cmd) => {
-    // If command has no conversationTypes restriction, it's available for all
     if (!cmd.conversationTypes || cmd.conversationTypes.length === 0) {
-      return true;
+      return false;
     }
     return conversationType && cmd.conversationTypes.includes(conversationType);
   });

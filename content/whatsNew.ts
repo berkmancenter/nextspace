@@ -21,8 +21,8 @@ import { WhatsNewEntry } from "../types.internal";
 export const whatsNewEntries: WhatsNewEntry[] = [
   {
     title: "Quick Guide",
-    body: "This is it — a reference panel in the nav giving you quick access to available slash commands and recent updates at any time during an event.",
-    releasedAt: "2026-04-09",
+    body: "You found the new guide! This is a quick guide to all the Nextspace features and recent updates.",
+    releasedAt: "2026-04-10",
   },
 ];
 
@@ -35,7 +35,7 @@ export const whatsNewEntries: WhatsNewEntry[] = [
  */
 export function getRecentEntries(
   windowDays = 14,
-  entries = whatsNewEntries
+  entries = whatsNewEntries,
 ): WhatsNewEntry[] {
   // Use Date.now() explicitly so tests can mock it; new Date() reads the real clock.
   const todayStr = new Date(Date.now()).toISOString().slice(0, 10); // today in UTC, YYYY-MM-DD
@@ -48,6 +48,8 @@ export function getRecentEntries(
   // YYYY-MM-DD strings sort lexicographically in chronological order,
   // so string comparison is equivalent to date comparison here.
   return entries
-    .filter((entry) => entry.releasedAt <= todayStr && entry.releasedAt >= cutoffStr)
+    .filter(
+      (entry) => entry.releasedAt <= todayStr && entry.releasedAt >= cutoffStr,
+    )
     .sort((a, b) => b.releasedAt.localeCompare(a.releasedAt));
 }

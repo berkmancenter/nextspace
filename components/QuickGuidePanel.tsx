@@ -3,7 +3,7 @@ import React from "react";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { Box, Divider, Typography } from "@mui/material";
 
-import { allFeatures } from "../content/features";
+import { allFeatures, isFeatureAvailableFor } from "../content/features";
 import { getRecentEntries } from "../content/whatsNew";
 import { useBotName, useConversationType } from "../context/ConversationTypeContext";
 
@@ -30,10 +30,7 @@ export const QuickGuidePanelContent = ({ headingId, showHeading = true }: QuickG
   // Filter features to those available for this event type once it's known.
   // Both groups are hidden entirely while the conversation type is still loading.
   const visibleFeatures = conversationType
-    ? allFeatures.filter((f) => {
-        if (!f.conversationTypes || f.conversationTypes.length === 0) return true;
-        return f.conversationTypes.includes(conversationType);
-      })
+    ? allFeatures.filter((f) => isFeatureAvailableFor(f, conversationType))
     : null;
 
   const visibleSlashCommands = visibleFeatures?.filter((f) => f.type === "slashCommand") ?? [];

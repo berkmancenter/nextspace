@@ -154,8 +154,8 @@ describe("QuickGuidePanelContent — What's New section", () => {
   });
 
   it("shows the What's New section when entries fall within the window", () => {
-    // Pin now to the release date of the Quick Guide entry (2026-04-09)
-    Date.now = jest.fn(() => new Date("2026-04-09").getTime());
+    // Pin now to the release date of the Quick Guide entry (2026-04-10)
+    Date.now = jest.fn(() => new Date("2026-04-10").getTime());
     renderContent(null);
     expect(screen.getByRole("region", { name: /what's new/i })).toBeInTheDocument();
   });
