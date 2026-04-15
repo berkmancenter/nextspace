@@ -5,6 +5,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Divider,
   FormControl,
   FormControlLabel,
   FormGroup,
@@ -35,8 +36,8 @@ import { useField } from "@mui/x-date-pickers/internals";
 
 const steps = [
   "Event Details",
-  "Conversation Configuration",
-  "Agent Configuration",
+  "Conversation Setup",
+  "Configuration",
   "Moderators & Speakers",
 ];
 
@@ -164,6 +165,18 @@ export const EventCreationForm: React.FC = ({}) => {
             }
           }
         });
+        // Initialize feature toggles and their sub-property defaults.
+        // Sub-properties are keyed as `featureName.propName` to avoid
+        // collisions when multiple features share the same property name.
+        type.features?.forEach((feature) => {
+          initialValues[feature.name] = feature.default;
+          feature.properties?.forEach((prop) => {
+            if (prop.default !== undefined) {
+              initialValues[`${feature.name}.${prop.name}`] = prop.default;
+            }
+          });
+        });
+
         setDynamicPropertyValues(initialValues);
       }
     }
@@ -297,18 +310,22 @@ export const EventCreationForm: React.FC = ({}) => {
     setSpeakers(updated);
   };
 
-  // Helper function to render dynamic property fields
+  // Helper function to render dynamic property fields.
+  // Pass `namespace` (feature name) to scope sub-property keys and prevent
+  // collisions when multiple features share the same property name.
   const renderDynamicPropertyField = (
-    prop: components["schemas"]["ConversationTypeProperty"],
+    prop: components["schemas"]["ConfigProperty"],
+    namespace?: string,
   ) => {
-    const value = dynamicPropertyValues[prop.name];
+    const stateKey = namespace ? `${namespace}.${prop.name}` : prop.name;
+    const value = dynamicPropertyValues[stateKey];
 
     switch (prop.type) {
       case "string":
         return (
           <TextField
-            key={prop.name}
-            name={prop.name}
+            key={stateKey}
+            name={stateKey}
             label={prop.label}
             value={value || prop.default || ""}
             helperText={prop.description}
@@ -319,7 +336,7 @@ export const EventCreationForm: React.FC = ({}) => {
             onChange={(e) => {
               setDynamicPropertyValues((prev) => ({
                 ...prev,
-                [prop.name]: e.target.value,
+                [stateKey]: e.target.value,
               }));
             }}
           />
@@ -328,8 +345,8 @@ export const EventCreationForm: React.FC = ({}) => {
       case "number":
         return (
           <TextField
-            key={prop.name}
-            name={prop.name}
+            key={stateKey}
+            name={stateKey}
             label={prop.label}
             type="number"
             value={
@@ -346,16 +363,38 @@ export const EventCreationForm: React.FC = ({}) => {
               if (inputValue === "") {
                 setDynamicPropertyValues((prev) => ({
                   ...prev,
-                  [prop.name]: 0,
+                  [stateKey]: 0,
                 }));
               } else {
                 const numValue = parseInt(inputValue, 10);
                 setDynamicPropertyValues((prev) => ({
                   ...prev,
-                  [prop.name]: isNaN(numValue) ? 0 : numValue,
+                  [stateKey]: isNaN(numValue) ? 0 : numValue,
                 }));
               }
             }}
+          />
+        );
+
+      case "boolean":
+        return (
+          <FormControlLabel
+            key={stateKey}
+            control={
+              <Checkbox
+                checked={
+                  value !== undefined ? Boolean(value) : Boolean(prop.default)
+                }
+                onChange={(e) => {
+                  setDynamicPropertyValues((prev) => ({
+                    ...prev,
+                    [stateKey]: e.target.checked,
+                  }));
+                }}
+              />
+            }
+            label={prop.label}
+            sx={{ mt: 1 }}
           />
         );
 
@@ -364,7 +403,7 @@ export const EventCreationForm: React.FC = ({}) => {
         if (prop.options && Array.isArray(prop.options)) {
           return (
             <FormControl
-              key={prop.name}
+              key={stateKey}
               component="fieldset"
               fullWidth
               margin="normal"
@@ -400,13 +439,13 @@ export const EventCreationForm: React.FC = ({}) => {
               )}
               <RadioGroup
                 value={JSON.stringify(value || {})}
-                name={prop.name}
+                name={stateKey}
                 onChange={(e) => {
                   try {
                     const parsedValue = JSON.parse(e.target.value);
                     setDynamicPropertyValues((prev) => ({
                       ...prev,
-                      [prop.name]: parsedValue,
+                      [stateKey]: parsedValue,
                     }));
                   } catch (err) {
                     console.error("Failed to parse radio value:", err);
@@ -475,7 +514,7 @@ export const EventCreationForm: React.FC = ({}) => {
           const itemKey = prop.itemKey || "name";
 
           return (
-            <Box key={prop.name} sx={{ mb: 3 }}>
+            <Box key={stateKey} sx={{ mb: 3 }}>
               <FormLabel
                 sx={{
                   fontSize: "0.875rem",
@@ -572,8 +611,8 @@ export const EventCreationForm: React.FC = ({}) => {
                                     onChange={(e) => {
                                       setDynamicPropertyValues((prev) => ({
                                         ...prev,
-                                        [prop.name]: {
-                                          ...prev[prop.name],
+                                        [stateKey]: {
+                                          ...prev[stateKey],
                                           [key]: {
                                             ...itemValue,
                                             [fieldKey]: e.target.checked,
@@ -619,8 +658,8 @@ export const EventCreationForm: React.FC = ({}) => {
                                   }
                                   setDynamicPropertyValues((prev) => ({
                                     ...prev,
-                                    [prop.name]: {
-                                      ...prev[prop.name],
+                                    [stateKey]: {
+                                      ...prev[stateKey],
                                       [key]: {
                                         ...itemValue,
                                         [fieldKey]: newValue,
@@ -647,8 +686,8 @@ export const EventCreationForm: React.FC = ({}) => {
                                 onChange={(e) => {
                                   setDynamicPropertyValues((prev) => ({
                                     ...prev,
-                                    [prop.name]: {
-                                      ...prev[prop.name],
+                                    [stateKey]: {
+                                      ...prev[stateKey],
                                       [key]: {
                                         ...itemValue,
                                         [fieldKey]: e.target.value,
@@ -745,11 +784,25 @@ export const EventCreationForm: React.FC = ({}) => {
       });
     }
 
-    console.log("Final properties object:", properties);
+    const features = (selectedType?.features ?? [])
+      .filter((feature) => Boolean(dynamicPropertyValues[feature.name]))
+      .map((feature) => {
+        const config: Record<string, any> = {};
+        feature.properties?.forEach((prop) => {
+          const value = dynamicPropertyValues[`${feature.name}.${prop.name}`];
+          if (value !== undefined && value !== null && value !== "") {
+            config[prop.name] = value;
+          } else if (prop.default !== undefined) {
+            config[prop.name] = prop.default;
+          }
+        });
+        return { name: feature.name, config };
+      });
 
     body = {
       ...body,
       properties,
+      ...(features.length > 0 && { features }),
     };
 
     Request("conversations/from-type", body)
@@ -930,11 +983,11 @@ export const EventCreationForm: React.FC = ({}) => {
             </Box>
           )}
 
-          {/* Step 2: Conversation Configuration */}
+          {/* Step 2: Conversation Setup */}
           {activeStep === 1 && (
             <Box>
               <Typography variant="h5" component="h2" gutterBottom>
-                Conversation Configuration
+                Conversation Setup
               </Typography>
 
               {/* Platform Selection */}
@@ -1062,20 +1115,96 @@ export const EventCreationForm: React.FC = ({}) => {
             </Box>
           )}
 
-          {/* Step 3: Agent Configuration */}
+          {/* Step 3: Configuration */}
           {activeStep === 2 && (
             <Box>
               <Typography variant="h5" component="h2" gutterBottom>
-                Agent Configuration
+                Configuration
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Configure your agent&apos;s behavior and settings
+                Customize your conversation settings
               </Typography>
 
               {conversationTypes
                 ?.find((type) => type.name === selectedConvType)
                 ?.properties?.filter((prop) => prop.name !== "zoomMeetingUrl")
                 .map((prop) => renderDynamicPropertyField(prop))}
+
+              {(() => {
+                const features = conversationTypes?.find(
+                  (type) => type.name === selectedConvType,
+                )?.features;
+                if (!features?.length) return null;
+                return (
+                  <Box sx={{ mt: 3 }}>
+                    <Divider sx={{ mb: 2 }} />
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight={600}
+                      gutterBottom
+                    >
+                      Features
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 2 }}
+                    >
+                      Enable additional capabilities for this conversation
+                    </Typography>
+                    {features.map((feature) => (
+                      <Box
+                        key={feature.name}
+                        sx={{
+                          mb: 1,
+                          p: 2,
+                          border: "1px solid",
+                          borderColor: dynamicPropertyValues[feature.name]
+                            ? "primary.main"
+                            : "divider",
+                          borderRadius: 1,
+                          transition: "border-color 0.2s",
+                        }}
+                      >
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={Boolean(
+                                dynamicPropertyValues[feature.name],
+                              )}
+                              onChange={(e) => {
+                                setDynamicPropertyValues((prev) => ({
+                                  ...prev,
+                                  [feature.name]: e.target.checked,
+                                }));
+                              }}
+                            />
+                          }
+                          label={
+                            <Box>
+                              <Typography fontWeight={500}>
+                                {feature.label}
+                              </Typography>
+                              {feature.description && (
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  {feature.description}
+                                </Typography>
+                              )}
+                            </Box>
+                          }
+                        />
+                        {dynamicPropertyValues[feature.name] &&
+                          feature.properties?.map((prop) =>
+                            renderDynamicPropertyField(prop, feature.name),
+                          )}
+                      </Box>
+                    ))}
+                  </Box>
+                );
+              })()}
             </Box>
           )}
 
