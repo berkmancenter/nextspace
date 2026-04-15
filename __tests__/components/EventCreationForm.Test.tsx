@@ -130,6 +130,30 @@ const mockConfig = {
           ],
         },
       ],
+      features: [
+        {
+          name: "liveTranscript",
+          label: "Live Transcript",
+          description: "Display a live transcript during the event",
+          default: false,
+          properties: [
+            {
+              name: "transcriptDelay",
+              type: "number",
+              label: "Transcript Delay (seconds)",
+              default: 5,
+              required: false,
+            },
+          ],
+        },
+        {
+          name: "autoSummary",
+          label: "Auto Summary",
+          description: "Generate a summary at the end of the event",
+          default: false,
+          properties: [],
+        },
+      ],
     },
     {
       name: "eventAssistant",
@@ -202,8 +226,8 @@ describe("EventCreationForm Component", () => {
 
     // Check that all step labels are present in the stepper
     expect(screen.getAllByText("Event Details").length).toBeGreaterThan(0);
-    expect(screen.getByText("Conversation Configuration")).toBeInTheDocument();
-    expect(screen.getByText("Agent Configuration")).toBeInTheDocument();
+    expect(screen.getByText("Conversation Setup")).toBeInTheDocument();
+    expect(screen.getByText("Configuration")).toBeInTheDocument();
     expect(screen.getByText("Moderators & Speakers")).toBeInTheDocument();
 
     // Should show Step 1 content
@@ -1118,6 +1142,194 @@ describe("EventCreationForm Component", () => {
       });
       // First model (gpt-4o-mini) should be selected by default
       expect(gptRadio).toBeChecked();
+    });
+  });
+
+  // Helper to navigate to Step 3 with Back Channel selected
+  const navigateToStep3WithBackChannel = async (user: ReturnType<typeof userEvent.setup>) => {
+    await fillEventDetails("Test Event", "https://huitstage.zoom.us/j/1234567890");
+    await user.click(screen.getByRole("button", { name: /next/i }));
+    await waitFor(() => screen.getByText("Nextspace"));
+    await user.click(screen.getByRole("checkbox", { name: /zoom/i }));
+    await user.click(screen.getByRole("radio", { name: /back channel/i }));
+    await user.click(screen.getByRole("button", { name: /next/i }));
+    await waitFor(() => screen.getByLabelText(/Bot Name/i));
+  };
+
+  describe("Features", () => {
+    it("displays the Features section on Step 3 when the conversation type has features", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithBackChannel(user);
+
+      expect(screen.getByText("Features")).toBeInTheDocument();
+      expect(screen.getByText("Live Transcript")).toBeInTheDocument();
+      expect(
+        screen.getByText("Display a live transcript during the event"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Auto Summary")).toBeInTheDocument();
+    });
+
+    it("feature checkboxes are unchecked by default when feature.default is false", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithBackChannel(user);
+
+      const liveTranscriptCheckbox = screen.getByRole("checkbox", {
+        name: /live transcript/i,
+      });
+      expect(liveTranscriptCheckbox).not.toBeChecked();
+
+      const autoSummaryCheckbox = screen.getByRole("checkbox", {
+        name: /auto summary/i,
+      });
+      expect(autoSummaryCheckbox).not.toBeChecked();
+    });
+
+    it("toggling a feature checkbox shows its sub-properties", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithBackChannel(user);
+
+      // Sub-property should not be visible before enabling the feature
+      expect(
+        screen.queryByLabelText(/Transcript Delay/i),
+      ).not.toBeInTheDocument();
+
+      const liveTranscriptCheckbox = screen.getByRole("checkbox", {
+        name: /live transcript/i,
+      });
+      await user.click(liveTranscriptCheckbox);
+
+      expect(liveTranscriptCheckbox).toBeChecked();
+      expect(screen.getByLabelText(/Transcript Delay/i)).toBeInTheDocument();
+    });
+
+    it("unchecking a feature hides its sub-properties", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithBackChannel(user);
+
+      const liveTranscriptCheckbox = screen.getByRole("checkbox", {
+        name: /live transcript/i,
+      });
+      await user.click(liveTranscriptCheckbox);
+      expect(screen.getByLabelText(/Transcript Delay/i)).toBeInTheDocument();
+
+      await user.click(liveTranscriptCheckbox);
+      expect(liveTranscriptCheckbox).not.toBeChecked();
+      expect(
+        screen.queryByLabelText(/Transcript Delay/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not include features in submission payload when none are enabled", async () => {
+      const user = userEvent.setup();
+      (Request as jest.Mock).mockResolvedValue({
+        id: "conv-no-features",
+        name: "Test Event",
+        channels: [],
+        agents: [],
+        adapters: [],
+        conversationType: "backChannel",
+      });
+
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithBackChannel(user);
+      await user.click(screen.getByRole("button", { name: /next/i }));
+      await waitFor(() => screen.getByText("About the Speakers"));
+      await user.click(
+        screen.getByRole("button", { name: /create conversation/i }),
+      );
+
+      await waitFor(() => {
+        const call = (Request as jest.Mock).mock.calls[0];
+        expect(call[1]).not.toHaveProperty("features");
+      });
+    });
+
+    it("includes enabled features with their properties in the submission payload", async () => {
+      const user = userEvent.setup();
+      (Request as jest.Mock).mockResolvedValue({
+        id: "conv-with-features",
+        name: "Test Event",
+        channels: [],
+        agents: [],
+        adapters: [],
+        conversationType: "backChannel",
+      });
+
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithBackChannel(user);
+
+      // Enable the liveTranscript feature
+      await user.click(
+        screen.getByRole("checkbox", { name: /live transcript/i }),
+      );
+
+      // Also enable autoSummary
+      await user.click(
+        screen.getByRole("checkbox", { name: /auto summary/i }),
+      );
+
+      await user.click(screen.getByRole("button", { name: /next/i }));
+      await waitFor(() => screen.getByText("About the Speakers"));
+      await user.click(
+        screen.getByRole("button", { name: /create conversation/i }),
+      );
+
+      await waitFor(() => {
+        expect(Request).toHaveBeenCalledWith(
+          "conversations/from-type",
+          expect.objectContaining({
+            features: expect.arrayContaining([
+              { name: "liveTranscript", config: { transcriptDelay: 5 } },
+              { name: "autoSummary", config: {} },
+            ]),
+          }),
+        );
+      });
+    });
+
+    it("does not show Features section when conversationType has no features", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await fillEventDetails(
+        "Test Event",
+        "https://huitstage.zoom.us/j/1234567890",
+      );
+      await user.click(screen.getByRole("button", { name: /next/i }));
+      await waitFor(() => screen.getByText("Nextspace"));
+      await user.click(screen.getByRole("checkbox", { name: /zoom/i }));
+      // Event Assistant has no features in the mock config
+      await user.click(
+        screen.getByRole("radio", { name: /event assistant/i }),
+      );
+      await user.click(screen.getByRole("button", { name: /next/i }));
+      await waitFor(() => screen.getByLabelText(/Bot Name/i));
+
+      expect(screen.queryByText("Features")).not.toBeInTheDocument();
     });
   });
 });

@@ -19,9 +19,7 @@ describe("Event Component", () => {
     });
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Conversation Configuration")
-      ).toBeInTheDocument();
+      expect(screen.getByText("Conversation Setup")).toBeInTheDocument();
     });
   });
 });
