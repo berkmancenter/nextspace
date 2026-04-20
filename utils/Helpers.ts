@@ -18,6 +18,7 @@ import TokenManagerDefault from "./TokenManager";
  * @property {string} [message] - Optional message ID reference
  * @property {MediaItem[]} [media] - Optional array of media items (images, audio, video)
  * @property {string} [sourceMessage] - Optional ID of the message this response is based on (for multimodal responses)
+ * @property {any} [content] - Optional structured content (objects, arrays, etc.)
  */
 export interface ParsedMessageBody {
   text: string;
@@ -25,6 +26,7 @@ export interface ParsedMessageBody {
   message?: string;
   media?: MediaItem[];
   sourceMessage?: string;
+  content?: any;
 }
 
 /**
@@ -42,6 +44,7 @@ export const parseMessageBody = (body: string | object): ParsedMessageBody => {
       message: obj.message?.toString(),
       media: Array.isArray(obj.media) ? obj.media : undefined,
       sourceMessage: obj.sourceMessage?.toString(),
+      content: obj.content,
     };
   }
 
@@ -195,11 +198,12 @@ export const GetChannelPasscode = (
       }
     });
 
-    // Get the passcode from channel string
-    passcodeParam = query.channel[channelIndex].split(",")[1];
   }
 
   if (hasChannel) {
+    if (typeof query.channel !== "string") {
+      passcodeParam = query.channel[channelIndex].split(",")[1];
+    }
     if (!passcodeParam) {
       setErrorMessage(`Please provide a ${channel} passcode.`);
       return null;
@@ -337,6 +341,11 @@ function generateEventUrls(
   )?.passcode;
   const hasChat = Boolean(chatPasscode);
 
+  const resourcesPasscode = conversationData.channels.find(
+    (channel) => channel.name === "resources",
+  )?.passcode;
+  const hasResources = Boolean(resourcesPasscode);
+
   const modPasscode = conversationData.channels.find(
     (channel) => channel.name === "moderator",
   )?.passcode;
@@ -371,7 +380,9 @@ function generateEventUrls(
       label: botName,
       url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
         hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
-      }${hasChat ? `&channel=chat,${chatPasscode}` : ""}`,
+      }${hasChat ? `&channel=chat,${chatPasscode}` : ""}${
+        hasResources ? `&channel=resources,${resourcesPasscode}` : ""
+      }`,
     };
     participant.push(eventAssistantUrl);
   } else if (
@@ -387,7 +398,9 @@ function generateEventUrls(
       label,
       url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
         hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
-      }${hasChat ? `&channel=chat,${chatPasscode}` : ""}`,
+      }${hasChat ? `&channel=chat,${chatPasscode}` : ""}${
+        hasResources ? `&channel=resources,${resourcesPasscode}` : ""
+      }`,
     };
     participant.push(eventAssistantPlusUrl);
     if (modPasscode) {
