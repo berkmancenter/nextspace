@@ -9,6 +9,7 @@ Nextspace uses a hybrid authentication model that supports both anonymous partic
 ### Authentication Types
 
 **Guest (authType="guest")**
+
 - Automatically created when users visit most pages
 - Assigned a pseudonym (e.g., "Gentle Deer", "Brave Fox") for participation in conversations
 - No login required - sessions are created automatically in the background
@@ -16,12 +17,14 @@ Nextspace uses a hybrid authentication model that supports both anonymous partic
 - Session persists via encrypted cookie for 30 days
 
 **Admin (authType="admin")**
+
 - Requires explicit login with username and password via `/login`
 - Full access to administrative routes (`/admin/*`)
 - Can create and manage events, configure agents, view analytics
 - Non-admin users attempting to access `/admin` routes are redirected to signup
 
 **User (authType="user")**
+
 - Planned for future implementation
 - Would represent authenticated users without admin privileges
 - Currently not fully implemented in the application
@@ -88,7 +91,6 @@ This project uses the Next.js [Pages Router](https://nextjs.org/docs/pages).
     Hook for tracking time spent on a page while visible (excludes time when tab is hidden).
 - **pages/**
   Next.js pages for the app.
-
   - **admin/[*type*]/**
     Administration tools; see [dynamic segments](https://nextjs.org/docs/pages/building-your-application/routing/dynamic-routes) in Next.js.
     - **[*id*].tsx**
@@ -239,15 +241,14 @@ Open [http://localhost:8080](http://localhost:8080) with your browser to see the
       3. In the LLM Engine [localhost](http://localhost) environment, set token to the value of `access.token` in the login response
    2. Create conversation with channels for moderator/participants
       1. In the response body, you should see a passcode for both the moderator and participant channels (see below for more details)
-4. Before running nextspace locally, be sure to change the `NEXT_PUBLIC_LLM_FCLTR_TOPIC_ID` in your `.env` file. The conversation ID can be found in the response body created in 3b. You can also find it in the Environment view in Postman under the “Current value” column.
-5. When running NextSpace locally, you should now be able to access these channels in your local browser.
+4. When running NextSpace locally, you should now be able to access these channels in your local browser.
 
 > _Note_: A collection of debugging configurations is provided when using VS Code. For help with the debugging in other IDEs or in devtools, see [here](https://nextjs.org/docs/app/guides/debugging).
 
 ### URL formatting convention
 
-NextSpace currently uses the following URL convention when loading either the moderator or back channel view:
-`.../<moderator|backchannel>?conversationId=<ID>&channel=<channel,password>`
+NextSpace currently uses the following URL convention when loading either the moderator or assistant view:
+`.../<moderator|assistant>?conversationId=<ID>&channel=<channel,password>`
 
 So a full example of this on your local instance might look like
 
