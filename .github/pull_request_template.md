@@ -16,6 +16,7 @@ Did you:
 - [ ] update the README and docs to be clear and easy to use for end users and developers?
 - [ ] add and/or update automated tests?
 - [ ] update team documentation of any new or changed environment variables?
+- [ ] add a What's New entry in `content/whatsNew.ts` for new features?
 
 ## Testing this PR
 

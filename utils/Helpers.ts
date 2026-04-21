@@ -92,13 +92,13 @@ export class Api {
     access: string,
     refresh: string,
     accessExpires?: string,
-    refreshExpires?: string
+    refreshExpires?: string,
   ) {
     TokenManagerDefault.setTokensFromStrings(
       access,
       refresh,
       accessExpires,
-      refreshExpires
+      refreshExpires,
     );
   }
 
@@ -293,6 +293,13 @@ async function getTypeForConversation(
       (type) => type.name === conversation.conversationType,
     );
     if (type) return type;
+    // backwards compatibility for removed conversation types like eventAssistantPlusProactive
+    return {
+      name: conversation.conversationType,
+      description: "",
+      platforms: [],
+      properties: [],
+    } as components["schemas"]["ConversationType"];
   }
   const agentNames = conversation.agents.map((agent) => agent.agentType);
   // Bit of a hack to support legacy conversations without a type. Takes advantage of the fact that
