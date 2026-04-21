@@ -6,11 +6,13 @@ import { jwtDecrypt } from "jose/jwt/decrypt";
  * @returns The decrypted cookie payload or null if decryption fails
  */
 export default async function decryptCookie(
-  token: string
+  token: string,
 ): Promise<any | null> {
   try {
     if (!token) throw new Error("No token found");
-    const secret = new TextEncoder().encode(process.env.SESSION_SECRET!);
+    if (!process.env.SESSION_SECRET) throw new Error("No session secret found");
+
+    const secret = Buffer.from(process.env.SESSION_SECRET, "base64");
     const cookie = await jwtDecrypt(token, secret);
     return cookie;
   } catch (error) {
