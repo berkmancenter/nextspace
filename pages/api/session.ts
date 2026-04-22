@@ -13,7 +13,10 @@ import { CURRENT_COOKIE_VERSION } from "../../utils/cookieValidator";
  */
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!process.env.SESSION_SECRET) {
-    res.status(500).json({ error: "SESSION_SECRET is not set" });
+    console.log("SESSION_SECRET is not set");
+    res
+      .status(500)
+      .json({ error: "Internal server error: missing environment variable" });
     return;
   }
 
