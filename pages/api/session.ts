@@ -21,6 +21,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   const secret = Buffer.from(process.env.SESSION_SECRET, "base64");
+  if (secret.length !== 32) {
+    console.error(
+      `SESSION_SECRET decoded to ${secret.length} bytes, expected 32`,
+    );
+    res
+      .status(500)
+      .json({
+        error: "Internal server error: invalid environment variable length",
+      });
+    return;
+  }
 
   // Handle PATCH request - update tokens in existing session
   if (req.method === "PATCH") {

@@ -65,7 +65,7 @@ export default function LoginPage() {
     try {
       const response = await Authenticate(
         formData.get("username")!.toString(),
-        formData.get("password")!.toString()
+        formData.get("password")!.toString(),
       );
       if (response.error) {
         setFormError(response.message);
@@ -82,12 +82,12 @@ export default function LoginPage() {
       );
 
       const userId = response.user?.id || response.userId;
-      
+
       // Get the active pseudonym for the user
       const activePseudonym = response.user?.pseudonyms?.find(
-        (p: any) => p.active
+        (p: any) => p.active,
       )?.pseudonym;
-      
+
       if (!activePseudonym) {
         setFormError("No active pseudonym found for user.");
         return;
@@ -98,7 +98,7 @@ export default function LoginPage() {
 
       // Set session cookie via local API route, including expiry timestamps
       // so the cookie-based proactive refresh can schedule correctly.
-      await fetch("/api/session", {
+      const sessionReq = await fetch("/api/session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -113,7 +113,15 @@ export default function LoginPage() {
           authType: "admin",
         }),
       });
+      // Check if the session request was successful
+      if (!sessionReq.ok) {
+        const errorData = await sessionReq.json();
+        setFormError(errorData.error || "Failed to set session cookie.");
+        return;
+      }
+
       setFormSuccess(true);
+
       // Redirect to events page after successful login
       router.push("/admin/events");
     } catch (error: any) {
@@ -192,9 +200,9 @@ export default function LoginPage() {
               !formRef.current?.elements.namedItem("username") ||
                 !(
                   formRef.current.elements.namedItem(
-                    "username"
+                    "username",
                   ) as HTMLInputElement
-                ).value
+                ).value,
             )
           }
           error={usernameHasError}
@@ -215,9 +223,9 @@ export default function LoginPage() {
               !formRef.current?.elements.namedItem("password") ||
                 !(
                   formRef.current.elements.namedItem(
-                    "password"
+                    "password",
                   ) as HTMLInputElement
-                ).value
+                ).value,
             )
           }
           error={passwordHasError}
