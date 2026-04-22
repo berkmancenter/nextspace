@@ -134,7 +134,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
         // Needed so the Quick Guide can filter commands by type name —
         // the raw API response only carries a type ID, not the resolved object.
         const conversation = await createConversationFromData(conversationResponse);
-        setConversationType(conversation.type.name);
+        setConversationType(conversation.type);
       }
 
       // Fetch messages

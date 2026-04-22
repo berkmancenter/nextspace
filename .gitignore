@@ -40,3 +40,4 @@ types.ts
 # TypeScript build cache
 *.tsbuildinfo
 REVIEW.md
+.claude/launch.json

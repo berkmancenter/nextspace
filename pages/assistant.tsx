@@ -5,7 +5,6 @@ import { AssistantChatPanel } from "../components/AssistantChatPanel";
 import { GroupChatPanel } from "../components/GroupChatPanel";
 import { ResourcesPanel } from "../components/ResourcesPanel";
 import { SlashCommand } from "../components/enhancers/slashCommandEnhancer";
-import { allSlashCommands } from "../content/slashCommands";
 import {
   Api,
   RetrieveData,
@@ -198,13 +197,15 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   // Combine session and local errors
   const errorMessage = sessionError || localError;
 
-  // Filter commands based on current conversation type
-  const slashCommands = allSlashCommands.filter((cmd) => {
-    if (!cmd.conversationTypes || cmd.conversationTypes.length === 0) {
-      return false;
-    }
-    return conversationType && cmd.conversationTypes.includes(conversationType);
-  });
+  // Derive slash commands from the loaded conversation type's features.
+  // Empty until the type loads, so the autocomplete stays hidden during that window.
+  const slashCommands: SlashCommand[] = (conversationType?.features ?? [])
+    .filter((f) => (f.audience === "participant" || f.audience === "both") && f.slashCommand != null)
+    .map((f) => ({
+      command: f.slashCommand!,
+      description: f.participantDescription ?? f.description ?? "",
+      value: `/${f.slashCommand} `,
+    }));
 
   // Set up message listener
   useEffect(() => {
@@ -306,7 +307,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         }
 
         const conversation = await createConversationFromData(conversationData);
-        setConversationType(conversation.type.name);
+        setConversationType(conversation.type);
         if (conversation.name) setEventName(conversation.name);
 
         // Extract event metadata from conversation

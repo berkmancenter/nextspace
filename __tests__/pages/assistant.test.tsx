@@ -469,7 +469,24 @@ describe("EventAssistantRoom", () => {
       });
       (createConversationFromData as jest.Mock).mockResolvedValue({
         agents: [{ id: "agent-456", agentType: "eventAssistantPlus" }],
-        type: { name: "eventAssistantPlus" },
+        type: {
+          name: "eventAssistantPlus",
+          description: "",
+          platforms: [],
+          properties: [],
+          features: [
+            {
+              name: "mod",
+              label: "Submit to Moderator",
+              tab: "chat",
+              audience: "participant",
+              slashCommand: "mod",
+              default: true,
+              agents: [],
+              description: "Submit a question to the moderator",
+            },
+          ],
+        },
       });
 
       await act(async () => {
@@ -536,7 +553,7 @@ describe("EventAssistantRoom", () => {
       });
       (createConversationFromData as jest.Mock).mockResolvedValue({
         agents: [{ id: "agent-456", agentType: "eventAssistant" }],
-        type: { name: "eventAssistant" },
+        type: { name: "eventAssistant", description: "", platforms: [], properties: [], features: [] },
       });
 
       await act(async () => {

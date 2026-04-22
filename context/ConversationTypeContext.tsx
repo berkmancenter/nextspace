@@ -1,14 +1,17 @@
 "use client";
 import { createContext, useContext, useState } from "react";
+import { components } from "../types";
+
+export type ConversationType = components["schemas"]["ConversationType"];
 
 const DEFAULT_BOT_NAME = "Berkie";
 
 /**
- * Holds the conversation type for the current event (e.g. "eventAssistantPlus").
+ * Holds the resolved conversation type for the current event.
  * null means the type hasn't loaded yet — consumers should treat this as "unknown".
  */
-const TypeValueContext = createContext<string | null>(null);
-const TypeSetterContext = createContext<(type: string | null) => void>(() => {});
+const ConversationTypeContext = createContext<ConversationType | null>(null);
+const ConversationTypeContextSetter = createContext<(type: ConversationType | null) => void>(() => {});
 
 /**
  * Holds the display name of the AI assistant bot for the current event.
@@ -32,21 +35,21 @@ export function ConversationTypeProvider({
   initialBotName = DEFAULT_BOT_NAME,
 }: {
   children: React.ReactNode;
-  initialValue?: string | null;
+  initialValue?: ConversationType | null;
   initialBotName?: string;
 }) {
-  const [type, setType] = useState<string | null>(initialValue);
+  const [type, setType] = useState<ConversationType | null>(initialValue);
   const [botName, setBotName] = useState<string>(initialBotName);
   return (
-    <TypeSetterContext.Provider value={setType}>
-      <TypeValueContext.Provider value={type}>
+    <ConversationTypeContextSetter.Provider value={setType}>
+      <ConversationTypeContext.Provider value={type}>
         <BotNameSetterContext.Provider value={setBotName}>
           <BotNameValueContext.Provider value={botName}>
             {children}
           </BotNameValueContext.Provider>
         </BotNameSetterContext.Provider>
-      </TypeValueContext.Provider>
-    </TypeSetterContext.Provider>
+      </ConversationTypeContext.Provider>
+    </ConversationTypeContextSetter.Provider>
   );
 }
 
@@ -54,8 +57,8 @@ export function ConversationTypeProvider({
  * Returns the current event's conversation type, or null if not yet loaded.
  * Use this to filter commands or features to what's available in the current event.
  */
-export function useConversationType(): string | null {
-  return useContext(TypeValueContext);
+export function useConversationType(): ConversationType | null {
+  return useContext(ConversationTypeContext);
 }
 
 /**
@@ -63,8 +66,8 @@ export function useConversationType(): string | null {
  * Page components call this once the conversation has been fetched, and
  * should reset to null when leaving the event so stale types don't leak.
  */
-export function useSetConversationType(): (type: string | null) => void {
-  return useContext(TypeSetterContext);
+export function useSetConversationType(): (type: ConversationType | null) => void {
+  return useContext(ConversationTypeContextSetter);
 }
 
 /**
