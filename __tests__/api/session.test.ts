@@ -29,7 +29,7 @@ jest.mock("../../utils/withEnvValidation", () => ({
 import handler from "../../pages/api/session";
 import { jwtDecrypt } from "jose";
 
-const SECRET = "test-secret-key-minimum-32-chars!!";
+const SECRET = "bri956LLFxctMUwQYElvu8VcM/hIN/4O6dwGnPLd9WM=";
 process.env.SESSION_SECRET = SECRET;
 Object.defineProperty(process.env, "NODE_ENV", {
   value: "test",
