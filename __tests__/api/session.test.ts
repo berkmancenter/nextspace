@@ -42,6 +42,82 @@ const mockJwtDecrypt = jwtDecrypt as jest.MockedFunction<typeof jwtDecrypt>;
 const jose = require("jose");
 const mockEncrypt = jose.__mockEncrypt;
 
+describe("SESSION_SECRET validation", () => {
+  const originalSecret = process.env.SESSION_SECRET;
+
+  afterEach(() => {
+    process.env.SESSION_SECRET = originalSecret;
+  });
+
+  it("should return 500 if SESSION_SECRET is not set", async () => {
+    delete process.env.SESSION_SECRET;
+
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+      method: "POST",
+      body: { username: "testuser", accessToken: "a", refreshToken: "b" },
+    });
+
+    await handler(req, res);
+
+    expect(res._getStatusCode()).toBe(500);
+    expect(JSON.parse(res._getData())).toEqual({
+      error: "Internal server error: missing environment variable",
+    });
+  });
+
+  it("should return 500 if SESSION_SECRET decodes to wrong byte length", async () => {
+    // base64 of a string that does not decode to 32 bytes
+    process.env.SESSION_SECRET = Buffer.from("tooshort").toString("base64");
+
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+      method: "POST",
+      body: { username: "testuser", accessToken: "a", refreshToken: "b" },
+    });
+
+    await handler(req, res);
+
+    expect(res._getStatusCode()).toBe(500);
+    expect(JSON.parse(res._getData())).toEqual({
+      error: "Internal server error: invalid environment variable length",
+    });
+  });
+
+  it("should return 500 if SESSION_SECRET is not valid base64 (random chars)", async () => {
+    // Not valid base64, but Buffer.from will still attempt to parse it;
+    // the result will not be 32 bytes
+    process.env.SESSION_SECRET = "not-valid-base64!!!";
+
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+      method: "POST",
+      body: { username: "testuser", accessToken: "a", refreshToken: "b" },
+    });
+
+    await handler(req, res);
+
+    expect(res._getStatusCode()).toBe(500);
+    expect(JSON.parse(res._getData())).toEqual({
+      error: "Internal server error: invalid environment variable length",
+    });
+  });
+
+  it("should return 500 if SESSION_SECRET is a 44-char base64 string that decodes to wrong length", async () => {
+    // 44 chars of base64 but not a valid 32-byte key (padding issues)
+    process.env.SESSION_SECRET = "YQ==".padEnd(44, "Y"); // invalid padding, not 32 bytes
+
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+      method: "POST",
+      body: { username: "testuser", accessToken: "a", refreshToken: "b" },
+    });
+
+    await handler(req, res);
+
+    expect(res._getStatusCode()).toBe(500);
+    expect(JSON.parse(res._getData())).toEqual({
+      error: "Internal server error: invalid environment variable length",
+    });
+  });
+});
+
 describe("/api/session", () => {
   beforeEach(() => {
     mockEncrypt.mockResolvedValue("encrypted-jwt-token");
