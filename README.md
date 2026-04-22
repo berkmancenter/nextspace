@@ -47,7 +47,7 @@ Nextspace uses a hybrid authentication model that supports both anonymous partic
 - Guest pseudonyms are for **participation**, not authentication
 - Session cookies are encrypted and HTTP-only for security
 - Certain pages (home, login, signup, logout) skip automatic guest session creation to avoid unnecessary accounts
-- The `SESSION_SECRET` environment variable must be at least 32 characters for secure cookie encryption
+- The `SESSION_SECRET` environment variable must be a base64-encoded 32-byte key (44 characters) for secure cookie encryption
 
 ### Documentation
 
