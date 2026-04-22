@@ -12,14 +12,36 @@ import { CURRENT_COOKIE_VERSION } from "../../utils/cookieValidator";
  * @returns A JSON response indicating successful cookie operation
  */
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const secret = new TextEncoder().encode(process.env.SESSION_SECRET!);
+  if (!process.env.SESSION_SECRET) {
+    console.log("SESSION_SECRET is not set");
+    res
+      .status(500)
+      .json({ error: "Internal server error: missing environment variable" });
+    return;
+  }
+
+  const secret = Buffer.from(process.env.SESSION_SECRET, "base64");
+  if (secret.length !== 32) {
+    console.error(
+      `SESSION_SECRET decoded to ${secret.length} bytes, expected 32`,
+    );
+    res
+      .status(500)
+      .json({
+        error: "Internal server error: invalid environment variable length",
+      });
+    return;
+  }
 
   // Handle PATCH request - update tokens in existing session
   if (req.method === "PATCH") {
-    const { accessToken, refreshToken, accessExpires, refreshExpires } = req.body;
+    const { accessToken, refreshToken, accessExpires, refreshExpires } =
+      req.body;
 
     if (!accessToken || !refreshToken) {
-      res.status(400).json({ error: "accessToken and refreshToken are required" });
+      res
+        .status(400)
+        .json({ error: "accessToken and refreshToken are required" });
       return;
     }
 
@@ -61,7 +83,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         "Set-Cookie",
         `nextspace-session=${cookie}; HttpOnly; ${
           process.env.NODE_ENV === "production" ? "Secure" : ""
-        }; SameSite=Strict; Max-Age=${maxAge}; Path=/`
+        }; SameSite=Strict; Max-Age=${maxAge}; Path=/`,
       );
       res.status(200).json({ message: "Successfully updated session tokens!" });
       return;
@@ -111,7 +133,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       .setExpirationTime(
         sessionData.expirationFromNow
           ? Math.floor(Date.now() / 1000) + sessionData.expirationFromNow
-          : "30d"
+          : "30d",
       )
       .setSubject(sessionData.username)
       .setIssuedAt()
@@ -123,7 +145,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       "Set-Cookie",
       `nextspace-session=${cookie}; HttpOnly; ${
         process.env.NODE_ENV === "production" ? "Secure" : ""
-      }; SameSite=Strict; Max-Age=${maxAge}; Path=/`
+      }; SameSite=Strict; Max-Age=${maxAge}; Path=/`,
     );
     res.status(200).json({ message: "Successfully set cookie!" });
     return;
