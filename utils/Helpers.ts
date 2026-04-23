@@ -24,6 +24,7 @@ export interface ParsedMessageBody {
   type?: string;
   message?: string;
   media?: MediaItem[];
+  source?: string;
   sourceMessage?: string;
 }
 
@@ -41,6 +42,7 @@ export const parseMessageBody = (body: string | object): ParsedMessageBody => {
       type: obj.type?.toString(),
       message: obj.message?.toString(),
       media: Array.isArray(obj.media) ? obj.media : undefined,
+      source: obj.source?.toString(),
       sourceMessage: obj.sourceMessage?.toString(),
     };
   }

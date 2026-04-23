@@ -2088,6 +2088,82 @@ describe("GroupChatPanel", () => {
     });
   });
 
+  describe("Voice reply banner", () => {
+    const agentMessage = (body: Record<string, unknown>) => ({
+      id: "1",
+      pseudonym: "Event Assistant",
+      createdAt: "2025-10-17T12:00:00Z",
+      body,
+      channels: ["chat"],
+      conversation: "conv-1",
+      pseudonymId: "ea-1",
+      fromAgent: true,
+      pause: false,
+      visible: true,
+      upVotes: [],
+      downVotes: [],
+    });
+
+    it("shows voice banner with 🔊 prefix for bot message with source=voice", () => {
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[
+            agentMessage({
+              text: "Here is my answer",
+              source: "voice",
+              sourceMessage: "What is the agenda?",
+            }),
+          ]}
+        />,
+      );
+
+      expect(screen.getByText(/In reply to:/)).toBeInTheDocument();
+      expect(screen.getByText(/🔊/)).toBeInTheDocument();
+      expect(screen.getByText(/What is the agenda\?/)).toBeInTheDocument();
+    });
+
+    it("does not show banner when source is not voice", () => {
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[agentMessage({ text: "Just a normal response" })]}
+        />,
+      );
+
+      expect(screen.queryByText(/In reply to:/)).not.toBeInTheDocument();
+    });
+
+    it("does not show banner when sourceMessage is missing", () => {
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[agentMessage({ text: "Answer", source: "voice" })]}
+        />,
+      );
+
+      expect(screen.queryByText(/In reply to:/)).not.toBeInTheDocument();
+    });
+
+    it("truncates sourceMessage longer than 60 characters", () => {
+      const longQuestion = "a".repeat(80);
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[
+            agentMessage({
+              text: "Answer",
+              source: "voice",
+              sourceMessage: longQuestion,
+            }),
+          ]}
+        />,
+      );
+
+      expect(screen.getByText(new RegExp("a{60}\\.\\.\\."))). toBeInTheDocument();
+    });
+  });
+
   describe("Thinking Bot Icon", () => {
     it("shows thinking bot icon when waiting for non-threaded response", () => {
       const messages = [

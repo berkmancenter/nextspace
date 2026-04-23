@@ -189,16 +189,32 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     }
 
     // Assistant messages
+    const isVoiceReply = parsed.source === "voice";
+    const sourceContextText = parsed.sourceMessage
+      ? parsed.sourceMessage.length > 60
+        ? parsed.sourceMessage.substring(0, 60) + "..."
+        : parsed.sourceMessage
+      : null;
+
     return (
-      <div
-        className="rounded-2xl px-2 py-1 text-gray-800 self-start"
-        style={{
-          backgroundColor: isHovered ? "white" : style.bubbleBg,
-          width: "85%",
-          border: "1px solid rgba(0, 0, 0, 0.1)",
-        }}
-      >
-        {renderAssistantMessage(parsed.text)}
+      <div style={{ width: "85%" }}>
+        {sourceContextText && (
+          <div className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded">
+            <span className="font-medium">
+              {isVoiceReply ? "🔊 " : ""}In reply to:{" "}
+            </span>
+            {sourceContextText}
+          </div>
+        )}
+        <div
+          className="rounded-2xl px-2 py-1 text-gray-800 self-start"
+          style={{
+            backgroundColor: isHovered ? "white" : style.bubbleBg,
+            width: "100%",
+            border: "1px solid rgba(0, 0, 0, 0.1)",
+          }}
+        >
+          {renderAssistantMessage(parsed.text)}
 
         {/* Render media items */}
         {parsed.media && parsed.media.length > 0 && (
@@ -231,6 +247,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             })}
           </div>
         )}
+        </div>
       </div>
     );
   };
