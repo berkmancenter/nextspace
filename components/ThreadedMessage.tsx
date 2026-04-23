@@ -165,20 +165,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
 
       {/* Message with avatar - always left-aligned */}
       <div
-        className={`flex gap-1.5 mb-1 flex-row transition-colors ${isThreadOpen ? "bg-blue-50 border-l-4 border-blue-400 pl-2 py-2 -ml-2 rounded-r-lg" : ""}`}
-        style={{
-          backgroundColor:
-            showReplyButton && !isThreadOpen ? "white" : undefined,
-          marginLeft: showReplyButton && !isThreadOpen ? "-8px" : undefined,
-          marginRight: showReplyButton && !isThreadOpen ? "-8px" : undefined,
-          marginTop: showReplyButton && !isThreadOpen ? "-4px" : undefined,
-          marginBottom: showReplyButton && !isThreadOpen ? "-16px" : undefined,
-          paddingLeft: showReplyButton && !isThreadOpen ? "8px" : undefined,
-          paddingRight: showReplyButton && !isThreadOpen ? "8px" : undefined,
-          paddingTop: showReplyButton && !isThreadOpen ? "4px" : undefined,
-          paddingBottom: showReplyButton && !isThreadOpen ? "16px" : undefined,
-          borderRadius: showReplyButton && !isThreadOpen ? "8px" : undefined,
-        }}
+        className={`flex flex-row gap-1.5 p-2 rounded-[.5rem] transition-all ${isThreadOpen ? "bg-blue-50 border-l-4 border-blue-400 pl-2 py-2 -ml-2 rounded-r-lg" : `${showReplyButton && "bg-white"}`}`}
       >
         {/* Avatar */}
         {renderAvatar(message)}
@@ -195,49 +182,45 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
 
           {/* Message bubble wrapper with hover state - extended to include button area */}
           <div
-            className="relative"
+            className="relative w-full lg:w-[calc(85% + 24px)]"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
             onTouchMove={handleTouchMove}
             onMouseEnter={() => setShowReplyButton(true)}
             onMouseLeave={() => setShowReplyButton(false)}
-            style={{ width: "calc(85% + 24px)" }}
           >
             {/* Message bubble - renderMessageContent provides the complete styled bubble */}
-            <div className="relative" style={{ width: "calc(100% - 24px)" }}>
+            <div className="relative flex flex-row gap-1 lg:gap-4">
               {renderMessageContent(message)}
-            </div>
 
-            {/* Reply button pill - reply icon in top right */}
-            {showReplyButton && (
-              <IconButton
-                onClick={handleReplyClick}
-                onMouseEnter={() => setShowReplyButton(true)}
-                size="small"
-                aria-label={`Reply to ${displayName}`}
-                sx={{
-                  position: "absolute",
-                  top: -4,
-                  right: 32,
-                  width: 32,
-                  height: 32,
-                  backgroundColor: "white",
-                  border: "1.5px solid #d1d5db",
-                  boxShadow: "0 4px 6px rgba(0,0,0,0.15)",
-                  transition: "all 0.2s ease",
-                  "&:hover": {
-                    backgroundColor: "#4A0979",
-                    borderColor: "#4A0979",
-                    boxShadow: "0 6px 12px rgba(74,9,121,0.3)",
-                    "& svg": {
-                      color: "white",
+              {/* Reply button pill - reply icon in top right */}
+              {showReplyButton && (
+                <IconButton
+                  onClick={handleReplyClick}
+                  onMouseEnter={() => setShowReplyButton(true)}
+                  size="small"
+                  aria-label={`Reply to ${displayName}`}
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    backgroundColor: "white",
+                    border: "1.5px solid #d1d5db",
+                    boxShadow: "0 4px 6px rgba(0,0,0,0.15)",
+                    transition: "all 0.2s ease",
+                    "&:hover": {
+                      backgroundColor: "#4A0979",
+                      borderColor: "#4A0979",
+                      boxShadow: "0 6px 12px rgba(74,9,121,0.3)",
+                      "& svg": {
+                        color: "white",
+                      },
                     },
-                  },
-                }}
-              >
-                <Reply sx={{ fontSize: 18, color: "#6b7280" }} />
-              </IconButton>
-            )}
+                  }}
+                >
+                  <Reply sx={{ fontSize: 18, color: "#6b7280" }} />
+                </IconButton>
+              )}
+            </div>
           </div>
 
           {/* First reply preview - always left-aligned */}
