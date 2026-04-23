@@ -272,7 +272,7 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
           />
           {expandedCategories.has("readings") && (
             <div className="bg-white px-6 py-4 border-b border-gray-200">
-              <p className="text-xs text-gray-400 mb-3">
+              <p className="text-xs text-gray-600 mb-3">
                 References sourced from{" "}
                 <a
                   href="https://www.semanticscholar.org"
@@ -306,7 +306,7 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                             AI Pick
                           </span>
                           {isNew && (
-                            <span className="inline-block text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                            <span className="inline-block text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
                               New
                             </span>
                           )}
