@@ -131,9 +131,9 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     return { parentMessages: parents, threadMap: map };
   }, [messages]);
 
-
   // Auto-scroll based on parent messages only (not threaded replies)
-  const { messagesEndRef, messagesContainerRef } = useAutoScroll(parentMessages);
+  const { messagesEndRef, messagesContainerRef } =
+    useAutoScroll(parentMessages);
 
   // Determine if we're waiting for a threaded reply
   const lastMessage = messages[messages.length - 1];
@@ -189,48 +189,69 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     }
 
     // Assistant messages
-    return (
-      <div
-        className="rounded-2xl px-2 py-1 text-gray-800 self-start"
-        style={{
-          backgroundColor: isHovered ? "white" : style.bubbleBg,
-          width: "85%",
-          border: "1px solid rgba(0, 0, 0, 0.1)",
-        }}
-      >
-        {renderAssistantMessage(parsed.text)}
+    const isVoiceReply = parsed.source === "voice";
+    const sourceContextText = parsed.sourceMessage
+      ? parsed.sourceMessage.length > 60
+        ? parsed.sourceMessage.substring(0, 60) + "..."
+        : parsed.sourceMessage
+      : null;
 
-        {/* Render media items */}
-        {parsed.media && parsed.media.length > 0 && (
+    return (
+      <div style={{ width: "85%" }}>
+        {sourceContextText && (
           <div
-            style={{
-              marginTop: "0.5rem",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.5rem",
-            }}
+            className="text-xs text-gray-600 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded"
+            role="note"
+            aria-label="Voice reply context"
           >
-            {parsed.media.map((item, index) => {
-              if (item.type === "image") {
-                return (
-                  <img
-                    key={`media-${index}`}
-                    src={`data:${item.mimeType};base64,${item.data}`}
-                    alt="Visual response"
-                    style={{
-                      maxWidth: "100%",
-                      height: "auto",
-                      borderRadius: "8px",
-                      border: "1px solid rgba(0, 0, 0, 0.1)",
-                    }}
-                  />
-                );
-              }
-              // Future: handle audio, video types here
-              return null;
-            })}
+            <span className="font-medium" aria-hidden="true">
+              {isVoiceReply ? "🔊 " : ""}In reply to:{" "}
+            </span>
+            {sourceContextText}
           </div>
         )}
+        <div
+          className="rounded-2xl px-2 py-1 text-gray-800 self-start"
+          style={{
+            backgroundColor: isHovered ? "white" : style.bubbleBg,
+            width: "100%",
+            border: "1px solid rgba(0, 0, 0, 0.1)",
+          }}
+        >
+          {renderAssistantMessage(parsed.text)}
+
+          {/* Render media items */}
+          {parsed.media && parsed.media.length > 0 && (
+            <div
+              style={{
+                marginTop: "0.5rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+              }}
+            >
+              {parsed.media.map((item, index) => {
+                if (item.type === "image") {
+                  return (
+                    <img
+                      key={`media-${index}`}
+                      src={`data:${item.mimeType};base64,${item.data}`}
+                      alt="Visual response"
+                      style={{
+                        maxWidth: "100%",
+                        height: "auto",
+                        borderRadius: "8px",
+                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                      }}
+                    />
+                  );
+                }
+                // Future: handle audio, video types here
+                return null;
+              })}
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -320,7 +341,11 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                   feedbackConfig={feedbackConfig}
                   showTimestamp={showTimestamp}
                   isThreadOpen={selectedThreadId === message.id}
-                  hasUnreadReplies={message.id ? messagesWithUnreadReplies.has(message.id) : false}
+                  hasUnreadReplies={
+                    message.id
+                      ? messagesWithUnreadReplies.has(message.id)
+                      : false
+                  }
                 />
               );
             })}
