@@ -100,6 +100,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [unseenAssistantCount, setUnseenAssistantCount] = useState<number>(0);
   const [unseenChatCount, setUnseenChatCount] = useState<number>(0);
   const [unseenResourcesCount, setUnseenResourcesCount] = useState<number>(0);
+  const [resourcesNavBadgeDismissed, setResourcesNavBadgeDismissed] = useState(false);
   const [unreadAssistantReplyCount, setUnreadAssistantReplyCount] = useState<number>(0);
   const [unreadChatReplyCount, setUnreadChatReplyCount] = useState<number>(0);
   // Track which resource message IDs contain new (unseen) readings for highlighting
@@ -244,14 +245,17 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         if (data.id) {
           setNewReadingMessageIds((prev) => new Set([...prev, data.id!]));
         }
-        // Increment counter if NOT viewing resources tab
+        // Always increment counter so the in-panel badge shows when already on the resources tab
+        const parsed = parseMessageBody(data.body);
+        const readingCount =
+          parsed.type === "reading" && Array.isArray(parsed.content)
+            ? parsed.content.length
+            : 1;
+        setUnseenResourcesCount((prev) => prev + readingCount);
+        // Only clear the nav badge dismissal when NOT on the resources tab
+        // (nav badge is separately suppressed by resourcesNavBadgeDismissed while on the tab)
         if (activeTabRef.current !== "resources") {
-          const parsed = parseMessageBody(data.body);
-          const readingCount =
-            parsed.type === "reading" && Array.isArray(parsed.content)
-              ? parsed.content.length
-              : 1;
-          setUnseenResourcesCount((prev) => prev + readingCount);
+          setResourcesNavBadgeDismissed(false);
         }
       } else if (!data.channels || !data.channels.includes("transcript")) {
         setAssistantMessages((prev) => [...prev, data]);
@@ -936,10 +940,13 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     } else if (tab === "chat") {
       setUnseenChatCount(0);
       // Note: unreadReplyCount is managed by GroupChatPanel visibility logic
+    } else if (tab === "resources") {
+      setResourcesNavBadgeDismissed(true);
     }
-    // Clear reading highlights when leaving the resources tab
+    // Clear reading state when leaving the resources tab
     if (activeTab === "resources" && tab !== "resources") {
       setNewReadingMessageIds(new Set());
+      setUnseenResourcesCount(0);
     }
     // Track tab switch analytics (transcript treated as a nav destination)
     trackConversationEvent(
@@ -992,7 +999,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
             onTabChange={handleTabChange}
             unseenAssistantCount={unseenAssistantCount}
             unseenChatCount={unseenChatCount}
-            unseenResourcesCount={unseenResourcesCount}
+            unseenResourcesCount={resourcesNavBadgeDismissed ? 0 : unseenResourcesCount}
             unreadAssistantReplyCount={unreadAssistantReplyCount}
             unreadChatReplyCount={unreadChatReplyCount}
             showChat={!!chatPasscode}

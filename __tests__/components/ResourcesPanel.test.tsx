@@ -368,7 +368,7 @@ describe("ResourcesPanel", () => {
   });
 
   describe("onMarkReadingsAsSeen callback", () => {
-    it("calls onMarkReadingsAsSeen when readings section is expanded", async () => {
+    it("does not call onMarkReadingsAsSeen when readings section is expanded", async () => {
       const user = userEvent.setup();
       const onMarkReadingsAsSeen = jest.fn();
       render(
@@ -378,10 +378,10 @@ describe("ResourcesPanel", () => {
         />,
       );
       await user.click(screen.getByText("Readings & References"));
-      expect(onMarkReadingsAsSeen).toHaveBeenCalledTimes(1);
+      expect(onMarkReadingsAsSeen).not.toHaveBeenCalled();
     });
 
-    it("does not call onMarkReadingsAsSeen when collapsing readings section", async () => {
+    it("calls onMarkReadingsAsSeen when collapsing readings section", async () => {
       const user = userEvent.setup();
       const onMarkReadingsAsSeen = jest.fn();
       render(

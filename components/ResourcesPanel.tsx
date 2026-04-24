@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { PseudonymousMessage } from "../types.internal";
 import { parseMessageBody } from "../utils/Helpers";
 import {
@@ -77,7 +77,19 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
   );
   // Snapshot of new reading IDs captured at expand time, so highlights persist
   // even after the parent clears newReadingMessageIds
-  const [newReadingIdsSnapshot, setNewReadingIdsSnapshot] = useState<Set<string>>(new Set());
+  const [newReadingIdsSnapshot, setNewReadingIdsSnapshot] = useState<
+    Set<string>
+  >(new Set());
+
+  // When new readings arrive while the section is already expanded, merge them into the snapshot
+  useEffect(() => {
+    if (!expandedCategories.has("readings") || !newReadingMessageIds) return;
+    setNewReadingIdsSnapshot((prev) => {
+      const hasNew = [...newReadingMessageIds].some((id) => !prev.has(id));
+      if (!hasNew) return prev;
+      return new Set([...prev, ...newReadingMessageIds]);
+    });
+  }, [newReadingMessageIds, expandedCategories]);
 
   // Extract reading recommendations from messages
   const readings = useMemo(() => {
@@ -125,17 +137,21 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
       const newSet = new Set(prev);
       if (newSet.has(categoryId)) {
         newSet.delete(categoryId);
-        if (categoryId === "readings") setNewReadingIdsSnapshot(new Set());
       } else {
         newSet.add(categoryId);
-        // Snapshot current new IDs before clearing, so highlights render correctly
-        if (categoryId === "readings") {
-          setNewReadingIdsSnapshot(new Set(newReadingMessageIds));
-          if (onMarkReadingsAsSeen) onMarkReadingsAsSeen();
-        }
       }
       return newSet;
     });
+    if (categoryId === "readings") {
+      if (expandedCategories.has(categoryId)) {
+        // Mark as seen on collapse so re-expanding doesn't re-show highlights
+        setNewReadingIdsSnapshot(new Set());
+        if (onMarkReadingsAsSeen) onMarkReadingsAsSeen();
+      } else {
+        // Snapshot current new IDs before clearing, so highlights render correctly
+        setNewReadingIdsSnapshot(new Set(newReadingMessageIds));
+      }
+    }
   };
 
   const CategoryHeader: React.FC<{
@@ -155,7 +171,10 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
             {category.title}
           </span>
           {category.count > 0 && (
-            <span aria-hidden="true" className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+            <span
+              aria-hidden="true"
+              className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium"
+            >
               {category.count}
             </span>
           )}
@@ -290,18 +309,21 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                     No reading recommendations available yet.
                   </li>
                 ) : (
-                  readings.map((reading, idx) => {
+                  readings.map((reading) => {
                     const isNew = newReadingIdsSnapshot.has(reading.messageId);
                     return (
                       <li
-                        key={idx}
+                        key={reading.messageId}
                         className={`border-l-4 pl-4 py-3 rounded-r ${
                           isNew
                             ? "border-amber-400 bg-amber-50"
                             : "border-indigo-400 bg-indigo-50"
                         }`}
                       >
-                        <div aria-hidden="true" className="flex items-center gap-2 mb-2">
+                        <div
+                          aria-hidden="true"
+                          className="flex items-center gap-2 mb-2"
+                        >
                           <span className="inline-block text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
                             AI Pick
                           </span>
@@ -332,7 +354,10 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                           {reading.authors.join(", ")} ({reading.year})
                         </p>
                         {(reading.relevanceReason || reading.abstract) && (
-                          <p tabIndex={0} className="text-xs text-gray-700 leading-relaxed mb-2">
+                          <p
+                            tabIndex={0}
+                            className="text-xs text-gray-700 leading-relaxed mb-2"
+                          >
                             <span className="sr-only">Relevance: </span>
                             {reading.relevanceReason || reading.abstract}
                           </p>
