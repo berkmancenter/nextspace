@@ -10,10 +10,9 @@ const baseProps = {
   unseenChatCount: 0,
   unreadAssistantReplyCount: 0,
   unreadChatReplyCount: 0,
-  unseenJargonCount: 0,
   showChat: true,
   showTranscript: true,
-  showJargon: false,
+  showResources: false,
   botName: "Berkie",
 };
 
@@ -22,13 +21,14 @@ describe("NavigationBar", () => {
     jest.clearAllMocks();
   });
 
-  it("renders all three tabs when showChat and showTranscript are true", () => {
+  it("renders assistant, chat, and transcript tabs when showChat and showTranscript are true", () => {
     render(<NavigationBar {...baseProps} />);
 
     // Both desktop and mobile navs render, so use getAllByLabelText
     expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("Group Chat").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("Transcript").length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("Resources")).not.toBeInTheDocument();
   });
 
   it("hides chat tab when showChat is false", () => {
@@ -55,6 +55,42 @@ describe("NavigationBar", () => {
     expect(screen.getAllByLabelText("Berkie").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("Group Chat")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Transcript")).not.toBeInTheDocument();
+  });
+
+  it("hides resources tab by default", () => {
+    render(<NavigationBar {...baseProps} />);
+
+    expect(screen.queryByLabelText("Resources")).not.toBeInTheDocument();
+  });
+
+  it("shows resources tab when showResources is true", () => {
+    render(<NavigationBar {...baseProps} showResources={true} />);
+
+    expect(screen.getAllByLabelText("Resources").length).toBeGreaterThan(0);
+  });
+
+  it("calls onTabChange with 'resources' when resources tab clicked", async () => {
+    const user = userEvent.setup();
+    const onTabChange = jest.fn();
+    render(
+      <NavigationBar {...baseProps} showResources={true} onTabChange={onTabChange} />,
+    );
+
+    const resourcesBtns = screen.getAllByLabelText("Resources");
+    await user.click(resourcesBtns[0]);
+
+    expect(onTabChange).toHaveBeenCalledWith("resources");
+  });
+
+  it("marks resources tab as active with aria-current='page' when activeTab is resources", () => {
+    render(
+      <NavigationBar {...baseProps} showResources={true} activeTab="resources" />,
+    );
+
+    const activeResourcesBtns = screen
+      .getAllByLabelText("Resources")
+      .filter((btn) => btn.getAttribute("aria-current") === "page");
+    expect(activeResourcesBtns.length).toBeGreaterThan(0);
   });
 
   it("marks the active tab with aria-current='page'", () => {
@@ -174,6 +210,42 @@ describe("NavigationBar", () => {
           !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
       );
       expect(visibleBadges.length).toBeGreaterThan(0);
+    });
+
+    it("shows badge on resources tab when unseenResourcesCount > 0 and not on resources tab", () => {
+      const { container } = render(
+        <NavigationBar
+          {...baseProps}
+          showResources={true}
+          unseenResourcesCount={3}
+          activeTab="assistant"
+        />,
+      );
+
+      const badges = container.querySelectorAll(".MuiBadge-badge");
+      const visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      expect(visibleBadges.length).toBeGreaterThan(0);
+    });
+
+    it("hides badge on resources tab when active even with unseenResourcesCount > 0", () => {
+      const { container } = render(
+        <NavigationBar
+          {...baseProps}
+          showResources={true}
+          unseenResourcesCount={3}
+          activeTab="resources"
+        />,
+      );
+
+      const badges = container.querySelectorAll(".MuiBadge-badge");
+      const visibleBadges = Array.from(badges).filter(
+        (badge) =>
+          !(badge as HTMLElement).classList.contains("MuiBadge-invisible"),
+      );
+      expect(visibleBadges.length).toBe(0);
     });
 
     it("shows badge when on chat tab with unseenChatCount but no unreadChatReplyCount", () => {

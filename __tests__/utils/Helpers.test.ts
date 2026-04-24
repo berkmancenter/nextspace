@@ -3,13 +3,18 @@ import {
   normalizeAssistantPseudonym,
   buildDirectChannels,
   parseMessageBody,
+  createConversationFromData,
+  GetChannelPasscode,
+  Api,
 } from "../../utils/Helpers";
 
 describe("resolveConversationBotName", () => {
   const fallback = "Berkie";
 
   it("returns configBotName when agents array is empty", () => {
-    expect(resolveConversationBotName({ agents: [] as any }, fallback)).toBe("Berkie");
+    expect(resolveConversationBotName({ agents: [] as any }, fallback)).toBe(
+      "Berkie",
+    );
   });
 
   it("returns configBotName when first agent has no agentConfig", () => {
@@ -18,13 +23,23 @@ describe("resolveConversationBotName", () => {
   });
 
   it("returns configBotName when agentConfig exists but has no botName key", () => {
-    const agents = [{ id: "a1", agentType: "eventAssistant", agentConfig: { llmModel: "gpt-4" } }] as any;
+    const agents = [
+      {
+        id: "a1",
+        agentType: "eventAssistant",
+        agentConfig: { llmModel: "gpt-4" },
+      },
+    ] as any;
     expect(resolveConversationBotName({ agents }, fallback)).toBe("Berkie");
   });
 
   it("returns agentConfig.botName when it is a non-empty string", () => {
     const agents = [
-      { id: "a1", agentType: "eventAssistant", agentConfig: { botName: "EventBot" } },
+      {
+        id: "a1",
+        agentType: "eventAssistant",
+        agentConfig: { botName: "EventBot" },
+      },
     ] as any;
     expect(resolveConversationBotName({ agents }, fallback)).toBe("EventBot");
   });
@@ -60,7 +75,11 @@ describe("resolveConversationBotName", () => {
   it("uses the first agent only, ignoring subsequent agents", () => {
     const agents = [
       { id: "a1", agentType: "eventAssistant", agentConfig: {} },
-      { id: "a2", agentType: "eventAssistant", agentConfig: { botName: "SecondBot" } },
+      {
+        id: "a2",
+        agentType: "eventAssistant",
+        agentConfig: { botName: "SecondBot" },
+      },
     ] as any;
     // First agent has no botName → falls back to config
     expect(resolveConversationBotName({ agents }, fallback)).toBe("Berkie");
@@ -68,8 +87,16 @@ describe("resolveConversationBotName", () => {
 
   it("uses the first agent's botName when both agents have botName", () => {
     const agents = [
-      { id: "a1", agentType: "eventAssistant", agentConfig: { botName: "FirstBot" } },
-      { id: "a2", agentType: "eventAssistant", agentConfig: { botName: "SecondBot" } },
+      {
+        id: "a1",
+        agentType: "eventAssistant",
+        agentConfig: { botName: "FirstBot" },
+      },
+      {
+        id: "a2",
+        agentType: "eventAssistant",
+        agentConfig: { botName: "SecondBot" },
+      },
     ] as any;
     expect(resolveConversationBotName({ agents }, fallback)).toBe("FirstBot");
   });
@@ -117,10 +144,7 @@ describe("buildDirectChannels", () => {
   const userId = "user-123";
 
   it("includes a direct channel for each agent with no preferenceKey", () => {
-    const agents = [
-      { agentId: "agent-abc" },
-      { agentId: "agent-def" },
-    ];
+    const agents = [{ agentId: "agent-abc" }, { agentId: "agent-def" }];
     const channels = buildDirectChannels(userId, agents, {});
     expect(channels).toHaveLength(2);
     expect(channels.map((c) => c.name)).toContain("direct-user-123-agent-abc");
@@ -132,9 +156,13 @@ describe("buildDirectChannels", () => {
       { agentId: "agent-abc" },
       { agentId: "agent-jargon", preferenceKey: "jargonClarification" },
     ];
-    const channels = buildDirectChannels(userId, agents, { jargonClarification: true });
+    const channels = buildDirectChannels(userId, agents, {
+      jargonClarification: true,
+    });
     expect(channels).toHaveLength(2);
-    expect(channels.map((c) => c.name)).toContain("direct-user-123-agent-jargon");
+    expect(channels.map((c) => c.name)).toContain(
+      "direct-user-123-agent-jargon",
+    );
   });
 
   it("excludes a preference-gated agent channel when the preference is false", () => {
@@ -142,9 +170,13 @@ describe("buildDirectChannels", () => {
       { agentId: "agent-abc" },
       { agentId: "agent-jargon", preferenceKey: "jargonClarification" },
     ];
-    const channels = buildDirectChannels(userId, agents, { jargonClarification: false });
+    const channels = buildDirectChannels(userId, agents, {
+      jargonClarification: false,
+    });
     expect(channels).toHaveLength(1);
-    expect(channels.map((c) => c.name)).not.toContain("direct-user-123-agent-jargon");
+    expect(channels.map((c) => c.name)).not.toContain(
+      "direct-user-123-agent-jargon",
+    );
   });
 
   it("excludes a preference-gated agent channel when the preference is absent", () => {
@@ -154,7 +186,9 @@ describe("buildDirectChannels", () => {
     ];
     const channels = buildDirectChannels(userId, agents, {});
     expect(channels).toHaveLength(1);
-    expect(channels.map((c) => c.name)).not.toContain("direct-user-123-agent-jargon");
+    expect(channels.map((c) => c.name)).not.toContain(
+      "direct-user-123-agent-jargon",
+    );
   });
 
   it("marks all channels as direct with null passcode — access is controlled by channel name, not passcode", () => {
@@ -181,7 +215,10 @@ describe("parseMessageBody", () => {
   });
 
   it("parses object body with type field", () => {
-    const result = parseMessageBody({ text: "Message", type: "moderator_submitted" });
+    const result = parseMessageBody({
+      text: "Message",
+      type: "moderator_submitted",
+    });
     expect(result.text).toBe("Message");
     expect(result.type).toBe("moderator_submitted");
   });
@@ -229,18 +266,21 @@ describe("parseMessageBody", () => {
 
   it("parses all fields together", () => {
     const media = [{ type: "image", data: "data", mimeType: "image/png" }];
+    const content = [{ foo: "bar" }];
     const result = parseMessageBody({
       text: "Complete message",
       type: "multimodal",
       message: "msg-123",
       media,
       sourceMessage: "msg-456",
+      content,
     });
     expect(result.text).toBe("Complete message");
     expect(result.type).toBe("multimodal");
     expect(result.message).toBe("msg-123");
     expect(result.media).toEqual(media);
     expect(result.sourceMessage).toBe("msg-456");
+    expect(result.content).toEqual(content);
   });
 
   it("converts non-string values to string for text field", () => {
@@ -261,5 +301,161 @@ describe("parseMessageBody", () => {
   it("converts non-string values to string for sourceMessage field", () => {
     const result = parseMessageBody({ text: "Message", sourceMessage: 999 });
     expect(result.sourceMessage).toBe("999");
+  });
+});
+
+describe("generateEventUrls (via createConversationFromData)", () => {
+  const baseConversation = {
+    id: "conv-123",
+    conversationType: "eventAssistant",
+    agents: [{ id: "agent-1", agentType: "eventAssistant" }],
+    channels: [] as Array<{ name: string; passcode?: string }>,
+    adapters: [],
+    platforms: [],
+  };
+
+  const mockConfig = {
+    conversationTypes: [
+      { id: "1", name: "eventAssistant" },
+      { id: "2", name: "eventAssistantPlus" },
+      { id: "3", name: "eventAssistantPlusProactive" },
+      { id: "4", name: "backChannel" },
+    ],
+    availablePlatforms: [],
+    conversationBotName: "Berkie",
+  };
+
+  let getConfigSpy: jest.SpyInstance;
+
+  beforeAll(() => {
+    // jsdom sets window.location.protocol to "about:" by default;
+    // override so generated URLs are predictable.
+    Object.defineProperty(window, "location", {
+      writable: true,
+      value: { protocol: "https:", host: "example.com" },
+    });
+  });
+
+  beforeEach(() => {
+    const instance = Api.get();
+    // Reset config cache so each test starts fresh
+    (instance as any).configCache = null;
+    getConfigSpy = jest
+      .spyOn(instance, "GetConfig")
+      .mockResolvedValue(mockConfig as any);
+  });
+
+  afterEach(() => {
+    getConfigSpy.mockRestore();
+  });
+
+  it("generates a participant URL without resources param when no resources channel exists", async () => {
+    const data = { ...baseConversation, channels: [] };
+    const result = await createConversationFromData(data as any);
+    const url = result.eventUrls.participant[0]?.url;
+    expect(url).not.toContain("channel=resources");
+  });
+
+  it("appends resources channel param when a resources channel is present (eventAssistant)", async () => {
+    const data = {
+      ...baseConversation,
+      channels: [{ name: "resources", passcode: "res-secret" }],
+    };
+    const result = await createConversationFromData(data as any);
+    const url = result.eventUrls.participant[0]?.url;
+    expect(url).toContain("channel=resources,res-secret");
+  });
+
+  it("appends resources channel param for eventAssistantPlus", async () => {
+    const data = {
+      ...baseConversation,
+      conversationType: "eventAssistantPlus",
+      agents: [{ id: "agent-1", agentType: "eventAssistantPlus" }],
+      channels: [{ name: "resources", passcode: "res-plus" }],
+    };
+    const result = await createConversationFromData(data as any);
+    const url = result.eventUrls.participant[0]?.url;
+    expect(url).toContain("channel=resources,res-plus");
+  });
+
+  it("appends resources channel param for eventAssistantPlusProactive", async () => {
+    const data = {
+      ...baseConversation,
+      conversationType: "eventAssistantPlusProactive",
+      agents: [{ id: "agent-1", agentType: "eventAssistantPlusProactive" }],
+      channels: [{ name: "resources", passcode: "res-proactive" }],
+    };
+    const result = await createConversationFromData(data as any);
+    const url = result.eventUrls.participant[0]?.url;
+    expect(url).toContain("channel=resources,res-proactive");
+  });
+
+  it("includes resources param after chat param when both channels exist", async () => {
+    const data = {
+      ...baseConversation,
+      channels: [
+        { name: "chat", passcode: "chat-secret" },
+        { name: "resources", passcode: "res-secret" },
+      ],
+    };
+    const result = await createConversationFromData(data as any);
+    const url = result.eventUrls.participant[0]?.url;
+    expect(url).toContain("channel=chat,chat-secret");
+    expect(url).toContain("channel=resources,res-secret");
+    // resources appears after chat in the URL
+    expect(url.indexOf("channel=chat")).toBeLessThan(
+      url.indexOf("channel=resources"),
+    );
+  });
+
+  it("includes transcript, chat, and resources params when all three channels exist", async () => {
+    const data = {
+      ...baseConversation,
+      channels: [
+        { name: "transcript", passcode: "tx-pass" },
+        { name: "chat", passcode: "chat-pass" },
+        { name: "resources", passcode: "res-pass" },
+      ],
+    };
+    const result = await createConversationFromData(data as any);
+    const url = result.eventUrls.participant[0]?.url;
+    expect(url).toContain("channel=transcript,tx-pass");
+    expect(url).toContain("channel=chat,chat-pass");
+    expect(url).toContain("channel=resources,res-pass");
+  });
+});
+
+describe("GetChannelPasscode", () => {
+  const noopError = jest.fn();
+
+  beforeEach(() => noopError.mockClear());
+
+  it("returns the passcode when the channel is present as a string", () => {
+    const result = GetChannelPasscode("chat", { channel: "chat,chat-secret" }, noopError);
+    expect(result).toBe("chat-secret");
+  });
+
+  it("returns null when the channel is absent from a string query param", () => {
+    const result = GetChannelPasscode("resources", { channel: "chat,chat-secret" }, noopError);
+    expect(result).toBeNull();
+    expect(noopError).not.toHaveBeenCalled();
+  });
+
+  it("returns the passcode when the channel is present in an array query param", () => {
+    const result = GetChannelPasscode("resources", { channel: ["chat,chat-pass", "resources,res-pass"] }, noopError);
+    expect(result).toBe("res-pass");
+  });
+
+  it("returns null (not another channel's passcode) when channel is absent from an array query param", () => {
+    // Regression: previously returned the first channel's passcode when the target channel was missing
+    const result = GetChannelPasscode("resources", { channel: ["transcript,tx-pass", "chat,chat-pass"] }, noopError);
+    expect(result).toBeNull();
+    expect(noopError).not.toHaveBeenCalled();
+  });
+
+  it("returns null and calls setErrorMessage when query.channel is absent", () => {
+    const result = GetChannelPasscode("chat", {}, noopError);
+    expect(result).toBeNull();
+    expect(noopError).toHaveBeenCalledWith("Please provide channels.");
   });
 });

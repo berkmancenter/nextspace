@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 
 import { AssistantChatPanel } from "../components/AssistantChatPanel";
 import { GroupChatPanel } from "../components/GroupChatPanel";
+import { ResourcesPanel } from "../components/ResourcesPanel";
 import { SlashCommand } from "../components/enhancers/slashCommandEnhancer";
 import {
   Api,
@@ -22,6 +23,7 @@ import {
   CheckAuthHeader,
   createConversationFromData,
   resolveConversationBotName,
+  parseMessageBody,
 } from "../utils/Helpers";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { AuthType } from "../types.internal";
@@ -97,8 +99,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [activeTab, setActiveTab] = useState<NavTab>("chat");
   const [unseenAssistantCount, setUnseenAssistantCount] = useState<number>(0);
   const [unseenChatCount, setUnseenChatCount] = useState<number>(0);
+  const [unseenResourcesCount, setUnseenResourcesCount] = useState<number>(0);
+  const [resourcesNavBadgeDismissed, setResourcesNavBadgeDismissed] = useState(false);
   const [unreadAssistantReplyCount, setUnreadAssistantReplyCount] = useState<number>(0);
   const [unreadChatReplyCount, setUnreadChatReplyCount] = useState<number>(0);
+  // Track which resource message IDs contain new (unseen) readings for highlighting
+  const [newReadingMessageIds, setNewReadingMessageIds] = useState<Set<string>>(new Set());
 
   // Track previous reply counts for chat messages (persists across tab switches)
   const [chatPreviousReplyCounts, setChatPreviousReplyCounts] = useState<
@@ -112,6 +118,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     PseudonymousMessage[]
   >([]);
   const [chatMessages, setChatMessages] = useState<PseudonymousMessage[]>([]);
+  const [resourcesMessages, setResourcesMessages] = useState<PseudonymousMessage[]>([]);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [jargonFilterAgentId, setJargonFilterAgentId] = useState<string | null>(
     null,
@@ -128,7 +135,11 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     useState<ControlledInputConfig | null>(null);
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>("");
   const [chatPasscode, setChatPasscode] = useState<string>("");
+  const [resourcesPasscode, setResourcesPasscode] = useState<string>("");
   const [eventName, setEventName] = useState<string>("");
+  const [eventDescription, setEventDescription] = useState<string>("");
+  const [speakers, setSpeakers] = useState<Array<{ name: string; bio: string }>>([]);
+  const [moderators, setModerators] = useState<Array<{ name: string; bio: string }>>([]);
   const [botName, setBotName] = useState<string>("Berkie");
   const [assistantInputValue, setAssistantInputValue] = useState<string>("");
   const [chatInputValue, setChatInputValue] = useState<string>("");
@@ -228,6 +239,24 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         if (activeTabRef.current !== "chat") {
           setUnseenChatCount((prev) => prev + 1);
         }
+      } else if (data.channels && data.channels.includes("resources")) {
+        setResourcesMessages((prev) => [...prev, data]);
+        // Track message ID for highlight on expand
+        if (data.id) {
+          setNewReadingMessageIds((prev) => new Set([...prev, data.id!]));
+        }
+        // Always increment counter so the in-panel badge shows when already on the resources tab
+        const parsed = parseMessageBody(data.body);
+        const readingCount =
+          parsed.type === "reading" && Array.isArray(parsed.content)
+            ? parsed.content.length
+            : 1;
+        setUnseenResourcesCount((prev) => prev + readingCount);
+        // Only clear the nav badge dismissal when NOT on the resources tab
+        // (nav badge is separately suppressed by resourcesNavBadgeDismissed while on the tab)
+        if (activeTabRef.current !== "resources") {
+          setResourcesNavBadgeDismissed(false);
+        }
       } else if (!data.channels || !data.channels.includes("transcript")) {
         setAssistantMessages((prev) => [...prev, data]);
         // Increment counter if NOT viewing assistant tab
@@ -297,11 +326,20 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         setConversationType(conversation.type.name);
         if (conversation.name) setEventName(conversation.name);
 
-        // Extract feedback frequency from conversation properties
+        // Extract event metadata from conversation
         const frequency =
           (conversation?.properties?.feedbackFrequency as number) || 1;
-
         setFeedbackFrequency(frequency);
+
+        if (conversation?.description) {
+          setEventDescription(conversation.description as string);
+        }
+        if (conversation?.presenters) {
+          setSpeakers(conversation.presenters as Array<{ name: string; bio: string }>);
+        }
+        if (conversation?.moderators) {
+          setModerators(conversation.moderators as Array<{ name: string; bio: string }>);
+        }
 
         // Override botName from the first agent's agentConfig if available,
         // falling back to config.conversationBotName
@@ -329,6 +367,16 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
           if (chatPasscodeParam) {
             setChatPasscode(chatPasscodeParam);
+          }
+
+          const resourcesPasscodeParam = GetChannelPasscode(
+            "resources",
+            router.query,
+            setLocalError,
+          );
+
+          if (resourcesPasscodeParam) {
+            setResourcesPasscode(resourcesPasscodeParam);
           }
         }
 
@@ -397,6 +445,13 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         direct: false,
       });
     }
+    if (resourcesPasscode) {
+      channels.push({
+        name: "resources",
+        passcode: resourcesPasscode,
+        direct: false,
+      });
+    }
 
     const joinConversation = () => {
       console.log("Joining conversation");
@@ -431,6 +486,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     userId,
     userPreferences,
     chatPasscode,
+    resourcesPasscode,
     router.query.conversationId,
   ]);
 
@@ -578,6 +634,28 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     fetchInitialMessages();
   }, [chatPasscode, router.query.conversationId]);
 
+  // Load initial resources messages when resourcesPasscode becomes available
+  useEffect(() => {
+    if (!resourcesPasscode || !router.query.conversationId) return;
+
+    const fetchInitialMessages = async () => {
+      try {
+        const resourcesMessages = await RetrieveData(
+          `messages/${router.query.conversationId}?channel=resources,${resourcesPasscode}`,
+          Api.get().getAccessToken(),
+        );
+
+        if (Array.isArray(resourcesMessages)) {
+          setResourcesMessages(resourcesMessages);
+        }
+      } catch (error) {
+        console.error("Error fetching initial resources messages:", error);
+      }
+    };
+
+    fetchInitialMessages();
+  }, [resourcesPasscode, router.query.conversationId]);
+
   // Check if user has existing preferences
   useEffect(() => {
     if (!userId) return;
@@ -642,8 +720,19 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         .catch((err) => console.error("Error re-fetching chat messages:", err));
     }
 
+    if (resourcesPasscode) {
+      RetrieveData(
+        `messages/${router.query.conversationId}?channel=resources,${resourcesPasscode}`,
+        Api.get().getAccessToken(),
+      )
+        .then((msgs) => {
+          if (Array.isArray(msgs)) setResourcesMessages(msgs);
+        })
+        .catch((err) => console.error("Error re-fetching resources messages:", err));
+    }
+
     fetchAllAssistantMessages();
-  }, [lastReconnectTime, router.query.conversationId, chatPasscode, fetchAllAssistantMessages]);
+  }, [lastReconnectTime, router.query.conversationId, chatPasscode, resourcesPasscode, fetchAllAssistantMessages]);
 
   async function sendMessage(
     message: string,
@@ -851,6 +940,13 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     } else if (tab === "chat") {
       setUnseenChatCount(0);
       // Note: unreadReplyCount is managed by GroupChatPanel visibility logic
+    } else if (tab === "resources") {
+      setResourcesNavBadgeDismissed(true);
+    }
+    // Clear reading state when leaving the resources tab
+    if (activeTab === "resources" && tab !== "resources") {
+      setNewReadingMessageIds(new Set());
+      setUnseenResourcesCount(0);
     }
     // Track tab switch analytics (transcript treated as a nav destination)
     trackConversationEvent(
@@ -859,6 +955,11 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       "tab_switched",
       tab,
     );
+  };
+
+  const handleMarkReadingsAsSeen = () => {
+    setUnseenResourcesCount(0);
+    setNewReadingMessageIds(new Set());
   };
 
   // Create feedback config for assistant messages
@@ -898,10 +999,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
             onTabChange={handleTabChange}
             unseenAssistantCount={unseenAssistantCount}
             unseenChatCount={unseenChatCount}
+            unseenResourcesCount={resourcesNavBadgeDismissed ? 0 : unseenResourcesCount}
             unreadAssistantReplyCount={unreadAssistantReplyCount}
             unreadChatReplyCount={unreadChatReplyCount}
             showChat={!!chatPasscode}
             showTranscript={!!transcriptPasscode}
+            showResources={true}
             botName={botName}
           />
 
@@ -921,7 +1024,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
               </div>
             ) : (
               <>
-                {/* Chat / Assistant panel */}
+                {/* Chat / Assistant / Resources panel */}
                 <div className="flex-1 flex flex-col relative overflow-hidden">
                   {isConnected ? (
                     activeTab === "chat" ? (
@@ -950,6 +1053,17 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                             return newSet;
                           });
                         }}
+                      />
+                    ) : activeTab === "resources" ? (
+                      <ResourcesPanel
+                        messages={resourcesMessages}
+                        eventDescription={eventDescription}
+                        speakers={speakers}
+                        moderators={moderators}
+                        eventName={eventName}
+                        unseenReadingsCount={unseenResourcesCount}
+                        onMarkReadingsAsSeen={handleMarkReadingsAsSeen}
+                        newReadingMessageIds={newReadingMessageIds}
                       />
                     ) : (
                       <AssistantChatPanel

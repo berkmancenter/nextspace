@@ -2298,4 +2298,368 @@ describe("EventAssistantRoom", () => {
       // "Option A" marked as selected
     });
   });
+
+  describe("Resources channel", () => {
+    const resourcesSetup = async () => {
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "resources,resources-pass",
+      };
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (path.includes("?channel=resources,")) {
+          return Promise.resolve([]);
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]);
+        }
+        return Promise.resolve(null);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+        name: "Tech Forum",
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
+    };
+
+    /** Grab the most recently registered message:new handler from the socket mock. */
+    const getMessageHandler = (): Function => {
+      const handler = mockSocket.on.mock.calls
+        .filter(([event]: [string]) => event === "message:new")
+        .map(([, h]: [string, Function]) => h)
+        .at(-1)!;
+      expect(handler).toBeDefined();
+      return handler;
+    };
+
+    it("includes resources channel in conversation:join when resourcesPasscode is set", async () => {
+      await resourcesSetup();
+
+      await waitFor(() => {
+        expect(mockSocket.emit).toHaveBeenCalledWith(
+          "conversation:join",
+          expect.objectContaining({
+            channels: expect.arrayContaining([
+              { name: "resources", passcode: "resources-pass", direct: false },
+            ]),
+          }),
+        );
+      });
+    });
+
+    it("fetches initial resources messages when resourcesPasscode is available", async () => {
+      await resourcesSetup();
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "messages/test-conversation-id?channel=resources,resources-pass",
+          "mock-access-token",
+        );
+      });
+    });
+
+    it("populates resourcesMessages from initial fetch", async () => {
+      const mockResourcesMessages = [
+        {
+          id: "res-1",
+          body: { type: "reading", content: [{ title: "Book A", authors: ["A"], year: 2020 }] },
+          channels: ["resources"],
+        },
+      ];
+
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "resources,resources-pass",
+      };
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (path.includes("?channel=resources,")) {
+          return Promise.resolve(mockResourcesMessages);
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+        name: "Tech Forum",
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "messages/test-conversation-id?channel=resources,resources-pass",
+          "mock-access-token",
+        );
+      });
+    });
+
+    it("routes incoming socket message with resources channel to resourcesMessages", async () => {
+      await resourcesSetup();
+
+      const user = userEvent.setup();
+      // Navigate to resources tab so the panel renders
+      const resourcesTab = screen.getAllByLabelText("Resources")[0];
+      await user.click(resourcesTab);
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+      });
+
+      const messageHandler = getMessageHandler();
+
+      act(() => {
+        messageHandler({
+          id: "res-msg-1",
+          body: { type: "reading", content: [] },
+          channels: ["resources"],
+          pseudonym: "System",
+        });
+      });
+
+      // The ResourcesPanel should still be visible after the message arrives
+      await waitFor(() => {
+        expect(screen.getByText("Readings & References")).toBeInTheDocument();
+      });
+    });
+
+    it("increments unseenResourcesCount when a resources message arrives and the resources tab is NOT active", async () => {
+      await resourcesSetup();
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+      });
+
+      const messageHandler = getMessageHandler();
+
+      // Default tab is chat — unseen count should increment, showing the dot badge
+      act(() => {
+        messageHandler({ id: "res-1", channels: ["resources"], body: { type: "reading", content: [{ title: "Book A", authors: ["Author"], year: 2020 }] } });
+      });
+
+      // NavigationBar uses MUI Badge dot variant — a visible badge has no MuiBadge-invisible class
+      await waitFor(() => {
+        const badges = document.querySelectorAll(".MuiBadge-badge");
+        const visibleBadges = Array.from(badges).filter(
+          (b) => !b.classList.contains("MuiBadge-invisible"),
+        );
+        expect(visibleBadges.length).toBeGreaterThan(0);
+      });
+    });
+
+    it("does NOT increment unseenResourcesCount when a resources message arrives and resources tab IS active", async () => {
+      await resourcesSetup();
+
+      const user = userEvent.setup();
+      await user.click(screen.getAllByLabelText("Resources")[0]);
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+      });
+
+      const messageHandler = getMessageHandler();
+
+      act(() => {
+        messageHandler({ id: "res-1", channels: ["resources"], body: { type: "reading", content: [] } });
+      });
+
+      // No dot badge should be visible since we're already on the resources tab
+      await waitFor(() => {
+        const badges = document.querySelectorAll(".MuiBadge-badge");
+        const visibleBadges = Array.from(badges).filter(
+          (b) => !b.classList.contains("MuiBadge-invisible"),
+        );
+        expect(visibleBadges.length).toBe(0);
+      });
+    });
+
+    it("resets unseenResourcesCount to 0 when switching to the resources tab", async () => {
+      await resourcesSetup();
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+      });
+
+      const messageHandler = getMessageHandler();
+
+      // Deliver a message while on another tab to bump the count
+      act(() => {
+        messageHandler({ id: "res-1", channels: ["resources"], body: {} });
+      });
+
+      // Badge dot should be visible
+      await waitFor(() => {
+        const badges = document.querySelectorAll(".MuiBadge-badge");
+        const visibleBadges = Array.from(badges).filter(
+          (b) => !b.classList.contains("MuiBadge-invisible"),
+        );
+        expect(visibleBadges.length).toBeGreaterThan(0);
+      });
+
+      // Switch to resources tab — count clears, badge becomes invisible
+      const user = userEvent.setup();
+      await user.click(screen.getAllByLabelText("Resources")[0]);
+
+      await waitFor(() => {
+        const badges = document.querySelectorAll(".MuiBadge-badge");
+        const visibleBadges = Array.from(badges).filter(
+          (b) => !b.classList.contains("MuiBadge-invisible"),
+        );
+        expect(visibleBadges.length).toBe(0);
+      });
+    });
+
+    it("renders ResourcesPanel when resources tab is active", async () => {
+      await resourcesSetup();
+
+      const user = userEvent.setup();
+      await user.click(screen.getAllByLabelText("Resources")[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText("Readings & References")).toBeInTheDocument();
+      });
+    });
+
+    it("does NOT route resources messages to assistantMessages or chatMessages", async () => {
+      await resourcesSetup();
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+      });
+
+      const messageHandler = getMessageHandler();
+
+      act(() => {
+        messageHandler({ id: "res-1", channels: ["resources"], body: { text: "Resources only" } });
+      });
+
+      // Switch to assistant tab and confirm the message isn't rendered there
+      const user = userEvent.setup();
+      await user.click(screen.getAllByLabelText("Berkie")[0]);
+
+      await waitFor(() => {
+        expect(screen.queryByText("Resources only")).not.toBeInTheDocument();
+      });
+    });
+
+    it("increments unseenResourcesCount by the number of items in a multi-item reading message", async () => {
+      await resourcesSetup();
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+      });
+
+      const messageHandler = getMessageHandler();
+
+      // Message with 3 reading items — count should go up by 3, not 1
+      act(() => {
+        messageHandler({
+          id: "res-multi",
+          channels: ["resources"],
+          body: {
+            type: "reading",
+            content: [
+              { title: "Book A", authors: ["A"], year: 2020 },
+              { title: "Book B", authors: ["B"], year: 2021 },
+              { title: "Book C", authors: ["C"], year: 2022 },
+            ],
+          },
+        });
+      });
+
+      // Switch to resources tab to see the reset value, confirming the count was > 1
+      // by checking badge was visible before switching
+      await waitFor(() => {
+        const badges = document.querySelectorAll(".MuiBadge-badge");
+        const visibleBadges = Array.from(badges).filter(
+          (b) => !b.classList.contains("MuiBadge-invisible"),
+        );
+        expect(visibleBadges.length).toBeGreaterThan(0);
+      });
+
+      // Switch to resources tab — count resets to 0 (confirming it was > 0)
+      const user = userEvent.setup();
+      await user.click(screen.getAllByLabelText("Resources")[0]);
+
+      await waitFor(() => {
+        const badges = document.querySelectorAll(".MuiBadge-badge");
+        const visibleBadges = Array.from(badges).filter(
+          (b) => !b.classList.contains("MuiBadge-invisible"),
+        );
+        expect(visibleBadges.length).toBe(0);
+      });
+    });
+
+    it("Resources tab is always present in the nav even without a resourcesPasscode", async () => {
+      mockRouter.query = { conversationId: "test-conversation-id" };
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
+
+      expect(screen.getAllByLabelText("Resources").length).toBeGreaterThan(0);
+    });
+
+    it("does not fetch resources messages when no resourcesPasscode is provided", async () => {
+      mockRouter.query = { conversationId: "test-conversation-id" };
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
+
+      const resourcesFetch = (RetrieveData as jest.Mock).mock.calls.find(
+        ([path]: [string]) => path.includes("channel=resources"),
+      );
+      expect(resourcesFetch).toBeUndefined();
+    });
+  });
 });

@@ -4,9 +4,11 @@ import React from "react";
 import { Badge } from "@mui/material";
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import GroupIcon from "@mui/icons-material/Group";
+import MenuBookOutlined from "@mui/icons-material/MenuBookOutlined";
+import MenuBook from "@mui/icons-material/MenuBook";
 import { BotIcon } from "./BotIcon";
 import { TranscriptIcon } from "./TranscriptIcon";
-export type NavTab = "assistant" | "chat" | "transcript";
+export type NavTab = "assistant" | "chat" | "transcript" | "resources";
 
 interface NavItem {
   id: NavTab;
@@ -21,10 +23,12 @@ interface NavigationBarProps {
   onTabChange: (tab: NavTab) => void;
   unseenAssistantCount: number;
   unseenChatCount: number;
+  unseenResourcesCount?: number;
   unreadAssistantReplyCount: number;
   unreadChatReplyCount: number;
   showChat: boolean;
   showTranscript: boolean;
+  showResources?: boolean;
   botName: string;
 }
 
@@ -43,10 +47,12 @@ export function NavigationBar({
   onTabChange,
   unseenAssistantCount,
   unseenChatCount,
+  unseenResourcesCount = 0,
   unreadAssistantReplyCount,
   unreadChatReplyCount,
   showChat,
   showTranscript,
+  showResources = false,
   botName,
 }: NavigationBarProps) {
   const navItems: NavItem[] = (
@@ -72,12 +78,20 @@ export function NavigationBar({
         InactiveIcon: null,
         show: showTranscript,
       },
+      {
+        id: "resources" as NavTab,
+        label: "Resources",
+        ActiveIcon: MenuBook,
+        InactiveIcon: MenuBookOutlined,
+        show: showResources,
+      },
     ] as NavItem[]
   ).filter((item) => item.show);
 
   const getUnseenCount = (id: NavTab) => {
     if (id === "assistant") return unseenAssistantCount;
     if (id === "chat") return unseenChatCount;
+    if (id === "resources") return unseenResourcesCount;
     return 0;
   };
 
