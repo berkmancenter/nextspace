@@ -1,5 +1,4 @@
 import { getRecentEntries, whatsNewEntries } from "../../content/whatsNew";
-import { WhatsNewEntry } from "../../types.internal";
 
 describe("whatsNewEntries", () => {
   it("has no entries with invalid releasedAt dates", () => {
@@ -44,9 +43,7 @@ describe("getRecentEntries", () => {
   });
 
   it("excludes future-dated entries", () => {
-    const entries: WhatsNewEntry[] = [
-      { title: "Not yet", body: "Coming soon", releasedAt: "2026-04-10" }, // 4 days ahead of NOW
-    ];
+    const entries = [makeEntry(-5)]; // 5 days ahead of pinned NOW
     expect(getRecentEntries(14, entries)).toHaveLength(0);
   });
 
