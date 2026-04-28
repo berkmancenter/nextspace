@@ -1,4 +1,5 @@
 import { getRecentEntries, whatsNewEntries } from "../../content/whatsNew";
+import { WhatsNewEntry } from "../../types.internal";
 
 describe("whatsNewEntries", () => {
   it("has no entries with invalid releasedAt dates", () => {
