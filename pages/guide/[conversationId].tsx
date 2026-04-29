@@ -11,7 +11,7 @@ import { components, paths } from "../../types";
 import { getRecentEntries } from "../../content/whatsNew";
 
 type FeatureConfig = components["schemas"]["FeatureConfig"];
-type GuideData = paths["/conversations/{conversationId}/guide"]["get"]["responses"]["200"]["content"]["application/json"];
+type GuideData = paths["/conversations/{conversationId}/features"]["get"]["responses"]["200"]["content"]["application/json"];
 
 function tabLabel(tab: string, botName: string): string {
   switch (tab) {
@@ -128,9 +128,19 @@ function TabSection({ tab, features, botName }: { tab: string; features: Feature
                       /{f.slashCommand}
                     </Typography>
                   </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    {f.participantDescription ?? f.description}
-                  </Typography>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      {f.description}
+                    </Typography>
+                    {f.prerequisite && (
+                      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5, mt: 0.5 }}>
+                        <InfoOutlinedIcon sx={{ fontSize: 13, color: "text.disabled", mt: "2px", flexShrink: 0 }} />
+                        <Typography variant="caption" color="text.secondary">
+                          {f.prerequisite}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
                 </Box>
               ))}
             </Box>
@@ -149,9 +159,19 @@ function TabSection({ tab, features, botName }: { tab: string; features: Feature
               {userControlled.map((f) => (
                 <Box key={f.name} sx={ROW_SX}>
                   <Typography variant="body2" fontWeight="medium">{f.label}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {f.participantDescription ?? f.description}
-                  </Typography>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      {f.description}
+                    </Typography>
+                    {f.prerequisite && (
+                      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5, mt: 0.5 }}>
+                        <InfoOutlinedIcon sx={{ fontSize: 13, color: "text.disabled", mt: "2px", flexShrink: 0 }} />
+                        <Typography variant="caption" color="text.secondary">
+                          {f.prerequisite}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
                 </Box>
               ))}
             </Box>
@@ -167,9 +187,19 @@ function TabSection({ tab, features, botName }: { tab: string; features: Feature
               {automatic.map((f) => (
                 <Box key={f.name} sx={ROW_SX}>
                   <Typography variant="body2" fontWeight="medium">{f.label}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {f.participantDescription ?? f.description}
-                  </Typography>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      {f.description}
+                    </Typography>
+                    {f.prerequisite && (
+                      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5, mt: 0.5 }}>
+                        <InfoOutlinedIcon sx={{ fontSize: 13, color: "text.disabled", mt: "2px", flexShrink: 0 }} />
+                        <Typography variant="caption" color="text.secondary">
+                          {f.prerequisite}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
                 </Box>
               ))}
             </Box>
@@ -220,7 +250,7 @@ export default function GuidePage() {
     if (!conversationId) return;
 
     fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/conversations/${conversationId}/guide?audience=participant`
+      `${process.env.NEXT_PUBLIC_API_URL}/conversations/${conversationId}/features`
     )
       .then((res) => {
         if (!res.ok) {
@@ -252,7 +282,7 @@ export default function GuidePage() {
   const botName = guide.conversationBotName ?? "Berkie";
   const features = guide.features ?? [];
   const TAB_ORDER = ["assistant", "group-chat", "transcript", "resources"];
-  const tabs = [...new Set(features.map((f) => f.tab))].sort(
+  const tabs = [...new Set(features.map((f) => f.category))].sort(
     (a, b) => TAB_ORDER.indexOf(a) - TAB_ORDER.indexOf(b)
   );
 
@@ -282,7 +312,7 @@ export default function GuidePage() {
               <TabSection
                 key={tab}
                 tab={tab}
-                features={features.filter((f) => f.tab === tab)}
+                features={features.filter((f) => f.category === tab)}
                 botName={botName}
               />
             ))}

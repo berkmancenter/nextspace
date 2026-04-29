@@ -23,43 +23,39 @@ const GUIDE_RESPONSE = {
     {
       name: "mindmap",
       label: "Mind Map",
-      tab: "assistant",
-      audience: "participant",
+      category: "assistant",
       slashCommand: "mindmap",
       userControlled: true,
       default: true,
       agents: [],
-      participantDescription: "Generate a visual mind map.",
+      description: "Generate a visual mind map.",
     },
     {
       name: "jargonFilter",
       label: "Jargon Filter",
-      tab: "assistant",
-      audience: "participant",
+      category: "assistant",
       userControlled: true,
       default: true,
       agents: [],
-      participantDescription: "Explains jargon automatically.",
+      description: "Explains jargon automatically.",
     },
     {
       name: "collectiveVoice",
       label: "Collective Voice",
-      tab: "group-chat",
-      audience: "participant",
+      category: "group-chat",
       userControlled: false,
       default: true,
       agents: [],
-      participantDescription: "Surfaces what participants are thinking.",
+      description: "Surfaces what participants are thinking.",
     },
     {
       name: "librarian",
       label: "Reading Recommendations",
-      tab: "resources",
-      audience: "participant",
+      category: "resources",
       userControlled: false,
       default: true,
       agents: [],
-      participantDescription: "Periodically recommends relevant reading.",
+      description: "Periodically recommends relevant reading.",
     },
   ],
 };
@@ -100,7 +96,7 @@ describe("GuidePage", () => {
     render(<GuidePage />);
     await waitFor(() =>
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:3000/v1/conversations/test-conv-id/guide?audience=participant"
+        "http://localhost:3000/v1/conversations/test-conv-id/features"
       )
     );
   });

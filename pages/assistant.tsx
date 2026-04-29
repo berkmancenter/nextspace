@@ -200,10 +200,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   // Derive slash commands from the loaded conversation type's features.
   // Empty until the type loads, so the autocomplete stays hidden during that window.
   const slashCommands: SlashCommand[] = (conversationType?.features ?? [])
-    .filter((f) => (f.audience === "participant" || f.audience === "both") && f.slashCommand != null)
+    .filter((f) => f.slashCommand != null)
     .map((f) => ({
       command: f.slashCommand!,
-      description: f.participantDescription ?? f.description ?? "",
+      description: f.description ?? "",
       value: `/${f.slashCommand} `,
     }));
 
