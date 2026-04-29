@@ -4,6 +4,7 @@ import { Box, CircularProgress, Divider, Typography } from "@mui/material";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import MenuBookOutlined from "@mui/icons-material/MenuBookOutlined";
 import { BotIcon } from "../../components/BotIcon";
 import { TranscriptIcon } from "../../components/TranscriptIcon";
@@ -134,7 +135,7 @@ function TabSection({ tab, features, botName }: { tab: string; features: Feature
                     </Typography>
                     {f.prerequisite && (
                       <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5, mt: 0.5 }}>
-                        <InfoOutlinedIcon sx={{ fontSize: 13, color: "text.disabled", mt: "2px", flexShrink: 0 }} />
+                        <SettingsOutlinedIcon sx={{ fontSize: 13, color: "text.disabled", mt: "2px", flexShrink: 0 }} />
                         <Typography variant="caption" color="text.secondary">
                           {f.prerequisite}
                         </Typography>
@@ -165,7 +166,7 @@ function TabSection({ tab, features, botName }: { tab: string; features: Feature
                     </Typography>
                     {f.prerequisite && (
                       <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5, mt: 0.5 }}>
-                        <InfoOutlinedIcon sx={{ fontSize: 13, color: "text.disabled", mt: "2px", flexShrink: 0 }} />
+                        <SettingsOutlinedIcon sx={{ fontSize: 13, color: "text.disabled", mt: "2px", flexShrink: 0 }} />
                         <Typography variant="caption" color="text.secondary">
                           {f.prerequisite}
                         </Typography>
@@ -193,7 +194,7 @@ function TabSection({ tab, features, botName }: { tab: string; features: Feature
                     </Typography>
                     {f.prerequisite && (
                       <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5, mt: 0.5 }}>
-                        <InfoOutlinedIcon sx={{ fontSize: 13, color: "text.disabled", mt: "2px", flexShrink: 0 }} />
+                        <SettingsOutlinedIcon sx={{ fontSize: 13, color: "text.disabled", mt: "2px", flexShrink: 0 }} />
                         <Typography variant="caption" color="text.secondary">
                           {f.prerequisite}
                         </Typography>
