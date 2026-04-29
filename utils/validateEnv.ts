@@ -9,7 +9,6 @@ export function validateEnv(): void {
   const requiredClientVars = [
     "NEXT_PUBLIC_API_URL",
     "NEXT_PUBLIC_SOCKET_URL",
-    "NEXT_PUBLIC_DEFAULT_TOPIC_ID",
     "NEXT_PUBLIC_ABOUT_URL",
   ];
 
@@ -34,7 +33,7 @@ export function validateEnv(): void {
 
   if (errors.length > 0) {
     throw new Error(
-      `Missing required environment variables: ${errors.join(", ")}`
+      `Missing required environment variables: ${errors.join(", ")}`,
     );
   }
 }

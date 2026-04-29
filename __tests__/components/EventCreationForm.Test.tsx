@@ -25,11 +25,86 @@ jest.mock("../../utils", () => ({
   Request: jest.fn(),
 }));
 
+jest.mock("../../utils/SessionManager", () => ({
+  __esModule: true,
+  default: {
+    get: () => ({
+      getSessionInfo: () => ({ userId: "current-user-id" }),
+    }),
+  },
+}));
+
+const mockPublicTopics = [
+  {
+    id: "topic-1",
+    name: "Public Topic 1",
+    private: false,
+    archived: false,
+    isDeleted: false,
+    owner: "other-user-id",
+  },
+  {
+    id: "topic-2",
+    name: "Public Topic 2",
+    private: false,
+    archived: false,
+    isDeleted: false,
+    owner: "other-user-id",
+  },
+  {
+    id: "topic-archived",
+    name: "Archived Topic",
+    private: false,
+    archived: true,
+    isDeleted: false,
+    owner: "other-user-id",
+  },
+  {
+    id: "topic-deleted",
+    name: "Deleted Topic",
+    private: false,
+    archived: false,
+    isDeleted: true,
+    owner: "other-user-id",
+  },
+];
+
+const mockUserTopics = [
+  {
+    id: "topic-3",
+    name: "My Private Topic",
+    private: true,
+    archived: false,
+    isDeleted: false,
+    owner: "current-user-id",
+  },
+];
+
+const makeRequestMock =
+  (conversationResult: any = null) =>
+  (endpoint: string, payload?: any) => {
+    if (endpoint === "topics" && !payload)
+      return Promise.resolve(mockPublicTopics);
+    if (endpoint === "topics/userTopics")
+      return Promise.resolve(mockUserTopics);
+    return Promise.resolve(conversationResult);
+  };
+
 const fillEventDetails = async (name: string, zoomUrl: string) => {
   const user = userEvent.setup();
+
   // Fill in event name
   const nameInput = screen.getByLabelText(/Event Name/i);
   await user.type(nameInput, name);
+
+  // Select a topic (required)
+  const topicInput = screen.getByLabelText(/Select a series/i);
+  fireEvent.click(topicInput);
+  fireEvent.keyDown(topicInput, { key: "ArrowDown" });
+  const topicOption = await screen.findByRole("option", {
+    name: /Public Topic 1/i,
+  });
+  fireEvent.click(topicOption);
 
   // Fill in Zoom URL
   const urlInput = screen.getByLabelText(/Zoom Meeting URL/i);
@@ -217,6 +292,7 @@ describe("EventCreationForm Component", () => {
     jest.clearAllMocks();
     mockPush.mockReset();
     (RetrieveData as jest.Mock).mockResolvedValue(mockConfig);
+    (Request as jest.Mock).mockImplementation(makeRequestMock());
   });
 
   it("renders the form with initial state on step 1", async () => {
@@ -620,7 +696,9 @@ describe("EventCreationForm Component", () => {
       adapters: [],
       conversationType: "eventAssistant",
     };
-    (Request as jest.Mock).mockResolvedValue(mockConversationData);
+    (Request as jest.Mock).mockImplementation(
+      makeRequestMock(mockConversationData),
+    );
 
     await act(async () => {
       render(<EventCreationForm />);
@@ -656,6 +734,7 @@ describe("EventCreationForm Component", () => {
           name: "Test Event",
           type: "backChannel",
           platforms: ["zoom"],
+          topicId: "topic-1",
           properties: expect.objectContaining({
             zoomMeetingUrl: "https://huitstage.zoom.us/j/1234567890",
             botName: "Back Channel",
@@ -679,7 +758,9 @@ describe("EventCreationForm Component", () => {
       adapters: [],
       conversationType: "eventAssistant",
     };
-    (Request as jest.Mock).mockResolvedValue(mockConversationData);
+    (Request as jest.Mock).mockImplementation(
+      makeRequestMock(mockConversationData),
+    );
 
     await act(async () => {
       render(<EventCreationForm />);
@@ -719,13 +800,13 @@ describe("EventCreationForm Component", () => {
         "conversations/from-type",
         expect.objectContaining({
           name: "Test Event Assistant",
+          topicId: "topic-1",
           properties: expect.objectContaining({
             llmModel: {
               llmPlatform: "bedrock",
               llmModel: "anthropic.claude-3-5-sonnet-20240620-v1:0",
             },
           }),
-          topicId: process.env.NEXT_PUBLIC_DEFAULT_TOPIC_ID,
           scheduledTime: expect.any(String),
         }),
       );
@@ -742,7 +823,9 @@ describe("EventCreationForm Component", () => {
       adapters: [],
       conversationType: "eventAssistant",
     };
-    (Request as jest.Mock).mockResolvedValue(mockConversationData);
+    (Request as jest.Mock).mockImplementation(
+      makeRequestMock(mockConversationData),
+    );
 
     await act(async () => {
       render(<EventCreationForm />);
@@ -797,7 +880,9 @@ describe("EventCreationForm Component", () => {
       adapters: [],
       conversationType: "eventAssistant",
     };
-    (Request as jest.Mock).mockResolvedValue(mockConversationData);
+    (Request as jest.Mock).mockImplementation(
+      makeRequestMock(mockConversationData),
+    );
 
     await act(async () => {
       render(<EventCreationForm />);
@@ -993,12 +1078,23 @@ describe("EventCreationForm Component", () => {
       ).toBeInTheDocument();
     });
 
-    expect(Request).not.toHaveBeenCalled();
+    expect(Request).not.toHaveBeenCalledWith(
+      "conversations/from-type",
+      expect.anything(),
+    );
   });
 
   it("displays error message when form submission fails", async () => {
     const user = userEvent.setup();
-    (Request as jest.Mock).mockRejectedValue(new Error("Network error"));
+    (Request as jest.Mock).mockImplementation(
+      (endpoint: string, payload?: any) => {
+        if (endpoint === "topics" && !payload)
+          return Promise.resolve(mockPublicTopics);
+        if (endpoint === "topics/userTopics")
+          return Promise.resolve(mockUserTopics);
+        return Promise.reject(new Error("Network error"));
+      },
+    );
 
     await act(async () => {
       render(<EventCreationForm />);
@@ -1060,7 +1156,9 @@ describe("EventCreationForm Component", () => {
       adapters: [],
       conversationType: "eventAssistant",
     };
-    (Request as jest.Mock).mockResolvedValue(mockConversationData);
+    (Request as jest.Mock).mockImplementation(
+      makeRequestMock(mockConversationData),
+    );
 
     await act(async () => {
       render(<EventCreationForm />);
@@ -1146,8 +1244,13 @@ describe("EventCreationForm Component", () => {
   });
 
   // Helper to navigate to Step 3 with Back Channel selected
-  const navigateToStep3WithBackChannel = async (user: ReturnType<typeof userEvent.setup>) => {
-    await fillEventDetails("Test Event", "https://huitstage.zoom.us/j/1234567890");
+  const navigateToStep3WithBackChannel = async (
+    user: ReturnType<typeof userEvent.setup>,
+  ) => {
+    await fillEventDetails(
+      "Test Event",
+      "https://huitstage.zoom.us/j/1234567890",
+    );
     await user.click(screen.getByRole("button", { name: /next/i }));
     await waitFor(() => screen.getByText("Nextspace"));
     await user.click(screen.getByRole("checkbox", { name: /zoom/i }));
@@ -1237,14 +1340,16 @@ describe("EventCreationForm Component", () => {
 
     it("does not include features in submission payload when none are enabled", async () => {
       const user = userEvent.setup();
-      (Request as jest.Mock).mockResolvedValue({
-        id: "conv-no-features",
-        name: "Test Event",
-        channels: [],
-        agents: [],
-        adapters: [],
-        conversationType: "backChannel",
-      });
+      (Request as jest.Mock).mockImplementation(
+        makeRequestMock({
+          id: "conv-no-features",
+          name: "Test Event",
+          channels: [],
+          agents: [],
+          adapters: [],
+          conversationType: "backChannel",
+        }),
+      );
 
       await act(async () => {
         render(<EventCreationForm />);
@@ -1258,21 +1363,25 @@ describe("EventCreationForm Component", () => {
       );
 
       await waitFor(() => {
-        const call = (Request as jest.Mock).mock.calls[0];
-        expect(call[1]).not.toHaveProperty("features");
+        const conversationCall = (Request as jest.Mock).mock.calls.find(
+          (call) => call[0] === "conversations/from-type",
+        );
+        expect(conversationCall![1]).not.toHaveProperty("features");
       });
     });
 
     it("includes enabled features with their properties in the submission payload", async () => {
       const user = userEvent.setup();
-      (Request as jest.Mock).mockResolvedValue({
-        id: "conv-with-features",
-        name: "Test Event",
-        channels: [],
-        agents: [],
-        adapters: [],
-        conversationType: "backChannel",
-      });
+      (Request as jest.Mock).mockImplementation(
+        makeRequestMock({
+          id: "conv-with-features",
+          name: "Test Event",
+          channels: [],
+          agents: [],
+          adapters: [],
+          conversationType: "backChannel",
+        }),
+      );
 
       await act(async () => {
         render(<EventCreationForm />);
@@ -1330,6 +1439,328 @@ describe("EventCreationForm Component", () => {
       await waitFor(() => screen.getByLabelText(/Bot Name/i));
 
       expect(screen.queryByText("Features")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Event Series", () => {
+    it("renders the Event Series field on Step 1", async () => {
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      expect(screen.getByText(/Event Series/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole("radio", { name: /choose existing series/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("radio", { name: /create new series/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("defaults to 'Choose existing series' mode", async () => {
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      expect(
+        screen.getByRole("radio", { name: /choose existing series/i }),
+      ).toBeChecked();
+      expect(
+        screen.getByRole("radio", { name: /create new series/i }),
+      ).not.toBeChecked();
+    });
+
+    it("fetches and displays public topics in the autocomplete", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await waitFor(() => {
+        expect(Request).toHaveBeenCalledWith("topics");
+        expect(Request).toHaveBeenCalledWith("topics/userTopics");
+      });
+
+      const topicInput = screen.getByLabelText(/Select a series/i);
+      fireEvent.click(topicInput);
+      fireEvent.keyDown(topicInput, { key: "ArrowDown" });
+
+      await waitFor(() => {
+        expect(screen.getByText("Public Topic 1")).toBeInTheDocument();
+        expect(screen.getByText("Public Topic 2")).toBeInTheDocument();
+      });
+    });
+
+    it("excludes archived and deleted topics from the list", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      const topicInput = screen.getByLabelText(/Select a series/i);
+      fireEvent.click(topicInput);
+      fireEvent.keyDown(topicInput, { key: "ArrowDown" });
+
+      // Wait for the listbox to open, then assert excluded topics are absent
+      await screen.findByRole("listbox");
+      expect(screen.queryByText("Archived Topic")).not.toBeInTheDocument();
+      expect(screen.queryByText("Deleted Topic")).not.toBeInTheDocument();
+    });
+
+    it("shows private topics owned by the current user", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      const topicInput = screen.getByLabelText(/Select a series/i);
+      fireEvent.click(topicInput);
+      fireEvent.keyDown(topicInput, { key: "ArrowDown" });
+
+      await waitFor(() => {
+        expect(screen.getByText("My Private Topic")).toBeInTheDocument();
+      });
+    });
+
+    it("shows error when Next is clicked with no topic selected", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      const nameInput = screen.getByLabelText(/Event Name/i);
+      await user.type(nameInput, "Test Event");
+
+      const urlInput = screen.getByLabelText(/Zoom Meeting URL/i);
+      await user.type(urlInput, "https://huitstage.zoom.us/j/1234567890");
+
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("An Event Series is required"),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("shows error on blur when autocomplete is left empty", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      const topicInput = screen.getByLabelText(/Select a series/i);
+      fireEvent.focus(topicInput);
+      fireEvent.blur(topicInput);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Please select an Event Series."),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("switches to new series creation form", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await user.click(
+        screen.getByRole("radio", { name: /create new series/i }),
+      );
+
+      expect(screen.getByLabelText(/Series Name/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Series Description/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole("checkbox", { name: /public/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("new series Public checkbox is unchecked by default", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await user.click(
+        screen.getByRole("radio", { name: /create new series/i }),
+      );
+
+      expect(screen.getByRole("checkbox", { name: /public/i })).not.toBeChecked();
+    });
+
+    it("shows error when Next is clicked with empty series name", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await user.click(
+        screen.getByRole("radio", { name: /create new series/i }),
+      );
+
+      const nameInput = screen.getByLabelText(/Event Name/i);
+      await user.type(nameInput, "Test Event");
+
+      const urlInput = screen.getByLabelText(/Zoom Meeting URL/i);
+      await user.type(urlInput, "https://huitstage.zoom.us/j/1234567890");
+
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Series name is required"),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("shows series name error on blur when left empty", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await user.click(
+        screen.getByRole("radio", { name: /create new series/i }),
+      );
+
+      const seriesNameInput = screen.getByLabelText(/Series Name/i);
+      await user.click(seriesNameInput);
+      await user.tab();
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Series name is required."),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("creates a new topic then submits the conversation with the new topic ID", async () => {
+      const user = userEvent.setup();
+      const newTopicId = "new-topic-id-123";
+      const mockConversationData = {
+        id: "new-conv-123",
+        name: "Test Event",
+        channels: [],
+        agents: [],
+        adapters: [],
+        conversationType: "backChannel",
+      };
+      (Request as jest.Mock).mockImplementation(
+        (endpoint: string, payload?: any) => {
+          if (endpoint === "topics" && !payload)
+            return Promise.resolve(mockPublicTopics);
+          if (endpoint === "topics/userTopics")
+            return Promise.resolve(mockUserTopics);
+          if (endpoint === "topics" && payload)
+            return Promise.resolve({ id: newTopicId });
+          return Promise.resolve(mockConversationData);
+        },
+      );
+
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      // Switch to new series mode
+      await user.click(
+        screen.getByRole("radio", { name: /create new series/i }),
+      );
+
+      // Fill in series name
+      await user.type(screen.getByLabelText(/Series Name/i), "My New Series");
+      await user.type(
+        screen.getByLabelText(/Series Description/i),
+        "A great series",
+      );
+
+      // Fill the rest of Step 1
+      await user.type(screen.getByLabelText(/Event Name/i), "Test Event");
+      await user.type(
+        screen.getByLabelText(/Zoom Meeting URL/i),
+        "https://huitstage.zoom.us/j/1234567890",
+      );
+
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => screen.getByText("Nextspace"));
+      await user.click(screen.getByRole("checkbox", { name: /zoom/i }));
+      await user.click(screen.getByRole("radio", { name: /back channel/i }));
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => screen.getByLabelText(/Bot Name/i));
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => screen.getByText("About the Speakers"));
+      await user.click(
+        screen.getByRole("button", { name: /create conversation/i }),
+      );
+
+      await waitFor(() => {
+        expect(Request).toHaveBeenCalledWith(
+          "topics",
+          expect.objectContaining({
+            name: "My New Series",
+            description: "A great series",
+            private: true,
+          }),
+        );
+        expect(Request).toHaveBeenCalledWith(
+          "conversations/from-type",
+          expect.objectContaining({ topicId: newTopicId }),
+        );
+      });
+    });
+
+    it("submits with selected existing topic ID", async () => {
+      const user = userEvent.setup();
+      const mockConversationData = {
+        id: "new-conv-123",
+        name: "Test Event",
+        channels: [],
+        agents: [],
+        adapters: [],
+        conversationType: "backChannel",
+      };
+      (Request as jest.Mock).mockImplementation(
+        makeRequestMock(mockConversationData),
+      );
+
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await fillEventDetails(
+        "Test Event",
+        "https://huitstage.zoom.us/j/1234567890",
+      );
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => screen.getByText("Nextspace"));
+      await user.click(screen.getByRole("checkbox", { name: /zoom/i }));
+      await user.click(screen.getByRole("radio", { name: /back channel/i }));
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => screen.getByLabelText(/Bot Name/i));
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => screen.getByText("About the Speakers"));
+      await user.click(
+        screen.getByRole("button", { name: /create conversation/i }),
+      );
+
+      await waitFor(() => {
+        expect(Request).toHaveBeenCalledWith(
+          "conversations/from-type",
+          expect.objectContaining({ topicId: "topic-1" }),
+        );
+        // Should NOT have called topics POST to create a new topic
+        expect(Request).not.toHaveBeenCalledWith(
+          "topics",
+          expect.anything(),
+        );
+      });
     });
   });
 });

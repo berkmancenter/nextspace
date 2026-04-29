@@ -2,9 +2,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Checkbox,
+  CircularProgress,
   Divider,
   FormControl,
   FormControlLabel,
@@ -32,7 +34,8 @@ import { EventStatus } from "./";
 import { components } from "../types";
 import { Conversation } from "../types.internal";
 import { createConversationFromData, Api } from "../utils/Helpers";
-import { useField } from "@mui/x-date-pickers/internals";
+import SessionManager from "../utils/SessionManager";
+import { NewTopicForm, NewTopicFormValues } from "./NewTopicForm";
 
 const steps = [
   "Event Details",
@@ -103,6 +106,20 @@ export const EventCreationForm: React.FC = ({}) => {
     Array<{ name: string; bio: string }>
   >([{ name: "", bio: "" }]);
   const [showModerators, setShowModerators] = useState<boolean>(false);
+
+  // Topic (Event Series) state
+  const [topicMode, setTopicMode] = useState<"existing" | "new">("existing");
+  const [availableTopics, setAvailableTopics] = useState<
+    components["schemas"]["Topic"][] | null
+  >(null);
+  const [topicsLoading, setTopicsLoading] = useState<boolean>(false);
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [topicHasError, setTopicHasError] = useState<boolean>(false);
+  const [newTopic, setNewTopic] = useState<NewTopicFormValues>({
+    name: "",
+    description: "",
+    public: false,
+  });
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -212,12 +229,70 @@ export const EventCreationForm: React.FC = ({}) => {
       fetchServerConfig();
   }, [supportedModels, availablePlatforms, conversationTypes]);
 
+  useEffect(() => {
+    async function fetchTopics() {
+      setTopicsLoading(true);
+      try {
+        const userId = SessionManager.get().getSessionInfo()?.userId;
+        const [allData, userData] = await Promise.all([
+          Request("topics"),
+          Request("topics/userTopics"),
+        ]);
+
+        const allTopics: components["schemas"]["Topic"][] = Array.isArray(
+          allData,
+        )
+          ? allData
+          : [];
+        const userTopics: components["schemas"]["Topic"][] = Array.isArray(
+          userData,
+        )
+          ? userData
+          : [];
+
+        // Merge, deduplicate by id, exclude archived
+        const seen = new Set<string>();
+        const merged: components["schemas"]["Topic"][] = [];
+        for (const t of [...allTopics, ...userTopics]) {
+          if (!t.id || seen.has(t.id) || t.archived || t.isDeleted) continue;
+          // Keep public topics or private topics owned by current user
+          if (!t.private || (userId && t.owner === userId)) {
+            seen.add(t.id);
+            merged.push(t);
+          }
+        }
+
+        setAvailableTopics(merged);
+      } catch {
+        setAvailableTopics([]);
+      } finally {
+        setTopicsLoading(false);
+      }
+    }
+
+    if (availableTopics === null) fetchTopics();
+  }, [availableTopics]);
+
   const validateStep1 = () => {
     // Check that required fields are present
     if (!eventName || eventName.trim() === "") {
       setFormError("Event Name is required");
       setFieldFocus("name");
       return false;
+    }
+
+    // Check topic/series selection
+    if (topicMode === "existing") {
+      if (!selectedTopicId) {
+        setFormError("An Event Series is required");
+        setTopicHasError(true);
+        return false;
+      }
+    } else {
+      if (!newTopic.name.trim()) {
+        setFormError("Series name is required");
+        return false;
+      }
     }
 
     // Check zoom fields
@@ -228,6 +303,7 @@ export const EventCreationForm: React.FC = ({}) => {
     }
 
     setFormError(null);
+    setTopicHasError(false);
     return true;
   };
 
@@ -734,9 +810,32 @@ export const EventCreationForm: React.FC = ({}) => {
     setFormError(null);
   };
 
-  const sendData = (formData: FormData) => {
+  const sendData = async (formData: FormData) => {
     // Validate step 3 before submission (though it's currently always valid)
     if (!validateStep3()) return;
+
+    // Resolve topic ID: create new topic if needed
+    let topicId = selectedTopicId;
+    if (topicMode === "new") {
+      const topicPayload: Record<string, any> = {
+        name: newTopic.name,
+        private: !newTopic.public,
+        votingAllowed: true,
+        conversationCreationAllowed: true,
+        archivable: true,
+        ...(newTopic.description && {
+          description: newTopic.description,
+        }),
+      };
+      const topicResult = await Request("topics", topicPayload);
+      if (!topicResult || topicResult.error) {
+        setFormError(
+          topicResult?.message?.message || "Failed to create Event Series.",
+        );
+        return;
+      }
+      topicId = topicResult.id;
+    }
 
     // Filter out empty moderators and speakers
     const validModerators = showModerators
@@ -752,7 +851,7 @@ export const EventCreationForm: React.FC = ({}) => {
       ...(zoomMeetingTime && { scheduledTime: zoomMeetingTime }),
       platforms: selectedPlatforms,
       type: selectedConvType,
-      topicId: process.env.NEXT_PUBLIC_DEFAULT_TOPIC_ID,
+      topicId,
       ...(validModerators.length > 0 && { moderators: validModerators }),
       ...(validSpeakers.length > 0 && { presenters: validSpeakers }),
     };
@@ -937,6 +1036,126 @@ export const EventCreationForm: React.FC = ({}) => {
                 value={eventDescription}
                 onChange={(e) => setEventDescription(e.target.value)}
               />
+
+              {/* Event Series (topic) selection */}
+              <FormControl
+                component="fieldset"
+                fullWidth
+                margin="normal"
+                error={topicHasError}
+                sx={{
+                  border: topicHasError
+                    ? "2px solid red"
+                    : "1px solid rgba(0, 0, 0, 0.23)",
+                  borderRadius: 1,
+                  p: 2,
+                  "&:focus-within": {
+                    borderColor: "primary.main",
+                    borderWidth: "2px",
+                  },
+                }}
+              >
+                <FormLabel
+                  component="legend"
+                  sx={{
+                    fontSize: "0.875rem",
+                    fontWeight: 500,
+                    color: "rgba(0, 0, 0, 0.87)",
+                  }}
+                >
+                  Event Series *
+                </FormLabel>
+                <RadioGroup
+                  row
+                  value={topicMode}
+                  onChange={(e) => {
+                    setTopicMode(e.target.value as "existing" | "new");
+                    setTopicHasError(false);
+                  }}
+                  sx={{ mb: 1 }}
+                >
+                  <FormControlLabel
+                    value="existing"
+                    control={<Radio size="small" />}
+                    label="Choose existing series"
+                  />
+                  <FormControlLabel
+                    value="new"
+                    control={<Radio size="small" />}
+                    label="Create new series"
+                  />
+                </RadioGroup>
+
+                {topicMode === "existing" && (
+                  <Autocomplete
+                    options={[...(availableTopics ?? [])].sort(
+                      (a, b) =>
+                        Number(a.private) - Number(b.private) ||
+                        a.name.localeCompare(b.name),
+                    )}
+                    loading={topicsLoading}
+                    groupBy={(option) =>
+                      option.private ? "Private (Yours)" : "Public"
+                    }
+                    getOptionLabel={(option) => option.name}
+                    isOptionEqualToValue={(option, value) =>
+                      option.id === value.id
+                    }
+                    value={
+                      availableTopics?.find((t) => t.id === selectedTopicId) ??
+                      null
+                    }
+                    onBlur={() => setTopicHasError(!selectedTopicId)}
+                    onChange={(_, value) => {
+                      setSelectedTopicId(value?.id ?? null);
+                      setTopicHasError(false);
+                    }}
+                    renderOption={(props, option) => (
+                      <Box component="li" {...props} key={option.id}>
+                        <Box sx={{ flexGrow: 1 }}>{option.name}</Box>
+                        {option.private && (
+                          <Typography
+                            variant="caption"
+                            sx={{ color: "text.secondary", ml: 1 }}
+                          >
+                            private
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Select a series"
+                        required
+                        error={topicHasError}
+                        helperText={
+                          topicHasError
+                            ? "Please select an Event Series."
+                            : undefined
+                        }
+                        slotProps={{
+                          input: {
+                            ...params.InputProps,
+                            endAdornment: (
+                              <>
+                                {topicsLoading ? (
+                                  <CircularProgress color="inherit" size={18} />
+                                ) : null}
+                                {params.InputProps.endAdornment}
+                              </>
+                            ),
+                          },
+                        }}
+                      />
+                    )}
+                  />
+                )}
+
+                {topicMode === "new" && (
+                  <NewTopicForm values={newTopic} onChange={setNewTopic} />
+                )}
+              </FormControl>
 
               <TextField
                 name="zoomUrl"
