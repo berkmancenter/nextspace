@@ -43,6 +43,13 @@ jest.mock("react-scroll", () => ({
   },
 }));
 
+jest.mock("../../utils/Helpers", () => ({
+  CheckAuthHeader: jest.fn().mockResolvedValue({ props: {} }),
+  createConversationFromData: jest.fn().mockResolvedValue({
+    type: { name: "eventAssistant" },
+  }),
+}));
+
 // Mock useSessionJoin
 const mockUseSessionJoin = jest.fn();
 jest.mock("../../utils/useSessionJoin", () => ({

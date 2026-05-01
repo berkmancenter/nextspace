@@ -26,6 +26,11 @@ import {
   parseMessageBody,
 } from "../utils/Helpers";
 import { useAnalytics } from "../hooks/useAnalytics";
+import {
+  useConversationType,
+  useSetBotName,
+  useSetConversationType,
+} from "../context/ConversationTypeContext";
 import { AuthType } from "../types.internal";
 import { trackConversationEvent, setUserId } from "../utils/analytics";
 import { Transcript } from "../components/";
@@ -111,9 +116,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     Map<string, number>
   >(new Map());
   // Track previous reply counts for assistant messages (persists across tab switches)
-  const [assistantPreviousReplyCounts, setAssistantPreviousReplyCounts] = useState<
-    Map<string, number>
-  >(new Map());
+  const [assistantPreviousReplyCounts, setAssistantPreviousReplyCounts] =
+    useState<Map<string, number>>(new Map());
   const [assistantMessages, setAssistantMessages] = useState<
     PseudonymousMessage[]
   >([]);
@@ -126,7 +130,16 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [userPreferences, setUserPreferences] = useState<
     Record<string, boolean>
   >({});
-  const [conversationType, setConversationType] = useState<string | null>(null);
+  const conversationType = useConversationType();
+  const setConversationType = useSetConversationType();
+  const setBotNameContext = useSetBotName();
+
+  /* Clear the shared conversation type and bot name when the event changes so
+     the Quick Guide doesn't show stale values while the new conversation loads. */
+  useEffect(() => {
+    setConversationType(null);
+    setBotNameContext("Berkie");
+  }, [router.query.conversationId]);
   const [feedbackFrequency, setFeedbackFrequency] = useState<number>(1);
   const [messageRatings, setMessageRatings] = useState<Map<string, string>>(
     new Map(),
@@ -150,9 +163,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     Set<string>
   >(new Set());
   // Track assistant messages with unread replies separately
-  const [assistantMessagesWithUnreadReplies, setAssistantMessagesWithUnreadReplies] = useState<
-    Set<string>
-  >(new Set());
+  const [
+    assistantMessagesWithUnreadReplies,
+    setAssistantMessagesWithUnreadReplies,
+  ] = useState<Set<string>>(new Set());
 
   const preferenceOptions = [
     {
@@ -183,46 +197,15 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   // Combine session and local errors
   const errorMessage = sessionError || localError;
 
-  // Available slash commands
-  // Commands can optionally specify which conversation types they're available for
-  const allSlashCommands: SlashCommand[] = [
-    {
-      command: "mod",
-      description: "Submit a question to the moderator",
-      value: "/mod ",
-      conversationTypes: ["eventAssistantPlus", "eventAssistantPlusProactive"],
-    },
-    {
-      command: "mindmap",
-      description:
-        "Create a visual mind map of the key topics discussed in the event",
-      value: "/mindmap ",
-      conversationTypes: [
-        "eventAssistant",
-        "eventAssistantPlus",
-        "eventAssistantPlusProactive",
-      ],
-    },
-    {
-      command: "visual",
-      description: "Request a visual response (image) to a question",
-      value: "/visual ",
-      conversationTypes: [
-        "eventAssistant",
-        "eventAssistantPlus",
-        "eventAssistantPlusProactive",
-      ],
-    },
-  ];
-
-  // Filter commands based on current conversation type
-  const slashCommands = allSlashCommands.filter((cmd) => {
-    // If command has no conversationTypes restriction, it's available for all
-    if (!cmd.conversationTypes || cmd.conversationTypes.length === 0) {
-      return true;
-    }
-    return conversationType && cmd.conversationTypes.includes(conversationType);
-  });
+  // Derive slash commands from the loaded conversation type's features.
+  // Empty until the type loads, so the autocomplete stays hidden during that window.
+  const slashCommands: SlashCommand[] = (conversationType?.features ?? [])
+    .filter((f) => f.slashCommand != null)
+    .map((f) => ({
+      command: f.slashCommand!,
+      description: f.description ?? "",
+      value: `/${f.slashCommand} `,
+    }));
 
   // Set up message listener
   useEffect(() => {
@@ -304,6 +287,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       try {
         const config = await Api.get().GetConfig();
         setBotName(config.conversationBotName);
+        setBotNameContext(config.conversationBotName);
 
         const conversationData = await RetrieveData(
           `conversations/${router.query.conversationId}`,
@@ -323,7 +307,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         }
 
         const conversation = await createConversationFromData(conversationData);
-        setConversationType(conversation.type.name);
+        setConversationType(conversation.type);
         if (conversation.name) setEventName(conversation.name);
 
         // Extract event metadata from conversation
@@ -343,9 +327,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
         // Override botName from the first agent's agentConfig if available,
         // falling back to config.conversationBotName
-        setBotName(
-          resolveConversationBotName(conversation, config.conversationBotName),
+        const resolvedBotName = resolveConversationBotName(
+          conversation,
+          config.conversationBotName,
         );
+        setBotName(resolvedBotName);
+        setBotNameContext(resolvedBotName);
 
         // Get transcript and chat passcodes if channel query param exists
         if (router.query.channel) {
@@ -504,7 +491,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         Api.get().getAccessToken(),
       );
 
-      let allMessages = Array.isArray(assistantMessages) ? assistantMessages : [];
+      let allMessages = Array.isArray(assistantMessages)
+        ? assistantMessages
+        : [];
 
       // Fetch jargon filter agent's messages, if enabled
       if (jargonFilterAgentId) {
@@ -519,8 +508,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       }
 
       // Sort all messages by creation time
-      allMessages.sort((a, b) =>
-        new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()
+      allMessages.sort(
+        (a, b) =>
+          new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime(),
       );
 
       if (allMessages.length > 0) {
@@ -756,11 +746,11 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     // If replying to a message in assistant tab, check if parent came from jargon filter agent
     // and use that channel instead
     if (effectiveTab !== "chat" && parentMessageId && jargonFilterAgentId) {
-      const parentMessage = assistantMessages.find((m) => m.id === parentMessageId);
+      const parentMessage = assistantMessages.find(
+        (m) => m.id === parentMessageId,
+      );
       if (
-        parentMessage?.channels?.some((c) =>
-          c.includes(jargonFilterAgentId)
-        )
+        parentMessage?.channels?.some((c) => c.includes(jargonFilterAgentId))
       ) {
         channels = [{ name: `direct-${userId}-${jargonFilterAgentId}` }];
       }
@@ -985,167 +975,171 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   };
 
   return (
-    // On mobile we add bottom padding so the fixed nav bar doesn't cover content
-    <div className="flex flex-row h-[calc(100vh-96px)] overflow-hidden pb-[60px] lg:pb-0">
-      {errorMessage ? (
-        <div className="text-medium-slate-blue text-lg font-bold mx-9 mt-6">
-          {errorMessage}
-        </div>
-      ) : (
-        <>
-          {/* ── Navigation Bar (left sidebar on desktop, bottom bar on mobile) ── */}
-          <NavigationBar
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-            unseenAssistantCount={unseenAssistantCount}
-            unseenChatCount={unseenChatCount}
-            unseenResourcesCount={resourcesNavBadgeDismissed ? 0 : unseenResourcesCount}
-            unreadAssistantReplyCount={unreadAssistantReplyCount}
-            unreadChatReplyCount={unreadChatReplyCount}
-            showChat={!!chatPasscode}
-            showTranscript={!!transcriptPasscode}
-            showResources={true}
-            botName={botName}
-          />
+    <>
+      {/* On mobile we add bottom padding so the fixed nav bar doesn't cover content */}
+      <div className="flex flex-row h-[calc(100vh-96px)] overflow-hidden pb-[60px] lg:pb-0">
+        {errorMessage ? (
+          <div className="text-medium-slate-blue text-lg font-bold mx-9 mt-6">
+            {errorMessage}
+          </div>
+        ) : (
+          <>
+            {/* ── Navigation Bar (left sidebar on desktop, bottom bar on mobile) ── */}
+            <NavigationBar
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              unseenAssistantCount={unseenAssistantCount}
+              unseenChatCount={unseenChatCount}
+              unseenResourcesCount={resourcesNavBadgeDismissed ? 0 : unseenResourcesCount}
+              unreadAssistantReplyCount={unreadAssistantReplyCount}
+              unreadChatReplyCount={unreadChatReplyCount}
+              showChat={!!chatPasscode}
+              showTranscript={!!transcriptPasscode}
+              showResources={true}
+              botName={botName}
+            />
 
-          {/* ── Main content area ── */}
-          <div className="flex-1 flex flex-row overflow-hidden">
-            {/* Transcript full-screen view when transcript tab is active */}
-            {activeTab === "transcript" && transcriptPasscode ? (
-              <div className="flex-1 overflow-hidden">
-                <Transcript
-                  category="assistant"
-                  socket={socket}
-                  conversationId={router.query.conversationId as string}
-                  transcriptPasscode={transcriptPasscode}
-                  lastReconnectTime={lastReconnectTime}
-                  hideToggle={true}
-                />
-              </div>
-            ) : (
-              <>
-                {/* Chat / Assistant / Resources panel */}
-                <div className="flex-1 flex flex-col relative overflow-hidden">
-                  {isConnected ? (
-                    activeTab === "chat" ? (
-                      <GroupChatPanel
-                        messages={chatMessages}
-                        pseudonym={pseudonym}
-                        eventName={eventName}
-                        botName={botName}
-                        inputValue={chatInputValue}
-                        onInputChange={setChatInputValue}
-                        onSendMessage={(msg, parentMessageId) => {
-                          // Wait for response if message mentions the bot
-                          const mentionsBot = msg.includes(`@${botName}`);
-                          sendMessage(msg, mentionsBot, parentMessageId);
-                        }}
-                        controlledMode={controlledMode}
-                        onExitControlledMode={exitControlledMode}
-                        feedbackConfig={chatFeedbackConfig}
-                        messagesWithUnreadReplies={messagesWithUnreadReplies}
-                        waitingForResponse={waitingForChatResponse}
-                        onMarkAsRead={(messageId) => {
-                          setMessagesWithUnreadReplies((prev) => {
-                            const newSet = new Set(prev);
-                            newSet.delete(messageId);
-                            setUnreadChatReplyCount(newSet.size);
-                            return newSet;
-                          });
-                        }}
-                      />
-                    ) : activeTab === "resources" ? (
-                      <ResourcesPanel
-                        messages={resourcesMessages}
-                        eventDescription={eventDescription}
-                        speakers={speakers}
-                        moderators={moderators}
-                        eventName={eventName}
-                        unseenReadingsCount={unseenResourcesCount}
-                        onMarkReadingsAsSeen={handleMarkReadingsAsSeen}
-                        newReadingMessageIds={newReadingMessageIds}
-                      />
+            {/* ── Main content area ── */}
+            <div className="flex-1 flex flex-row overflow-hidden">
+              {/* Transcript full-screen view when transcript tab is active */}
+              {activeTab === "transcript" && transcriptPasscode ? (
+                <div className="flex-1 overflow-hidden">
+                  <Transcript
+                    category="assistant"
+                    socket={socket}
+                    conversationId={router.query.conversationId as string}
+                    transcriptPasscode={transcriptPasscode}
+                    lastReconnectTime={lastReconnectTime}
+                    hideToggle={true}
+                  />
+                </div>
+              ) : (
+                <>
+                  {/* Chat / Assistant / Resources panel */}
+                  <div className="flex-1 flex flex-col relative overflow-hidden">
+                    {isConnected ? (
+                      activeTab === "chat" ? (
+                        <GroupChatPanel
+                          messages={chatMessages}
+                          pseudonym={pseudonym}
+                          eventName={eventName}
+                          botName={botName}
+                          inputValue={chatInputValue}
+                          onInputChange={setChatInputValue}
+                          onSendMessage={(msg, parentMessageId) => {
+                            // Wait for response if message mentions the bot
+                            const mentionsBot = msg.includes(`@${botName}`);
+                            sendMessage(msg, mentionsBot, parentMessageId);
+                          }}
+                          controlledMode={controlledMode}
+                          onExitControlledMode={exitControlledMode}
+                          feedbackConfig={chatFeedbackConfig}
+                          messagesWithUnreadReplies={messagesWithUnreadReplies}
+                          waitingForResponse={waitingForChatResponse}
+                          onMarkAsRead={(messageId) => {
+                            setMessagesWithUnreadReplies((prev) => {
+                              const newSet = new Set(prev);
+                              newSet.delete(messageId);
+                              setUnreadChatReplyCount(newSet.size);
+                              return newSet;
+                            });
+                          }}
+                        />
+                      ) : activeTab === "resources" ? (
+                        <ResourcesPanel
+                          messages={resourcesMessages}
+                          eventDescription={eventDescription}
+                          speakers={speakers}
+                          moderators={moderators}
+                          eventName={eventName}
+                          unseenReadingsCount={unseenResourcesCount}
+                          onMarkReadingsAsSeen={handleMarkReadingsAsSeen}
+                          newReadingMessageIds={newReadingMessageIds}
+                        />
+                      ) : (
+                        <AssistantChatPanel
+                          messages={assistantMessages}
+                          pseudonym={pseudonym}
+                          waitingForResponse={waitingForResponse}
+                          controlledMode={controlledMode}
+                          slashCommands={slashCommands}
+                          eventName={eventName}
+                          botName={botName}
+                          inputValue={assistantInputValue}
+                          onInputChange={setAssistantInputValue}
+                          onSendMessage={(msg, parentMessageId) =>
+                            sendMessage(msg, true, parentMessageId)
+                          }
+                          onExitControlledMode={exitControlledMode}
+                          onPromptSelect={handlePromptSelect}
+                          userId={userId}
+                          showPreferences={showPreferences}
+                          preferenceOptions={preferenceOptions}
+                          onPreferencesSubmit={handlePreferencesSubmit}
+                          preferencesError={preferencesError}
+                          feedbackConfig={assistantFeedbackConfig}
+                          messagesWithUnreadReplies={
+                            assistantMessagesWithUnreadReplies
+                          }
+                          onMarkAsRead={(messageId) => {
+                            setAssistantMessagesWithUnreadReplies((prev) => {
+                              const newSet = new Set(prev);
+                              newSet.delete(messageId);
+                              setUnreadAssistantReplyCount(newSet.size);
+                              return newSet;
+                            });
+                          }}
+                        />
+                      )
                     ) : (
-                      <AssistantChatPanel
-                        messages={assistantMessages}
-                        pseudonym={pseudonym}
-                        waitingForResponse={waitingForResponse}
-                        controlledMode={controlledMode}
-                        slashCommands={slashCommands}
-                        eventName={eventName}
-                        botName={botName}
-                        inputValue={assistantInputValue}
-                        onInputChange={setAssistantInputValue}
-                        onSendMessage={(msg, parentMessageId) =>
-                          sendMessage(msg, true, parentMessageId)
-                        }
-                        onExitControlledMode={exitControlledMode}
-                        onPromptSelect={handlePromptSelect}
-                        userId={userId}
-                        showPreferences={showPreferences}
-                        preferenceOptions={preferenceOptions}
-                        onPreferencesSubmit={handlePreferencesSubmit}
-                        preferencesError={preferencesError}
-                        feedbackConfig={assistantFeedbackConfig}
-                        messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
-                        onMarkAsRead={(messageId) => {
-                          setAssistantMessagesWithUnreadReplies((prev) => {
-                            const newSet = new Set(prev);
-                            newSet.delete(messageId);
-                            setUnreadAssistantReplyCount(newSet.size);
-                            return newSet;
-                          });
-                        }}
+                      <div className="flex items-center justify-center h-full">
+                        <svg
+                          className="mx-auto w-12 h-5"
+                          viewBox="0 0 40 10"
+                          fill="currentColor"
+                        >
+                          <circle
+                            className="animate-bounce fill-sky-400"
+                            cx="5"
+                            cy="5"
+                            r="4"
+                          />
+                          <circle
+                            className="animate-bounce [animation-delay:-0.2s] fill-medium-slate-blue"
+                            cx="20"
+                            cy="5"
+                            r="4"
+                          />
+                          <circle
+                            className="animate-bounce [animation-delay:-0.4s] fill-purple-500"
+                            cx="35"
+                            cy="5"
+                            r="4"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Transcript sidebar — still accessible on Chat and Event Bot views */}
+                  {transcriptPasscode && (
+                    <div className="lg:order-2 hidden lg:block">
+                      <Transcript
+                        category="assistant"
+                        socket={socket}
+                        conversationId={router.query.conversationId as string}
+                        transcriptPasscode={transcriptPasscode}
+                        lastReconnectTime={lastReconnectTime}
                       />
-                    )
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <svg
-                        className="mx-auto w-12 h-5"
-                        viewBox="0 0 40 10"
-                        fill="currentColor"
-                      >
-                        <circle
-                          className="animate-bounce fill-sky-400"
-                          cx="5"
-                          cy="5"
-                          r="4"
-                        />
-                        <circle
-                          className="animate-bounce [animation-delay:-0.2s] fill-medium-slate-blue"
-                          cx="20"
-                          cy="5"
-                          r="4"
-                        />
-                        <circle
-                          className="animate-bounce [animation-delay:-0.4s] fill-purple-500"
-                          cx="35"
-                          cy="5"
-                          r="4"
-                        />
-                      </svg>
                     </div>
                   )}
-                </div>
-
-                {/* Transcript sidebar — still accessible on Chat and Event Bot views */}
-                {transcriptPasscode && (
-                  <div className="lg:order-2 hidden lg:block">
-                    <Transcript
-                      category="assistant"
-                      socket={socket}
-                      conversationId={router.query.conversationId as string}
-                      transcriptPasscode={transcriptPasscode}
-                      lastReconnectTime={lastReconnectTime}
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 

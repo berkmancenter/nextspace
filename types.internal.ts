@@ -170,3 +170,16 @@ export interface AgentChannelConfig {
   agentId: string;
   preferenceKey?: string;
 }
+
+/**
+ * A single "What's New" entry displayed in the Help panel.
+ * @property {string} title - Short feature name or headline.
+ * @property {string} body - One or two sentence description of the change.
+ * @property {string} releasedAt - ISO date string (e.g. "2026-04-01"). Future-dated
+ *   entries and malformed strings are silently excluded by getRecentEntries().
+ */
+export interface WhatsNewEntry {
+  title: string;
+  body: string;
+  releasedAt: string;
+}

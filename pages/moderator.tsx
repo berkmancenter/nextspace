@@ -16,10 +16,11 @@ import {
 } from "../utils";
 
 import { Transcript } from "../components/";
-import { CheckAuthHeader } from "../utils/Helpers";
+import { CheckAuthHeader, createConversationFromData } from "../utils/Helpers";
 import { useSessionJoin } from "../utils/useSessionJoin";
 import { AuthType } from "../types.internal";
 import { useAnalytics } from "../hooks/useAnalytics";
+import { useSetConversationType } from "../context/ConversationTypeContext";
 import {
   trackConversationEvent,
 } from "../utils/analytics";
@@ -33,6 +34,18 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
 
   // Initialize page-level analytics
   useAnalytics({ pageType: "moderator" });
+
+  const setConversationType = useSetConversationType();
+
+  /* Clear the shared conversation type when the event changes so the Quick
+     Guide doesn't show stale commands while the new conversation loads.
+     The cleanup also handles navigating from moderator → participant view:
+     both pages share the same conversationId, so the dep-change effect won't
+     fire on the new page — unmount cleanup is the only thing that clears it. */
+  useEffect(() => {
+    setConversationType(null);
+    return () => setConversationType(null);
+  }, [router.query.conversationId]);
 
   const [localError, setLocalError] = useState<string | null>(null);
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
@@ -118,6 +131,10 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
 
       if (conversationResponse && !("error" in conversationResponse)) {
         setConversationName(conversationResponse.name || "");
+        // Needed so the Quick Guide can filter commands by type name —
+        // the raw API response only carries a type ID, not the resolved object.
+        const conversation = await createConversationFromData(conversationResponse);
+        setConversationType(conversation.type);
       }
 
       // Fetch messages

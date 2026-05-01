@@ -10,6 +10,7 @@ import {
   ThemeProvider,
 } from "@mui/material";
 import { Layout } from "../components";
+import { ConversationTypeProvider } from "../context/ConversationTypeContext";
 import SessionManager from "../utils/SessionManager";
 import { validateEnv } from "../utils/validateEnv";
 import { useSessionTracking } from "../hooks/useAnalytics";
@@ -85,6 +86,7 @@ export default function App({ Component, pageProps }: AppProps) {
     return (
       <AppCacheProvider>
         <ThemeProvider theme={theme}>
+          <ConversationTypeProvider>
           <Layout authType={(pageProps.authType as AuthType) || "guest"}>
             <Head>
               <title>NextSpace</title>
@@ -116,6 +118,7 @@ export default function App({ Component, pageProps }: AppProps) {
               </svg>
             </div>
           </Layout>
+          </ConversationTypeProvider>
         </ThemeProvider>
       </AppCacheProvider>
     );
@@ -124,14 +127,16 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <AppCacheProvider>
       <ThemeProvider theme={theme}>
-        <Layout authType={(pageProps.authType as AuthType) || "guest"}>
-          <Head>
-            <title>NextSpace</title>
-          </Head>
-          <StyledEngineProvider injectFirst>
-            <Component {...pageProps} />
-          </StyledEngineProvider>
-        </Layout>
+        <ConversationTypeProvider>
+          <Layout authType={(pageProps.authType as AuthType) || "guest"}>
+            <Head>
+              <title>NextSpace</title>
+            </Head>
+            <StyledEngineProvider injectFirst>
+              <Component {...pageProps} />
+            </StyledEngineProvider>
+          </Layout>
+        </ConversationTypeProvider>
       </ThemeProvider>
     </AppCacheProvider>
   );

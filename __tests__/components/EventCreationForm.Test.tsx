@@ -135,6 +135,7 @@ const mockConfig = {
           name: "liveTranscript",
           label: "Live Transcript",
           description: "Display a live transcript during the event",
+          userControlled: false,
           default: false,
           properties: [
             {
@@ -150,7 +151,84 @@ const mockConfig = {
           name: "autoSummary",
           label: "Auto Summary",
           description: "Generate a summary at the end of the event",
+          userControlled: false,
           default: false,
+          properties: [],
+        },
+      ],
+    },
+    {
+      name: "eventAssistantPlus",
+      label: "Event Assistant Plus",
+      description: "A combination of Event Assistant and Back Channel",
+      properties: [
+        {
+          name: "zoomMeetingUrl",
+          type: "string",
+          label: "Zoom Meeting URL",
+          required: true,
+        },
+      ],
+      features: [
+        {
+          name: "collectiveVoice",
+          label: "Collective Voice",
+          description:
+            "Contributes to the group chat by surfacing what participants are privately thinking.",
+          userControlled: false,
+          default: true,
+          properties: [],
+        },
+        {
+          name: "catalyst",
+          label: "Catalyst",
+          description:
+            "Participates in the group chat as an active voice, jumping into silences.",
+          userControlled: false,
+          default: true,
+          properties: [],
+        },
+        {
+          name: "librarian",
+          label: "Reading Recommendations",
+          description:
+            "Periodically recommends relevant reading during the event.",
+          userControlled: false,
+          default: true,
+          properties: [],
+        },
+        {
+          name: "mod",
+          label: "Submit to Moderator",
+          description: "Submit a private question to the moderator.",
+          userControlled: true,
+          default: true,
+          properties: [],
+        },
+        {
+          name: "mindmap",
+          label: "Mind Map",
+          description:
+            "Creates a visual mind map of the key topics discussed in the event.",
+          userControlled: true,
+          default: true,
+          properties: [],
+        },
+        {
+          name: "visual",
+          label: "Visual Response",
+          description: "Ask for a visual (image) response to a question.",
+          userControlled: true,
+          default: true,
+          properties: [],
+        },
+        {
+          name: "jargonFilter",
+          label: "Jargon Filter",
+          description:
+            "Automatically explains jargon and technical terms used by speakers.",
+          userControlled: true,
+          default: true,
           properties: [],
         },
       ],
@@ -694,7 +772,7 @@ describe("EventCreationForm Component", () => {
 
     await waitFor(() => screen.getByText("Nextspace"));
     await user.click(screen.getByRole("checkbox", { name: /zoom/i }));
-    await user.click(screen.getByRole("radio", { name: /event assistant/i }));
+    await user.click(screen.getByRole("radio", { name: /^event assistant$/i }));
     await user.click(screen.getByRole("button", { name: /next/i }));
 
     await waitFor(() => {
@@ -1146,8 +1224,13 @@ describe("EventCreationForm Component", () => {
   });
 
   // Helper to navigate to Step 3 with Back Channel selected
-  const navigateToStep3WithBackChannel = async (user: ReturnType<typeof userEvent.setup>) => {
-    await fillEventDetails("Test Event", "https://huitstage.zoom.us/j/1234567890");
+  const navigateToStep3WithBackChannel = async (
+    user: ReturnType<typeof userEvent.setup>,
+  ) => {
+    await fillEventDetails(
+      "Test Event",
+      "https://huitstage.zoom.us/j/1234567890",
+    );
     await user.click(screen.getByRole("button", { name: /next/i }));
     await waitFor(() => screen.getByText("Nextspace"));
     await user.click(screen.getByRole("checkbox", { name: /zoom/i }));
@@ -1286,9 +1369,7 @@ describe("EventCreationForm Component", () => {
       );
 
       // Also enable autoSummary
-      await user.click(
-        screen.getByRole("checkbox", { name: /auto summary/i }),
-      );
+      await user.click(screen.getByRole("checkbox", { name: /auto summary/i }));
 
       await user.click(screen.getByRole("button", { name: /next/i }));
       await waitFor(() => screen.getByText("About the Speakers"));
@@ -1309,6 +1390,40 @@ describe("EventCreationForm Component", () => {
       });
     });
 
+    it("shows only the organizer-configured features for Event Assistant Plus", async () => {
+      // This test is an explicit allowlist. If you add a new feature to eventAssistantPlus
+      // and it should appear in the event creation form (userControlled: false), add it here.
+      // If it should NOT appear (userControlled: true), add it to the "should not appear" block.
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await fillEventDetails(
+        "Test Event",
+        "https://huitstage.zoom.us/j/1234567890",
+      );
+      await user.click(screen.getByRole("button", { name: /next/i }));
+      await waitFor(() => screen.getByText("Nextspace"));
+      await user.click(screen.getByRole("checkbox", { name: /zoom/i }));
+      await user.click(
+        screen.getByRole("radio", { name: /event assistant plus/i }),
+      );
+      await user.click(screen.getByRole("button", { name: /next/i }));
+      await waitFor(() => screen.getByText("Features"));
+
+      // Organizer-configured features (userControlled: false) — should appear
+      expect(screen.getByText("Collective Voice")).toBeInTheDocument();
+      expect(screen.getByText("Catalyst")).toBeInTheDocument();
+      expect(screen.getByText("Reading Recommendations")).toBeInTheDocument();
+
+      // Participant-facing features (userControlled: true) — should not appear
+      expect(screen.queryByText("Submit to Moderator")).not.toBeInTheDocument();
+      expect(screen.queryByText("Mind Map")).not.toBeInTheDocument();
+      expect(screen.queryByText("Visual Response")).not.toBeInTheDocument();
+      expect(screen.queryByText("Jargon Filter")).not.toBeInTheDocument();
+    });
+
     it("does not show Features section when conversationType has no features", async () => {
       const user = userEvent.setup();
       await act(async () => {
@@ -1324,7 +1439,7 @@ describe("EventCreationForm Component", () => {
       await user.click(screen.getByRole("checkbox", { name: /zoom/i }));
       // Event Assistant has no features in the mock config
       await user.click(
-        screen.getByRole("radio", { name: /event assistant/i }),
+        screen.getByRole("radio", { name: /^event assistant$/i }),
       );
       await user.click(screen.getByRole("button", { name: /next/i }));
       await waitFor(() => screen.getByLabelText(/Bot Name/i));

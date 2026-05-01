@@ -1,4 +1,8 @@
 import "@testing-library/jest-dom";
+import { toHaveNoViolations } from "jest-axe";
+
+// Extend expect with axe accessibility matchers
+expect.extend(toHaveNoViolations);
 import { TextEncoder, TextDecoder } from "util";
 
 // Polyfill TextEncoder/TextDecoder for Node.js environment
