@@ -513,7 +513,7 @@ function WhatsNew() {
       <Divider sx={{ mb: 2 }} />
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         {entries.map((entry) => (
-          <Box key={entry.releasedAt}>
+          <Box key={`${entry.releasedAt}-${entry.title}`}>
             <Typography variant="body2" fontWeight="medium" gutterBottom>
               {entry.title}
             </Typography>
