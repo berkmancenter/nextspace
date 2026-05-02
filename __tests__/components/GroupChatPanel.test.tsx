@@ -1,6 +1,20 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GroupChatPanel } from "../../components/GroupChatPanel";
+import { useAutoScroll } from "../../hooks/useAutoScroll";
+
+/*
+ * Mock useAutoScroll so GroupChatPanel tests focus on what the component
+ * passes to the hook, not on scroll mechanics. Scroll behavior itself is
+ * covered in __tests__/hooks/useAutoScroll.test.tsx.
+ */
+jest.mock("../../hooks/useAutoScroll", () => ({
+  useAutoScroll: jest.fn().mockReturnValue({
+    messagesContainerRef: { current: null },
+    messagesEndRef: { current: null },
+    scrollToBottom: jest.fn(),
+  }),
+}));
 
 // Mock MessageInput component
 jest.mock("../../components/MessageInput", () => ({
@@ -300,27 +314,7 @@ describe("GroupChatPanel", () => {
     expect(mockOnSendMessage).toHaveBeenCalledWith("Test message");
   });
 
-  it("scrolls to bottom when new messages arrive", async () => {
-    const { rerender, container } = render(
-      <GroupChatPanel {...baseProps} messages={[]} />,
-    );
-
-    // Get the scrollable messages container
-    const messagesContainer = container.querySelector(".overflow-y-auto");
-
-    // Mock scrollTop and scrollHeight
-    Object.defineProperty(messagesContainer, "scrollHeight", {
-      configurable: true,
-      value: 1000,
-    });
-
-    const scrollTopSpy = jest.fn();
-    Object.defineProperty(messagesContainer, "scrollTop", {
-      configurable: true,
-      set: scrollTopSpy,
-      get: () => 0,
-    });
-
+  it("passes messages to useAutoScroll when messages arrive", () => {
     const newMessages = [
       {
         id: "1",
@@ -338,11 +332,9 @@ describe("GroupChatPanel", () => {
       },
     ];
 
-    rerender(<GroupChatPanel {...baseProps} messages={newMessages} />);
+    render(<GroupChatPanel {...baseProps} messages={newMessages} />);
 
-    await waitFor(() => {
-      expect(scrollTopSpy).toHaveBeenCalledWith(1000);
-    });
+    expect(useAutoScroll).toHaveBeenCalledWith(newMessages);
   });
 
   it("parses message body correctly for string input", () => {
@@ -2422,6 +2414,52 @@ describe("GroupChatPanel", () => {
       // Both thinking indicator and message input should be present
       expect(screen.getByText("thinking...")).toBeInTheDocument();
       expect(screen.getByTestId("message-input")).toBeInTheDocument();
+    });
+  });
+
+  describe("useAutoScroll integration", () => {
+    it("passes all messages to useAutoScroll, including thread replies", () => {
+      // If GroupChatPanel only passed parentMessages, the hook would never see
+      // thread replies — meaning Berkie's threaded responses wouldn't trigger
+      // a scroll even when the user is pinned to the bottom.
+      const parentMessage = {
+        id: "parent-1",
+        pseudonym: "Alice",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "User question" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "alice-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const threadReply = {
+        id: "reply-1",
+        pseudonym: "Berkie",
+        parentMessage: "parent-1",
+        createdAt: "2025-10-17T12:01:00Z",
+        body: { text: "Berkie's threaded reply" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "berkie-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const messages = [parentMessage, threadReply];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      // The hook should receive the full messages array — both the parent and
+      // the thread reply — not just the filtered parentMessages list.
+      expect(useAutoScroll).toHaveBeenCalledWith(messages);
     });
   });
 });

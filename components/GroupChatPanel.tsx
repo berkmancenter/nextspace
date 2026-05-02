@@ -131,9 +131,8 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     return { parentMessages: parents, threadMap: map };
   }, [messages]);
 
-  // Auto-scroll based on parent messages only (not threaded replies)
-  const { messagesEndRef, messagesContainerRef } =
-    useAutoScroll(parentMessages);
+  // Auto-scroll based on any new messages, including threaded replies
+  const { messagesEndRef, messagesContainerRef } = useAutoScroll(messages);
 
   // Determine if we're waiting for a threaded reply
   const lastMessage = messages[messages.length - 1];
