@@ -13,6 +13,7 @@ jest.mock("../../hooks/useAutoScroll", () => ({
     messagesContainerRef: { current: null },
     messagesEndRef: { current: null },
     scrollToBottom: jest.fn(),
+    isAtBottom: true,
   }),
 }));
 
@@ -2414,6 +2415,80 @@ describe("GroupChatPanel", () => {
       // Both thinking indicator and message input should be present
       expect(screen.getByText("thinking...")).toBeInTheDocument();
       expect(screen.getByTestId("message-input")).toBeInTheDocument();
+    });
+  });
+
+  describe("Scroll-to-bottom button", () => {
+    it("is not rendered when user is at the bottom", () => {
+      (useAutoScroll as jest.Mock).mockReturnValue({
+        messagesContainerRef: { current: null },
+        messagesEndRef: { current: null },
+        scrollToBottom: jest.fn(),
+        isAtBottom: true,
+      });
+
+      render(<GroupChatPanel {...baseProps} />);
+
+      expect(
+        screen.queryByRole("button", { name: /scroll to latest messages/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("appears when the user has scrolled up", () => {
+      (useAutoScroll as jest.Mock).mockReturnValue({
+        messagesContainerRef: { current: null },
+        messagesEndRef: { current: null },
+        scrollToBottom: jest.fn(),
+        isAtBottom: false,
+      });
+
+      render(<GroupChatPanel {...baseProps} />);
+
+      expect(
+        screen.getByRole("button", { name: /scroll to latest messages/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("calls scrollToBottom when clicked", async () => {
+      const mockScrollToBottom = jest.fn();
+      (useAutoScroll as jest.Mock).mockReturnValue({
+        messagesContainerRef: { current: null },
+        messagesEndRef: { current: null },
+        scrollToBottom: mockScrollToBottom,
+        isAtBottom: false,
+      });
+
+      const user = userEvent.setup();
+      render(<GroupChatPanel {...baseProps} />);
+
+      await user.click(
+        screen.getByRole("button", { name: /scroll to latest messages/i }),
+      );
+
+      expect(mockScrollToBottom).toHaveBeenCalledTimes(1);
+    });
+
+    it("moves focus to the message input when clicked", async () => {
+      (useAutoScroll as jest.Mock).mockReturnValue({
+        messagesContainerRef: { current: null },
+        messagesEndRef: { current: null },
+        scrollToBottom: jest.fn(),
+        isAtBottom: false,
+      });
+
+      const user = userEvent.setup();
+      render(<GroupChatPanel {...baseProps} />);
+
+      await user.click(
+        screen.getByRole("button", { name: /scroll to latest messages/i }),
+      );
+
+      /* The handler focuses the first focusable input inside the MessageInput
+         wrapper. In tests the mock renders an <input data-testid="message-input-field">,
+         so that element should receive focus. */
+      expect(document.activeElement).toBe(
+        screen.getByTestId("message-input-field"),
+      );
     });
   });
 

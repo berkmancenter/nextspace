@@ -1,4 +1,4 @@
-import React, { FC, useMemo } from "react";
+import React, { FC, useMemo, useRef } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { MessageInput } from "./MessageInput";
@@ -18,6 +18,8 @@ import {
   normalizeAssistantPseudonym,
   parseMessageBody,
 } from "../utils/Helpers";
+import { IconButton, Tooltip } from "@mui/material";
+import ArrowCircleDownIcon from "@mui/icons-material/ArrowCircleDown";
 
 /**
  * Render assistant message with markdown support
@@ -132,7 +134,20 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   }, [messages]);
 
   // Auto-scroll based on any new messages, including threaded replies
-  const { messagesEndRef, messagesContainerRef } = useAutoScroll(messages);
+  const { messagesEndRef, messagesContainerRef, isAtBottom, scrollToBottom } =
+    useAutoScroll(messages);
+
+  const messageInputRef = useRef<HTMLDivElement>(null);
+
+  /* Move focus into the message input after jumping to the bottom so keyboard
+     users don't lose their place (WCAG 2.4.3). */
+  const handleScrollToBottom = () => {
+    scrollToBottom();
+    const input = messageInputRef.current?.querySelector<HTMLElement>(
+      'textarea, input, [contenteditable="true"]',
+    );
+    input?.focus();
+  };
 
   // Determine if we're waiting for a threaded reply
   const lastMessage = messages[messages.length - 1];
@@ -292,81 +307,103 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
         }`}
       >
         {/* Scrollable messages area */}
-        <div
-          ref={messagesContainerRef}
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-2 pr-2 md:px-8 pt-2 bg-gray-100"
-        >
+        <div className="relative flex flex-col flex-1 overflow-hidden">
           <div
-            className="flex flex-col items-start gap-4 pb-2"
-            aria-live="assertive"
+            ref={messagesContainerRef}
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-2 pr-2 md:px-8 pt-2 bg-gray-100"
           >
-            {/* Panel title and subtitle */}
-            <div className="w-full pt-4 pb-2">
-              <h2 className="text-xl font-bold uppercase tracking-wide text-gray-900">
-                Welcome to&nbsp;
-                <span className="text-medium-slate-blue">
-                  {eventName || "Your Event"}
-                </span>
-                &nbsp;Group Chat
-              </h2>
-              <p className="text-sm text-gray-500 mt-0.5">
-                Chat in real time with other event participants.
-              </p>
-            </div>
-
-            {parentMessages.map((message, i) => {
-              // Determine if we should show timestamp
-              const showTimestamp = (() => {
-                if (i === 0) return true;
-                const prevDate = new Date(parentMessages[i - 1].createdAt!);
-                const currDate = new Date(message.createdAt!);
-                return (
-                  prevDate.getHours() !== currDate.getHours() ||
-                  prevDate.getMinutes() !== currDate.getMinutes()
-                );
-              })();
-
-              return (
-                <ThreadedMessage
-                  key={message.id || `msg-${i}`}
-                  message={message}
-                  replies={threadMap.get(message.id!) || []}
-                  pseudonym={pseudonym}
-                  onOpenThread={handleOpenThread}
-                  onMarkAsRead={handleMarkAsRead}
-                  botName={botName}
-                  renderAvatar={renderAvatar}
-                  renderMessageContent={renderMessageContent}
-                  feedbackConfig={feedbackConfig}
-                  showTimestamp={showTimestamp}
-                  isThreadOpen={selectedThreadId === message.id}
-                  hasUnreadReplies={
-                    message.id
-                      ? messagesWithUnreadReplies.has(message.id)
-                      : false
-                  }
-                />
-              );
-            })}
-
-            {/* Bot loading indicator - appears after last user message (only for main chat) */}
-            {waitingForResponse &&
-              !waitingForThreadedReply &&
-              parentMessages.length > 0 && (
-                <div className="relative z-10 flex items-center gap-1 mt-2 mb-1">
-                  <BotIcon size={32} color="#4b5563" bouncing={true} />
-                  <span className="text-xs text-gray-500 italic">
-                    thinking...
+            <div
+              className="flex flex-col items-start gap-4 pb-2"
+              aria-live="assertive"
+            >
+              {/* Panel title and subtitle */}
+              <div className="w-full pt-4 pb-2">
+                <h2 className="text-xl font-bold uppercase tracking-wide text-gray-900">
+                  Welcome to&nbsp;
+                  <span className="text-medium-slate-blue">
+                    {eventName || "Your Event"}
                   </span>
-                </div>
-              )}
-            {/* Scroll target */}
-            <div ref={messagesEndRef} className="h-2" />
+                  &nbsp;Group Chat
+                </h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Chat in real time with other event participants.
+                </p>
+              </div>
+
+              {parentMessages.map((message, i) => {
+                // Determine if we should show timestamp
+                const showTimestamp = (() => {
+                  if (i === 0) return true;
+                  const prevDate = new Date(parentMessages[i - 1].createdAt!);
+                  const currDate = new Date(message.createdAt!);
+                  return (
+                    prevDate.getHours() !== currDate.getHours() ||
+                    prevDate.getMinutes() !== currDate.getMinutes()
+                  );
+                })();
+
+                return (
+                  <ThreadedMessage
+                    key={message.id || `msg-${i}`}
+                    message={message}
+                    replies={threadMap.get(message.id!) || []}
+                    pseudonym={pseudonym}
+                    onOpenThread={handleOpenThread}
+                    onMarkAsRead={handleMarkAsRead}
+                    botName={botName}
+                    renderAvatar={renderAvatar}
+                    renderMessageContent={renderMessageContent}
+                    feedbackConfig={feedbackConfig}
+                    showTimestamp={showTimestamp}
+                    isThreadOpen={selectedThreadId === message.id}
+                    hasUnreadReplies={
+                      message.id
+                        ? messagesWithUnreadReplies.has(message.id)
+                        : false
+                    }
+                  />
+                );
+              })}
+
+              {/* Bot loading indicator - appears after last user message (only for main chat) */}
+              {waitingForResponse &&
+                !waitingForThreadedReply &&
+                parentMessages.length > 0 && (
+                  <div className="relative z-10 flex items-center gap-1 mt-2 mb-1">
+                    <BotIcon size={32} color="#4b5563" bouncing={true} />
+                    <span className="text-xs text-gray-500 italic">
+                      thinking...
+                    </span>
+                  </div>
+                )}
+              {/* Scroll target */}
+              <div ref={messagesEndRef} className="h-2" />
+            </div>
           </div>
+          {!isAtBottom && (
+            <Tooltip title="Scroll down to latest messages" arrow>
+              <IconButton
+                onClick={handleScrollToBottom}
+                aria-label="Scroll to latest messages"
+                size="medium"
+                sx={{
+                  position: "absolute",
+                  bottom: 24,
+                  right: 24,
+                  backgroundColor: "white",
+                  color: "#4845D2",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                  "&:hover": { backgroundColor: "#f5f5f5" },
+                }}
+              >
+                <ArrowCircleDownIcon />
+              </IconButton>
+            </Tooltip>
+          )}
         </div>
 
         {/* MessageInput*/}
-        <div className="flex-shrink-0">
+        <div ref={messageInputRef} className="flex-shrink-0">
           <MessageInput
             pseudonym={pseudonym}
             enhancers={enhancers}
