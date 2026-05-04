@@ -18,7 +18,11 @@ function setScrollPosition(
     currentPosition,
     totalContentHeight,
     visibleHeight,
-  }: { currentPosition: number; totalContentHeight: number; visibleHeight: number },
+  }: {
+    currentPosition: number;
+    totalContentHeight: number;
+    visibleHeight: number;
+  },
 ) {
   Object.defineProperty(el, "scrollTop", {
     configurable: true,

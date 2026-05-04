@@ -2072,12 +2072,16 @@ describe("GroupChatPanel", () => {
           messages={messages}
           messagesWithUnreadReplies={messagesWithUnreadReplies}
           onMarkAsRead={jest.fn()}
-        />
+        />,
       );
 
       // Both messages should be rendered
-      expect(screen.getByText("Parent with unread replies")).toBeInTheDocument();
-      expect(screen.getByText("Parent without unread replies")).toBeInTheDocument();
+      expect(
+        screen.getByText("Parent with unread replies"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Parent without unread replies"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -2153,7 +2157,9 @@ describe("GroupChatPanel", () => {
         />,
       );
 
-      expect(screen.getByText(new RegExp("a{60}\\.\\.\\."))). toBeInTheDocument();
+      expect(
+        screen.getByText(new RegExp("a{60}\\.\\.\\.")),
+      ).toBeInTheDocument();
     });
   });
 
@@ -2181,7 +2187,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={messages}
           waitingForResponse={true}
-        />
+        />,
       );
 
       // Should show thinking indicator with bouncing bot icon
@@ -2213,7 +2219,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={messages}
           waitingForResponse={false}
-        />
+        />,
       );
 
       const bouncingIcon = container.querySelector(".animate-bounce");
@@ -2258,7 +2264,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={[parentMessage, userReply]}
           waitingForResponse={true}
-        />
+        />,
       );
 
       // Main chat should NOT show thinking indicator when waiting for threaded reply
@@ -2304,7 +2310,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={messages}
           waitingForResponse={true}
-        />
+        />,
       );
 
       // Both messages should be visible
@@ -2340,7 +2346,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={initialMessages}
           waitingForResponse={true}
-        />
+        />,
       );
 
       // Verify thinking indicator is shown
@@ -2372,7 +2378,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={messagesWithResponse}
           waitingForResponse={false}
-        />
+        />,
       );
 
       // Verify thinking indicator is removed
@@ -2409,7 +2415,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={messages}
           waitingForResponse={true}
-        />
+        />,
       );
 
       // Both thinking indicator and message input should be present
