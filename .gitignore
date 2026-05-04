@@ -39,5 +39,6 @@ types.ts
 
 # TypeScript build cache
 *.tsbuildinfo
-REVIEW.md
+
+# Local claude configs
 .claude/*
