@@ -173,9 +173,6 @@ NEXT_PUBLIC_API_URL=<your-backend-url>
 NEXT_PUBLIC_SOCKET_URL=<your-socket-url>
   The URL to the socket.io instance, e.g. "ws://localhost:5555/?EIO=4&transport=websocket"
 
-NEXT_PUBLIC_DEFAULT_TOPIC_ID=<topic-id>
-  The ID of the default topic for submitting new events; used within the event creation form
-
 NEXT_PUBLIC_ABOUT_URL=<about-url>
   The URL for the About page footer link
 
