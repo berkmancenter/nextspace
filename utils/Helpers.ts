@@ -137,7 +137,7 @@ export class Api {
   async GetConfig() {
     if (!this.configCache) {
       const config = await RetrieveData("/config");
-      if ("error" in config) {
+      if (!config || "error" in config) {
         throw new Error("Failed to fetch config");
       }
       this.configCache = {
@@ -199,7 +199,6 @@ export const GetChannelPasscode = (
         return true;
       }
     });
-
   }
 
   if (hasChannel) {

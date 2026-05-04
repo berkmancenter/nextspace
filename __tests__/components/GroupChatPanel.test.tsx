@@ -1,6 +1,21 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GroupChatPanel } from "../../components/GroupChatPanel";
+import { useAutoScroll } from "../../hooks/useAutoScroll";
+
+/*
+ * Mock useAutoScroll so GroupChatPanel tests focus on what the component
+ * passes to the hook, not on scroll mechanics. Scroll behavior itself is
+ * covered in __tests__/hooks/useAutoScroll.test.tsx.
+ */
+jest.mock("../../hooks/useAutoScroll", () => ({
+  useAutoScroll: jest.fn().mockReturnValue({
+    messagesContainerRef: { current: null },
+    messagesEndRef: { current: null },
+    scrollToBottom: jest.fn(),
+    isAtBottom: true,
+  }),
+}));
 
 // Mock MessageInput component
 jest.mock("../../components/MessageInput", () => ({
@@ -300,27 +315,7 @@ describe("GroupChatPanel", () => {
     expect(mockOnSendMessage).toHaveBeenCalledWith("Test message");
   });
 
-  it("scrolls to bottom when new messages arrive", async () => {
-    const { rerender, container } = render(
-      <GroupChatPanel {...baseProps} messages={[]} />,
-    );
-
-    // Get the scrollable messages container
-    const messagesContainer = container.querySelector(".overflow-y-auto");
-
-    // Mock scrollTop and scrollHeight
-    Object.defineProperty(messagesContainer, "scrollHeight", {
-      configurable: true,
-      value: 1000,
-    });
-
-    const scrollTopSpy = jest.fn();
-    Object.defineProperty(messagesContainer, "scrollTop", {
-      configurable: true,
-      set: scrollTopSpy,
-      get: () => 0,
-    });
-
+  it("passes messages to useAutoScroll when messages arrive", () => {
     const newMessages = [
       {
         id: "1",
@@ -338,11 +333,9 @@ describe("GroupChatPanel", () => {
       },
     ];
 
-    rerender(<GroupChatPanel {...baseProps} messages={newMessages} />);
+    render(<GroupChatPanel {...baseProps} messages={newMessages} />);
 
-    await waitFor(() => {
-      expect(scrollTopSpy).toHaveBeenCalledWith(1000);
-    });
+    expect(useAutoScroll).toHaveBeenCalledWith(newMessages);
   });
 
   it("parses message body correctly for string input", () => {
@@ -2079,12 +2072,16 @@ describe("GroupChatPanel", () => {
           messages={messages}
           messagesWithUnreadReplies={messagesWithUnreadReplies}
           onMarkAsRead={jest.fn()}
-        />
+        />,
       );
 
       // Both messages should be rendered
-      expect(screen.getByText("Parent with unread replies")).toBeInTheDocument();
-      expect(screen.getByText("Parent without unread replies")).toBeInTheDocument();
+      expect(
+        screen.getByText("Parent with unread replies"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Parent without unread replies"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -2160,7 +2157,9 @@ describe("GroupChatPanel", () => {
         />,
       );
 
-      expect(screen.getByText(new RegExp("a{60}\\.\\.\\."))). toBeInTheDocument();
+      expect(
+        screen.getByText(new RegExp("a{60}\\.\\.\\.")),
+      ).toBeInTheDocument();
     });
   });
 
@@ -2188,7 +2187,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={messages}
           waitingForResponse={true}
-        />
+        />,
       );
 
       // Should show thinking indicator with bouncing bot icon
@@ -2220,7 +2219,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={messages}
           waitingForResponse={false}
-        />
+        />,
       );
 
       const bouncingIcon = container.querySelector(".animate-bounce");
@@ -2265,7 +2264,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={[parentMessage, userReply]}
           waitingForResponse={true}
-        />
+        />,
       );
 
       // Main chat should NOT show thinking indicator when waiting for threaded reply
@@ -2311,7 +2310,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={messages}
           waitingForResponse={true}
-        />
+        />,
       );
 
       // Both messages should be visible
@@ -2347,7 +2346,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={initialMessages}
           waitingForResponse={true}
-        />
+        />,
       );
 
       // Verify thinking indicator is shown
@@ -2379,7 +2378,7 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={messagesWithResponse}
           waitingForResponse={false}
-        />
+        />,
       );
 
       // Verify thinking indicator is removed
@@ -2416,12 +2415,132 @@ describe("GroupChatPanel", () => {
           {...baseProps}
           messages={messages}
           waitingForResponse={true}
-        />
+        />,
       );
 
       // Both thinking indicator and message input should be present
       expect(screen.getByText("thinking...")).toBeInTheDocument();
       expect(screen.getByTestId("message-input")).toBeInTheDocument();
+    });
+  });
+
+  describe("Scroll-to-bottom button", () => {
+    it("is not rendered when user is at the bottom", () => {
+      (useAutoScroll as jest.Mock).mockReturnValue({
+        messagesContainerRef: { current: null },
+        messagesEndRef: { current: null },
+        scrollToBottom: jest.fn(),
+        isAtBottom: true,
+      });
+
+      render(<GroupChatPanel {...baseProps} />);
+
+      expect(
+        screen.queryByRole("button", { name: /scroll to latest messages/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("appears when the user has scrolled up", () => {
+      (useAutoScroll as jest.Mock).mockReturnValue({
+        messagesContainerRef: { current: null },
+        messagesEndRef: { current: null },
+        scrollToBottom: jest.fn(),
+        isAtBottom: false,
+      });
+
+      render(<GroupChatPanel {...baseProps} />);
+
+      expect(
+        screen.getByRole("button", { name: /scroll to latest messages/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("calls scrollToBottom when clicked", async () => {
+      const mockScrollToBottom = jest.fn();
+      (useAutoScroll as jest.Mock).mockReturnValue({
+        messagesContainerRef: { current: null },
+        messagesEndRef: { current: null },
+        scrollToBottom: mockScrollToBottom,
+        isAtBottom: false,
+      });
+
+      const user = userEvent.setup();
+      render(<GroupChatPanel {...baseProps} />);
+
+      await user.click(
+        screen.getByRole("button", { name: /scroll to latest messages/i }),
+      );
+
+      expect(mockScrollToBottom).toHaveBeenCalledTimes(1);
+    });
+
+    it("moves focus to the message input when clicked", async () => {
+      (useAutoScroll as jest.Mock).mockReturnValue({
+        messagesContainerRef: { current: null },
+        messagesEndRef: { current: null },
+        scrollToBottom: jest.fn(),
+        isAtBottom: false,
+      });
+
+      const user = userEvent.setup();
+      render(<GroupChatPanel {...baseProps} />);
+
+      await user.click(
+        screen.getByRole("button", { name: /scroll to latest messages/i }),
+      );
+
+      /* The handler focuses the first focusable input inside the MessageInput
+         wrapper. In tests the mock renders an <input data-testid="message-input-field">,
+         so that element should receive focus. */
+      expect(document.activeElement).toBe(
+        screen.getByTestId("message-input-field"),
+      );
+    });
+  });
+
+  describe("useAutoScroll integration", () => {
+    it("passes all messages to useAutoScroll, including thread replies", () => {
+      // If GroupChatPanel only passed parentMessages, the hook would never see
+      // thread replies — meaning Berkie's threaded responses wouldn't trigger
+      // a scroll even when the user is pinned to the bottom.
+      const parentMessage = {
+        id: "parent-1",
+        pseudonym: "Alice",
+        createdAt: "2025-10-17T12:00:00Z",
+        body: { text: "User question" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "alice-1",
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const threadReply = {
+        id: "reply-1",
+        pseudonym: "Berkie",
+        parentMessage: "parent-1",
+        createdAt: "2025-10-17T12:01:00Z",
+        body: { text: "Berkie's threaded reply" },
+        channels: ["chat"],
+        conversation: "conv-1",
+        pseudonymId: "berkie-1",
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const messages = [parentMessage, threadReply];
+
+      render(<GroupChatPanel {...baseProps} messages={messages} />);
+
+      // The hook should receive the full messages array — both the parent and
+      // the thread reply — not just the filtered parentMessages list.
+      expect(useAutoScroll).toHaveBeenCalledWith(messages);
     });
   });
 });

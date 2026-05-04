@@ -11,6 +11,7 @@ import FeedbackOutlinedIcon from "@mui/icons-material/FeedbackOutlined";
 
 import { AuthType, HeaderProps, PageName } from "../types.internal";
 import Logo from "./Logo";
+import { QuickGuideIconButton } from "./QuickGuideIconButton";
 import { Close, Menu } from "@mui/icons-material";
 import { useRouter } from "next/router";
 import { Api } from "../utils";
@@ -63,42 +64,54 @@ export const Header = ({
   let currentPages: Record<string, { icon: JSX.Element; url: string }>;
   
   if (authType === "admin") {
-    // Admin users see admin pages + logout
-    currentPages = {
-      ...adminPagesBase,
-      "Log Out": {
-        icon: <LogoutIcon />,
-        url: "/logout",
-      },
-      "Give Feedback": {
-        icon: <FeedbackOutlinedIcon />,
-        url: "https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform",
-      },
-    };
+    // Admin users see admin pages; Give Feedback + Log Out rendered after Quick Guide
+    currentPages = { ...adminPagesBase };
   } else if (authType === "user") {
-    // Regular logged-in users see logout + feedback (future: add user-specific pages)
-    currentPages = {
-      "Log Out": {
-        icon: <LogoutIcon />,
-        url: "/logout",
-      },
-      "Give Feedback": {
-        icon: <FeedbackOutlinedIcon />,
-        url: "https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform",
-      },
-    };
+    // Regular logged-in users; Give Feedback + Log Out rendered after Quick Guide
+    currentPages = {};
   } else {
     // Guest users: show login button only on admin routes
     currentPages = {
       ...(isAdminRoute && {
         "Log In": { icon: <LoginIcon />, url: "/login" },
       }),
-      "Give Feedback": {
-        icon: <FeedbackOutlinedIcon />,
-        url: "https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform",
-      },
     };
   }
+
+  const isLoggedIn = authType === "admin" || authType === "user";
+
+  /* Shared button style for nav items rendered explicitly after Quick Guide */
+  const navButtonSx = {
+    textTransform: "capitalize" as const,
+    "&:hover": { color: "#4845d2" },
+    fontSize: "1rem",
+    color: "grey",
+    backgroundColor: "transparent",
+  };
+
+  const giveFeedbackUrl =
+    "https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform";
+
+  const TrailingNavItems = () => (
+    <>
+      <Link
+        href={giveFeedbackUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <Button sx={navButtonSx} startIcon={<FeedbackOutlinedIcon />}>
+          Give Feedback
+        </Button>
+      </Link>
+      {isLoggedIn && (
+        <Link href="/logout">
+          <Button sx={navButtonSx} startIcon={<LogoutIcon />}>
+            Log Out
+          </Button>
+        </Link>
+      )}
+    </>
+  );
 
   const toggleDrawer = (newOpen: boolean) => () => {
     setOpen(newOpen);
@@ -167,12 +180,16 @@ export const Header = ({
             </Box>
             <List sx={{ margin: 3 }} className="flex flex-col">
               {NavItems()}
+              {router.asPath.includes("conversationId") && <QuickGuideIconButton showLabel />}
+              <TrailingNavItems />
             </List>
           </Drawer>
         </div>
-        <Box className="hidden lg:flex flex-row justify-end grow-1 gap-x-6">
+        <div className="hidden lg:flex flex-row justify-end grow-1 gap-x-6 items-center">
           {NavItems()}
-        </Box>
+          {router.asPath.includes("conversationId") && <QuickGuideIconButton showLabel />}
+          <TrailingNavItems />
+        </div>
       </Toolbar>
     </div>
   );

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import EventAssistantRoom from "../../pages/assistant";
 import { RetrieveData, SendData } from "../../utils";
 import { createConversationFromData } from "../../utils/Helpers";
+import { ConversationTypeProvider } from "../../context/ConversationTypeContext";
 
 // Mock next/router
 const mockPush = jest.fn();
@@ -468,11 +469,32 @@ describe("EventAssistantRoom", () => {
       });
       (createConversationFromData as jest.Mock).mockResolvedValue({
         agents: [{ id: "agent-456", agentType: "eventAssistantPlus" }],
-        type: { name: "eventAssistantPlus" },
+        type: {
+          name: "eventAssistantPlus",
+          description: "",
+          platforms: [],
+          properties: [],
+          features: [
+            {
+              name: "mod",
+              label: "Submit to Moderator",
+              tab: "chat",
+              audience: "participant",
+              slashCommand: "mod",
+              default: true,
+              agents: [],
+              description: "Submit a question to the moderator",
+            },
+          ],
+        },
       });
 
       await act(async () => {
-        render(<EventAssistantRoom authType={"guest"} />);
+        render(
+          <ConversationTypeProvider>
+            <EventAssistantRoom authType={"guest"} />
+          </ConversationTypeProvider>
+        );
       });
 
       // Wait for conversation data to load (RetrieveData called for conversations/)
@@ -531,11 +553,15 @@ describe("EventAssistantRoom", () => {
       });
       (createConversationFromData as jest.Mock).mockResolvedValue({
         agents: [{ id: "agent-456", agentType: "eventAssistant" }],
-        type: { name: "eventAssistant" },
+        type: { name: "eventAssistant", description: "", platforms: [], properties: [], features: [] },
       });
 
       await act(async () => {
-        render(<EventAssistantRoom authType={"guest"} />);
+        render(
+          <ConversationTypeProvider>
+            <EventAssistantRoom authType={"guest"} />
+          </ConversationTypeProvider>
+        );
       });
 
       await waitFor(() => {

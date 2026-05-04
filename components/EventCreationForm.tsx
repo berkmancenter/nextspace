@@ -1357,7 +1357,7 @@ export const EventCreationForm: React.FC = ({}) => {
               {(() => {
                 const features = conversationTypes?.find(
                   (type) => type.name === selectedConvType,
-                )?.features;
+                )?.features?.filter((f) => f.userControlled === false);
                 if (!features?.length) return null;
                 return (
                   <Box sx={{ mt: 3 }}>
