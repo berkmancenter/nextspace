@@ -33,7 +33,7 @@ import { Request } from "../utils";
 import { EventStatus } from "./";
 import { components } from "../types";
 import { Conversation } from "../types.internal";
-import { createConversationFromData, Api } from "../utils/Helpers";
+import { createConversationFromData, Api, SendData } from "../utils/Helpers";
 import SessionManager from "../utils/SessionManager";
 import { NewTopicForm, NewTopicFormValues } from "./NewTopicForm";
 
@@ -827,14 +827,19 @@ export const EventCreationForm: React.FC = ({}) => {
           description: newTopic.description,
         }),
       };
-      const topicResult = await Request("topics", topicPayload);
-      if (!topicResult || topicResult.error) {
-        setFormError(
-          topicResult?.message?.message || "Failed to create Event Series.",
-        );
+      try {
+        const topicResult = await Request("topics", topicPayload);
+        if (!topicResult || topicResult.error) {
+          setFormError(
+            topicResult?.message?.message || "Failed to create Event Series.",
+          );
+          return;
+        }
+        topicId = topicResult.id;
+      } catch (error) {
+        setFormError("Failed to create Event Series");
         return;
       }
-      topicId = topicResult.id;
     }
 
     // Filter out empty moderators and speakers
