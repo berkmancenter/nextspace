@@ -278,6 +278,49 @@ function FeatureRowWithPill({ f }: { f: FeatureConfig }) {
   );
 }
 
+function SlashCommandRow({ f }: { f: FeatureConfig }) {
+  const state: PillState = f.enabled === false ? "unavailable" : "active";
+  const isUnavailable = state === "unavailable";
+  const descColor = isUnavailable ? "text.disabled" : "text.secondary";
+  return (
+    <Box
+      aria-disabled={isUnavailable ? "true" : undefined}
+      sx={{
+        display: "grid",
+        gridTemplateColumns: { xs: "110px 1fr auto", sm: "160px 1fr auto" },
+        gap: 2,
+        py: 1,
+        borderBottom: "1px solid",
+        borderColor: "divider",
+        "&:last-child": { borderBottom: "none" },
+        alignItems: "start",
+        opacity: isUnavailable ? 0.6 : 1,
+      }}
+    >
+      <Box>
+        <Typography
+          variant="body2"
+          sx={{
+            fontFamily: "monospace",
+            bgcolor: isUnavailable ? "transparent" : "action.hover",
+            display: "inline-block",
+            px: 0.75,
+            py: 0.25,
+            borderRadius: 1,
+            color: isUnavailable ? "text.disabled" : "text.primary",
+          }}
+        >
+          /{f.slashCommand}
+        </Typography>
+      </Box>
+      <Typography variant="body2" color={descColor}>
+        {f.description}
+      </Typography>
+      <StatusPill state={state} />
+    </Box>
+  );
+}
+
 function TabSection({
   tab,
   features,
@@ -300,9 +343,7 @@ function TabSection({
   const automatic = features.filter(
     (f) => !f.slashCommand && !f.userControlled,
   );
-  const hasDisabled = features.some(
-    (f) => !f.slashCommand && f.enabled === false,
-  );
+  const hasDisabled = features.some((f) => f.enabled === false);
   const hasNonSlash = userControlled.length + automatic.length > 0;
 
   return (
@@ -379,46 +420,16 @@ function TabSection({
         {/* Slash commands — header with Active pill, existing table below */}
         {slashCommands.length > 0 && (
           <Box sx={{ pt: 1.5, pb: hasNonSlash ? 0 : 1.5 }}>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                mb: 1,
-              }}
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ ...TIER_LABEL_SX, mb: 1 }}
             >
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={TIER_LABEL_SX}
-              >
-                Commands — type / in the chat
-              </Typography>
-              <StatusPill state="active" />
-            </Box>
+              Commands — type / in the chat
+            </Typography>
             <Box sx={{ pl: 2 }}>
               {slashCommands.map((f) => (
-                <FeatureRow
-                  key={f.name}
-                  f={f}
-                  nameSlot={
-                    <Box>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontFamily: "monospace",
-                          bgcolor: "action.hover",
-                          display: "inline-block",
-                          px: 0.75,
-                          py: 0.25,
-                          borderRadius: 1,
-                        }}
-                      >
-                        /{f.slashCommand}
-                      </Typography>
-                    </Box>
-                  }
-                />
+                <SlashCommandRow key={f.name} f={f} />
               ))}
             </Box>
           </Box>

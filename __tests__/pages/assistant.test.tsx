@@ -597,6 +597,86 @@ describe("EventAssistantRoom", () => {
         { timeout: 3000 },
       );
     });
+
+    it("does not show /mod command when the feature is disabled (enabled: false)", async () => {
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,test-chat-passcode",
+      };
+
+      mockUseSessionJoin.mockReturnValue({
+        socket: mockSocket,
+        pseudonym: "test-pseudonym",
+        userId: "user-123",
+        isConnected: true,
+        errorMessage: null,
+      });
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-456", agentType: "eventAssistant" }],
+          });
+        } else if (path.startsWith("messages/")) {
+          return Promise.resolve([]);
+        }
+        return Promise.resolve(null);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-456", agentType: "eventAssistant" }],
+        features: [{ name: "mod", enabled: false }],
+        type: {
+          name: "eventAssistantPlus",
+          description: "",
+          platforms: [],
+          properties: [],
+          features: [
+            {
+              name: "mod",
+              label: "Submit to Moderator",
+              tab: "chat",
+              audience: "participant",
+              slashCommand: "mod",
+              default: true,
+              agents: [],
+              description: "Submit a question to the moderator",
+            },
+          ],
+        },
+      });
+
+      await act(async () => {
+        render(
+          <ConversationTypeProvider>
+            <EventAssistantRoom authType={"guest"} />
+          </ConversationTypeProvider>,
+        );
+      });
+
+      await waitFor(() => {
+        expect(createConversationFromData).toHaveBeenCalled();
+      });
+
+      const user = userEvent.setup();
+
+      const assistantTabs = screen.getAllByLabelText("Berkie");
+      await user.click(assistantTabs[0]);
+
+      await waitFor(() => {
+        expect(
+          screen.getByPlaceholderText("Enter your message here"),
+        ).toBeInTheDocument();
+      });
+
+      const input = screen.getByPlaceholderText("Enter your message here");
+      await user.type(input, "/");
+
+      await waitFor(
+        () => {
+          expect(screen.queryByText("/mod")).not.toBeInTheDocument();
+        },
+        { timeout: 3000 },
+      );
+    });
   });
 
   describe("Bot @mention routing in chat tab", () => {

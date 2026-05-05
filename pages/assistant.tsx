@@ -105,11 +105,15 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [unseenAssistantCount, setUnseenAssistantCount] = useState<number>(0);
   const [unseenChatCount, setUnseenChatCount] = useState<number>(0);
   const [unseenResourcesCount, setUnseenResourcesCount] = useState<number>(0);
-  const [resourcesNavBadgeDismissed, setResourcesNavBadgeDismissed] = useState(false);
-  const [unreadAssistantReplyCount, setUnreadAssistantReplyCount] = useState<number>(0);
+  const [resourcesNavBadgeDismissed, setResourcesNavBadgeDismissed] =
+    useState(false);
+  const [unreadAssistantReplyCount, setUnreadAssistantReplyCount] =
+    useState<number>(0);
   const [unreadChatReplyCount, setUnreadChatReplyCount] = useState<number>(0);
   // Track which resource message IDs contain new (unseen) readings for highlighting
-  const [newReadingMessageIds, setNewReadingMessageIds] = useState<Set<string>>(new Set());
+  const [newReadingMessageIds, setNewReadingMessageIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Track previous reply counts for chat messages (persists across tab switches)
   const [chatPreviousReplyCounts, setChatPreviousReplyCounts] = useState<
@@ -122,7 +126,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     PseudonymousMessage[]
   >([]);
   const [chatMessages, setChatMessages] = useState<PseudonymousMessage[]>([]);
-  const [resourcesMessages, setResourcesMessages] = useState<PseudonymousMessage[]>([]);
+  const [resourcesMessages, setResourcesMessages] = useState<
+    PseudonymousMessage[]
+  >([]);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [jargonFilterAgentId, setJargonFilterAgentId] = useState<string | null>(
     null,
@@ -130,6 +136,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [userPreferences, setUserPreferences] = useState<
     Record<string, boolean>
   >({});
+  const [conversationFeatures, setConversationFeatures] = useState<
+    { name: string; enabled?: boolean }[]
+  >([]);
   const conversationType = useConversationType();
   const setConversationType = useSetConversationType();
   const setBotNameContext = useSetBotName();
@@ -151,8 +160,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [resourcesPasscode, setResourcesPasscode] = useState<string>("");
   const [eventName, setEventName] = useState<string>("");
   const [eventDescription, setEventDescription] = useState<string>("");
-  const [speakers, setSpeakers] = useState<Array<{ name: string; bio: string }>>([]);
-  const [moderators, setModerators] = useState<Array<{ name: string; bio: string }>>([]);
+  const [speakers, setSpeakers] = useState<
+    Array<{ name: string; bio: string }>
+  >([]);
+  const [moderators, setModerators] = useState<
+    Array<{ name: string; bio: string }>
+  >([]);
   const [botName, setBotName] = useState<string>("Berkie");
   const [assistantInputValue, setAssistantInputValue] = useState<string>("");
   const [chatInputValue, setChatInputValue] = useState<string>("");
@@ -200,7 +213,11 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   // Derive slash commands from the loaded conversation type's features.
   // Empty until the type loads, so the autocomplete stays hidden during that window.
   const slashCommands: SlashCommand[] = (conversationType?.features ?? [])
-    .filter((f) => f.slashCommand != null)
+    .filter((f) => {
+      if (f.slashCommand == null) return false;
+      const override = conversationFeatures.find((cf) => cf.name === f.name);
+      return override?.enabled !== false;
+    })
     .map((f) => ({
       command: f.slashCommand!,
       description: f.description ?? "",
@@ -308,6 +325,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
         const conversation = await createConversationFromData(conversationData);
         setConversationType(conversation.type);
+        setConversationFeatures(conversation.features ?? []);
         if (conversation.name) setEventName(conversation.name);
 
         // Extract event metadata from conversation
@@ -319,10 +337,14 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           setEventDescription(conversation.description as string);
         }
         if (conversation?.presenters) {
-          setSpeakers(conversation.presenters as Array<{ name: string; bio: string }>);
+          setSpeakers(
+            conversation.presenters as Array<{ name: string; bio: string }>,
+          );
         }
         if (conversation?.moderators) {
-          setModerators(conversation.moderators as Array<{ name: string; bio: string }>);
+          setModerators(
+            conversation.moderators as Array<{ name: string; bio: string }>,
+          );
         }
 
         // Override botName from the first agent's agentConfig if available,
@@ -715,11 +737,19 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         .then((msgs) => {
           if (Array.isArray(msgs)) setResourcesMessages(msgs);
         })
-        .catch((err) => console.error("Error re-fetching resources messages:", err));
+        .catch((err) =>
+          console.error("Error re-fetching resources messages:", err),
+        );
     }
 
     fetchAllAssistantMessages();
-  }, [lastReconnectTime, router.query.conversationId, chatPasscode, resourcesPasscode, fetchAllAssistantMessages]);
+  }, [
+    lastReconnectTime,
+    router.query.conversationId,
+    chatPasscode,
+    resourcesPasscode,
+    fetchAllAssistantMessages,
+  ]);
 
   async function sendMessage(
     message: string,
@@ -987,7 +1017,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
               onTabChange={handleTabChange}
               unseenAssistantCount={unseenAssistantCount}
               unseenChatCount={unseenChatCount}
-              unseenResourcesCount={resourcesNavBadgeDismissed ? 0 : unseenResourcesCount}
+              unseenResourcesCount={
+                resourcesNavBadgeDismissed ? 0 : unseenResourcesCount
+              }
               unreadAssistantReplyCount={unreadAssistantReplyCount}
               unreadChatReplyCount={unreadChatReplyCount}
               showChat={!!chatPasscode}
