@@ -84,6 +84,25 @@ const GUIDE_RESPONSE_WITH_DISABLED = {
   ],
 };
 
+// slashCommand + enabled: false → "Not available" pill per row
+const GUIDE_RESPONSE_WITH_DISABLED_SLASH = {
+  ...GUIDE_RESPONSE,
+  features: [
+    {
+      name: "mindmap",
+      label: "Mind Map",
+      category: "assistant",
+      slashCommand: "mindmap",
+      userControlled: true,
+      default: true,
+      enabled: false,
+      agents: [],
+      description: "Generate a visual mind map.",
+    },
+    ...GUIDE_RESPONSE.features.slice(1),
+  ],
+};
+
 // userControlled: false + enabled: false → "Not available" pill
 const GUIDE_RESPONSE_WITH_UNAVAILABLE = {
   ...GUIDE_RESPONSE,
@@ -159,6 +178,44 @@ describe("GuidePage", () => {
     render(<GuidePage />);
     await waitFor(() =>
       expect(screen.getByText("/mindmap")).toBeInTheDocument(),
+    );
+  });
+
+  it("shows 'Active' pill for an enabled slash command", async () => {
+    resolveWith(GUIDE_RESPONSE);
+    render(<GuidePage />);
+    await waitFor(() => {
+      expect(screen.getByText("/mindmap")).toBeInTheDocument();
+      // Multiple Active pills may exist (one per enabled slash command row)
+      expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("shows 'Not available' pill for a disabled slash command", async () => {
+    resolveWith(GUIDE_RESPONSE_WITH_DISABLED_SLASH);
+    render(<GuidePage />);
+    await waitFor(() => {
+      expect(screen.getByText("/mindmap")).toBeInTheDocument();
+      expect(screen.getByText("Not available")).toBeInTheDocument();
+    });
+  });
+
+  it("marks a disabled slash command row with aria-disabled", async () => {
+    resolveWith(GUIDE_RESPONSE_WITH_DISABLED_SLASH);
+    render(<GuidePage />);
+    await waitFor(() => {
+      const row = screen.getByText("/mindmap").closest("[aria-disabled]");
+      expect(row).toHaveAttribute("aria-disabled", "true");
+    });
+  });
+
+  it("shows caveat when a slash command is disabled", async () => {
+    resolveWith(GUIDE_RESPONSE_WITH_DISABLED_SLASH);
+    render(<GuidePage />);
+    await waitFor(() =>
+      expect(
+        screen.getByText(/feature availability varies by event/i),
+      ).toBeInTheDocument(),
     );
   });
 
