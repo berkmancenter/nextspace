@@ -47,6 +47,7 @@ interface AssistantChatPanelProps {
   feedbackConfig?: FeedbackConfig;
   messagesWithUnreadReplies?: Set<string>;
   onMarkAsRead?: (messageId: string) => void;
+  inactive?: boolean;
 }
 
 export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
@@ -70,6 +71,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   feedbackConfig,
   messagesWithUnreadReplies = new Set(),
   onMarkAsRead,
+  inactive = false,
 }) => {
   const [preferencesVisible, setPreferencesVisible] = useState(showPreferences);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
@@ -464,16 +466,22 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
 
         {/* MessageInput*/}
         <div className="flex-shrink-0">
-          <MessageInput
-            pseudonym={pseudonym}
-            enhancers={enhancers}
-            onSendMessage={onSendMessage}
-            waitingForResponse={waitingForResponse}
-            controlledMode={controlledMode}
-            onExitControlledMode={onExitControlledMode}
-            inputValue={inputValue}
-            onInputChange={onInputChange}
-          />
+          {inactive ? (
+            <div className="px-4 py-3 text-sm text-gray-500 italic text-center border-t border-gray-200">
+              This event has ended. {botName} is no longer active.
+            </div>
+          ) : (
+            <MessageInput
+              pseudonym={pseudonym}
+              enhancers={enhancers}
+              onSendMessage={onSendMessage}
+              waitingForResponse={waitingForResponse}
+              controlledMode={controlledMode}
+              onExitControlledMode={onExitControlledMode}
+              inputValue={inputValue}
+              onInputChange={onInputChange}
+            />
+          )}
         </div>
       </div>
 

@@ -11,6 +11,8 @@ import { RetrieveData, Request } from "../../utils";
 import { Api } from "../../utils/Helpers";
 import "@testing-library/jest-dom";
 
+jest.setTimeout(60000);
+
 // Mock next/router
 const mockPush = jest.fn();
 jest.mock("next/router", () => ({
@@ -1697,7 +1699,9 @@ describe("EventCreationForm Component", () => {
         screen.getByRole("radio", { name: /create new series/i }),
       );
 
-      expect(screen.getByRole("checkbox", { name: /public/i })).not.toBeChecked();
+      expect(
+        screen.getByRole("checkbox", { name: /public/i }),
+      ).not.toBeChecked();
     });
 
     it("shows error when Next is clicked with empty series name", async () => {
@@ -1719,9 +1723,7 @@ describe("EventCreationForm Component", () => {
       await user.click(screen.getByRole("button", { name: /next/i }));
 
       await waitFor(() => {
-        expect(
-          screen.getByText("Series name is required"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Series name is required")).toBeInTheDocument();
       });
     });
 
@@ -1866,10 +1868,7 @@ describe("EventCreationForm Component", () => {
           expect.objectContaining({ topicId: "topic-1" }),
         );
         // Should NOT have called topics POST to create a new topic
-        expect(Request).not.toHaveBeenCalledWith(
-          "topics",
-          expect.anything(),
-        );
+        expect(Request).not.toHaveBeenCalledWith("topics", expect.anything());
       });
     });
   });

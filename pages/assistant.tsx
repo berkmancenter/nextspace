@@ -130,6 +130,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     PseudonymousMessage[]
   >([]);
   const [agentId, setAgentId] = useState<string | null>(null);
+  const [agentActive, setAgentActive] = useState<boolean>(true);
   const [jargonFilterAgentId, setJargonFilterAgentId] = useState<string | null>(
     null,
   );
@@ -397,10 +398,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         if (eventAsstAgent) {
           setAgentId(eventAsstAgent.id!);
         } else {
-          setLocalError(
-            "This conversation does not have an event assistant agent.",
-          );
-          return;
+          setAgentActive(false);
         }
 
         const jargonAgent = conversation.agents.find(
@@ -422,26 +420,34 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   // Also re-joins automatically on every socket reconnection so that messages
   // continue flowing after a token refresh or transient network drop.
   useEffect(() => {
-    if (!socket || !agentId || !userId || !router.query.conversationId) {
+    if (!socket || !userId || !router.query.conversationId) {
+      return;
+    }
+
+    // Only wait for agentId if the agent is expected to be active
+    if (agentActive && !agentId) {
       return;
     }
 
     // Build direct channels based on available agents and user preferences
-    const agentChannels = buildDirectChannels(
-      userId,
-      [
-        { agentId },
-        ...(jargonFilterAgentId
-          ? [
-              {
-                agentId: jargonFilterAgentId,
-                preferenceKey: "jargonClarification",
-              },
-            ]
-          : []),
-      ],
-      userPreferences,
-    );
+    const agentChannels =
+      agentId
+        ? buildDirectChannels(
+            userId,
+            [
+              { agentId },
+              ...(jargonFilterAgentId
+                ? [
+                    {
+                      agentId: jargonFilterAgentId,
+                      preferenceKey: "jargonClarification",
+                    },
+                  ]
+                : []),
+            ],
+            userPreferences,
+          )
+        : [];
 
     const channels: components["schemas"]["Channel"][] = [...agentChannels];
     if (chatPasscode) {
@@ -457,6 +463,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         passcode: resourcesPasscode,
         direct: false,
       });
+    }
+
+    // Nothing to join if there are no channels (e.g. inactive event with no agent
+    // and no chat/resources passcodes — transcript uses its own channel:join).
+    if (channels.length === 0) {
+      return;
     }
 
     const joinConversation = () => {
@@ -488,6 +500,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   }, [
     socket,
     agentId,
+    agentActive,
     jargonFilterAgentId,
     userId,
     userPreferences,
@@ -1107,6 +1120,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                           onPreferencesSubmit={handlePreferencesSubmit}
                           preferencesError={preferencesError}
                           feedbackConfig={assistantFeedbackConfig}
+                          inactive={!agentActive}
                           messagesWithUnreadReplies={
                             assistantMessagesWithUnreadReplies
                           }

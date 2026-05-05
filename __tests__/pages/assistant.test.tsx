@@ -303,7 +303,7 @@ describe("EventAssistantRoom", () => {
     });
   });
 
-  it("displays error when conversation has no event assistant agent", async () => {
+  it("shows inactive notice when conversation has no event assistant agent", async () => {
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: "agent-123", agentType: "regular" }],
     });
@@ -316,11 +316,13 @@ describe("EventAssistantRoom", () => {
       render(<EventAssistantRoom authType={"guest"} />);
     });
 
+    await act(async () => {
+      await userEvent.click(screen.getAllByRole("button", { name: "Berkie" })[0]);
+    });
+
     await waitFor(() => {
       expect(
-        screen.getByText(
-          "This conversation does not have an event assistant agent.",
-        ),
+        screen.getByText("This event has ended. Berkie is no longer active."),
       ).toBeInTheDocument();
     });
   });
@@ -830,11 +832,13 @@ describe("EventAssistantRoom", () => {
         expect(createConversationFromData).toHaveBeenCalled();
       });
 
-      // Error is shown because there's no event assistant agent, but botName defaults to "Berkie"
+      await act(async () => {
+        await userEvent.click(screen.getAllByRole("button", { name: "Berkie" })[0]);
+      });
+
+      // Inactive notice is shown because there's no event assistant agent, using default botName "Berkie"
       expect(
-        screen.getByText(
-          "This conversation does not have an event assistant agent.",
-        ),
+        screen.getByText("This event has ended. Berkie is no longer active."),
       ).toBeInTheDocument();
     });
   });
