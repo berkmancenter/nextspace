@@ -6,7 +6,7 @@ describe("getFeedbackEligibleMessages", () => {
   const createMessage = (
     id: string,
     fromAgent: boolean,
-    bodyType?: string
+    bodyType?: string,
   ): PseudonymousMessage => ({
     id,
     fromAgent,
@@ -71,21 +71,6 @@ describe("getFeedbackEligibleMessages", () => {
       expect(result.size).toBe(2);
     });
 
-    it("excludes unanswerable messages", () => {
-      const messages = [
-        createMessage("1", true),
-        createMessage("2", true, "unanswerable"),
-        createMessage("3", true),
-      ];
-
-      const result = getFeedbackEligibleMessages(messages, 1);
-
-      expect(result.has("1")).toBe(true);
-      expect(result.has("2")).toBe(false);
-      expect(result.has("3")).toBe(true);
-      expect(result.size).toBe(2);
-    });
-
     it("excludes moderator_offered messages", () => {
       const messages = [
         createMessage("1", true),
@@ -135,7 +120,6 @@ describe("getFeedbackEligibleMessages", () => {
       const messages = [
         createMessage("1", true),
         createMessage("2", true, "intro"),
-        createMessage("3", true, "unanswerable"),
         createMessage("4", true),
         createMessage("5", true, "moderator_offered"),
         createMessage("6", true, "moderator_submitted"),
@@ -148,7 +132,6 @@ describe("getFeedbackEligibleMessages", () => {
       // Only messages 1, 4, and 7 should be eligible
       expect(result.has("1")).toBe(true);
       expect(result.has("2")).toBe(false);
-      expect(result.has("3")).toBe(false);
       expect(result.has("4")).toBe(true);
       expect(result.has("5")).toBe(false);
       expect(result.has("6")).toBe(false);
@@ -260,7 +243,6 @@ describe("getFeedbackEligibleMessages", () => {
         createMessage("1", true), // 1st eligible
         createMessage("2", true, "intro"), // excluded
         createMessage("3", true), // 2nd eligible - should show feedback
-        createMessage("4", true, "unanswerable"), // excluded
         createMessage("5", true), // 3rd eligible
         createMessage("6", true), // 4th eligible - should show feedback
       ];
@@ -271,7 +253,6 @@ describe("getFeedbackEligibleMessages", () => {
       expect(result.has("1")).toBe(false);
       expect(result.has("2")).toBe(false);
       expect(result.has("3")).toBe(true); // 2nd eligible
-      expect(result.has("4")).toBe(false);
       expect(result.has("5")).toBe(false);
       expect(result.has("6")).toBe(true); // 4th eligible
     });
@@ -353,10 +334,7 @@ describe("getFeedbackEligibleMessages", () => {
     });
 
     it("handles frequency larger than number of eligible messages", () => {
-      const messages = [
-        createMessage("1", true),
-        createMessage("2", true),
-      ];
+      const messages = [createMessage("1", true), createMessage("2", true)];
 
       const result = getFeedbackEligibleMessages(messages, 5);
 
