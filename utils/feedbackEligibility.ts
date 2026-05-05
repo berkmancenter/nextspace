@@ -6,7 +6,6 @@ import { parseMessageBody } from "./Helpers";
  */
 export const INELIGIBLE_MESSAGE_TYPES = [
   "intro",
-  "unanswerable",
   "moderator_offered",
   "moderator_submitted",
   "moderator_declined",
@@ -23,7 +22,7 @@ export const INELIGIBLE_MESSAGE_TYPES = [
  */
 export function getFeedbackEligibleMessages(
   messages: PseudonymousMessage[],
-  feedbackFrequency: number = 1
+  feedbackFrequency: number = 1,
 ): Set<string> {
   // If frequency is 0 or negative, never show feedback
   if (feedbackFrequency <= 0) {
