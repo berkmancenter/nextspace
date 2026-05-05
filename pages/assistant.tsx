@@ -370,10 +370,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         // Check if the event has an event assistant agent
         const eventAsstAgent = conversation.agents.find(
           (agent: components["schemas"]["Agent"]) =>
-            agent.agentType === "eventAssistant" ||
-            agent.agentType === "eventAssistantPlus" ||
-            agent.agentType === "eventChannelMediator" ||
-            agent.agentType === "eventChannelMediatorPlus",
+            agent.agentType === "eventAssistant",
         );
         if (eventAsstAgent) {
           setAgentId(eventAsstAgent.id!);

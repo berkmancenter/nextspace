@@ -298,7 +298,7 @@ async function getTypeForConversation(
       (type) => type.name === conversation.conversationType,
     );
     if (type) return type;
-    // backwards compatibility for removed conversation types like eventAssistantPlusProactive
+    // backwards compatibility for removed conversation types
     return {
       name: conversation.conversationType,
       description: "",
@@ -351,6 +351,11 @@ function generateEventUrls(
     (channel) => channel.name === "moderator",
   )?.passcode;
 
+  const moderatorFeatureEnabled =
+    conversationData.features?.some(
+      (f) => f.name === "moderatorSupport" && f.enabled === true,
+    ) ?? false;
+
   const modUrl = modPasscode
     ? `${urlPrefix}/moderator/?conversationId=${
         conversationData.id
@@ -370,7 +375,7 @@ function generateEventUrls(
         url: `${urlPrefix}/backchannel/?conversationId=${conversationData.id}&channel=participant,${participantPasscode}`,
       });
     }
-    if (modPasscode) {
+    if (moderatorFeatureEnabled && modPasscode) {
       moderator.push({
         label: "Back Channel",
         url: modUrl,
@@ -386,27 +391,9 @@ function generateEventUrls(
       }`,
     };
     participant.push(eventAssistantUrl);
-  } else if (
-    convType &&
-    (convType.name === "eventAssistantPlus" ||
-      convType.name === "eventAssistantPlusProactive")
-  ) {
-    const label =
-      convType.name === "eventAssistantPlus"
-        ? `${botName} Plus`
-        : `${botName} Plus Proactive`;
-    const eventAssistantPlusUrl = {
-      label,
-      url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
-        hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
-      }${hasChat ? `&channel=chat,${chatPasscode}` : ""}${
-        hasResources ? `&channel=resources,${resourcesPasscode}` : ""
-      }`,
-    };
-    participant.push(eventAssistantPlusUrl);
-    if (modPasscode) {
+    if (moderatorFeatureEnabled && modPasscode) {
       moderator.push({
-        label,
+        label: botName,
         url: modUrl,
       });
     }

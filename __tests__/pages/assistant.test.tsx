@@ -89,7 +89,11 @@ jest.mock("../../utils", () => ({
   buildDirectChannels: jest.fn((userId, agents, preferences) =>
     agents
       .filter((a: any) => !a.preferenceKey || preferences[a.preferenceKey])
-      .map((a: any) => ({ name: `direct-${userId}-${a.agentId}`, passcode: null, direct: true }))
+      .map((a: any) => ({
+        name: `direct-${userId}-${a.agentId}`,
+        passcode: null,
+        direct: true,
+      })),
   ),
 }));
 
@@ -443,7 +447,7 @@ describe("EventAssistantRoom", () => {
   });
 
   describe("Conversation-Type-Specific Commands", () => {
-    it("shows /mod command for Event Assistant Plus", async () => {
+    it("shows /mod command for Event Assistant", async () => {
       // Set up router query with channel and chat passcode
       mockRouter.query = {
         conversationId: "test-conversation-id",
@@ -460,7 +464,7 @@ describe("EventAssistantRoom", () => {
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
         if (path.startsWith("conversations/")) {
           return Promise.resolve({
-            agents: [{ id: "agent-456", agentType: "eventAssistantPlus" }],
+            agents: [{ id: "agent-456", agentType: "eventAssistant" }],
           });
         } else if (path.startsWith("messages/")) {
           return Promise.resolve([]);
@@ -468,9 +472,9 @@ describe("EventAssistantRoom", () => {
         return Promise.resolve(null);
       });
       (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: "agent-456", agentType: "eventAssistantPlus" }],
+        agents: [{ id: "agent-456", agentType: "eventAssistant" }],
         type: {
-          name: "eventAssistantPlus",
+          name: "eventAssistant",
           description: "",
           platforms: [],
           properties: [],
@@ -493,7 +497,7 @@ describe("EventAssistantRoom", () => {
         render(
           <ConversationTypeProvider>
             <EventAssistantRoom authType={"guest"} />
-          </ConversationTypeProvider>
+          </ConversationTypeProvider>,
         );
       });
 
@@ -553,14 +557,20 @@ describe("EventAssistantRoom", () => {
       });
       (createConversationFromData as jest.Mock).mockResolvedValue({
         agents: [{ id: "agent-456", agentType: "eventAssistant" }],
-        type: { name: "eventAssistant", description: "", platforms: [], properties: [], features: [] },
+        type: {
+          name: "eventAssistant",
+          description: "",
+          platforms: [],
+          properties: [],
+          features: [],
+        },
       });
 
       await act(async () => {
         render(
           <ConversationTypeProvider>
             <EventAssistantRoom authType={"guest"} />
-          </ConversationTypeProvider>
+          </ConversationTypeProvider>,
         );
       });
 
@@ -1899,17 +1909,22 @@ describe("EventAssistantRoom", () => {
     it("displays jargon clarification messages inline in the assistant panel when jargonFilterAgentId is set", async () => {
       const conversationWithJargon = {
         agents: [
-          { id: "agent-123", agentType: "eventAssistantPlus" },
+          { id: "agent-123", agentType: "eventAssistant" },
           { id: "jargon-agent-456", agentType: "jargonFilterAgent" },
         ],
-        type: { name: "eventAssistantPlus" },
+        type: { name: "eventAssistant" },
       };
-      (createConversationFromData as jest.Mock).mockResolvedValue(conversationWithJargon);
+      (createConversationFromData as jest.Mock).mockResolvedValue(
+        conversationWithJargon,
+      );
 
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
         if (path.startsWith("conversations/")) {
           return Promise.resolve(conversationWithJargon);
-        } else if (path.includes("users/user/") && path.includes("/preferences")) {
+        } else if (
+          path.includes("users/user/") &&
+          path.includes("/preferences")
+        ) {
           return Promise.resolve({ jargonClarification: true });
         } else if (path.startsWith("messages/")) {
           return Promise.resolve([]);
@@ -1923,7 +1938,10 @@ describe("EventAssistantRoom", () => {
 
       // Wait for jargonFilterAgentId to be set from conversation data
       await waitFor(() => {
-        expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+        expect(mockSocket.on).toHaveBeenCalledWith(
+          "message:new",
+          expect.any(Function),
+        );
       });
 
       // Retrieve the most recently registered message:new handler — it has jargonFilterAgentId in its closure
@@ -1938,7 +1956,11 @@ describe("EventAssistantRoom", () => {
       // Simulate a jargon clarification message arriving on the jargon filter's direct channel
       const jargonMessage = {
         id: "msg-jargon-1",
-        body: { type: "jargon_clarification", text: "An SLO is a reliability target.", sourceText: "Our SLOs..." },
+        body: {
+          type: "jargon_clarification",
+          text: "An SLO is a reliability target.",
+          sourceText: "Our SLOs...",
+        },
         bodyType: "json",
         fromAgent: true,
         channels: ["direct-user-123-jargon-agent-456"],
@@ -1966,7 +1988,9 @@ describe("EventAssistantRoom", () => {
 
       // Verify the jargon clarification content appears inline in the assistant panel
       await waitFor(() => {
-        expect(screen.getByText("An SLO is a reliability target.")).toBeInTheDocument();
+        expect(
+          screen.getByText("An SLO is a reliability target."),
+        ).toBeInTheDocument();
       });
     });
   });
@@ -2068,7 +2092,9 @@ describe("EventAssistantRoom", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText("Enter your message here")).toBeInTheDocument();
+        expect(
+          screen.getByPlaceholderText("Enter your message here"),
+        ).toBeInTheDocument();
       });
 
       // Simulate the component calling sendMessage with prompt response parameters
@@ -2236,7 +2262,9 @@ describe("EventAssistantRoom", () => {
       expect(screen.queryByText(/^Yes$/)).not.toBeInTheDocument();
 
       // The follow-up message should be visible
-      expect(screen.getByText("Great! Here's how I can help...")).toBeInTheDocument();
+      expect(
+        screen.getByText("Great! Here's how I can help..."),
+      ).toBeInTheDocument();
     });
 
     it("restores selected prompt option on page load when response exists", async () => {
@@ -2355,7 +2383,9 @@ describe("EventAssistantRoom", () => {
         render(<EventAssistantRoom authType={"guest"} />);
       });
 
-      await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(createConversationFromData).toHaveBeenCalled(),
+      );
     };
 
     /** Grab the most recently registered message:new handler from the socket mock. */
@@ -2398,7 +2428,10 @@ describe("EventAssistantRoom", () => {
       const mockResourcesMessages = [
         {
           id: "res-1",
-          body: { type: "reading", content: [{ title: "Book A", authors: ["A"], year: 2020 }] },
+          body: {
+            type: "reading",
+            content: [{ title: "Book A", authors: ["A"], year: 2020 }],
+          },
           channels: ["resources"],
         },
       ];
@@ -2446,7 +2479,10 @@ describe("EventAssistantRoom", () => {
       await user.click(resourcesTab);
 
       await waitFor(() => {
-        expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+        expect(mockSocket.on).toHaveBeenCalledWith(
+          "message:new",
+          expect.any(Function),
+        );
       });
 
       const messageHandler = getMessageHandler();
@@ -2470,14 +2506,24 @@ describe("EventAssistantRoom", () => {
       await resourcesSetup();
 
       await waitFor(() => {
-        expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+        expect(mockSocket.on).toHaveBeenCalledWith(
+          "message:new",
+          expect.any(Function),
+        );
       });
 
       const messageHandler = getMessageHandler();
 
       // Default tab is chat — unseen count should increment, showing the dot badge
       act(() => {
-        messageHandler({ id: "res-1", channels: ["resources"], body: { type: "reading", content: [{ title: "Book A", authors: ["Author"], year: 2020 }] } });
+        messageHandler({
+          id: "res-1",
+          channels: ["resources"],
+          body: {
+            type: "reading",
+            content: [{ title: "Book A", authors: ["Author"], year: 2020 }],
+          },
+        });
       });
 
       // NavigationBar uses MUI Badge dot variant — a visible badge has no MuiBadge-invisible class
@@ -2497,13 +2543,20 @@ describe("EventAssistantRoom", () => {
       await user.click(screen.getAllByLabelText("Resources")[0]);
 
       await waitFor(() => {
-        expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+        expect(mockSocket.on).toHaveBeenCalledWith(
+          "message:new",
+          expect.any(Function),
+        );
       });
 
       const messageHandler = getMessageHandler();
 
       act(() => {
-        messageHandler({ id: "res-1", channels: ["resources"], body: { type: "reading", content: [] } });
+        messageHandler({
+          id: "res-1",
+          channels: ["resources"],
+          body: { type: "reading", content: [] },
+        });
       });
 
       // No dot badge should be visible since we're already on the resources tab
@@ -2520,7 +2573,10 @@ describe("EventAssistantRoom", () => {
       await resourcesSetup();
 
       await waitFor(() => {
-        expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+        expect(mockSocket.on).toHaveBeenCalledWith(
+          "message:new",
+          expect.any(Function),
+        );
       });
 
       const messageHandler = getMessageHandler();
@@ -2567,13 +2623,20 @@ describe("EventAssistantRoom", () => {
       await resourcesSetup();
 
       await waitFor(() => {
-        expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+        expect(mockSocket.on).toHaveBeenCalledWith(
+          "message:new",
+          expect.any(Function),
+        );
       });
 
       const messageHandler = getMessageHandler();
 
       act(() => {
-        messageHandler({ id: "res-1", channels: ["resources"], body: { text: "Resources only" } });
+        messageHandler({
+          id: "res-1",
+          channels: ["resources"],
+          body: { text: "Resources only" },
+        });
       });
 
       // Switch to assistant tab and confirm the message isn't rendered there
@@ -2589,7 +2652,10 @@ describe("EventAssistantRoom", () => {
       await resourcesSetup();
 
       await waitFor(() => {
-        expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+        expect(mockSocket.on).toHaveBeenCalledWith(
+          "message:new",
+          expect.any(Function),
+        );
       });
 
       const messageHandler = getMessageHandler();
@@ -2654,7 +2720,9 @@ describe("EventAssistantRoom", () => {
         render(<EventAssistantRoom authType={"guest"} />);
       });
 
-      await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(createConversationFromData).toHaveBeenCalled(),
+      );
 
       expect(screen.getAllByLabelText("Resources").length).toBeGreaterThan(0);
     });
@@ -2680,7 +2748,9 @@ describe("EventAssistantRoom", () => {
         render(<EventAssistantRoom authType={"guest"} />);
       });
 
-      await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(createConversationFromData).toHaveBeenCalled(),
+      );
 
       const resourcesFetch = (RetrieveData as jest.Mock).mock.calls.find(
         ([path]: [string]) => path.includes("channel=resources"),
