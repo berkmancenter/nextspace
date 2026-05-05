@@ -317,9 +317,7 @@ describe("generateEventUrls (via createConversationFromData)", () => {
   const mockConfig = {
     conversationTypes: [
       { id: "1", name: "eventAssistant" },
-      { id: "2", name: "eventAssistantPlus" },
-      { id: "3", name: "eventAssistantPlusProactive" },
-      { id: "4", name: "backChannel" },
+      { id: "2", name: "backChannel" },
     ],
     availablePlatforms: [],
     conversationBotName: "Berkie",
@@ -366,28 +364,16 @@ describe("generateEventUrls (via createConversationFromData)", () => {
     expect(url).toContain("channel=resources,res-secret");
   });
 
-  it("appends resources channel param for eventAssistantPlus", async () => {
+  it("appends resources channel param for eventAssistant", async () => {
     const data = {
       ...baseConversation,
-      conversationType: "eventAssistantPlus",
-      agents: [{ id: "agent-1", agentType: "eventAssistantPlus" }],
+      conversationType: "eventAssistant",
+      agents: [{ id: "agent-1", agentType: "eventAssistant" }],
       channels: [{ name: "resources", passcode: "res-plus" }],
     };
     const result = await createConversationFromData(data as any);
     const url = result.eventUrls.participant[0]?.url;
     expect(url).toContain("channel=resources,res-plus");
-  });
-
-  it("appends resources channel param for eventAssistantPlusProactive", async () => {
-    const data = {
-      ...baseConversation,
-      conversationType: "eventAssistantPlusProactive",
-      agents: [{ id: "agent-1", agentType: "eventAssistantPlusProactive" }],
-      channels: [{ name: "resources", passcode: "res-proactive" }],
-    };
-    const result = await createConversationFromData(data as any);
-    const url = result.eventUrls.participant[0]?.url;
-    expect(url).toContain("channel=resources,res-proactive");
   });
 
   it("includes resources param after chat param when both channels exist", async () => {
@@ -423,6 +409,49 @@ describe("generateEventUrls (via createConversationFromData)", () => {
     expect(url).toContain("channel=chat,chat-pass");
     expect(url).toContain("channel=resources,res-pass");
   });
+
+  it("includes a moderator URL when moderatorSupport feature is enabled and moderator channel exists", async () => {
+    const data = {
+      ...baseConversation,
+      channels: [{ name: "moderator", passcode: "mod-pass" }],
+      features: [{ name: "moderatorSupport", enabled: true }],
+    };
+    const result = await createConversationFromData(data as any);
+    expect(result.eventUrls.moderator.length).toBe(1);
+    expect(result.eventUrls.moderator[0].url).toContain(
+      "channel=moderator,mod-pass",
+    );
+  });
+
+  it("excludes moderator URL when moderatorSupport feature is absent from conversation features", async () => {
+    const data = {
+      ...baseConversation,
+      channels: [{ name: "moderator", passcode: "mod-pass" }],
+      features: [],
+    };
+    const result = await createConversationFromData(data as any);
+    expect(result.eventUrls.moderator.length).toBe(0);
+  });
+
+  it("excludes moderator URL when moderatorSupport feature is explicitly disabled", async () => {
+    const data = {
+      ...baseConversation,
+      channels: [{ name: "moderator", passcode: "mod-pass" }],
+      features: [{ name: "moderatorSupport", enabled: false }],
+    };
+    const result = await createConversationFromData(data as any);
+    expect(result.eventUrls.moderator.length).toBe(0);
+  });
+
+  it("excludes moderator URL when moderatorSupport is enabled but no moderator channel exists", async () => {
+    const data = {
+      ...baseConversation,
+      channels: [],
+      features: [{ name: "moderatorSupport", enabled: true }],
+    };
+    const result = await createConversationFromData(data as any);
+    expect(result.eventUrls.moderator.length).toBe(0);
+  });
 });
 
 describe("GetChannelPasscode", () => {
@@ -431,24 +460,40 @@ describe("GetChannelPasscode", () => {
   beforeEach(() => noopError.mockClear());
 
   it("returns the passcode when the channel is present as a string", () => {
-    const result = GetChannelPasscode("chat", { channel: "chat,chat-secret" }, noopError);
+    const result = GetChannelPasscode(
+      "chat",
+      { channel: "chat,chat-secret" },
+      noopError,
+    );
     expect(result).toBe("chat-secret");
   });
 
   it("returns null when the channel is absent from a string query param", () => {
-    const result = GetChannelPasscode("resources", { channel: "chat,chat-secret" }, noopError);
+    const result = GetChannelPasscode(
+      "resources",
+      { channel: "chat,chat-secret" },
+      noopError,
+    );
     expect(result).toBeNull();
     expect(noopError).not.toHaveBeenCalled();
   });
 
   it("returns the passcode when the channel is present in an array query param", () => {
-    const result = GetChannelPasscode("resources", { channel: ["chat,chat-pass", "resources,res-pass"] }, noopError);
+    const result = GetChannelPasscode(
+      "resources",
+      { channel: ["chat,chat-pass", "resources,res-pass"] },
+      noopError,
+    );
     expect(result).toBe("res-pass");
   });
 
   it("returns null (not another channel's passcode) when channel is absent from an array query param", () => {
     // Regression: previously returned the first channel's passcode when the target channel was missing
-    const result = GetChannelPasscode("resources", { channel: ["transcript,tx-pass", "chat,chat-pass"] }, noopError);
+    const result = GetChannelPasscode(
+      "resources",
+      { channel: ["transcript,tx-pass", "chat,chat-pass"] },
+      noopError,
+    );
     expect(result).toBeNull();
     expect(noopError).not.toHaveBeenCalled();
   });

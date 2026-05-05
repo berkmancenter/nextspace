@@ -19,7 +19,7 @@ describe("MessageInput Component", () => {
       command: "mod",
       description: "Submit a question to the moderator",
       value: "/mod ",
-      conversationTypes: ["eventAssistantPlus"],
+      conversationTypes: ["eventAssistant"],
     },
     {
       command: "test",

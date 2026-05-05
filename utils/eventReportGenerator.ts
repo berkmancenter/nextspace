@@ -245,7 +245,7 @@ async function fetchUserMetricsReport(
       reportName: "userMetrics",
       format: "csv",
       additionalChannels: "chat",
-      agent: "eventAssistantPlus",
+      agent: "eventAssistant",
     });
 
     const urlSuffix = `conversations/${conversationId}/report?${params.toString()}`;
