@@ -100,10 +100,10 @@ export const EventCreationForm: React.FC = ({}) => {
 
   // Moderators and Speakers state
   const [moderators, setModerators] = useState<
-    Array<{ name: string; bio: string }>
+    Array<{ name: string; bio: string; alternateName?: string }>
   >([{ name: "", bio: "" }]);
   const [speakers, setSpeakers] = useState<
-    Array<{ name: string; bio: string }>
+    Array<{ name: string; bio: string; alternateName?: string }>
   >([{ name: "", bio: "" }]);
   const [showModerators, setShowModerators] = useState<boolean>(false);
 
@@ -357,7 +357,7 @@ export const EventCreationForm: React.FC = ({}) => {
 
   const updateModerator = (
     index: number,
-    field: "name" | "bio",
+    field: "name" | "bio" | "alternateName",
     value: string,
   ) => {
     const updated = [...moderators];
@@ -378,7 +378,7 @@ export const EventCreationForm: React.FC = ({}) => {
 
   const updateSpeaker = (
     index: number,
-    field: "name" | "bio",
+    field: "name" | "bio" | "alternateName",
     value: string,
   ) => {
     const updated = [...speakers];
@@ -1485,6 +1485,25 @@ export const EventCreationForm: React.FC = ({}) => {
                     variant="outlined"
                     margin="normal"
                   />
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 1, mb: 0.5 }}
+                  >
+                    Attendees or the live transcription might use a nickname,
+                    abbreviation, or misspelling. Adding it here helps the
+                    platform connect those references to the right person.
+                  </Typography>
+                  <TextField
+                    label="Alternate Name"
+                    value={speaker.alternateName ?? ""}
+                    onChange={(e) =>
+                      updateSpeaker(index, "alternateName", e.target.value)
+                    }
+                    fullWidth
+                    variant="outlined"
+                    placeholder="Separate multiple names with commas, e.g. Jon, Dr. Smith"
+                  />
                   <TextField
                     label="Bio"
                     value={speaker.bio}
@@ -1590,6 +1609,30 @@ export const EventCreationForm: React.FC = ({}) => {
                           variant="outlined"
                           margin="normal"
                           placeholder="Enter moderator's name"
+                        />
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mt: 1, mb: 0.5 }}
+                        >
+                          Attendees or the live transcription might use a
+                          nickname, abbreviation, or misspelling. Adding it
+                          here helps the platform connect those references to
+                          the right person.
+                        </Typography>
+                        <TextField
+                          label="Alternate Name"
+                          value={moderator.alternateName ?? ""}
+                          onChange={(e) =>
+                            updateModerator(
+                              index,
+                              "alternateName",
+                              e.target.value,
+                            )
+                          }
+                          fullWidth
+                          variant="outlined"
+                          placeholder="Separate multiple names with commas, e.g. Jon, Dr. Smith"
                         />
                         <TextField
                           label="Bio"
