@@ -235,8 +235,8 @@ const mockConfig = {
       ],
     },
     {
-      name: "eventAssistantPlus",
-      label: "Event Assistant Plus",
+      name: "eventAssistantExtraTest",
+      label: "Event Assistant With Additional Features",
       description: "A combination of Event Assistant and Back Channel",
       properties: [
         {
@@ -1496,8 +1496,8 @@ describe("EventCreationForm Component", () => {
       });
     });
 
-    it("shows only the organizer-configured features for Event Assistant Plus", async () => {
-      // This test is an explicit allowlist. If you add a new feature to eventAssistantPlus
+    it("shows only the organizer-configured features for Event Assistant Extra Test", async () => {
+      // This test is an explicit allowlist. If you add a new feature to the test type eventAssistantExtraTest
       // and it should appear in the event creation form (userControlled: false), add it here.
       // If it should NOT appear (userControlled: true), add it to the "should not appear" block.
       const user = userEvent.setup();
@@ -1513,7 +1513,9 @@ describe("EventCreationForm Component", () => {
       await waitFor(() => screen.getByText("Nextspace"));
       await user.click(screen.getByRole("checkbox", { name: /zoom/i }));
       await user.click(
-        screen.getByRole("radio", { name: /event assistant plus/i }),
+        screen.getByRole("radio", {
+          name: /event assistant with additional features/i,
+        }),
       );
       await user.click(screen.getByRole("button", { name: /next/i }));
       await waitFor(() => screen.getByText("Features"));

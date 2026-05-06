@@ -384,78 +384,6 @@ describe("GroupChatPanel", () => {
     expect(screen.getByText("Object message")).toBeInTheDocument();
   });
 
-  it("normalizes 'Event Assistant Plus' to 'Berkie'", () => {
-    const messages = [
-      {
-        id: "1",
-        pseudonym: "Event Assistant Plus",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hello from EA Plus" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "ea-plus-1",
-        fromAgent: true,
-        pause: false,
-        visible: true,
-        upVotes: [],
-        downVotes: [],
-      },
-    ];
-
-    render(<GroupChatPanel {...baseProps} messages={messages} />);
-
-    expect(screen.getByText("Berkie")).toBeInTheDocument();
-    expect(screen.queryByText("Event Assistant Plus")).not.toBeInTheDocument();
-  });
-
-  it("normalizes 'Event Mediator' to 'Berkie'", () => {
-    const messages = [
-      {
-        id: "1",
-        pseudonym: "Event Mediator",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hello from Event Mediator" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "em-1",
-        fromAgent: true,
-        pause: false,
-        visible: true,
-        upVotes: [],
-        downVotes: [],
-      },
-    ];
-
-    render(<GroupChatPanel {...baseProps} messages={messages} />);
-
-    expect(screen.getByText("Berkie")).toBeInTheDocument();
-    expect(screen.queryByText("Event Mediator")).not.toBeInTheDocument();
-  });
-
-  it("normalizes 'Event Mediator Plus' to 'Berkie'", () => {
-    const messages = [
-      {
-        id: "1",
-        pseudonym: "Event Mediator Plus",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hello from Event Mediator Plus" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "em-plus-1",
-        fromAgent: true,
-        pause: false,
-        visible: true,
-        upVotes: [],
-        downVotes: [],
-      },
-    ];
-
-    render(<GroupChatPanel {...baseProps} messages={messages} />);
-
-    expect(screen.getByText("Berkie")).toBeInTheDocument();
-    expect(screen.queryByText("Event Mediator Plus")).not.toBeInTheDocument();
-  });
-
   it("normalizes 'Engagement Agent' to 'Berkie'", () => {
     const messages = [
       {
@@ -511,37 +439,6 @@ describe("GroupChatPanel", () => {
     expect(messageBubble).toHaveStyle({ backgroundColor: "#DDD6FE" });
   });
 
-  it("applies assistant avatar and background color to Event Assistant Plus messages", () => {
-    const messages = [
-      {
-        id: "1",
-        pseudonym: "Event Assistant Plus",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hello from Event Assistant Plus" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "ea-plus-1",
-        fromAgent: true,
-        pause: false,
-        visible: true,
-        upVotes: [],
-        downVotes: [],
-      },
-    ];
-
-    const { container } = render(
-      <GroupChatPanel {...baseProps} messages={messages} />,
-    );
-
-    // Check that the avatar has the purple background color (#DDD6FE)
-    const avatar = container.querySelector(".rounded-full");
-    expect(avatar).toHaveStyle({ backgroundColor: "#DDD6FE" });
-
-    // Check that the message bubble has the purple background color (#DDD6FE)
-    const messageBubble = container.querySelector(".rounded-2xl");
-    expect(messageBubble).toHaveStyle({ backgroundColor: "#DDD6FE" });
-  });
-
   it("applies assistant avatar and background color to Event Mediator messages", () => {
     const messages = [
       {
@@ -571,77 +468,6 @@ describe("GroupChatPanel", () => {
     // Check that the message bubble has the purple background color (#DDD6FE)
     const messageBubble = container.querySelector(".rounded-2xl");
     expect(messageBubble).toHaveStyle({ backgroundColor: "#DDD6FE" });
-  });
-
-  it("applies assistant avatar and background color to Event Mediator Plus messages", () => {
-    const messages = [
-      {
-        id: "1",
-        pseudonym: "Event Mediator Plus",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hello from Event Mediator Plus" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "em-plus-1",
-        fromAgent: true,
-        pause: false,
-        visible: true,
-        upVotes: [],
-        downVotes: [],
-      },
-    ];
-
-    const { container } = render(
-      <GroupChatPanel {...baseProps} messages={messages} />,
-    );
-
-    // Check that the avatar has the purple background color (#DDD6FE)
-    const avatar = container.querySelector(".rounded-full");
-    expect(avatar).toHaveStyle({ backgroundColor: "#DDD6FE" });
-
-    // Check that the message bubble has the purple background color (#DDD6FE)
-    const messageBubble = container.querySelector(".rounded-2xl");
-    expect(messageBubble).toHaveStyle({ backgroundColor: "#DDD6FE" });
-  });
-
-  it("normalizes 'Event Assistant Plus' to 'Event Assistant' in contributors for mentions", () => {
-    const messages = [
-      {
-        id: "1",
-        pseudonym: "Event Assistant Plus",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hello from EA Plus" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "ea-plus-1",
-        fromAgent: true,
-        pause: false,
-        visible: true,
-        upVotes: [],
-        downVotes: [],
-      },
-      {
-        id: "2",
-        pseudonym: "Alice",
-        createdAt: "2025-10-17T12:01:00Z",
-        body: { text: "Hi there" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "alice-1",
-        fromAgent: false,
-        pause: false,
-        visible: true,
-        upVotes: [],
-        downVotes: [],
-      },
-    ];
-
-    render(<GroupChatPanel {...baseProps} messages={messages} />);
-
-    // The MessageInput component should receive enhancers with normalized "Event Assistant"
-    // (not "Event Assistant Plus") in the contributors list
-    // This is tested implicitly through the mocked MessageInput component
-    expect(screen.getByTestId("message-input")).toBeInTheDocument();
   });
 
   describe("Visual message handling (media)", () => {
