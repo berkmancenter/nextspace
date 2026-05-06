@@ -121,15 +121,16 @@ describe("ModeratorScreen", () => {
     },
     {
       id: "3",
-      pseudonym: "Event Mediator Plus",
+      pseudonym: "Event Mediator",
       createdAt: "2026-03-13T00:31:29.268Z",
       channels: ["moderator"],
       body: {
         insights: [
           {
-            value: "At least 2 participants are independently reporting they cannot hear the speaker/audio.",
-            type: "insight"
-          }
+            value:
+              "At least 2 participants are independently reporting they cannot hear the speaker/audio.",
+            type: "insight",
+          },
         ],
         timestamp: {
           start: 1773361630922,
@@ -238,9 +239,10 @@ describe("ModeratorScreen", () => {
     // Simulate token rotation: the singleton returns a new token after the
     // component has already mounted. The page must read the singleton on every
     // call rather than capturing the value at render time.
-    const mockGetTokens = jest.fn()
+    const mockGetTokens = jest
+      .fn()
       .mockReturnValueOnce({ access: "initial-token" }) // first read (useEffect guard)
-      .mockReturnValue({ access: "rotated-token" });    // all subsequent reads
+      .mockReturnValue({ access: "rotated-token" }); // all subsequent reads
 
     const { Api: MockApi } = require("../../utils");
     MockApi.get.mockReturnValue({
@@ -269,7 +271,9 @@ describe("ModeratorScreen", () => {
   });
 
   it("uses fresh token from Api singleton when re-fetching after gap-reconnect", async () => {
-    const mockGetTokens = jest.fn().mockReturnValue({ access: "fresh-token-after-reconnect" });
+    const mockGetTokens = jest
+      .fn()
+      .mockReturnValue({ access: "fresh-token-after-reconnect" });
     const { Api: MockApi } = require("../../utils");
     MockApi.get.mockReturnValue({
       SetTokens: jest.fn(),
@@ -291,7 +295,7 @@ describe("ModeratorScreen", () => {
     }));
 
     const { rerender } = await act(async () =>
-      render(<ModeratorScreen authType={"user"} />)
+      render(<ModeratorScreen authType={"user"} />),
     );
 
     // Simulate a gap-reconnect by re-rendering with a non-null lastReconnectTime
@@ -312,8 +316,10 @@ describe("ModeratorScreen", () => {
     await waitFor(() => {
       const retrieveDataCalls = (RetrieveData as jest.Mock).mock.calls;
       // At least one call should be the gap-reconnect re-fetch for moderator messages
-      const reconnectFetch = retrieveDataCalls.find(([url]) =>
-        url.includes("messages/test-conversation") && url.includes("moderator")
+      const reconnectFetch = retrieveDataCalls.find(
+        ([url]) =>
+          url.includes("messages/test-conversation") &&
+          url.includes("moderator"),
       );
       expect(reconnectFetch).toBeDefined();
       // It must use the current token from the singleton, not a stale string
@@ -321,21 +327,21 @@ describe("ModeratorScreen", () => {
     });
   });
 
-  it("renders insights from Event Mediator Plus pseudonym correctly", async () => {
+  it("renders insights from Event Mediator pseudonym correctly", async () => {
     await act(async () => {
       render(<ModeratorScreen authType={"user"} />);
     });
 
     await waitFor(() => {
       expect(
-        screen.getByText(/At least 2 participants are independently reporting/)
+        screen.getByText(/At least 2 participants are independently reporting/),
       ).toBeInTheDocument();
     });
   });
 
   it("logs unknown message formats to console instead of displaying them", async () => {
     const consoleLogSpy = jest.spyOn(console, "log").mockImplementation();
-    
+
     const messagesWithUnknown = [
       ...mockMessages,
       {
@@ -364,16 +370,18 @@ describe("ModeratorScreen", () => {
     await waitFor(() => {
       // Check that console.log was called with the unknown message
       const unknownMessageCalls = consoleLogSpy.mock.calls.filter(
-        (call) => call[0] === "Unknown message format:"
+        (call) => call[0] === "Unknown message format:",
       );
       expect(unknownMessageCalls.length).toBeGreaterThan(0);
       expect(unknownMessageCalls[0][1]).toMatchObject({
         id: "4",
         pseudonym: "Unknown Agent",
       });
-      
+
       // Ensure "Unknown message format" text is NOT displayed in the UI
-      expect(screen.queryByText("Unknown message format")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Unknown message format"),
+      ).not.toBeInTheDocument();
     });
 
     consoleLogSpy.mockRestore();
@@ -405,14 +413,14 @@ describe("ModeratorScreen", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Custom insight from non-standard agent")
+        screen.getByText("Custom insight from non-standard agent"),
       ).toBeInTheDocument();
     });
   });
 
   it("logs messages with metrics property that is not an array", async () => {
     const consoleLogSpy = jest.spyOn(console, "log").mockImplementation();
-    
+
     const messagesWithInvalidMetrics = [
       {
         id: "6",
@@ -437,7 +445,7 @@ describe("ModeratorScreen", () => {
 
     await waitFor(() => {
       const unknownMessageCalls = consoleLogSpy.mock.calls.filter(
-        (call) => call[0] === "Unknown message format:"
+        (call) => call[0] === "Unknown message format:",
       );
       expect(unknownMessageCalls.length).toBeGreaterThan(0);
       expect(unknownMessageCalls[0][1]).toMatchObject({
@@ -451,7 +459,7 @@ describe("ModeratorScreen", () => {
 
   it("logs messages with preset but no text property", async () => {
     const consoleLogSpy = jest.spyOn(console, "log").mockImplementation();
-    
+
     const messagesWithPartialPreset = [
       {
         id: "7",
@@ -479,7 +487,7 @@ describe("ModeratorScreen", () => {
 
     await waitFor(() => {
       const unknownMessageCalls = consoleLogSpy.mock.calls.filter(
-        (call) => call[0] === "Unknown message format:"
+        (call) => call[0] === "Unknown message format:",
       );
       expect(unknownMessageCalls.length).toBeGreaterThan(0);
       expect(unknownMessageCalls[0][1]).toMatchObject({

@@ -18,7 +18,7 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 const GUIDE_RESPONSE = {
-  conversationType: "eventAssistantPlus",
+  conversationType: "eventAssistant",
   conversationBotName: "TestBot",
   features: [
     {

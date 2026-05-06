@@ -84,7 +84,6 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   );
 
   // Extract unique contributors for mentions
-  // Normalize "Event Assistant Plus" and "Mediators" to "Event Assistant" for consistency
   const contributors = useMemo(
     () =>
       Array.from(

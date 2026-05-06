@@ -65,7 +65,7 @@ This view displays what an event participant uses to send in questions and feedb
 
 ### Assistant (participant)
 
-This view is for event participants to interact with Event Assistant or Event Assistant Plus. It provides an interface to send and receive direct messages with the agent, and with Event Assistant Plus, to send messages to the moderator. If the event has enabled it and it is provided in the URL as a parameter, a transcript view is also visible.
+This view is for event participants to interact with Event Assistant. It provides an interface to send and receive direct messages with the agent, and if the moderator support feature is enabled, to send messages to the moderator. If the event has enabled it and it is provided in the URL as a parameter, a transcript view is also visible.
 
 ## Getting Started
 

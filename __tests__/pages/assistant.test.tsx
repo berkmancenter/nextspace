@@ -317,7 +317,9 @@ describe("EventAssistantRoom", () => {
     });
 
     await act(async () => {
-      await userEvent.click(screen.getAllByRole("button", { name: "Berkie" })[0]);
+      await userEvent.click(
+        screen.getAllByRole("button", { name: "Berkie" })[0],
+      );
     });
 
     await waitFor(() => {
@@ -533,7 +535,7 @@ describe("EventAssistantRoom", () => {
       );
     });
 
-    it("does not show /mod command for Event Assistant (non-Plus)", async () => {
+    it("does not show /mod command for Event Assistant without moderator feature", async () => {
       // Set up router query with channel and chat passcode
       mockRouter.query = {
         conversationId: "test-conversation-id",
@@ -627,7 +629,7 @@ describe("EventAssistantRoom", () => {
         agents: [{ id: "agent-456", agentType: "eventAssistant" }],
         features: [{ name: "mod", enabled: false }],
         type: {
-          name: "eventAssistantPlus",
+          name: "eventAssistant",
           description: "",
           platforms: [],
           properties: [],
@@ -833,7 +835,9 @@ describe("EventAssistantRoom", () => {
       });
 
       await act(async () => {
-        await userEvent.click(screen.getAllByRole("button", { name: "Berkie" })[0]);
+        await userEvent.click(
+          screen.getAllByRole("button", { name: "Berkie" })[0],
+        );
       });
 
       // Inactive notice is shown because there's no event assistant agent, using default botName "Berkie"
