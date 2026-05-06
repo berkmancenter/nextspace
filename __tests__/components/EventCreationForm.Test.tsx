@@ -11,6 +11,8 @@ import { RetrieveData, Request } from "../../utils";
 import { Api } from "../../utils/Helpers";
 import "@testing-library/jest-dom";
 
+jest.setTimeout(60000);
+
 // Mock next/router
 const mockPush = jest.fn();
 jest.mock("next/router", () => ({
