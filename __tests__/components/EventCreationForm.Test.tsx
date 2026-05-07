@@ -118,6 +118,10 @@ const fillEventDetails = async (name: string, zoomUrl: string) => {
 
   // Assert the input value
   expect(dateInput).toHaveTextContent("11/15/2025 10:00 AMMeeting Day/Time");
+
+  // Set end time (required when start time is provided)
+  const endTimeInput = screen.getAllByLabelText(/Meeting End Time/i)[0];
+  await user.type(endTimeInput, "11/15/2025 11:00 AM");
 };
 
 const mockConfig = {
@@ -1553,6 +1557,167 @@ describe("EventCreationForm Component", () => {
       await waitFor(() => screen.getByLabelText(/Bot Name/i));
 
       expect(screen.queryByText("Features")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Scheduled Times", () => {
+    it("shows error when start time is provided but end time is missing", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      // Fill required fields with a start time but no end time
+      await user.type(screen.getByLabelText(/Event Name/i), "Test Event");
+
+      const topicInput = screen.getByLabelText(/Select a series/i);
+      fireEvent.click(topicInput);
+      fireEvent.keyDown(topicInput, { key: "ArrowDown" });
+      fireEvent.click(
+        await screen.findByRole("option", { name: /Public Topic 1/i }),
+      );
+
+      await user.type(
+        screen.getByLabelText(/Zoom Meeting URL/i),
+        "https://huitstage.zoom.us/j/1234567890",
+      );
+
+      const startTimeInput = screen.getAllByLabelText(/Meeting Day\/Time/i)[0];
+      await user.type(startTimeInput, "11/15/2025 10:00 AM");
+
+      // No end time set
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(
+            "Meeting End Time is required when a start time is provided",
+          ),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("shows error when end time is provided but start time is missing", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      // Fill required fields without setting start time
+      const nameInput = screen.getByLabelText(/Event Name/i);
+      await user.type(nameInput, "Test Event");
+
+      const topicInput = screen.getByLabelText(/Select a series/i);
+      fireEvent.click(topicInput);
+      fireEvent.keyDown(topicInput, { key: "ArrowDown" });
+      const topicOption = await screen.findByRole("option", {
+        name: /Public Topic 1/i,
+      });
+      fireEvent.click(topicOption);
+
+      const urlInput = screen.getByLabelText(/Zoom Meeting URL/i);
+      await user.type(urlInput, "https://huitstage.zoom.us/j/1234567890");
+
+      // Set only end time, no start time
+      const endTimeInput = screen.getAllByLabelText(/Meeting End Time/i)[0];
+      await user.type(endTimeInput, "11/15/2025 11:00 AM");
+
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(
+            "Meeting Start Time is required when an end time is provided",
+          ),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("shows inline error when end time is before start time", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      // Set start time to 10:00 AM
+      const startTimeInput = screen.getAllByLabelText(/Meeting Day\/Time/i)[0];
+      await user.type(startTimeInput, "11/15/2025 10:00 AM");
+
+      // Set end time to 09:00 AM (before start)
+      const endTimeInput = screen.getAllByLabelText(/Meeting End Time/i)[0];
+      await user.type(endTimeInput, "11/15/2025 09:00 AM");
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Meeting End Time must be after the start time."),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("includes scheduledEndTime in payload when both times are provided", async () => {
+      const user = userEvent.setup();
+      const mockConversationData = {
+        id: "new-conv-times",
+        name: "Timed Event",
+        channels: [],
+        agents: [],
+        adapters: [],
+        conversationType: "backChannel",
+      };
+      (Request as jest.Mock).mockImplementation(
+        makeRequestMock(mockConversationData),
+      );
+
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      // Fill name and topic
+      await user.type(screen.getByLabelText(/Event Name/i), "Timed Event");
+
+      const topicInput = screen.getByLabelText(/Select a series/i);
+      fireEvent.click(topicInput);
+      fireEvent.keyDown(topicInput, { key: "ArrowDown" });
+      fireEvent.click(
+        await screen.findByRole("option", { name: /Public Topic 1/i }),
+      );
+
+      await user.type(
+        screen.getByLabelText(/Zoom Meeting URL/i),
+        "https://huitstage.zoom.us/j/1234567890",
+      );
+
+      // Set start and end times
+      const startTimeInput = screen.getAllByLabelText(/Meeting Day\/Time/i)[0];
+      await user.type(startTimeInput, "11/15/2025 10:00 AM");
+
+      const endTimeInput = screen.getAllByLabelText(/Meeting End Time/i)[0];
+      await user.type(endTimeInput, "11/15/2025 11:00 AM");
+
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => screen.getByText("Nextspace"));
+      await user.click(screen.getByRole("checkbox", { name: /zoom/i }));
+      await user.click(screen.getByRole("radio", { name: /back channel/i }));
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => screen.getByLabelText(/Bot Name/i));
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => screen.getByText("About the Speakers"));
+      await user.click(
+        screen.getByRole("button", { name: /create conversation/i }),
+      );
+
+      await waitFor(() => {
+        expect(Request).toHaveBeenCalledWith(
+          "conversations/from-type",
+          expect.objectContaining({
+            scheduledTime: expect.any(String),
+            scheduledEndTime: expect.any(String),
+          }),
+        );
+      });
     });
   });
 
