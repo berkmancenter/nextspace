@@ -986,7 +986,7 @@ describe("EventCreationForm Component", () => {
     await waitFor(() => screen.getByText("About the Speakers"));
 
     // Add speaker info
-    const speakerNameInputs = screen.getAllByLabelText(/Name/i);
+    const speakerNameInputs = screen.getAllByLabelText(/^Name$/i);
     await user.type(speakerNameInputs[0], "John Doe");
     const speakerBioInputs = screen.getAllByLabelText(/Bio/i);
     await user.type(speakerBioInputs[0], "Expert speaker");
@@ -1001,7 +1001,7 @@ describe("EventCreationForm Component", () => {
       expect(screen.getByText("Moderator 1")).toBeInTheDocument();
     });
 
-    const moderatorNameInput = screen.getAllByLabelText(/Name/i)[1];
+    const moderatorNameInput = screen.getAllByLabelText(/^Name$/i)[1];
     await user.type(moderatorNameInput, "Jane Smith");
     const moderatorBioInput = screen.getAllByLabelText(/Bio/i)[1];
     await user.type(moderatorBioInput, "Experienced moderator");
@@ -1871,6 +1871,105 @@ describe("EventCreationForm Component", () => {
         );
         // Should NOT have called topics POST to create a new topic
         expect(Request).not.toHaveBeenCalledWith("topics", expect.anything());
+      });
+    });
+  });
+
+  describe("Alternate Name field", () => {
+    const navigateToStep4 = async (user: ReturnType<typeof userEvent.setup>) => {
+      await fillEventDetails(
+        "Test Event",
+        "https://huitstage.zoom.us/j/1234567890",
+      );
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => screen.getByText("Nextspace"));
+      await user.click(screen.getByRole("checkbox", { name: /zoom/i }));
+      await user.click(screen.getByRole("radio", { name: /back channel/i }));
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => screen.getByLabelText(/Bot Name/i));
+      await user.click(screen.getByRole("button", { name: /next/i }));
+
+      await waitFor(() => screen.getByText("About the Speakers"));
+    };
+
+    beforeEach(() => {
+      (Request as jest.Mock).mockImplementation(
+        makeRequestMock({
+          id: "new-conv-altname",
+          name: "Test Event",
+          channels: [],
+          agents: [],
+          adapters: [],
+          conversationType: "eventAssistant",
+        }),
+      );
+    });
+
+    it("renders Alternate Name input for speakers", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep4(user);
+
+      expect(
+        screen.getByLabelText(/Alternate Name/i),
+      ).toBeInTheDocument();
+    });
+
+    it("renders Alternate Name input for moderators", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep4(user);
+
+      await user.click(
+        screen.getByRole("button", { name: /\+ Add Moderators/i }),
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("Moderator 1")).toBeInTheDocument();
+      });
+
+      const alternateNameInputs = screen.getAllByLabelText(/Alternate Name/i);
+      expect(alternateNameInputs.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("includes alternateName in the request payload", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep4(user);
+
+      const nameInputs = screen.getAllByLabelText(/^Name$/i);
+      await user.type(nameInputs[0], "Jonathan Smith");
+
+      const alternateNameInput = screen.getByLabelText(/Alternate Name/i);
+      await user.type(alternateNameInput, "Jon");
+
+      await user.click(
+        screen.getByRole("button", { name: /create conversation/i }),
+      );
+
+      await waitFor(() => {
+        expect(Request).toHaveBeenCalledWith(
+          "conversations/from-type",
+          expect.objectContaining({
+            presenters: [
+              expect.objectContaining({
+                name: "Jonathan Smith",
+                alternateName: "Jon",
+              }),
+            ],
+          }),
+        );
       });
     });
   });
