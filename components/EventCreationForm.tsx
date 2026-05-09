@@ -81,6 +81,11 @@ export const EventCreationForm: React.FC = ({}) => {
   const [zoomMeetingUrlHasError, setZoomMeetingUrlHasError] =
     useState<boolean>(false);
   const [zoomMeetingTime, setZoomMeetingTime] = useState<string>("");
+  const [scheduledEndTime, setScheduledEndTime] = useState<string>("");
+  const [scheduledEndTimeHasError, setScheduledEndTimeHasError] =
+    useState<boolean>(false);
+  const [zoomMeetingTimeHasError, setZoomMeetingTimeHasError] =
+    useState<boolean>(false);
 
   const [dynamicPropertyValues, setDynamicPropertyValues] = useState<
     Record<string, any>
@@ -299,6 +304,21 @@ export const EventCreationForm: React.FC = ({}) => {
     if (!zoomMeetingUrl) {
       setFormError("Zoom Meeting URL is required");
       setFieldFocus("zoomMeetingUrl");
+      return false;
+    }
+
+    if (scheduledEndTime && !zoomMeetingTime) {
+      setFormError("Meeting Start Time is required when an end time is provided");
+      return false;
+    }
+
+    if (zoomMeetingTime && !scheduledEndTime) {
+      setFormError("Meeting End Time is required when a start time is provided");
+      return false;
+    }
+
+    if (zoomMeetingTime && scheduledEndTime && scheduledEndTime <= zoomMeetingTime) {
+      setFormError("Meeting End Time must be after the start time");
       return false;
     }
 
@@ -854,6 +874,7 @@ export const EventCreationForm: React.FC = ({}) => {
       name: eventName,
       ...(eventDescription && { description: eventDescription }),
       ...(zoomMeetingTime && { scheduledTime: zoomMeetingTime }),
+      ...(scheduledEndTime && { scheduledEndTime }),
       platforms: selectedPlatforms,
       type: selectedConvType,
       topicId,
@@ -1189,17 +1210,45 @@ export const EventCreationForm: React.FC = ({}) => {
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DateTimePicker
                   label="Meeting Day/Time"
-                  onChange={(newValue) =>
-                    setZoomMeetingTime(
-                      newValue?.isValid() ? newValue?.toISOString() : "",
-                    )
-                  }
+                  onChange={(newValue) => {
+                    const value = newValue?.isValid() ? newValue.toISOString() : "";
+                    setZoomMeetingTime(value);
+                    setZoomMeetingTimeHasError(!value && !!scheduledEndTime);
+                    if (scheduledEndTime) {
+                      setScheduledEndTimeHasError(
+                        !!value && scheduledEndTime <= value,
+                      );
+                    }
+                  }}
                   slotProps={{
                     textField: {
                       margin: "normal",
                       fullWidth: true,
-                      helperText:
-                        "Enter the meeting start time if it begins more than 15 minutes from now.",
+                      error: zoomMeetingTimeHasError,
+                      helperText: zoomMeetingTimeHasError
+                        ? "Meeting Start Time is required when an end time is provided."
+                        : "Enter the meeting start time if it begins more than 15 minutes from now.",
+                    },
+                  }}
+                />
+                <DateTimePicker
+                  label="Meeting End Time"
+                  onChange={(newValue) => {
+                    const value = newValue?.isValid() ? newValue.toISOString() : "";
+                    setScheduledEndTime(value);
+                    setScheduledEndTimeHasError(
+                      !!value && !!zoomMeetingTime && value <= zoomMeetingTime,
+                    );
+                    setZoomMeetingTimeHasError(!value ? false : !zoomMeetingTime);
+                  }}
+                  slotProps={{
+                    textField: {
+                      margin: "normal",
+                      fullWidth: true,
+                      error: scheduledEndTimeHasError,
+                      helperText: scheduledEndTimeHasError
+                        ? "Meeting End Time must be after the start time."
+                        : "Enter the scheduled end time for the meeting (optional).",
                     },
                   }}
                 />
