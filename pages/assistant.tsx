@@ -129,6 +129,13 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [resourcesMessages, setResourcesMessages] = useState<
     PseudonymousMessage[]
   >([]);
+  // Tracks whether the first conversation:join has completed so initial message
+  // fetches wait until intros (returned in the join callback) are applied first.
+  const [initialJoinComplete, setInitialJoinComplete] = useState(false);
+  // Refs hold the most-recent intro messages per channel so fetch effects and
+  // reconnect re-fetches can always prepend them without stale-closure issues.
+  const chatIntroRef = useRef<PseudonymousMessage[]>([]);
+  const assistantIntroRef = useRef<PseudonymousMessage[]>([]);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [agentActive, setAgentActive] = useState<boolean>(true);
   const [jargonFilterAgentId, setJargonFilterAgentId] = useState<string | null>(
@@ -430,24 +437,23 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     }
 
     // Build direct channels based on available agents and user preferences
-    const agentChannels =
-      agentId
-        ? buildDirectChannels(
-            userId,
-            [
-              { agentId },
-              ...(jargonFilterAgentId
-                ? [
-                    {
-                      agentId: jargonFilterAgentId,
-                      preferenceKey: "jargonClarification",
-                    },
-                  ]
-                : []),
-            ],
-            userPreferences,
-          )
-        : [];
+    const agentChannels = agentId
+      ? buildDirectChannels(
+          userId,
+          [
+            { agentId },
+            ...(jargonFilterAgentId
+              ? [
+                  {
+                    agentId: jargonFilterAgentId,
+                    preferenceKey: "jargonClarification",
+                  },
+                ]
+              : []),
+          ],
+          userPreferences,
+        )
+      : [];
 
     const channels: components["schemas"]["Channel"][] = [...agentChannels];
     if (chatPasscode) {
@@ -483,8 +489,38 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           token: Api.get().getAccessToken(),
           channels,
         },
-        () => console.log("Successfully joined conversation"),
-        (error) => console.error("Failed to join conversation:", error),
+        (response) => {
+          console.log("Successfully joined conversation");
+
+          const intros: PseudonymousMessage[] = response?.intros ?? [];
+
+          chatIntroRef.current = intros.filter(
+            (m) => Array.isArray(m.channels) && m.channels.includes("chat"),
+          );
+          // Any intro not in chat belongs to the direct (assistant) channel.
+          assistantIntroRef.current = intros.filter(
+            (m) => !Array.isArray(m.channels) || !m.channels.includes("chat"),
+          );
+
+          // Only push intros into state on the very first join. Re-joins
+          // (e.g. when userPreferences loads and the effect re-runs) must not
+          // add them again — the initial fetch effects will prepend from the
+          // refs once initialJoinComplete flips to true.
+          setInitialJoinComplete((already) => {
+            if (!already) {
+              if (chatIntroRef.current.length > 0)
+                setChatMessages(chatIntroRef.current);
+              if (assistantIntroRef.current.length > 0)
+                setAssistantMessages(assistantIntroRef.current);
+            }
+            return true;
+          });
+        },
+        (error) => {
+          console.error("Failed to join conversation:", error);
+          // Unblock initial fetches even when join fails so messages still load.
+          setInitialJoinComplete(true);
+        },
       );
     };
 
@@ -523,9 +559,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         Api.get().getAccessToken(),
       );
 
-      let allMessages = Array.isArray(assistantMessages)
-        ? assistantMessages
-        : [];
+      // Filter intro messages from older conversations where intros were persisted
+      let allMessages = (
+        Array.isArray(assistantMessages) ? assistantMessages : []
+      ).filter((m) => parseMessageBody(m.body)?.type !== "intro");
 
       // Fetch jargon filter agent's messages, if enabled
       if (jargonFilterAgentId) {
@@ -547,7 +584,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
       if (allMessages.length > 0) {
         const messagesWithReplies = await fetchAndInsertReplies(allMessages);
-        setAssistantMessages(messagesWithReplies);
+        setAssistantMessages([
+          ...assistantIntroRef.current,
+          ...messagesWithReplies,
+        ]);
       }
     } catch (error) {
       console.error("Error fetching assistant messages:", error);
@@ -633,9 +673,11 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     setUnreadAssistantReplyCount(updatedUnreadSet.size);
   }, [assistantMessages, pseudonym]);
 
-  // Load initial chat messages when chatPasscode becomes available
+  // Load initial chat messages after the conversation:join completes (so intros
+  // are already in state before DB messages are prepended).
   useEffect(() => {
-    if (!chatPasscode || !router.query.conversationId) return;
+    if (!chatPasscode || !router.query.conversationId || !initialJoinComplete)
+      return;
 
     const fetchInitialMessages = async () => {
       try {
@@ -645,8 +687,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         );
 
         if (Array.isArray(chatMessages)) {
-          const messagesWithReplies = await fetchAndInsertReplies(chatMessages);
-          setChatMessages(messagesWithReplies);
+          // Filter intro messages from older conversations where intros were persisted
+          const nonIntros = chatMessages.filter(
+            (m) => parseMessageBody(m.body)?.type !== "intro",
+          );
+          const messagesWithReplies = await fetchAndInsertReplies(nonIntros);
+          setChatMessages([...chatIntroRef.current, ...messagesWithReplies]);
         }
       } catch (error) {
         console.error("Error fetching initial chat messages:", error);
@@ -654,7 +700,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     };
 
     fetchInitialMessages();
-  }, [chatPasscode, router.query.conversationId]);
+  }, [chatPasscode, router.query.conversationId, initialJoinComplete]);
 
   // Load initial resources messages when resourcesPasscode becomes available
   useEffect(() => {
@@ -662,13 +708,13 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
     const fetchInitialMessages = async () => {
       try {
-        const resourcesMessages = await RetrieveData(
+        const fetchedMessages = await RetrieveData(
           `messages/${router.query.conversationId}?channel=resources,${resourcesPasscode}`,
           Api.get().getAccessToken(),
         );
 
-        if (Array.isArray(resourcesMessages)) {
-          setResourcesMessages(resourcesMessages);
+        if (Array.isArray(fetchedMessages)) {
+          setResourcesMessages(fetchedMessages);
         }
       } catch (error) {
         console.error("Error fetching initial resources messages:", error);
@@ -718,10 +764,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     fetchUserPreferences();
   }, [userId]);
 
-  // Load initial assistant messages when userId and agentId become available
+  // Load initial assistant messages after the conversation:join completes (so
+  // intros are already in state before DB messages are prepended).
   useEffect(() => {
+    if (!initialJoinComplete) return;
     fetchAllAssistantMessages();
-  }, [fetchAllAssistantMessages]);
+  }, [fetchAllAssistantMessages, initialJoinComplete]);
 
   // Re-fetch all message history when the socket reconnects after a significant
   // gap (user was on another tab/app for a while). Fills any messages missed
@@ -737,7 +785,13 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         Api.get().getAccessToken(),
       )
         .then((msgs) => {
-          if (Array.isArray(msgs)) setChatMessages(msgs);
+          // Filter intro messages from older conversations where intros were persisted
+          if (Array.isArray(msgs)) {
+            const nonIntros = msgs.filter(
+              (m) => parseMessageBody(m.body)?.type !== "intro",
+            );
+            setChatMessages([...chatIntroRef.current, ...nonIntros]);
+          }
         })
         .catch((err) => console.error("Error re-fetching chat messages:", err));
     }
