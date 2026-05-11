@@ -51,6 +51,9 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
   const [conversationName, setConversationName] = useState<string>("");
 
+  const [conversationActive, setConversationActive] = useState<boolean>(true);
+  const [moderatorSupportEnabled, setModeratorSupportEnabled] = useState<boolean>(true);
+
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>("");
   const [modPasscode, setModPasscode] = useState<string>("");
   const [messageFocusTimeRange, setMessageFocusTimeRange] = useState<{
@@ -131,6 +134,11 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
 
       if (conversationResponse && !("error" in conversationResponse)) {
         setConversationName(conversationResponse.name || "");
+        setConversationActive(conversationResponse.active ?? true);
+        const hasModeratorSupport = (conversationResponse.features ?? []).some(
+          (f: { name: string; enabled: boolean }) => f.name === "moderatorSupport" && f.enabled === true
+        );
+        setModeratorSupportEnabled(hasModeratorSupport);
         // Needed so the Quick Guide can filter commands by type name —
         // the raw API response only carries a type ID, not the resolved object.
         const conversation = await createConversationFromData(conversationResponse);
@@ -324,6 +332,11 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
                   </span>
                   &nbsp; event.
                 </h2>
+                {conversationActive && !moderatorSupportEnabled && (
+                  <p className="font-medium mb-4">
+                    Moderator question submission is not enabled for this conversation. No audience questions will be received here.
+                  </p>
+                )}
                 <div aria-live="polite">
                   {messages.length > 0 ? (
                     messages.map((message: ModeratorMetricsMessage, index) => (
@@ -369,7 +382,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
                       </div>
                     ))
                   ) : (
-                    <p>No messages yet.</p>
+                    moderatorSupportEnabled && <p>No messages yet.</p>
                   )}
                 </div>
               </div>

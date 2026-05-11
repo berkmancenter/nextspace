@@ -351,11 +351,6 @@ function generateEventUrls(
     (channel) => channel.name === "moderator",
   )?.passcode;
 
-  const moderatorFeatureEnabled =
-    conversationData.features?.some(
-      (f) => f.name === "moderatorSupport" && f.enabled === true,
-    ) ?? false;
-
   const modUrl = modPasscode
     ? `${urlPrefix}/moderator/?conversationId=${
         conversationData.id
@@ -375,7 +370,7 @@ function generateEventUrls(
         url: `${urlPrefix}/backchannel/?conversationId=${conversationData.id}&channel=participant,${participantPasscode}`,
       });
     }
-    if (moderatorFeatureEnabled && modPasscode) {
+    if (modPasscode) {
       moderator.push({
         label: "Back Channel",
         url: modUrl,
@@ -391,7 +386,7 @@ function generateEventUrls(
       }`,
     };
     participant.push(eventAssistantUrl);
-    if (moderatorFeatureEnabled && modPasscode) {
+    if (modPasscode) {
       moderator.push({
         label: botName,
         url: modUrl,

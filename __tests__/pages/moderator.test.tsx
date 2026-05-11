@@ -140,11 +140,20 @@ describe("ModeratorScreen", () => {
     },
   ];
 
+  const mockConversation = {
+    name: "Test Event",
+    active: true,
+    features: [{ name: "moderatorSupport", enabled: true }],
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
     (io as jest.Mock).mockReturnValue(mockSocket);
-    (RetrieveData as jest.Mock).mockResolvedValue(mockMessages);
+    (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+      if (url.startsWith("conversations/")) return Promise.resolve(mockConversation);
+      return Promise.resolve(mockMessages);
+    });
 
     // Default mock implementation for useSessionJoin
     mockUseSessionJoin.mockReturnValue({
@@ -455,6 +464,109 @@ describe("ModeratorScreen", () => {
     });
 
     consoleLogSpy.mockRestore();
+  });
+
+  describe("moderatorSupport feature flag", () => {
+    it("shows disabled notice when conversation is active and moderatorSupport feature is absent", async () => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/"))
+          return Promise.resolve({ name: "Test Event", active: true, features: [] });
+        return Promise.resolve([]);
+      });
+
+      await act(async () => {
+        render(<ModeratorScreen authType={"user"} />);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Moderator question submission is not enabled/),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("shows disabled notice when moderatorSupport feature exists but is disabled", async () => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/"))
+          return Promise.resolve({
+            name: "Test Event",
+            active: true,
+            features: [{ name: "moderatorSupport", enabled: false }],
+          });
+        return Promise.resolve([]);
+      });
+
+      await act(async () => {
+        render(<ModeratorScreen authType={"user"} />);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Moderator question submission is not enabled/),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("does not show disabled notice when moderatorSupport feature is enabled", async () => {
+      await act(async () => {
+        render(<ModeratorScreen authType={"user"} />);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByText(/Moderator question submission is not enabled/),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it("does not show 'No messages yet' when moderatorSupport is disabled", async () => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/"))
+          return Promise.resolve({ name: "Test Event", active: true, features: [] });
+        return Promise.resolve([]);
+      });
+
+      await act(async () => {
+        render(<ModeratorScreen authType={"user"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("No messages yet.")).not.toBeInTheDocument();
+      });
+    });
+
+    it("shows 'No messages yet' when moderatorSupport is enabled and there are no messages", async () => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/")) return Promise.resolve(mockConversation);
+        return Promise.resolve([]);
+      });
+
+      await act(async () => {
+        render(<ModeratorScreen authType={"user"} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("No messages yet.")).toBeInTheDocument();
+      });
+    });
+
+    it("does not show disabled notice when conversation is inactive, even if moderatorSupport is absent", async () => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith("conversations/"))
+          return Promise.resolve({ name: "Test Event", active: false, features: [] });
+        return Promise.resolve(mockMessages);
+      });
+
+      await act(async () => {
+        render(<ModeratorScreen authType={"user"} />);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByText(/Moderator question submission is not enabled/),
+        ).not.toBeInTheDocument();
+      });
+    });
   });
 
   it("logs messages with preset but no text property", async () => {

@@ -410,11 +410,10 @@ describe("generateEventUrls (via createConversationFromData)", () => {
     expect(url).toContain("channel=resources,res-pass");
   });
 
-  it("includes a moderator URL when moderatorSupport feature is enabled and moderator channel exists", async () => {
+  it("includes a moderator URL when  moderator channel exists", async () => {
     const data = {
       ...baseConversation,
       channels: [{ name: "moderator", passcode: "mod-pass" }],
-      features: [{ name: "moderatorSupport", enabled: true }],
     };
     const result = await createConversationFromData(data as any);
     expect(result.eventUrls.moderator.length).toBe(1);
@@ -423,27 +422,7 @@ describe("generateEventUrls (via createConversationFromData)", () => {
     );
   });
 
-  it("excludes moderator URL when moderatorSupport feature is absent from conversation features", async () => {
-    const data = {
-      ...baseConversation,
-      channels: [{ name: "moderator", passcode: "mod-pass" }],
-      features: [],
-    };
-    const result = await createConversationFromData(data as any);
-    expect(result.eventUrls.moderator.length).toBe(0);
-  });
-
-  it("excludes moderator URL when moderatorSupport feature is explicitly disabled", async () => {
-    const data = {
-      ...baseConversation,
-      channels: [{ name: "moderator", passcode: "mod-pass" }],
-      features: [{ name: "moderatorSupport", enabled: false }],
-    };
-    const result = await createConversationFromData(data as any);
-    expect(result.eventUrls.moderator.length).toBe(0);
-  });
-
-  it("excludes moderator URL when moderatorSupport is enabled but no moderator channel exists", async () => {
+  it("excludes moderator URL when no moderator channel exists", async () => {
     const data = {
       ...baseConversation,
       channels: [],
