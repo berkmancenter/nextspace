@@ -57,7 +57,7 @@ export async function emitWithTokenRefresh(
   socket: any,
   event: string,
   data: any,
-  onSuccess?: () => void,
+  onSuccess?: (response?: any) => void,
   onError?: (error: any) => void
 ) {
   // Ensure we have a fresh token before emitting.
@@ -113,7 +113,7 @@ export async function emitWithTokenRefresh(
           } else {
             if (onSuccess) {
               try {
-                onSuccess();
+                onSuccess(response);
               } catch (e) {
                 console.error("Error in onSuccess callback:", e);
               }
@@ -149,7 +149,7 @@ export async function emitWithTokenRefresh(
     } else {
       if (onSuccess) {
         try {
-          onSuccess();
+          onSuccess(response);
         } catch (e) {
           console.error("Error in onSuccess callback:", e);
         }

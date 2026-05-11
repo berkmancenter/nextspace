@@ -332,6 +332,8 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
               {parentMessages.map((message, i) => {
                 // Determine if we should show timestamp
                 const showTimestamp = (() => {
+                  // Some messages, like intros, may not have createdAt - in that case, don't show timestamp
+                  if (!message.createdAt) return false;
                   if (i === 0) return true;
                   const prevDate = new Date(parentMessages[i - 1].createdAt!);
                   const currDate = new Date(message.createdAt!);

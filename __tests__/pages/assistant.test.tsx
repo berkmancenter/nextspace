@@ -2441,6 +2441,416 @@ describe("EventAssistantRoom", () => {
     });
   });
 
+  describe("Intro messages from conversation:join callback", () => {
+    it("displays assistant intro messages returned in the join callback response", async () => {
+      const introMessage = {
+        id: "intro-ws-1",
+        body: "Welcome to the event!",
+        pseudonym: "Berkie",
+        fromAgent: true,
+        channels: [],
+        createdAt: "2024-01-01T09:59:00Z",
+        conversation: "test-conversation-id",
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      const { emitWithTokenRefresh } = require("../../utils");
+      (emitWithTokenRefresh as jest.Mock).mockImplementationOnce(
+        (socket: any, event: string, data: any, onSuccess: Function) => {
+          if (onSuccess) onSuccess({ intros: [introMessage] });
+          socket.emit(event, data);
+        },
+      );
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        }
+        return Promise.resolve([]);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      const user = userEvent.setup();
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() =>
+        expect(createConversationFromData).toHaveBeenCalled(),
+      );
+
+      // Switch to assistant tab to see the intro message
+      const assistantTab = screen.getAllByLabelText("Berkie")[0];
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getByText("Welcome to the event!")).toBeInTheDocument();
+      });
+    });
+
+    it("routes chat intros from join callback to the chat panel", async () => {
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,chat-pass",
+      };
+
+      const chatIntro = {
+        id: "chat-intro-1",
+        body: "Welcome to the chat!",
+        pseudonym: "Berkie",
+        fromAgent: true,
+        channels: ["chat"],
+        createdAt: "2024-01-01T09:59:00Z",
+      };
+
+      const { emitWithTokenRefresh } = require("../../utils");
+      (emitWithTokenRefresh as jest.Mock).mockImplementationOnce(
+        (socket: any, event: string, data: any, onSuccess: Function) => {
+          if (onSuccess) onSuccess({ intros: [chatIntro] });
+          socket.emit(event, data);
+        },
+      );
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        }
+        return Promise.resolve([]);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      // Chat tab is active by default when chatPasscode is set
+      await waitFor(() => {
+        expect(screen.getByText("Welcome to the chat!")).toBeInTheDocument();
+      });
+    });
+
+    it("filters out intro-typed messages (object body) from the DB assistant fetch", async () => {
+      const dbMessages = [
+        {
+          id: "intro-db-1",
+          // Object body with type: "intro" — parseMessageBody will return type "intro"
+          body: { type: "intro", text: "Old intro from DB" },
+          pseudonym: "Berkie",
+          fromAgent: true,
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T09:59:00Z",
+        },
+        {
+          id: "msg-db-1",
+          body: "Regular message from DB",
+          pseudonym: "User",
+          fromAgent: false,
+          channels: ["direct-user-123-agent-123"],
+          createdAt: "2024-01-01T10:00:00Z",
+        },
+      ];
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (path.includes("?channel=direct-")) {
+          return Promise.resolve(dbMessages);
+        }
+        return Promise.resolve([]);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      const user = userEvent.setup();
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "messages/test-conversation-id?channel=direct-user-123-agent-123",
+          "mock-access-token",
+        );
+      });
+
+      // Switch to assistant tab to see what was rendered
+      const assistantTab = screen.getAllByLabelText("Berkie")[0];
+      await user.click(assistantTab);
+
+      // Regular message should be visible
+      await waitFor(() => {
+        expect(screen.getByText("Regular message from DB")).toBeInTheDocument();
+      });
+
+      // The intro-typed message should have been filtered out
+      expect(screen.queryByText("Old intro from DB")).not.toBeInTheDocument();
+    });
+
+    it("filters out intro-typed messages from the DB chat fetch", async () => {
+      mockRouter.query = {
+        conversationId: "test-conversation-id",
+        channel: "chat,chat-pass",
+      };
+
+      const chatDbMessages = [
+        {
+          id: "chat-intro-db-1",
+          body: { type: "intro", text: "Old chat intro" },
+          pseudonym: "Berkie",
+          fromAgent: true,
+          channels: ["chat"],
+          createdAt: "2024-01-01T09:59:00Z",
+        },
+        {
+          id: "chat-msg-1",
+          body: "Regular chat message",
+          pseudonym: "User",
+          fromAgent: false,
+          channels: ["chat"],
+          createdAt: "2024-01-01T10:00:00Z",
+        },
+      ];
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (path.includes("?channel=chat")) {
+          return Promise.resolve(chatDbMessages);
+        }
+        return Promise.resolve([]);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          "messages/test-conversation-id?channel=chat,chat-pass",
+          "mock-access-token",
+        );
+      });
+
+      // Chat tab is active by default
+      await waitFor(() => {
+        expect(screen.getByText("Regular chat message")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText("Old chat intro")).not.toBeInTheDocument();
+    });
+
+    it("prepends join callback intros before DB messages in the assistant panel", async () => {
+      const introMessage = {
+        id: "intro-ws-1",
+        body: "Intro message",
+        pseudonym: "Berkie",
+        fromAgent: true,
+        channels: [],
+        createdAt: "2024-01-01T09:59:00Z",
+      };
+
+      const { emitWithTokenRefresh } = require("../../utils");
+      (emitWithTokenRefresh as jest.Mock).mockImplementationOnce(
+        (socket: any, event: string, data: any, onSuccess: Function) => {
+          if (onSuccess) onSuccess({ intros: [introMessage] });
+          socket.emit(event, data);
+        },
+      );
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        } else if (path.includes("?channel=direct-")) {
+          return Promise.resolve([
+            {
+              id: "msg-db-1",
+              body: "DB message after intro",
+              pseudonym: "Berkie",
+              fromAgent: true,
+              channels: ["direct-user-123-agent-123"],
+              createdAt: "2024-01-01T10:00:00Z",
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      const user = userEvent.setup();
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() =>
+        expect(createConversationFromData).toHaveBeenCalled(),
+      );
+
+      const assistantTab = screen.getAllByLabelText("Berkie")[0];
+      await user.click(assistantTab);
+
+      // Wait for both messages to render (both fromAgent: true → AssistantMessage mock)
+      await waitFor(() => {
+        const messages = screen.getAllByTestId("assistant-message");
+        expect(messages.length).toBeGreaterThanOrEqual(2);
+      });
+
+      const messages = screen.getAllByTestId("assistant-message");
+      const introIdx = messages.findIndex(
+        (el) => el.textContent?.includes("Intro message"),
+      );
+      const dbIdx = messages.findIndex(
+        (el) => el.textContent?.includes("DB message after intro"),
+      );
+      expect(introIdx).toBeGreaterThanOrEqual(0);
+      expect(dbIdx).toBeGreaterThanOrEqual(0);
+      expect(introIdx).toBeLessThan(dbIdx);
+    });
+
+    it("does not fetch messages before conversation:join callback fires", async () => {
+      const { emitWithTokenRefresh } = require("../../utils");
+      (emitWithTokenRefresh as jest.Mock).mockImplementationOnce(
+        (socket: any, event: string, data: any, _onSuccess: Function) => {
+          // Intentionally do NOT call onSuccess — simulates join in progress
+          socket.emit(event, data);
+        },
+      );
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        }
+        return Promise.resolve([]);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() =>
+        expect(createConversationFromData).toHaveBeenCalled(),
+      );
+
+      // Give async effects time to settle
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      // Message fetch should NOT have been triggered because initialJoinComplete
+      // never flipped to true (join callback was not called)
+      const messageFetch = (RetrieveData as jest.Mock).mock.calls.find(
+        ([path]: [string]) => path.includes("?channel=direct-"),
+      );
+      expect(messageFetch).toBeUndefined();
+    });
+
+    it("does not re-add intros on socket reconnect", async () => {
+      const introMessage = {
+        id: "intro-1",
+        body: "Intro message",
+        pseudonym: "Berkie",
+        fromAgent: true,
+        channels: [],
+        createdAt: "2024-01-01T09:59:00Z",
+      };
+
+      const { emitWithTokenRefresh } = require("../../utils");
+      (emitWithTokenRefresh as jest.Mock)
+        .mockImplementationOnce(
+          (socket: any, event: string, data: any, onSuccess: Function) => {
+            if (onSuccess) onSuccess({ intros: [introMessage] });
+            socket.emit(event, data);
+          },
+        )
+        .mockImplementationOnce(
+          (socket: any, event: string, data: any, onSuccess: Function) => {
+            if (onSuccess) onSuccess({ intros: [introMessage] });
+            socket.emit(event, data);
+          },
+        );
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith("conversations/")) {
+          return Promise.resolve({
+            agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+          });
+        }
+        return Promise.resolve([]);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: "agent-123", agentType: "eventAssistant" }],
+        type: { name: "eventAssistant" },
+      });
+
+      const user = userEvent.setup();
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={"guest"} />);
+      });
+
+      await waitFor(() =>
+        expect(createConversationFromData).toHaveBeenCalled(),
+      );
+
+      const assistantTab = screen.getAllByLabelText("Berkie")[0];
+      await user.click(assistantTab);
+
+      await waitFor(() => {
+        expect(screen.getAllByText("Intro message")).toHaveLength(1);
+      });
+
+      // Simulate socket reconnect by invoking the registered "connect" handler
+      const connectHandlerCall = mockSocket.on.mock.calls.find(
+        ([event]: [string]) => event === "connect",
+      );
+      const connectHandler = connectHandlerCall?.[1];
+      expect(connectHandler).toBeDefined();
+
+      await act(async () => {
+        connectHandler();
+      });
+
+      // Intro should still only appear once — not duplicated
+      expect(screen.getAllByText("Intro message")).toHaveLength(1);
+    });
+  });
+
   describe("Resources channel", () => {
     const resourcesSetup = async () => {
       mockRouter.query = {
