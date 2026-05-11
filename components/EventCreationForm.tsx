@@ -1222,6 +1222,7 @@ export const EventCreationForm: React.FC = ({}) => {
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DateTimePicker
                   label="Meeting Day/Time"
+                  value={zoomMeetingTime ? dayjs(zoomMeetingTime) : null}
                   minDateTime={dayjs().add(10, "minute")}
                   onChange={(newValue) => {
                     const value = newValue?.isValid() ? newValue.toISOString() : "";
@@ -1246,6 +1247,7 @@ export const EventCreationForm: React.FC = ({}) => {
                 />
                 <DateTimePicker
                   label="Meeting End Time"
+                  value={scheduledEndTime ? dayjs(scheduledEndTime) : null}
                   minDateTime={zoomMeetingTime ? dayjs(zoomMeetingTime).add(1, "minute") : undefined}
                   onChange={(newValue) => {
                     const value = newValue?.isValid() ? newValue.toISOString() : "";
