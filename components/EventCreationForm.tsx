@@ -28,6 +28,7 @@ import {
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
+import dayjs from "dayjs";
 import { useRouter } from "next/router";
 import { Request } from "../utils";
 import { EventStatus } from "./";
@@ -86,6 +87,8 @@ export const EventCreationForm: React.FC = ({}) => {
     useState<boolean>(false);
   const [zoomMeetingTimeHasError, setZoomMeetingTimeHasError] =
     useState<boolean>(false);
+  const [zoomMeetingTimeErrorMessage, setZoomMeetingTimeErrorMessage] =
+    useState<string>("Meeting Start Time is required when an end time is provided.");
 
   const [dynamicPropertyValues, setDynamicPropertyValues] = useState<
     Record<string, any>
@@ -307,8 +310,17 @@ export const EventCreationForm: React.FC = ({}) => {
       return false;
     }
 
+    if (zoomMeetingTime && new Date(zoomMeetingTime) < new Date(Date.now() + 10 * 60 * 1000)) {
+      setFormError("Meeting Start Time must be at least 10 minutes from now");
+      setZoomMeetingTimeErrorMessage("Meeting Start Time must be at least 10 minutes from now.");
+      setZoomMeetingTimeHasError(true);
+      return false;
+    }
+
     if (scheduledEndTime && !zoomMeetingTime) {
       setFormError("Meeting Start Time is required when an end time is provided");
+      setZoomMeetingTimeErrorMessage("Meeting Start Time is required when an end time is provided.");
+      setZoomMeetingTimeHasError(true);
       return false;
     }
 
@@ -1210,6 +1222,7 @@ export const EventCreationForm: React.FC = ({}) => {
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DateTimePicker
                   label="Meeting Day/Time"
+                  minDateTime={dayjs().add(10, "minute")}
                   onChange={(newValue) => {
                     const value = newValue?.isValid() ? newValue.toISOString() : "";
                     setZoomMeetingTime(value);
@@ -1226,7 +1239,7 @@ export const EventCreationForm: React.FC = ({}) => {
                       fullWidth: true,
                       error: zoomMeetingTimeHasError,
                       helperText: zoomMeetingTimeHasError
-                        ? "Meeting Start Time is required when an end time is provided."
+                        ? zoomMeetingTimeErrorMessage
                         : "Enter the meeting start time if it begins more than 15 minutes from now.",
                     },
                   }}
