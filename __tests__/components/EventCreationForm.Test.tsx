@@ -13,6 +13,25 @@ import "@testing-library/jest-dom";
 
 jest.setTimeout(60000);
 
+// Generate a date string in the format the DateTimePicker expects (MM/DD/YYYY HH:MM AM/PM),
+// offset from today so tests don't break as time passes.
+const getFutureDateString = (daysFromNow: number, hour: number, minute = 0): string => {
+  const date = new Date();
+  date.setDate(date.getDate() + daysFromNow);
+  date.setHours(hour, minute, 0, 0);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const year = date.getFullYear();
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const hour12 = String(hour % 12 || 12).padStart(2, "0");
+  const mins = String(minute).padStart(2, "0");
+  return `${month}/${day}/${year} ${hour12}:${mins} ${ampm}`;
+};
+
+const futureStartTime = getFutureDateString(30, 10);        // 30 days from now at 10:00 AM
+const futureEndTime = getFutureDateString(30, 11);          // 30 days from now at 11:00 AM
+const futureEndBeforeStart = getFutureDateString(30, 9);    // 30 days from now at 09:00 AM (before start)
+
 // Mock next/router
 const mockPush = jest.fn();
 jest.mock("next/router", () => ({
@@ -114,14 +133,14 @@ const fillEventDetails = async (name: string, zoomUrl: string) => {
 
   // Set day/time - directly type into the datetime input
   const dateInput = screen.getAllByLabelText(/Meeting Day\/Time/i)[0];
-  await user.type(dateInput, "11/15/2025 10:00 AM");
+  await user.type(dateInput, futureStartTime);
 
   // Assert the input value
-  expect(dateInput).toHaveTextContent("11/15/2025 10:00 AMMeeting Day/Time");
+  expect(dateInput).toHaveTextContent(`${futureStartTime}Meeting Day/Time`);
 
   // Set end time (required when start time is provided)
   const endTimeInput = screen.getAllByLabelText(/Meeting End Time/i)[0];
-  await user.type(endTimeInput, "11/15/2025 11:00 AM");
+  await user.type(endTimeInput, futureEndTime);
 };
 
 const mockConfig = {
@@ -1583,7 +1602,7 @@ describe("EventCreationForm Component", () => {
       );
 
       const startTimeInput = screen.getAllByLabelText(/Meeting Day\/Time/i)[0];
-      await user.type(startTimeInput, "11/15/2025 10:00 AM");
+      await user.type(startTimeInput, futureStartTime);
 
       // No end time set
       await user.click(screen.getByRole("button", { name: /next/i }));
@@ -1620,7 +1639,7 @@ describe("EventCreationForm Component", () => {
 
       // Set only end time, no start time
       const endTimeInput = screen.getAllByLabelText(/Meeting End Time/i)[0];
-      await user.type(endTimeInput, "11/15/2025 11:00 AM");
+      await user.type(endTimeInput, futureEndTime);
 
       await user.click(screen.getByRole("button", { name: /next/i }));
 
@@ -1641,11 +1660,11 @@ describe("EventCreationForm Component", () => {
 
       // Set start time to 10:00 AM
       const startTimeInput = screen.getAllByLabelText(/Meeting Day\/Time/i)[0];
-      await user.type(startTimeInput, "11/15/2025 10:00 AM");
+      await user.type(startTimeInput, futureStartTime);
 
       // Set end time to 09:00 AM (before start)
       const endTimeInput = screen.getAllByLabelText(/Meeting End Time/i)[0];
-      await user.type(endTimeInput, "11/15/2025 09:00 AM");
+      await user.type(endTimeInput, futureEndBeforeStart);
 
       await waitFor(() => {
         expect(
@@ -1689,10 +1708,10 @@ describe("EventCreationForm Component", () => {
 
       // Set start and end times
       const startTimeInput = screen.getAllByLabelText(/Meeting Day\/Time/i)[0];
-      await user.type(startTimeInput, "11/15/2025 10:00 AM");
+      await user.type(startTimeInput, futureStartTime);
 
       const endTimeInput = screen.getAllByLabelText(/Meeting End Time/i)[0];
-      await user.type(endTimeInput, "11/15/2025 11:00 AM");
+      await user.type(endTimeInput, futureEndTime);
 
       await user.click(screen.getByRole("button", { name: /next/i }));
 

@@ -1246,6 +1246,7 @@ export const EventCreationForm: React.FC = ({}) => {
                 />
                 <DateTimePicker
                   label="Meeting End Time"
+                  minDateTime={zoomMeetingTime ? dayjs(zoomMeetingTime).add(1, "minute") : undefined}
                   onChange={(newValue) => {
                     const value = newValue?.isValid() ? newValue.toISOString() : "";
                     setScheduledEndTime(value);
