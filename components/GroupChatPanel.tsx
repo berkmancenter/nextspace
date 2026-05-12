@@ -1,25 +1,18 @@
-import React, { FC, useMemo, useRef } from "react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { MessageInput } from "./MessageInput";
-import { ThreadedMessage } from "./ThreadedMessage";
-import { ThreadPanel } from "./ThreadPanel";
-import { UserMessage } from "./messages/UserMessage";
-import {
-  PseudonymousMessage,
-  ControlledInputConfig,
-  FeedbackConfig,
-} from "../types.internal";
-import { getAvatarStyle, getAssistantAvatarStyle } from "../utils/avatarUtils";
-import { useAutoScroll } from "../hooks/useAutoScroll";
-import { BotIcon } from "./BotIcon";
-import { createMentionsEnhancer } from "./enhancers/mentionsEnhancer";
-import {
-  normalizeAssistantPseudonym,
-  parseMessageBody,
-} from "../utils/Helpers";
-import { IconButton, Tooltip } from "@mui/material";
-import ArrowCircleDownIcon from "@mui/icons-material/ArrowCircleDown";
+import React, { FC, useMemo, useRef } from 'react';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { MessageInput } from './MessageInput';
+import { ThreadedMessage } from './ThreadedMessage';
+import { ThreadPanel } from './ThreadPanel';
+import { UserMessage } from './messages/UserMessage';
+import { PseudonymousMessage, ControlledInputConfig, FeedbackConfig } from '../types.internal';
+import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
+import { useAutoScroll } from '../hooks/useAutoScroll';
+import { BotIcon } from './BotIcon';
+import { createMentionsEnhancer } from './enhancers/mentionsEnhancer';
+import { normalizeAssistantPseudonym, parseMessageBody } from '../utils/Helpers';
+import { IconButton, Tooltip } from '@mui/material';
+import ArrowCircleDownIcon from '@mui/icons-material/ArrowCircleDown';
 
 /**
  * Render assistant message with markdown support
@@ -32,12 +25,7 @@ const renderAssistantMessage = (text: string): React.ReactNode => {
         remarkPlugins={[remarkGfm]}
         components={{
           a: ({ node, ...props }) => (
-            <a
-              {...props}
-              className="text-medium-slate-blue"
-              target="_blank"
-              rel="noopener noreferrer"
-            />
+            <a {...props} className="text-medium-slate-blue" target="_blank" rel="noopener noreferrer" />
           ),
         }}
       >
@@ -67,7 +55,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   messages,
   pseudonym,
   eventName,
-  botName = "Berkie",
+  botName = 'Berkie',
   inputValue,
   onInputChange,
   onSendMessage,
@@ -79,30 +67,18 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   waitingForResponse = false,
 }) => {
   // State for tracking which thread is open in split view
-  const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(
-    null,
-  );
+  const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(null);
 
   // Extract unique contributors for mentions
   const contributors = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          messages
-            .map((m) => normalizeAssistantPseudonym(m, botName))
-            .filter(Boolean),
-        ),
-      ),
+    () => Array.from(new Set(messages.map((m) => normalizeAssistantPseudonym(m, botName)).filter(Boolean))),
     [messages],
   );
 
   // Always register the mentions enhancer so the @ button is visible from the
   // start. The enhancer's getItems() will simply return an empty list until
   // contributors are known (i.e. until messages have loaded).
-  const enhancers = useMemo(
-    () => [createMentionsEnhancer(contributors)],
-    [contributors],
-  );
+  const enhancers = useMemo(() => [createMentionsEnhancer(contributors)], [contributors]);
 
   // Organize messages into threads
   const { parentMessages, threadMap } = useMemo(() => {
@@ -123,18 +99,14 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
 
     // Sort replies by createdAt
     map.forEach((replies) => {
-      replies.sort(
-        (a, b) =>
-          new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime(),
-      );
+      replies.sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
     });
 
     return { parentMessages: parents, threadMap: map };
   }, [messages]);
 
   // Auto-scroll based on any new messages, including threaded replies
-  const { messagesEndRef, messagesContainerRef, isAtBottom, scrollToBottom } =
-    useAutoScroll(messages);
+  const { messagesEndRef, messagesContainerRef, isAtBottom, scrollToBottom } = useAutoScroll(messages);
 
   const messageInputRef = useRef<HTMLDivElement>(null);
 
@@ -142,75 +114,56 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
      users don't lose their place (WCAG 2.4.3). */
   const handleScrollToBottom = () => {
     scrollToBottom();
-    const input = messageInputRef.current?.querySelector<HTMLElement>(
-      'textarea, input, [contenteditable="true"]',
-    );
+    const input = messageInputRef.current?.querySelector<HTMLElement>('textarea, input, [contenteditable="true"]');
     input?.focus();
   };
 
   // Determine if we're waiting for a threaded reply
   const lastMessage = messages[messages.length - 1];
-  const waitingForThreadedReply =
-    waitingForResponse && lastMessage?.parentMessage;
+  const waitingForThreadedReply = waitingForResponse && lastMessage?.parentMessage;
 
   // Helper to render avatar for chat mode
   const renderAvatar = (message: PseudonymousMessage) => {
     const isCurrentUser = message.pseudonym === pseudonym;
     const isAssistant = message.fromAgent;
 
-    const style = isAssistant
-      ? getAssistantAvatarStyle()
-      : getAvatarStyle(message.pseudonym || "", isCurrentUser);
+    const style = isAssistant ? getAssistantAvatarStyle() : getAvatarStyle(message.pseudonym || '', isCurrentUser);
 
     return (
       <div
         className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
         style={{ backgroundColor: style.avatarBg }}
       >
-        {isAssistant ? (
-          <BotIcon size={22} color="#4b5563" />
-        ) : (
-          <style.icon fontSize="inherit" />
-        )}
+        {isAssistant ? <BotIcon size={22} color="#4b5563" /> : <style.icon fontSize="inherit" />}
       </div>
     );
   };
 
   // Helper to render message content bubble
-  const renderMessageContent = (
-    message: PseudonymousMessage,
-    isHovered?: boolean,
-  ) => {
+  const renderMessageContent = (message: PseudonymousMessage, isHovered?: boolean) => {
     const isCurrentUser = message.pseudonym === pseudonym;
     const isAssistant = message.fromAgent;
     const parsed = parseMessageBody(message.body);
 
-    const style = isAssistant
-      ? getAssistantAvatarStyle()
-      : getAvatarStyle(message.pseudonym || "", isCurrentUser);
+    const style = isAssistant ? getAssistantAvatarStyle() : getAvatarStyle(message.pseudonym || '', isCurrentUser);
 
     // User messages - use UserMessage component
     if (!isAssistant) {
       return (
-        <UserMessage
-          message={message}
-          contributors={contributors}
-          backgroundColor={style.bubbleBg}
-          isHovered={isHovered}
-        />
+        <UserMessage message={message} contributors={contributors} backgroundColor={style.bubbleBg} isHovered={isHovered} />
       );
     }
 
     // Assistant messages
-    const isVoiceReply = parsed.source === "voice";
+    const isVoiceReply = parsed.source === 'voice';
     const sourceContextText = parsed.sourceMessage
       ? parsed.sourceMessage.length > 60
-        ? parsed.sourceMessage.substring(0, 60) + "..."
+        ? parsed.sourceMessage.substring(0, 60) + '...'
         : parsed.sourceMessage
       : null;
 
     return (
-      <div style={{ width: "85%" }}>
+      <div style={{ width: '85%' }}>
         {sourceContextText && (
           <div
             className="text-xs text-gray-600 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded"
@@ -218,7 +171,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             aria-label="Voice reply context"
           >
             <span className="font-medium" aria-hidden="true">
-              {isVoiceReply ? "🔊 " : ""}In reply to:{" "}
+              {isVoiceReply ? '🔊 ' : ''}In reply to:{' '}
             </span>
             {sourceContextText}
           </div>
@@ -226,9 +179,9 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
         <div
           className="rounded-2xl px-2 py-1 text-gray-800 self-start"
           style={{
-            backgroundColor: isHovered ? "white" : style.bubbleBg,
-            width: "100%",
-            border: "1px solid rgba(0, 0, 0, 0.1)",
+            backgroundColor: isHovered ? 'white' : style.bubbleBg,
+            width: '100%',
+            border: '1px solid rgba(0, 0, 0, 0.1)',
           }}
         >
           {renderAssistantMessage(parsed.text)}
@@ -237,24 +190,24 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
           {parsed.media && parsed.media.length > 0 && (
             <div
               style={{
-                marginTop: "0.5rem",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem",
+                marginTop: '0.5rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
               }}
             >
               {parsed.media.map((item, index) => {
-                if (item.type === "image") {
+                if (item.type === 'image') {
                   return (
                     <img
                       key={`media-${index}`}
                       src={`data:${item.mimeType};base64,${item.data}`}
                       alt="Visual response"
                       style={{
-                        maxWidth: "100%",
-                        height: "auto",
-                        borderRadius: "8px",
-                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                        maxWidth: '100%',
+                        height: 'auto',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(0, 0, 0, 0.1)',
                       }}
                     />
                   );
@@ -290,19 +243,15 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   };
 
   // Get the selected thread data
-  const selectedThread = selectedThreadId
-    ? parentMessages.find((m) => m.id === selectedThreadId)
-    : null;
-  const selectedThreadReplies = selectedThreadId
-    ? threadMap.get(selectedThreadId) || []
-    : [];
+  const selectedThread = selectedThreadId ? parentMessages.find((m) => m.id === selectedThreadId) : null;
+  const selectedThreadReplies = selectedThreadId ? threadMap.get(selectedThreadId) || [] : [];
 
   return (
     <div className="flex h-full w-full overflow-hidden">
       {/* Main chat panel */}
       <div
         className={`flex flex-col h-full overflow-hidden transition-all duration-300 ${
-          selectedThreadId ? "hidden md:flex md:w-1/2" : "w-full"
+          selectedThreadId ? 'hidden md:flex md:w-1/2' : 'w-full'
         }`}
       >
         {/* Scrollable messages area */}
@@ -311,22 +260,15 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             ref={messagesContainerRef}
             className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-2 pr-2 md:px-8 pt-2 bg-gray-100"
           >
-            <div
-              className="flex flex-col items-start gap-4 pb-2"
-              aria-live="assertive"
-            >
+            <div className="flex flex-col items-start gap-4 pb-2" aria-live="assertive">
               {/* Panel title and subtitle */}
               <div className="w-full pt-4 pb-2">
                 <h2 className="text-xl font-bold uppercase tracking-wide text-gray-900">
                   Welcome to&nbsp;
-                  <span className="text-medium-slate-blue">
-                    {eventName || "Your Event"}
-                  </span>
+                  <span className="text-medium-slate-blue">{eventName || 'Your Event'}</span>
                   &nbsp;Group Chat
                 </h2>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  Chat in real time with other event participants.
-                </p>
+                <p className="text-sm text-gray-500 mt-0.5">Chat in real time with other event participants.</p>
               </div>
 
               {parentMessages.map((message, i) => {
@@ -337,10 +279,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                   if (i === 0) return true;
                   const prevDate = new Date(parentMessages[i - 1].createdAt!);
                   const currDate = new Date(message.createdAt!);
-                  return (
-                    prevDate.getHours() !== currDate.getHours() ||
-                    prevDate.getMinutes() !== currDate.getMinutes()
-                  );
+                  return prevDate.getHours() !== currDate.getHours() || prevDate.getMinutes() !== currDate.getMinutes();
                 })();
 
                 return (
@@ -357,26 +296,18 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                     feedbackConfig={feedbackConfig}
                     showTimestamp={showTimestamp}
                     isThreadOpen={selectedThreadId === message.id}
-                    hasUnreadReplies={
-                      message.id
-                        ? messagesWithUnreadReplies.has(message.id)
-                        : false
-                    }
+                    hasUnreadReplies={message.id ? messagesWithUnreadReplies.has(message.id) : false}
                   />
                 );
               })}
 
               {/* Bot loading indicator - appears after last user message (only for main chat) */}
-              {waitingForResponse &&
-                !waitingForThreadedReply &&
-                parentMessages.length > 0 && (
-                  <div className="relative z-10 flex items-center gap-1 mt-2 mb-1">
-                    <BotIcon size={32} color="#4b5563" bouncing={true} />
-                    <span className="text-xs text-gray-500 italic">
-                      thinking...
-                    </span>
-                  </div>
-                )}
+              {waitingForResponse && !waitingForThreadedReply && parentMessages.length > 0 && (
+                <div className="relative z-10 flex items-center gap-1 mt-2 mb-1">
+                  <BotIcon size={32} color="#4b5563" bouncing={true} />
+                  <span className="text-xs text-gray-500 italic">thinking...</span>
+                </div>
+              )}
               {/* Scroll target */}
               <div ref={messagesEndRef} className="h-2" />
             </div>
@@ -388,13 +319,13 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                 aria-label="Scroll to latest messages"
                 size="medium"
                 sx={{
-                  position: "absolute",
+                  position: 'absolute',
                   bottom: 24,
                   right: 24,
-                  backgroundColor: "white",
-                  color: "#4845D2",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                  "&:hover": { backgroundColor: "#f5f5f5" },
+                  backgroundColor: 'white',
+                  color: '#4845D2',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  '&:hover': { backgroundColor: '#f5f5f5' },
                 }}
               >
                 <ArrowCircleDownIcon />
@@ -433,12 +364,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             enhancers={enhancers}
             botName={botName}
             feedbackConfig={feedbackConfig}
-            waitingForResponse={
-              !!(
-                waitingForThreadedReply &&
-                lastMessage?.parentMessage === selectedThreadId
-              )
-            }
+            waitingForResponse={!!(waitingForThreadedReply && lastMessage?.parentMessage === selectedThreadId)}
           />
         </div>
       )}

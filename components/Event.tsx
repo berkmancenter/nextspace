@@ -1,7 +1,7 @@
-import React from "react";
-import { EventProps } from "../types.internal";
+import React from 'react';
+import { EventProps } from '../types.internal';
 // import { ExperimentCreationForm } from "./ExperimentCreationForm";
-import { EventCreationForm } from "./EventCreationForm";
+import { EventCreationForm } from './EventCreationForm';
 
 /**
  * Event component

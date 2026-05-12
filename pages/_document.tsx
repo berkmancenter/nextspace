@@ -1,13 +1,9 @@
-import { Html, Head, Main, NextScript, DocumentContext } from "next/document";
-import {
-  DocumentHeadTags,
-  DocumentHeadTagsProps,
-  documentGetInitialProps,
-} from "@mui/material-nextjs/v15-pagesRouter";
+import { Html, Head, Main, NextScript, DocumentContext } from 'next/document';
+import { DocumentHeadTags, DocumentHeadTagsProps, documentGetInitialProps } from '@mui/material-nextjs/v15-pagesRouter';
 
 export default function Document(props: DocumentHeadTagsProps) {
   // Check if analytics is enabled (defaults to true if not set)
-  const analyticsEnabled = process.env.NEXT_PUBLIC_ENABLE_ANALYTICS !== "false";
+  const analyticsEnabled = process.env.NEXT_PUBLIC_ENABLE_ANALYTICS !== 'false';
   const matomoUrl = process.env.NEXT_PUBLIC_MATOMO_URL;
 
   return (

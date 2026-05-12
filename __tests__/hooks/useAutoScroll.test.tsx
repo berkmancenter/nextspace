@@ -1,5 +1,5 @@
-import { render, screen, act } from "@testing-library/react";
-import { useAutoScroll } from "../../hooks/useAutoScroll";
+import { render, screen, act } from '@testing-library/react';
+import { useAutoScroll } from '../../hooks/useAutoScroll';
 
 /**
  * Renders the hook inside a real component so the container ref attaches to
@@ -24,27 +24,27 @@ function setScrollPosition(
     visibleHeight: number;
   },
 ) {
-  Object.defineProperty(el, "scrollTop", {
+  Object.defineProperty(el, 'scrollTop', {
     configurable: true,
     writable: true,
     value: currentPosition,
   });
-  Object.defineProperty(el, "scrollHeight", {
+  Object.defineProperty(el, 'scrollHeight', {
     configurable: true,
     get: () => totalContentHeight,
   });
-  Object.defineProperty(el, "clientHeight", {
+  Object.defineProperty(el, 'clientHeight', {
     configurable: true,
     get: () => visibleHeight,
   });
 }
 
-describe("useAutoScroll", () => {
-  it("scrolls to bottom by default when new messages arrive", () => {
+describe('useAutoScroll', () => {
+  it('scrolls to bottom by default when new messages arrive', () => {
     // No scroll event fired — the hook should treat the user as "at the bottom"
     // by default and show every new message that comes in
     const { rerender } = render(<TestComponent messages={[]} />);
-    const container = screen.getByTestId("container");
+    const container = screen.getByTestId('container');
 
     setScrollPosition(container, {
       currentPosition: 0,
@@ -53,17 +53,17 @@ describe("useAutoScroll", () => {
     });
 
     act(() => {
-      rerender(<TestComponent messages={["msg1"]} />);
+      rerender(<TestComponent messages={['msg1']} />);
     });
 
     expect(container.scrollTop).toBe(600);
   });
 
-  it("does not scroll when the user has scrolled up and a new message arrives", () => {
+  it('does not scroll when the user has scrolled up and a new message arrives', () => {
     // User has scrolled up (100px gap from bottom — above the 50px threshold).
     // A new message arriving should not yank them back down.
     const { rerender } = render(<TestComponent messages={[]} />);
-    const container = screen.getByTestId("container");
+    const container = screen.getByTestId('container');
 
     setScrollPosition(container, {
       currentPosition: 0,
@@ -72,22 +72,22 @@ describe("useAutoScroll", () => {
     });
 
     act(() => {
-      container.dispatchEvent(new Event("scroll"));
+      container.dispatchEvent(new Event('scroll'));
     });
 
     act(() => {
-      rerender(<TestComponent messages={["msg1"]} />);
+      rerender(<TestComponent messages={['msg1']} />);
     });
 
     expect(container.scrollTop).toBe(0);
   });
 
-  it("resumes scrolling once the user returns to the bottom", () => {
+  it('resumes scrolling once the user returns to the bottom', () => {
     // First a message arrives while the user is scrolled up — no scroll.
     // Then the user scrolls back to the bottom.
     // The next new message should scroll again.
     const { rerender } = render(<TestComponent messages={[]} />);
-    const container = screen.getByTestId("container");
+    const container = screen.getByTestId('container');
 
     // Scroll up
     setScrollPosition(container, {
@@ -96,12 +96,12 @@ describe("useAutoScroll", () => {
       visibleHeight: 500,
     });
     act(() => {
-      container.dispatchEvent(new Event("scroll"));
+      container.dispatchEvent(new Event('scroll'));
     });
 
     // New message while scrolled up — should stay put
     act(() => {
-      rerender(<TestComponent messages={["msg1"]} />);
+      rerender(<TestComponent messages={['msg1']} />);
     });
     expect(container.scrollTop).toBe(0);
 
@@ -112,12 +112,12 @@ describe("useAutoScroll", () => {
       visibleHeight: 500,
     });
     act(() => {
-      container.dispatchEvent(new Event("scroll"));
+      container.dispatchEvent(new Event('scroll'));
     });
 
     // New message — should scroll now
     act(() => {
-      rerender(<TestComponent messages={["msg1", "msg2"]} />);
+      rerender(<TestComponent messages={['msg1', 'msg2']} />);
     });
     expect(container.scrollTop).toBe(600);
   });

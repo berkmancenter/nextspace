@@ -6,14 +6,10 @@ export function validateEnv(): void {
   const errors: string[] = [];
 
   // Required client-side environment variables
-  const requiredClientVars = [
-    "NEXT_PUBLIC_API_URL",
-    "NEXT_PUBLIC_SOCKET_URL",
-    "NEXT_PUBLIC_ABOUT_URL",
-  ];
+  const requiredClientVars = ['NEXT_PUBLIC_API_URL', 'NEXT_PUBLIC_SOCKET_URL', 'NEXT_PUBLIC_ABOUT_URL'];
 
   // Required server-side environment variables
-  const requiredServerVars = ["SESSION_SECRET"];
+  const requiredServerVars = ['SESSION_SECRET'];
 
   // Check client-side variables (NEXT_PUBLIC_*)
   for (const key of requiredClientVars) {
@@ -23,7 +19,7 @@ export function validateEnv(): void {
   }
 
   // Check server-side variables (only on server)
-  if (typeof window === "undefined") {
+  if (typeof window === 'undefined') {
     for (const key of requiredServerVars) {
       if (!process.env[key]) {
         errors.push(key);
@@ -32,8 +28,6 @@ export function validateEnv(): void {
   }
 
   if (errors.length > 0) {
-    throw new Error(
-      `Missing required environment variables: ${errors.join(", ")}`,
-    );
+    throw new Error(`Missing required environment variables: ${errors.join(', ')}`);
   }
 }

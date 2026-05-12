@@ -1,13 +1,13 @@
-import { useRouter } from "next/router";
-import type { Metadata } from "next";
+import { useRouter } from 'next/router';
+import type { Metadata } from 'next';
 
-import { Header } from "./Header";
-import { Footer } from "./Footer";
-import { AuthType } from "../types.internal";
+import { Header } from './Header';
+import { Footer } from './Footer';
+import { AuthType } from '../types.internal';
 
 export const metadata: Metadata = {
-  title: "Nextspace",
-  description: "",
+  title: 'Nextspace',
+  description: '',
 };
 
 /**
@@ -18,22 +18,17 @@ export const metadata: Metadata = {
  * @param authType - The authentication type of the current user.
  * @returns A React component for the layout.
  */
-export const Layout = ({
-  children,
-  authType = "guest",
-}: Readonly<{ children: React.ReactNode; authType?: AuthType }>) => {
+export const Layout = ({ children, authType = 'guest' }: Readonly<{ children: React.ReactNode; authType?: AuthType }>) => {
   const router = useRouter();
-  const currentUrl = router.isReady ? router.asPath : "";
+  const currentUrl = router.isReady ? router.asPath : '';
 
   // Pages where footer should be hidden (full-screen chat interfaces)
-  const hideFooter = currentUrl.includes("conversationId");
+  const hideFooter = currentUrl.includes('conversationId');
 
   return (
     <div
       className={`min-h-screen flex flex-col ${
-        currentUrl.includes("conversationId")
-          ? "bg-[#FFFFFF]"
-          : "bg-main bg-transparent bg-cover bg-center bg-no-repeat"
+        currentUrl.includes('conversationId') ? 'bg-[#FFFFFF]' : 'bg-main bg-transparent bg-cover bg-center bg-no-repeat'
       }`}
     >
       <Header authType={authType} />

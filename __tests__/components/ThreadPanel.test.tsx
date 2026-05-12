@@ -1,62 +1,60 @@
-import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { ThreadPanel } from "../../components/ThreadPanel";
-import { PseudonymousMessage } from "../../types.internal";
-import { InputEnhancer } from "../../types/inputEnhancer";
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { ThreadPanel } from '../../components/ThreadPanel';
+import { PseudonymousMessage } from '../../types.internal';
+import { InputEnhancer } from '../../types/inputEnhancer';
 
-describe("ThreadPanel Component", () => {
+describe('ThreadPanel Component', () => {
   const mockParentMessage: PseudonymousMessage = {
-    id: "parent-123",
-    body: { text: "Parent message" },
-    pseudonym: "User1",
-    conversation: "conv-1",
-    pseudonymId: "user1-id",
+    id: 'parent-123',
+    body: { text: 'Parent message' },
+    pseudonym: 'User1',
+    conversation: 'conv-1',
+    pseudonymId: 'user1-id',
     fromAgent: false,
     pause: false,
     visible: true,
     upVotes: [],
     downVotes: [],
-    channels: ["chat"],
+    channels: ['chat'],
     createdAt: new Date().toISOString(),
   };
 
   const mockReplies: PseudonymousMessage[] = [
     {
-      id: "reply-1",
-      body: { text: "First reply" },
-      pseudonym: "User2",
-      conversation: "conv-1",
-      pseudonymId: "user2-id",
+      id: 'reply-1',
+      body: { text: 'First reply' },
+      pseudonym: 'User2',
+      conversation: 'conv-1',
+      pseudonymId: 'user2-id',
       fromAgent: false,
       pause: false,
       visible: true,
       upVotes: [],
       downVotes: [],
-      channels: ["chat"],
+      channels: ['chat'],
       createdAt: new Date().toISOString(),
     },
     {
-      id: "reply-2",
-      body: { text: "Second reply" },
-      pseudonym: "User1",
-      conversation: "conv-1",
-      pseudonymId: "user1-id",
+      id: 'reply-2',
+      body: { text: 'Second reply' },
+      pseudonym: 'User1',
+      conversation: 'conv-1',
+      pseudonymId: 'user1-id',
       fromAgent: false,
       pause: false,
       visible: true,
       upVotes: [],
       downVotes: [],
-      channels: ["chat"],
+      channels: ['chat'],
       createdAt: new Date().toISOString(),
     },
   ];
 
-  const mockRenderAvatar = jest.fn((msg: PseudonymousMessage) => (
-    <div data-testid={`avatar-${msg.id}`}>Avatar</div>
-  ));
+  const mockRenderAvatar = jest.fn((msg: PseudonymousMessage) => <div data-testid={`avatar-${msg.id}`}>Avatar</div>);
 
   const mockRenderMessageContent = jest.fn((msg: PseudonymousMessage) => {
-    const text = typeof msg.body === "object" ? (msg.body as any).text : msg.body;
+    const text = typeof msg.body === 'object' ? (msg.body as any).text : msg.body;
     return <div data-testid={`message-${msg.id}`}>{text}</div>;
   });
 
@@ -66,68 +64,68 @@ describe("ThreadPanel Component", () => {
   const defaultProps = {
     parentMessage: mockParentMessage,
     replies: mockReplies,
-    pseudonym: "User1",
+    pseudonym: 'User1',
     onClose: mockOnClose,
     onSendReply: mockOnSendReply,
     renderAvatar: mockRenderAvatar,
     renderMessageContent: mockRenderMessageContent,
     enhancers: [] as InputEnhancer<any>[],
-    botName: "Test Bot",
+    botName: 'Test Bot',
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it("renders the thread panel header", () => {
+  it('renders the thread panel header', () => {
     render(<ThreadPanel {...defaultProps} />);
-    expect(screen.getByText("Replies")).toBeInTheDocument();
+    expect(screen.getByText('Replies')).toBeInTheDocument();
   });
 
-  it("renders the close button", () => {
+  it('renders the close button', () => {
     render(<ThreadPanel {...defaultProps} />);
-    const closeButton = screen.getByLabelText("Close thread");
+    const closeButton = screen.getByLabelText('Close thread');
     expect(closeButton).toBeInTheDocument();
   });
 
-  it("calls onClose when close button is clicked", () => {
+  it('calls onClose when close button is clicked', () => {
     render(<ThreadPanel {...defaultProps} />);
-    const closeButton = screen.getByLabelText("Close thread");
+    const closeButton = screen.getByLabelText('Close thread');
     fireEvent.click(closeButton);
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
   it("renders the parent message with 'Original Message' label", () => {
     render(<ThreadPanel {...defaultProps} />);
-    expect(screen.getByText("Original Message")).toBeInTheDocument();
+    expect(screen.getByText('Original Message')).toBeInTheDocument();
     expect(screen.getByTestId(`message-${mockParentMessage.id}`)).toBeInTheDocument();
   });
 
-  it("renders all replies", () => {
+  it('renders all replies', () => {
     render(<ThreadPanel {...defaultProps} />);
     expect(screen.getByTestId(`message-${mockReplies[0].id}`)).toBeInTheDocument();
     expect(screen.getByTestId(`message-${mockReplies[1].id}`)).toBeInTheDocument();
   });
 
-  it("shows correct reply count", () => {
+  it('shows correct reply count', () => {
     render(<ThreadPanel {...defaultProps} />);
-    expect(screen.getByText("2 Replies")).toBeInTheDocument();
+    expect(screen.getByText('2 Replies')).toBeInTheDocument();
   });
 
   it("shows singular 'Reply' when there is one reply", () => {
     const singleReply = [mockReplies[0]];
     render(<ThreadPanel {...defaultProps} replies={singleReply} />);
-    expect(screen.getByText("1 Reply")).toBeInTheDocument();
+    expect(screen.getByText('1 Reply')).toBeInTheDocument();
   });
 
   it("marks current user's messages with (You)", () => {
     render(<ThreadPanel {...defaultProps} />);
-    const youLabels = screen.getAllByText("(You)");
+    const youLabels = screen.getAllByText('(You)');
     expect(youLabels.length).toBeGreaterThan(0);
   });
 
-  it("displays timestamps for parent message and replies", () => {
-    const fixedDate = new Date("2024-01-15T14:30:00");
+  it('displays timestamps for parent message and replies', () => {
+    const fixedDate = new Date('2024-01-15T14:30:00');
     const parentWithTimestamp = {
       ...mockParentMessage,
       createdAt: fixedDate.toISOString(),
@@ -137,107 +135,101 @@ describe("ThreadPanel Component", () => {
       createdAt: new Date(fixedDate.getTime() + (idx + 1) * 60000).toISOString(),
     }));
 
-    render(
-      <ThreadPanel
-        {...defaultProps}
-        parentMessage={parentWithTimestamp}
-        replies={repliesWithTimestamps}
-      />
-    );
+    render(<ThreadPanel {...defaultProps} parentMessage={parentWithTimestamp} replies={repliesWithTimestamps} />);
 
     // Check parent message timestamp
-    const parentTimestamp = fixedDate.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
+    const parentTimestamp = fixedDate.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
     });
     expect(screen.getByText(parentTimestamp)).toBeInTheDocument();
 
     // Check reply timestamps
     repliesWithTimestamps.forEach((reply) => {
-      const replyTimestamp = new Date(reply.createdAt).toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
+      const replyTimestamp = new Date(reply.createdAt).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
       });
       expect(screen.getByText(replyTimestamp)).toBeInTheDocument();
     });
   });
 
-  it("renders reply input box by default", () => {
+  it('renders reply input box by default', () => {
     render(<ThreadPanel {...defaultProps} />);
-    const textarea = screen.getByPlaceholderText("Reply...");
+    const textarea = screen.getByPlaceholderText('Reply...');
     expect(textarea).toBeInTheDocument();
   });
 
-  it("updates reply text when typing", () => {
+  it('updates reply text when typing', () => {
     render(<ThreadPanel {...defaultProps} />);
-    const textarea = screen.getByPlaceholderText("Reply...") as HTMLTextAreaElement;
-    fireEvent.change(textarea, { target: { value: "Test reply" } });
-    expect(textarea.value).toBe("Test reply");
+    const textarea = screen.getByPlaceholderText('Reply...') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'Test reply' } });
+    expect(textarea.value).toBe('Test reply');
   });
 
-  it("sends reply when Enter is pressed without Shift", () => {
+  it('sends reply when Enter is pressed without Shift', () => {
     render(<ThreadPanel {...defaultProps} />);
-    const textarea = screen.getByPlaceholderText("Reply...");
-    fireEvent.change(textarea, { target: { value: "Test reply" } });
-    fireEvent.keyDown(textarea, { key: "Enter", shiftKey: false });
+    const textarea = screen.getByPlaceholderText('Reply...');
+    fireEvent.change(textarea, { target: { value: 'Test reply' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
 
-    expect(mockOnSendReply).toHaveBeenCalledWith("Test reply", mockParentMessage.id);
+    expect(mockOnSendReply).toHaveBeenCalledWith('Test reply', mockParentMessage.id);
   });
 
-  it("does not send reply when Enter is pressed with Shift", () => {
+  it('does not send reply when Enter is pressed with Shift', () => {
     render(<ThreadPanel {...defaultProps} />);
-    const textarea = screen.getByPlaceholderText("Reply...");
-    fireEvent.change(textarea, { target: { value: "Test reply" } });
-    fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
+    const textarea = screen.getByPlaceholderText('Reply...');
+    fireEvent.change(textarea, { target: { value: 'Test reply' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: true });
 
     expect(mockOnSendReply).not.toHaveBeenCalled();
   });
 
-  it("clears reply text after sending", () => {
+  it('clears reply text after sending', () => {
     render(<ThreadPanel {...defaultProps} />);
-    const textarea = screen.getByPlaceholderText("Reply...") as HTMLTextAreaElement;
-    fireEvent.change(textarea, { target: { value: "Test reply" } });
-    fireEvent.keyDown(textarea, { key: "Enter", shiftKey: false });
+    const textarea = screen.getByPlaceholderText('Reply...') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'Test reply' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
 
-    expect(textarea.value).toBe("");
+    expect(textarea.value).toBe('');
   });
 
-  it("sends reply when send button is clicked", () => {
+  it('sends reply when send button is clicked', () => {
     render(<ThreadPanel {...defaultProps} />);
-    const textarea = screen.getByPlaceholderText("Reply...");
-    fireEvent.change(textarea, { target: { value: "Test reply" } });
+    const textarea = screen.getByPlaceholderText('Reply...');
+    fireEvent.change(textarea, { target: { value: 'Test reply' } });
 
-    const sendButton = screen.getByLabelText("Send reply");
+    const sendButton = screen.getByLabelText('Send reply');
     fireEvent.click(sendButton);
 
-    expect(mockOnSendReply).toHaveBeenCalledWith("Test reply", mockParentMessage.id);
+    expect(mockOnSendReply).toHaveBeenCalledWith('Test reply', mockParentMessage.id);
   });
 
-  it("disables send button when reply text is empty", () => {
+  it('disables send button when reply text is empty', () => {
     render(<ThreadPanel {...defaultProps} />);
-    const sendButton = screen.getByLabelText("Send reply");
+    const sendButton = screen.getByLabelText('Send reply');
     expect(sendButton).toBeDisabled();
   });
 
-  it("enables send button when reply text is not empty", () => {
+  it('enables send button when reply text is not empty', () => {
     render(<ThreadPanel {...defaultProps} />);
-    const textarea = screen.getByPlaceholderText("Reply...");
-    fireEvent.change(textarea, { target: { value: "Test reply" } });
+    const textarea = screen.getByPlaceholderText('Reply...');
+    fireEvent.change(textarea, { target: { value: 'Test reply' } });
 
-    const sendButton = screen.getByLabelText("Send reply");
+    const sendButton = screen.getByLabelText('Send reply');
     expect(sendButton).not.toBeDisabled();
   });
 
-  it("does not send reply with only whitespace", () => {
+  it('does not send reply with only whitespace', () => {
     render(<ThreadPanel {...defaultProps} />);
-    const textarea = screen.getByPlaceholderText("Reply...");
-    fireEvent.change(textarea, { target: { value: "   " } });
-    fireEvent.keyDown(textarea, { key: "Enter", shiftKey: false });
+    const textarea = screen.getByPlaceholderText('Reply...');
+    fireEvent.change(textarea, { target: { value: '   ' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
 
     expect(mockOnSendReply).not.toHaveBeenCalled();
   });
 
-  it("renders avatars for all messages", () => {
+  it('renders avatars for all messages', () => {
     render(<ThreadPanel {...defaultProps} />);
     expect(mockRenderAvatar).toHaveBeenCalledWith(mockParentMessage);
     mockReplies.forEach((reply) => {
@@ -245,7 +237,7 @@ describe("ThreadPanel Component", () => {
     });
   });
 
-  it("renders message content for all messages", () => {
+  it('renders message content for all messages', () => {
     render(<ThreadPanel {...defaultProps} />);
     expect(mockRenderMessageContent).toHaveBeenCalledWith(mockParentMessage);
     mockReplies.forEach((reply) => {
@@ -253,98 +245,97 @@ describe("ThreadPanel Component", () => {
     });
   });
 
-
-  it("renders enhancer buttons when provided", () => {
+  it('renders enhancer buttons when provided', () => {
     const mockEnhancer: InputEnhancer<any> = {
-      id: "test-enhancer",
+      id: 'test-enhancer',
       detectTrigger: jest.fn(() => null),
       getItems: jest.fn(() => []),
       onSelect: jest.fn(),
       renderItem: jest.fn(),
       button: {
-        icon: "@",
-        onClick: jest.fn((value, cursor) => ({ value: value + "@", cursorPos: cursor + 1 })),
-        getTitle: jest.fn(() => "Test Enhancer"),
+        icon: '@',
+        onClick: jest.fn((value, cursor) => ({ value: value + '@', cursorPos: cursor + 1 })),
+        getTitle: jest.fn(() => 'Test Enhancer'),
       },
     };
 
     render(<ThreadPanel {...defaultProps} enhancers={[mockEnhancer]} />);
-    expect(screen.getByTitle("Test Enhancer")).toBeInTheDocument();
+    expect(screen.getByTitle('Test Enhancer')).toBeInTheDocument();
   });
 
-  it("handles enhancer button click", () => {
+  it('handles enhancer button click', () => {
     const mockEnhancer: InputEnhancer<any> = {
-      id: "test-enhancer",
+      id: 'test-enhancer',
       detectTrigger: jest.fn(() => null),
       getItems: jest.fn(() => []),
       onSelect: jest.fn(),
       renderItem: jest.fn(),
       button: {
-        icon: "@",
-        onClick: jest.fn((value, cursor) => ({ value: value + "@", cursorPos: cursor + 1 })),
-        getTitle: jest.fn(() => "Test Enhancer"),
+        icon: '@',
+        onClick: jest.fn((value, cursor) => ({ value: value + '@', cursorPos: cursor + 1 })),
+        getTitle: jest.fn(() => 'Test Enhancer'),
       },
     };
 
     render(<ThreadPanel {...defaultProps} enhancers={[mockEnhancer]} />);
-    const enhancerButton = screen.getByTitle("Test Enhancer");
+    const enhancerButton = screen.getByTitle('Test Enhancer');
     fireEvent.click(enhancerButton);
 
     expect(mockEnhancer.button.onClick).toHaveBeenCalled();
   });
 
-  it("handles Escape key to close reply input", () => {
+  it('handles Escape key to close reply input', () => {
     render(<ThreadPanel {...defaultProps} />);
-    const textarea = screen.getByPlaceholderText("Reply...");
-    fireEvent.change(textarea, { target: { value: "Test" } });
-    fireEvent.keyDown(textarea, { key: "Escape" });
+    const textarea = screen.getByPlaceholderText('Reply...');
+    fireEvent.change(textarea, { target: { value: 'Test' } });
+    fireEvent.keyDown(textarea, { key: 'Escape' });
 
     // After escape, reply button should be shown instead of textarea
-    expect(screen.queryByPlaceholderText("Reply...")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Reply...')).not.toBeInTheDocument();
   });
 
   it("shows 'Reply to thread...' button when not replying", () => {
     render(<ThreadPanel {...defaultProps} />);
-    const textarea = screen.getByPlaceholderText("Reply...");
-    fireEvent.keyDown(textarea, { key: "Escape" });
+    const textarea = screen.getByPlaceholderText('Reply...');
+    fireEvent.keyDown(textarea, { key: 'Escape' });
 
-    expect(screen.getByText("Reply to thread...")).toBeInTheDocument();
+    expect(screen.getByText('Reply to thread...')).toBeInTheDocument();
   });
 
   it("opens reply input when 'Reply to thread...' button is clicked", () => {
     render(<ThreadPanel {...defaultProps} />);
-    const textarea = screen.getByPlaceholderText("Reply...");
-    fireEvent.keyDown(textarea, { key: "Escape" });
+    const textarea = screen.getByPlaceholderText('Reply...');
+    fireEvent.keyDown(textarea, { key: 'Escape' });
 
-    const replyButton = screen.getByText("Reply to thread...");
+    const replyButton = screen.getByText('Reply to thread...');
     fireEvent.click(replyButton);
 
-    expect(screen.getByPlaceholderText("Reply...")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Reply...')).toBeInTheDocument();
   });
 
-  it("handles empty replies array", () => {
+  it('handles empty replies array', () => {
     render(<ThreadPanel {...defaultProps} replies={[]} />);
     // Should not show the reply count divider when there are no replies
     expect(screen.queryByText(/\d+ Reply|\d+ Replies/)).not.toBeInTheDocument();
   });
 
-  it("focuses textarea when reply input is opened", async () => {
+  it('focuses textarea when reply input is opened', async () => {
     render(<ThreadPanel {...defaultProps} />);
-    const textarea = screen.getByPlaceholderText("Reply...");
+    const textarea = screen.getByPlaceholderText('Reply...');
 
     // Close and reopen
-    fireEvent.keyDown(textarea, { key: "Escape" });
-    const replyButton = screen.getByText("Reply to thread...");
+    fireEvent.keyDown(textarea, { key: 'Escape' });
+    const replyButton = screen.getByText('Reply to thread...');
     fireEvent.click(replyButton);
 
-    const newTextarea = screen.getByPlaceholderText("Reply...");
+    const newTextarea = screen.getByPlaceholderText('Reply...');
     await waitFor(() => {
       expect(newTextarea).toHaveFocus();
     });
   });
 
   // Feedback tests
-  describe("Feedback rendering", () => {
+  describe('Feedback rendering', () => {
     it("renders feedback for parent message when it's from agent and eligible", () => {
       const assistantParent = { ...mockParentMessage, fromAgent: true };
       const eligibleIds = new Set([assistantParent.id!]);
@@ -356,18 +347,12 @@ describe("ThreadPanel Component", () => {
         onSendRating: jest.fn(),
       };
 
-      render(
-        <ThreadPanel
-          {...defaultProps}
-          parentMessage={assistantParent}
-          feedbackConfig={feedbackConfig}
-        />
-      );
+      render(<ThreadPanel {...defaultProps} parentMessage={assistantParent} feedbackConfig={feedbackConfig} />);
 
-      expect(screen.getByText("How did the bot do?")).toBeInTheDocument();
+      expect(screen.getByText('How did the bot do?')).toBeInTheDocument();
     });
 
-    it("does not render feedback for parent message when not from agent", () => {
+    it('does not render feedback for parent message when not from agent', () => {
       const eligibleIds = new Set([mockParentMessage.id!]);
       const messageRatings = new Map();
       const feedbackConfig = {
@@ -377,19 +362,14 @@ describe("ThreadPanel Component", () => {
         onSendRating: jest.fn(),
       };
 
-      render(
-        <ThreadPanel
-          {...defaultProps}
-          feedbackConfig={feedbackConfig}
-        />
-      );
+      render(<ThreadPanel {...defaultProps} feedbackConfig={feedbackConfig} />);
 
-      expect(screen.queryByText("How did the bot do?")).not.toBeInTheDocument();
+      expect(screen.queryByText('How did the bot do?')).not.toBeInTheDocument();
     });
 
-    it("does not render feedback for parent message when not eligible", () => {
+    it('does not render feedback for parent message when not eligible', () => {
       const assistantParent = { ...mockParentMessage, fromAgent: true };
-      const eligibleIds = new Set(["different-id"]);
+      const eligibleIds = new Set(['different-id']);
       const messageRatings = new Map();
       const feedbackConfig = {
         eligibleMessageIds: eligibleIds,
@@ -398,18 +378,12 @@ describe("ThreadPanel Component", () => {
         onSendRating: jest.fn(),
       };
 
-      render(
-        <ThreadPanel
-          {...defaultProps}
-          parentMessage={assistantParent}
-          feedbackConfig={feedbackConfig}
-        />
-      );
+      render(<ThreadPanel {...defaultProps} parentMessage={assistantParent} feedbackConfig={feedbackConfig} />);
 
-      expect(screen.queryByText("How did the bot do?")).not.toBeInTheDocument();
+      expect(screen.queryByText('How did the bot do?')).not.toBeInTheDocument();
     });
 
-    it("renders feedback for reply messages when they are from agent and eligible", () => {
+    it('renders feedback for reply messages when they are from agent and eligible', () => {
       const assistantReply = { ...mockReplies[0], fromAgent: true };
       const repliesWithAssistant = [assistantReply, mockReplies[1]];
       const eligibleIds = new Set([assistantReply.id!]);
@@ -421,21 +395,15 @@ describe("ThreadPanel Component", () => {
         onSendRating: jest.fn(),
       };
 
-      render(
-        <ThreadPanel
-          {...defaultProps}
-          replies={repliesWithAssistant}
-          feedbackConfig={feedbackConfig}
-        />
-      );
+      render(<ThreadPanel {...defaultProps} replies={repliesWithAssistant} feedbackConfig={feedbackConfig} />);
 
-      expect(screen.getByText("How did the bot do?")).toBeInTheDocument();
+      expect(screen.getByText('How did the bot do?')).toBeInTheDocument();
     });
 
-    it("passes initialRating from messageRatings map to parent message feedback", () => {
+    it('passes initialRating from messageRatings map to parent message feedback', () => {
       const assistantParent = { ...mockParentMessage, fromAgent: true };
       const eligibleIds = new Set([assistantParent.id!]);
-      const messageRatings = new Map([["parent-123", "WOW!"]]);
+      const messageRatings = new Map([['parent-123', 'WOW!']]);
       const feedbackConfig = {
         eligibleMessageIds: eligibleIds,
         messageRatings,
@@ -443,23 +411,17 @@ describe("ThreadPanel Component", () => {
         onSendRating: jest.fn(),
       };
 
-      render(
-        <ThreadPanel
-          {...defaultProps}
-          parentMessage={assistantParent}
-          feedbackConfig={feedbackConfig}
-        />
-      );
+      render(<ThreadPanel {...defaultProps} parentMessage={assistantParent} feedbackConfig={feedbackConfig} />);
 
-      expect(screen.getByText("How did the bot do?")).toBeInTheDocument();
+      expect(screen.getByText('How did the bot do?')).toBeInTheDocument();
       // MessageFeedback component receives initialRating prop
     });
 
-    it("passes initialRating from messageRatings map to reply message feedback", () => {
+    it('passes initialRating from messageRatings map to reply message feedback', () => {
       const assistantReply = { ...mockReplies[0], fromAgent: true };
       const repliesWithAssistant = [assistantReply, mockReplies[1]];
       const eligibleIds = new Set([assistantReply.id!]);
-      const messageRatings = new Map([["reply-1", "OK"]]);
+      const messageRatings = new Map([['reply-1', 'OK']]);
       const feedbackConfig = {
         eligibleMessageIds: eligibleIds,
         messageRatings,
@@ -467,19 +429,13 @@ describe("ThreadPanel Component", () => {
         onSendRating: jest.fn(),
       };
 
-      render(
-        <ThreadPanel
-          {...defaultProps}
-          replies={repliesWithAssistant}
-          feedbackConfig={feedbackConfig}
-        />
-      );
+      render(<ThreadPanel {...defaultProps} replies={repliesWithAssistant} feedbackConfig={feedbackConfig} />);
 
-      expect(screen.getByText("How did the bot do?")).toBeInTheDocument();
+      expect(screen.getByText('How did the bot do?')).toBeInTheDocument();
       // MessageFeedback component receives initialRating prop
     });
 
-    it("calls onSendRating when rating is submitted on parent message", () => {
+    it('calls onSendRating when rating is submitted on parent message', () => {
       const assistantParent = { ...mockParentMessage, fromAgent: true };
       const eligibleIds = new Set([assistantParent.id!]);
       const messageRatings = new Map();
@@ -491,21 +447,15 @@ describe("ThreadPanel Component", () => {
         onSendRating: mockOnSendRating,
       };
 
-      render(
-        <ThreadPanel
-          {...defaultProps}
-          parentMessage={assistantParent}
-          feedbackConfig={feedbackConfig}
-        />
-      );
+      render(<ThreadPanel {...defaultProps} parentMessage={assistantParent} feedbackConfig={feedbackConfig} />);
 
-      const wowButton = screen.getByRole("radio", { name: "WOW!" });
+      const wowButton = screen.getByRole('radio', { name: 'WOW!' });
       fireEvent.click(wowButton);
 
-      expect(mockOnSendRating).toHaveBeenCalledWith("parent-123", "WOW!");
+      expect(mockOnSendRating).toHaveBeenCalledWith('parent-123', 'WOW!');
     });
 
-    it("calls onSendRating when rating is submitted on reply message", () => {
+    it('calls onSendRating when rating is submitted on reply message', () => {
       const assistantReply = { ...mockReplies[0], fromAgent: true };
       const repliesWithAssistant = [assistantReply, mockReplies[1]];
       const eligibleIds = new Set([assistantReply.id!]);
@@ -518,21 +468,15 @@ describe("ThreadPanel Component", () => {
         onSendRating: mockOnSendRating,
       };
 
-      render(
-        <ThreadPanel
-          {...defaultProps}
-          replies={repliesWithAssistant}
-          feedbackConfig={feedbackConfig}
-        />
-      );
+      render(<ThreadPanel {...defaultProps} replies={repliesWithAssistant} feedbackConfig={feedbackConfig} />);
 
-      const mehButton = screen.getByRole("radio", { name: "Meh" });
+      const mehButton = screen.getByRole('radio', { name: 'Meh' });
       fireEvent.click(mehButton);
 
-      expect(mockOnSendRating).toHaveBeenCalledWith("reply-1", "Meh");
+      expect(mockOnSendRating).toHaveBeenCalledWith('reply-1', 'Meh');
     });
 
-    it("calls onPopulateFeedbackText when share more is clicked on parent message", () => {
+    it('calls onPopulateFeedbackText when share more is clicked on parent message', () => {
       const assistantParent = { ...mockParentMessage, fromAgent: true };
       const eligibleIds = new Set([assistantParent.id!]);
       const messageRatings = new Map();
@@ -544,49 +488,37 @@ describe("ThreadPanel Component", () => {
         onSendRating: jest.fn(),
       };
 
-      render(
-        <ThreadPanel
-          {...defaultProps}
-          parentMessage={assistantParent}
-          feedbackConfig={feedbackConfig}
-        />
-      );
+      render(<ThreadPanel {...defaultProps} parentMessage={assistantParent} feedbackConfig={feedbackConfig} />);
 
       // First click a rating to show the "share more" link
-      const okButton = screen.getByRole("radio", { name: "OK" });
+      const okButton = screen.getByRole('radio', { name: 'OK' });
       fireEvent.click(okButton);
 
       // Then click the "Would you like to share more?" link
-      const shareMoreLink = screen.getByText("Would you like to share more?");
+      const shareMoreLink = screen.getByText('Would you like to share more?');
       fireEvent.click(shareMoreLink);
 
       expect(mockOnPopulateFeedbackText).toHaveBeenCalledWith(
         expect.objectContaining({
-          prefix: "/feedback|Text|parent-123|",
-          label: "Feedback Mode",
-        })
+          prefix: '/feedback|Text|parent-123|',
+          label: 'Feedback Mode',
+        }),
       );
     });
 
-    it("does not render feedback when feedbackConfig is not provided", () => {
+    it('does not render feedback when feedbackConfig is not provided', () => {
       const assistantParent = { ...mockParentMessage, fromAgent: true };
       const assistantReply = { ...mockReplies[0], fromAgent: true };
       const repliesWithAssistant = [assistantReply, mockReplies[1]];
 
-      render(
-        <ThreadPanel
-          {...defaultProps}
-          parentMessage={assistantParent}
-          replies={repliesWithAssistant}
-        />
-      );
+      render(<ThreadPanel {...defaultProps} parentMessage={assistantParent} replies={repliesWithAssistant} />);
 
-      expect(screen.queryByText("How did the bot do?")).not.toBeInTheDocument();
+      expect(screen.queryByText('How did the bot do?')).not.toBeInTheDocument();
     });
 
-    it("does not render feedback when message has no id", () => {
+    it('does not render feedback when message has no id', () => {
       const assistantParentNoId = { ...mockParentMessage, fromAgent: true, id: undefined };
-      const eligibleIds = new Set(["parent-123"]);
+      const eligibleIds = new Set(['parent-123']);
       const messageRatings = new Map();
       const feedbackConfig = {
         eligibleMessageIds: eligibleIds,
@@ -595,18 +527,12 @@ describe("ThreadPanel Component", () => {
         onSendRating: jest.fn(),
       };
 
-      render(
-        <ThreadPanel
-          {...defaultProps}
-          parentMessage={assistantParentNoId}
-          feedbackConfig={feedbackConfig}
-        />
-      );
+      render(<ThreadPanel {...defaultProps} parentMessage={assistantParentNoId} feedbackConfig={feedbackConfig} />);
 
-      expect(screen.queryByText("How did the bot do?")).not.toBeInTheDocument();
+      expect(screen.queryByText('How did the bot do?')).not.toBeInTheDocument();
     });
 
-    it("renders feedback for multiple eligible reply messages", () => {
+    it('renders feedback for multiple eligible reply messages', () => {
       const assistantReply1 = { ...mockReplies[0], fromAgent: true };
       const assistantReply2 = { ...mockReplies[1], fromAgent: true };
       const repliesWithMultipleAssistants = [assistantReply1, assistantReply2];
@@ -619,59 +545,47 @@ describe("ThreadPanel Component", () => {
         onSendRating: jest.fn(),
       };
 
-      render(
-        <ThreadPanel
-          {...defaultProps}
-          replies={repliesWithMultipleAssistants}
-          feedbackConfig={feedbackConfig}
-        />
-      );
+      render(<ThreadPanel {...defaultProps} replies={repliesWithMultipleAssistants} feedbackConfig={feedbackConfig} />);
 
-      const feedbackSections = screen.getAllByText("How did the bot do?");
+      const feedbackSections = screen.getAllByText('How did the bot do?');
       expect(feedbackSections).toHaveLength(2);
     });
   });
 
-  describe("Thinking Bot Icon", () => {
-    it("shows thinking bot icon when waitingForResponse is true", () => {
-      const { container } = render(
-        <ThreadPanel {...defaultProps} waitingForResponse={true} />
-      );
+  describe('Thinking Bot Icon', () => {
+    it('shows thinking bot icon when waitingForResponse is true', () => {
+      const { container } = render(<ThreadPanel {...defaultProps} waitingForResponse={true} />);
 
       // Check for bouncing bot icon
-      const bouncingIcon = container.querySelector(".animate-bounce");
+      const bouncingIcon = container.querySelector('.animate-bounce');
       expect(bouncingIcon).toBeInTheDocument();
 
       // Check for "thinking..." text
-      expect(screen.getByText("thinking...")).toBeInTheDocument();
+      expect(screen.getByText('thinking...')).toBeInTheDocument();
     });
 
-    it("does not show thinking bot icon when waitingForResponse is false", () => {
-      const { container} = render(
-        <ThreadPanel {...defaultProps} waitingForResponse={false} />
-      );
+    it('does not show thinking bot icon when waitingForResponse is false', () => {
+      const { container } = render(<ThreadPanel {...defaultProps} waitingForResponse={false} />);
 
-      const bouncingIcon = container.querySelector(".animate-bounce");
+      const bouncingIcon = container.querySelector('.animate-bounce');
       expect(bouncingIcon).not.toBeInTheDocument();
-      expect(screen.queryByText("thinking...")).not.toBeInTheDocument();
+      expect(screen.queryByText('thinking...')).not.toBeInTheDocument();
     });
 
-    it("shows thinking bot icon below existing replies", () => {
-      const { container } = render(
-        <ThreadPanel {...defaultProps} waitingForResponse={true} />
-      );
+    it('shows thinking bot icon below existing replies', () => {
+      const { container } = render(<ThreadPanel {...defaultProps} waitingForResponse={true} />);
 
       // All replies should be visible
       expect(screen.getByTestId(`message-${mockReplies[0].id}`)).toBeInTheDocument();
       expect(screen.getByTestId(`message-${mockReplies[1].id}`)).toBeInTheDocument();
 
       // Thinking indicator should also be visible
-      expect(screen.getByText("thinking...")).toBeInTheDocument();
-      const bouncingIcon = container.querySelector(".animate-bounce");
+      expect(screen.getByText('thinking...')).toBeInTheDocument();
+      const bouncingIcon = container.querySelector('.animate-bounce');
       expect(bouncingIcon).toBeInTheDocument();
     });
 
-    it("auto-scrolls to bottom when thinking indicator appears", async () => {
+    it('auto-scrolls to bottom when thinking indicator appears', async () => {
       const { rerender } = render(<ThreadPanel {...defaultProps} />);
 
       // Update to show waiting state
@@ -679,68 +593,58 @@ describe("ThreadPanel Component", () => {
 
       // Verify thinking indicator appears
       await waitFor(() => {
-        expect(screen.getByText("thinking...")).toBeInTheDocument();
+        expect(screen.getByText('thinking...')).toBeInTheDocument();
       });
     });
 
-    it("removes thinking indicator when response arrives", async () => {
-      const { rerender, container } = render(
-        <ThreadPanel {...defaultProps} waitingForResponse={true} />
-      );
+    it('removes thinking indicator when response arrives', async () => {
+      const { rerender, container } = render(<ThreadPanel {...defaultProps} waitingForResponse={true} />);
 
       // Verify thinking indicator is shown
-      expect(screen.getByText("thinking...")).toBeInTheDocument();
-      let bouncingIcon = container.querySelector(".animate-bounce");
+      expect(screen.getByText('thinking...')).toBeInTheDocument();
+      let bouncingIcon = container.querySelector('.animate-bounce');
       expect(bouncingIcon).toBeInTheDocument();
 
       // Add a new reply and remove waiting state
       const newReply: PseudonymousMessage = {
-        id: "reply-3",
-        body: { text: "Bot reply" },
-        pseudonym: "Test Bot",
-        conversation: "conv-1",
-        pseudonymId: "bot-id",
+        id: 'reply-3',
+        body: { text: 'Bot reply' },
+        pseudonym: 'Test Bot',
+        conversation: 'conv-1',
+        pseudonymId: 'bot-id',
         fromAgent: true,
         pause: false,
         visible: true,
         upVotes: [],
         downVotes: [],
-        channels: ["chat"],
+        channels: ['chat'],
         createdAt: new Date().toISOString(),
       };
 
       const updatedReplies = [...mockReplies, newReply];
 
-      rerender(
-        <ThreadPanel
-          {...defaultProps}
-          replies={updatedReplies}
-          waitingForResponse={false}
-        />
-      );
+      rerender(<ThreadPanel {...defaultProps} replies={updatedReplies} waitingForResponse={false} />);
 
       // Verify thinking indicator is removed
       await waitFor(() => {
-        expect(screen.queryByText("thinking...")).not.toBeInTheDocument();
+        expect(screen.queryByText('thinking...')).not.toBeInTheDocument();
       });
-      bouncingIcon = container.querySelector(".animate-bounce");
+      bouncingIcon = container.querySelector('.animate-bounce');
       expect(bouncingIcon).not.toBeInTheDocument();
 
       // Verify new reply is displayed
-      expect(screen.getByText("Bot reply")).toBeInTheDocument();
+      expect(screen.getByText('Bot reply')).toBeInTheDocument();
     });
 
-    it("shows thinking indicator above reply input area", () => {
-      const { container } = render(
-        <ThreadPanel {...defaultProps} waitingForResponse={true} />
-      );
+    it('shows thinking indicator above reply input area', () => {
+      const { container } = render(<ThreadPanel {...defaultProps} waitingForResponse={true} />);
 
       // Both thinking indicator and reply input should be present
-      expect(screen.getByText("thinking...")).toBeInTheDocument();
-      expect(screen.getByPlaceholderText("Reply...")).toBeInTheDocument();
+      expect(screen.getByText('thinking...')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Reply...')).toBeInTheDocument();
 
       // Thinking indicator should be in the scrollable area, not in the input area
-      const bouncingIcon = container.querySelector(".animate-bounce");
+      const bouncingIcon = container.querySelector('.animate-bounce');
       expect(bouncingIcon).toBeInTheDocument();
     });
   });

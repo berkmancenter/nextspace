@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react';
 
 /**
  * TranscriptIcon — custom SVG icon for the Transcript navigation item.
@@ -13,8 +13,8 @@ import React from "react";
  */
 export function TranscriptIcon({
   size = 26,
-  color = "currentColor",
-  className = "",
+  color = 'currentColor',
+  className = '',
 }: {
   size?: number;
   color?: string;

@@ -1,25 +1,22 @@
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { Transcript } from "../../components/Transcript";
-import { RetrieveData, SendData } from "../../utils";
-import {
-  trackConversationEvent,
-  trackFeatureUsage,
-} from "../../utils/analytics";
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Transcript } from '../../components/Transcript';
+import { RetrieveData, SendData } from '../../utils';
+import { trackConversationEvent, trackFeatureUsage } from '../../utils/analytics';
 
-jest.mock("../../utils", () => ({
+jest.mock('../../utils', () => ({
   RetrieveData: jest.fn(),
   SendData: jest.fn(),
   // Api is used by Transcript to get a fresh token for all API calls and socket emits.
   Api: {
     get: jest.fn(() => ({
-      GetTokens: jest.fn(() => ({ access: "token", refresh: "mock-refresh" })),
-      getAccessToken: jest.fn(() => "token"),
+      GetTokens: jest.fn(() => ({ access: 'token', refresh: 'mock-refresh' })),
+      getAccessToken: jest.fn(() => 'token'),
     })),
   },
 }));
 
-jest.mock("../../utils/analytics", () => ({
+jest.mock('../../utils/analytics', () => ({
   trackConversationEvent: jest.fn(),
   trackFeatureUsage: jest.fn(),
 }));
@@ -30,7 +27,7 @@ const mockStop = jest.fn(() => 5); // Return 5 seconds by default
 const mockGetActiveDuration = jest.fn(() => 5);
 const mockIsRunning = jest.fn(() => false);
 
-jest.mock("../../hooks/useVisibilityAwareDuration", () => ({
+jest.mock('../../hooks/useVisibilityAwareDuration', () => ({
   useVisibilityAwareDuration: jest.fn(() => ({
     start: mockStart,
     stop: mockStop,
@@ -39,7 +36,7 @@ jest.mock("../../hooks/useVisibilityAwareDuration", () => ({
   })),
 }));
 
-describe("Transcript", () => {
+describe('Transcript', () => {
   const mockSocket = {
     emit: jest.fn(),
     on: jest.fn(),
@@ -53,22 +50,22 @@ describe("Transcript", () => {
 
   const baseProps = {
     socket: mockSocket as any,
-    conversationId: "conversation-1",
-    transcriptPasscode: "passcode",
+    conversationId: 'conversation-1',
+    transcriptPasscode: 'passcode',
   };
 
   const transcriptMessages = [
     {
-      id: "m1",
-      channels: ["transcript"],
-      createdAt: "2025-10-17T12:01:00Z",
-      body: { text: "Hello world" },
+      id: 'm1',
+      channels: ['transcript'],
+      createdAt: '2025-10-17T12:01:00Z',
+      body: { text: 'Hello world' },
     },
     {
-      id: "m2",
-      channels: ["transcript"],
-      createdAt: "2025-10-17T12:02:00Z",
-      body: { text: "Second message" },
+      id: 'm2',
+      channels: ['transcript'],
+      createdAt: '2025-10-17T12:02:00Z',
+      body: { text: 'Second message' },
     },
   ];
 
@@ -80,13 +77,13 @@ describe("Transcript", () => {
     jest.clearAllMocks();
     // Mock RetrieveData to handle both conversation and message fetching
     (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-      if (url.startsWith("conversations/")) {
+      if (url.startsWith('conversations/')) {
         // Return conversation data
         return Promise.resolve({
-          name: "Test Conversation",
-          transcript: { status: "active" },
+          name: 'Test Conversation',
+          transcript: { status: 'active' },
         });
-      } else if (url.startsWith("messages/")) {
+      } else if (url.startsWith('messages/')) {
         // Return transcript messages
         return Promise.resolve(transcriptMessages);
       }
@@ -98,137 +95,129 @@ describe("Transcript", () => {
 
   const toggleTranscript = async (user: ReturnType<typeof setupUser>) => {
     // Find the toggle button - it changes aria-label based on state
-    const toggle = screen.getByRole("button", {
+    const toggle = screen.getByRole('button', {
       name: /transcript/i,
     });
     await user.click(toggle);
   };
 
-  it("starts open and can be toggled closed and open", async () => {
+  it('starts open and can be toggled closed and open', async () => {
     const user = setupUser();
     render(<Transcript {...baseProps} />);
 
     // Should start open with "Close transcript" button
-    const toggle = screen.getByRole("button", {
+    const toggle = screen.getByRole('button', {
       name: /Close transcript/i,
     });
     expect(toggle).toBeInTheDocument();
 
     // Should show horizontal header when open
-    expect(screen.getAllByText("LIVE TRANSCRIPT").length).toBeGreaterThan(0);
+    expect(screen.getAllByText('LIVE TRANSCRIPT').length).toBeGreaterThan(0);
 
     // Close the transcript
     await user.click(toggle);
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", {
+        screen.getByRole('button', {
           name: /Open transcript/i,
         }),
       ).toBeInTheDocument();
       // Should show vertical text when collapsed
-      expect(screen.getAllByText("LIVE TRANSCRIPT").length).toBeGreaterThan(0);
+      expect(screen.getAllByText('LIVE TRANSCRIPT').length).toBeGreaterThan(0);
     });
 
     // Open it again
-    const openButton = screen.getByRole("button", {
+    const openButton = screen.getByRole('button', {
       name: /Open transcript/i,
     });
     await user.click(openButton);
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", {
+        screen.getByRole('button', {
           name: /Close transcript/i,
         }),
       ).toBeInTheDocument();
     });
   });
 
-  it("displays vertical text when collapsed", async () => {
+  it('displays vertical text when collapsed', async () => {
     const user = setupUser();
     render(<Transcript {...baseProps} />);
 
     // Close the transcript first (starts open now)
-    const closeButton = screen.getByRole("button", {
+    const closeButton = screen.getByRole('button', {
       name: /Close transcript/i,
     });
     await user.click(closeButton);
 
     await waitFor(() => {
       // Should show vertical "LIVE TRANSCRIPT" text when collapsed
-      expect(screen.getAllByText("LIVE TRANSCRIPT").length).toBeGreaterThan(0);
+      expect(screen.getAllByText('LIVE TRANSCRIPT').length).toBeGreaterThan(0);
 
       // Should have the open button
-      expect(
-        screen.getByRole("button", { name: /Open transcript/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Open transcript/i })).toBeInTheDocument();
     });
   });
 
-  it("changes width when toggled", async () => {
+  it('changes width when toggled', async () => {
     const user = setupUser();
     const { container } = render(<Transcript {...baseProps} />);
 
     const transcriptContainer = container.firstChild as HTMLElement;
 
     // Should start open with full width (w-[33vw])
-    expect(transcriptContainer).toHaveClass("lg:w-[33vw]");
+    expect(transcriptContainer).toHaveClass('lg:w-[33vw]');
 
     // Close transcript
     await toggleTranscript(user);
 
     await waitFor(() => {
       // Should collapse to narrow width (w-16 = 64px)
-      expect(transcriptContainer).toHaveClass("lg:w-16");
+      expect(transcriptContainer).toHaveClass('lg:w-16');
     });
   });
 
-  it("renders transcript messages when opened", async () => {
+  it('renders transcript messages when opened', async () => {
     render(<Transcript {...baseProps} />);
 
     // Should start open with messages visible
     await waitFor(() => {
-      expect(screen.getByText("Hello world")).toBeInTheDocument();
-      expect(screen.getByText("Second message")).toBeInTheDocument();
+      expect(screen.getByText('Hello world')).toBeInTheDocument();
+      expect(screen.getByText('Second message')).toBeInTheDocument();
     });
   });
 
-  it("auto-opens transcript when focusTimeRange is set", async () => {
+  it('auto-opens transcript when focusTimeRange is set', async () => {
     render(
       <Transcript
         {...baseProps}
         focusTimeRange={{
-          start: new Date("2025-10-17T12:00:30Z"),
-          end: new Date("2025-10-17T12:01:30Z"),
+          start: new Date('2025-10-17T12:00:30Z'),
+          end: new Date('2025-10-17T12:01:30Z'),
         }}
       />,
     );
 
     // Should auto-open when focusTimeRange is provided
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /Close transcript/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Close transcript/i })).toBeInTheDocument();
     });
 
     // Should apply focus styles with purple highlight
     await waitFor(() => {
-      const highlightedElement = document.getElementById(
-        "transcript-message-m1",
-      );
-      expect(highlightedElement?.className).toContain("bg-[#4A0979]");
+      const highlightedElement = document.getElementById('transcript-message-m1');
+      expect(highlightedElement?.className).toContain('bg-[#4A0979]');
     });
   });
 
-  it("applies focus styles when transcript is already open and focusTimeRange is set", async () => {
+  it('applies focus styles when transcript is already open and focusTimeRange is set', async () => {
     // Start with transcript open (default), no focusTimeRange
     const { rerender } = render(<Transcript {...baseProps} />);
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /Close transcript/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Close transcript/i })).toBeInTheDocument();
     });
 
     // Now set focusTimeRange
@@ -236,107 +225,93 @@ describe("Transcript", () => {
       <Transcript
         {...baseProps}
         focusTimeRange={{
-          start: new Date("2025-10-17T12:00:30Z"),
-          end: new Date("2025-10-17T12:01:30Z"),
+          start: new Date('2025-10-17T12:00:30Z'),
+          end: new Date('2025-10-17T12:01:30Z'),
         }}
       />,
     );
 
     await waitFor(() => {
-      const highlightedElement = document.getElementById(
-        "transcript-message-m1",
-      );
-      expect(highlightedElement?.className).toContain("bg-[#4A0979]");
+      const highlightedElement = document.getElementById('transcript-message-m1');
+      expect(highlightedElement?.className).toContain('bg-[#4A0979]');
     });
   });
 
-  it("preserves focus when transcript is manually closed and reopened", async () => {
+  it('preserves focus when transcript is manually closed and reopened', async () => {
     const user = setupUser();
 
     render(
       <Transcript
         {...baseProps}
         focusTimeRange={{
-          start: new Date("2025-10-17T12:00:30Z"),
-          end: new Date("2025-10-17T12:01:30Z"),
+          start: new Date('2025-10-17T12:00:30Z'),
+          end: new Date('2025-10-17T12:01:30Z'),
         }}
       />,
     );
 
     // Should auto-open with focus
     await waitFor(() => {
-      const highlightedElement = document.getElementById(
-        "transcript-message-m1",
-      );
-      expect(highlightedElement?.className).toContain("bg-[#4A0979]");
+      const highlightedElement = document.getElementById('transcript-message-m1');
+      expect(highlightedElement?.className).toContain('bg-[#4A0979]');
     });
 
     // Manually close via toggle
     await toggleTranscript(user);
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /Open transcript/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Open transcript/i })).toBeInTheDocument();
     });
 
     // Manually reopen → focus should still be applied
     await toggleTranscript(user);
 
     await waitFor(() => {
-      const highlightedElement = document.getElementById(
-        "transcript-message-m1",
-      );
-      expect(highlightedElement?.className).toContain("bg-[#4A0979]");
+      const highlightedElement = document.getElementById('transcript-message-m1');
+      expect(highlightedElement?.className).toContain('bg-[#4A0979]');
     });
   });
 
-  it("clears focus when focusTimeRange prop is removed", async () => {
+  it('clears focus when focusTimeRange prop is removed', async () => {
     const { rerender } = render(
       <Transcript
         {...baseProps}
         focusTimeRange={{
-          start: new Date("2025-10-17T12:00:30Z"),
-          end: new Date("2025-10-17T12:01:30Z"),
+          start: new Date('2025-10-17T12:00:30Z'),
+          end: new Date('2025-10-17T12:01:30Z'),
         }}
       />,
     );
 
     // Should auto-open with focus
     await waitFor(() => {
-      const highlightedElement = document.getElementById(
-        "transcript-message-m1",
-      );
-      expect(highlightedElement?.className).toContain("bg-[#4A0979]");
+      const highlightedElement = document.getElementById('transcript-message-m1');
+      expect(highlightedElement?.className).toContain('bg-[#4A0979]');
     });
 
     // Remove focusTimeRange
     rerender(<Transcript {...baseProps} />);
 
     await waitFor(() => {
-      const highlightedElement = document.getElementById(
-        "transcript-message-m1",
-      );
-      expect(highlightedElement?.className).not.toContain("bg-[#4A0979]");
+      const highlightedElement = document.getElementById('transcript-message-m1');
+      expect(highlightedElement?.className).not.toContain('bg-[#4A0979]');
     });
   });
 
-  it("updates focus when focusTimeRange changes", async () => {
+  it('updates focus when focusTimeRange changes', async () => {
     const { rerender } = render(
       <Transcript
         {...baseProps}
         focusTimeRange={{
-          start: new Date("2025-10-17T12:00:30Z"),
-          end: new Date("2025-10-17T12:01:30Z"),
+          start: new Date('2025-10-17T12:00:30Z'),
+          end: new Date('2025-10-17T12:01:30Z'),
         }}
       />,
     );
 
     // Should auto-open and focus m1
     await waitFor(() => {
-      expect(document.querySelector("#transcript-message-m1")).toHaveClass(
-        "bg-[#4A0979]",
-      );
+      expect(document.querySelector('#transcript-message-m1')).toHaveClass('bg-[#4A0979]');
     });
 
     // Change focusTimeRange to focus m2
@@ -344,33 +319,27 @@ describe("Transcript", () => {
       <Transcript
         {...baseProps}
         focusTimeRange={{
-          start: new Date("2025-10-17T12:01:30Z"),
-          end: new Date("2025-10-17T12:02:30Z"),
+          start: new Date('2025-10-17T12:01:30Z'),
+          end: new Date('2025-10-17T12:02:30Z'),
         }}
       />,
     );
 
     await waitFor(() => {
-      expect(document.querySelector("#transcript-message-m2")).toHaveClass(
-        "bg-[#4A0979]",
-      );
-      expect(document.querySelector("#transcript-message-m1")).not.toHaveClass(
-        "bg-[#4A0979]",
-      );
+      expect(document.querySelector('#transcript-message-m2')).toHaveClass('bg-[#4A0979]');
+      expect(document.querySelector('#transcript-message-m1')).not.toHaveClass('bg-[#4A0979]');
     });
   });
 
-  it("applies focus after messages load if focusTimeRange was set before messages arrived", async () => {
+  it('applies focus after messages load if focusTimeRange was set before messages arrived', async () => {
     (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-      if (url.startsWith("conversations/")) {
+      if (url.startsWith('conversations/')) {
         return Promise.resolve({
-          name: "Test Conversation",
-          transcript: { status: "active" },
+          name: 'Test Conversation',
+          transcript: { status: 'active' },
         });
-      } else if (url.startsWith("messages/")) {
-        return new Promise((resolve) =>
-          setTimeout(() => resolve(transcriptMessages), 100),
-        );
+      } else if (url.startsWith('messages/')) {
+        return new Promise((resolve) => setTimeout(() => resolve(transcriptMessages), 100));
       }
       return Promise.resolve(null);
     });
@@ -379,32 +348,28 @@ describe("Transcript", () => {
       <Transcript
         {...baseProps}
         focusTimeRange={{
-          start: new Date("2025-10-17T12:00:30Z"),
-          end: new Date("2025-10-17T12:01:30Z"),
+          start: new Date('2025-10-17T12:00:30Z'),
+          end: new Date('2025-10-17T12:01:30Z'),
         }}
       />,
     );
 
     // Should auto-open
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /Close transcript/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Close transcript/i })).toBeInTheDocument();
     });
 
     // Focus should apply once messages load
     await waitFor(
       () => {
-        const highlightedElement = document.getElementById(
-          "transcript-message-m1",
-        );
-        expect(highlightedElement?.className).toContain("bg-[#4A0979]");
+        const highlightedElement = document.getElementById('transcript-message-m1');
+        expect(highlightedElement?.className).toContain('bg-[#4A0979]');
       },
       { timeout: 300 },
     );
   });
 
-  it("scrolls to the earliest message in focus range", async () => {
+  it('scrolls to the earliest message in focus range', async () => {
     const scrollIntoViewMock = jest.fn();
     Element.prototype.scrollIntoView = scrollIntoViewMock;
 
@@ -412,8 +377,8 @@ describe("Transcript", () => {
       <Transcript
         {...baseProps}
         focusTimeRange={{
-          start: new Date("2025-10-17T12:00:30Z"),
-          end: new Date("2025-10-17T12:01:30Z"),
+          start: new Date('2025-10-17T12:00:30Z'),
+          end: new Date('2025-10-17T12:01:30Z'),
         }}
       />,
     );
@@ -427,74 +392,64 @@ describe("Transcript", () => {
     );
   });
 
-  it("removes socket listener on unmount", () => {
+  it('removes socket listener on unmount', () => {
     const { unmount } = render(<Transcript {...baseProps} />);
 
     // Verify subscription was initiated
-    expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {
+    expect(mockSocket.emit).toHaveBeenCalledWith('channel:join', {
       conversationId: baseProps.conversationId,
-      token: "token",
+      token: 'token',
       channel: {
-        name: "transcript",
+        name: 'transcript',
         passcode: baseProps.transcriptPasscode,
       },
     });
 
     // Verify listener was added
-    expect(mockSocket.on).toHaveBeenCalledWith(
-      "message:new",
-      expect.any(Function),
-    );
+    expect(mockSocket.on).toHaveBeenCalledWith('message:new', expect.any(Function));
 
     // Find the message:new handler by event name (not by call index, since
     // the "connect" re-join listener is also registered via socket.on now)
-    const addedHandler = mockSocket.on.mock.calls.find(
-      (call) => call[0] === "message:new",
-    )?.[1];
+    const addedHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
 
     unmount();
 
     // Verify cleanup was called with same handler
-    expect(mockSocket.off).toHaveBeenCalledWith("message:new", addedHandler);
+    expect(mockSocket.off).toHaveBeenCalledWith('message:new', addedHandler);
   });
 
-  it("does not add duplicate socket listeners", () => {
+  it('does not add duplicate socket listeners', () => {
     mockSocket.listenerCount.mockReturnValue(1); // Pretend listener exists
 
     render(<Transcript {...baseProps} />);
 
     // Should emit channel:join
-    expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {
+    expect(mockSocket.emit).toHaveBeenCalledWith('channel:join', {
       conversationId: baseProps.conversationId,
-      token: "token",
+      token: 'token',
       channel: {
-        name: "transcript",
+        name: 'transcript',
         passcode: baseProps.transcriptPasscode,
       },
     });
 
     // Should still add listener (we removed hasListeners check)
-    expect(mockSocket.on).toHaveBeenCalledWith(
-      "message:new",
-      expect.any(Function),
-    );
+    expect(mockSocket.on).toHaveBeenCalledWith('message:new', expect.any(Function));
   });
 
-  it("removes old listener when socket changes", () => {
+  it('removes old listener when socket changes', () => {
     const { rerender } = render(<Transcript {...baseProps} />);
 
     // Find the message:new handler by event name (not by call index, since
     // the "connect" re-join listener is also registered via socket.on now)
-    const firstHandler = mockSocket.on.mock.calls.find(
-      (call) => call[0] === "message:new",
-    )?.[1];
+    const firstHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
 
     // Verify first socket emitted channel:join
-    expect(mockSocket.emit).toHaveBeenCalledWith("channel:join", {
+    expect(mockSocket.emit).toHaveBeenCalledWith('channel:join', {
       conversationId: baseProps.conversationId,
-      token: "token",
+      token: 'token',
       channel: {
-        name: "transcript",
+        name: 'transcript',
         passcode: baseProps.transcriptPasscode,
       },
     });
@@ -509,84 +464,73 @@ describe("Transcript", () => {
       offAny: jest.fn(),
       listenerCount: jest.fn().mockReturnValue(0),
       connected: true,
-      auth: { token: "mock-token" },
+      auth: { token: 'mock-token' },
       hasListeners: jest.fn(() => false),
     };
 
     rerender(<Transcript {...baseProps} socket={newMockSocket as any} />);
 
     // Old socket should have cleanup called
-    expect(mockSocket.off).toHaveBeenCalledWith("message:new", firstHandler);
+    expect(mockSocket.off).toHaveBeenCalledWith('message:new', firstHandler);
 
     // New socket should emit channel:join
-    expect(newMockSocket.emit).toHaveBeenCalledWith("channel:join", {
+    expect(newMockSocket.emit).toHaveBeenCalledWith('channel:join', {
       conversationId: baseProps.conversationId,
-      token: "token",
+      token: 'token',
       channel: {
-        name: "transcript",
+        name: 'transcript',
         passcode: baseProps.transcriptPasscode,
       },
     });
 
     // New socket should have listener added
-    expect(newMockSocket.on).toHaveBeenCalledWith(
-      "message:new",
-      expect.any(Function),
-    );
+    expect(newMockSocket.on).toHaveBeenCalledWith('message:new', expect.any(Function));
   });
 
-  it("does not reopen transcript when new messages arrive", async () => {
+  it('does not reopen transcript when new messages arrive', async () => {
     const user = setupUser();
 
     render(
       <Transcript
         {...baseProps}
         focusTimeRange={{
-          start: new Date("2025-10-17T12:00:30Z"),
-          end: new Date("2025-10-17T12:01:30Z"),
+          start: new Date('2025-10-17T12:00:30Z'),
+          end: new Date('2025-10-17T12:01:30Z'),
         }}
       />,
     );
 
     // Should auto-open
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /Close transcript/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Close transcript/i })).toBeInTheDocument();
     });
 
     // User manually closes
     await toggleTranscript(user);
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /Open transcript/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Open transcript/i })).toBeInTheDocument();
     });
 
     // Simulate new message arriving via socket
-    const messageHandler = mockSocket.on.mock.calls.find(
-      (call) => call[0] === "message:new",
-    )?.[1];
+    const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
 
     messageHandler?.({
-      id: "m3",
-      channels: ["transcript"],
-      createdAt: "2025-10-17T12:01:15Z", // Within focus range
-      body: { text: "New socket message" },
+      id: 'm3',
+      channels: ['transcript'],
+      createdAt: '2025-10-17T12:01:15Z', // Within focus range
+      body: { text: 'New socket message' },
     });
 
     // Wait a bit
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Transcript should still be closed
-    expect(
-      screen.getByRole("button", { name: /Open transcript/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open transcript/i })).toBeInTheDocument();
   });
 
   // Tests for transcript controls (pause, resume, delete, download)
-  describe("Transcript Controls", () => {
+  describe('Transcript Controls', () => {
     const controlsProps = {
       ...baseProps,
       showControls: true,
@@ -613,38 +557,32 @@ describe("Transcript", () => {
       global.URL.revokeObjectURL = originalRevokeObjectURL;
     });
 
-    it("renders control buttons when showControls is true", async () => {
+    it('renders control buttons when showControls is true', async () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Pause recording")).toBeInTheDocument();
-        expect(screen.getByLabelText("Delete transcript")).toBeInTheDocument();
-        expect(screen.getByLabelText("Download transcript")).toBeInTheDocument();
+        expect(screen.getByLabelText('Pause recording')).toBeInTheDocument();
+        expect(screen.getByLabelText('Delete transcript')).toBeInTheDocument();
+        expect(screen.getByLabelText('Download transcript')).toBeInTheDocument();
       });
     });
 
-    it("does not render control buttons when showControls is false", () => {
+    it('does not render control buttons when showControls is false', () => {
       render(<Transcript {...baseProps} />);
 
-      expect(
-        screen.queryByLabelText("Pause recording"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByLabelText("Delete transcript"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByLabelText("Download transcript"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Pause recording')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Delete transcript')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Download transcript')).not.toBeInTheDocument();
     });
 
-    it("shows pause button when transcript is active", async () => {
+    it('shows pause button when transcript is active', async () => {
       (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-        if (url.startsWith("conversations/")) {
+        if (url.startsWith('conversations/')) {
           return Promise.resolve({
-            name: "Test Conversation",
-            transcript: { status: "active" },
+            name: 'Test Conversation',
+            transcript: { status: 'active' },
           });
-        } else if (url.startsWith("messages/")) {
+        } else if (url.startsWith('messages/')) {
           return Promise.resolve(transcriptMessages);
         }
         return Promise.resolve(null);
@@ -653,19 +591,19 @@ describe("Transcript", () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Pause recording")).toBeInTheDocument();
-        expect(screen.getByText("Pause")).toBeInTheDocument();
+        expect(screen.getByLabelText('Pause recording')).toBeInTheDocument();
+        expect(screen.getByText('Pause')).toBeInTheDocument();
       });
     });
 
-    it("shows resume button when transcript is paused", async () => {
+    it('shows resume button when transcript is paused', async () => {
       (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-        if (url.startsWith("conversations/")) {
+        if (url.startsWith('conversations/')) {
           return Promise.resolve({
-            name: "Test Conversation",
-            transcript: { status: "paused" },
+            name: 'Test Conversation',
+            transcript: { status: 'paused' },
           });
-        } else if (url.startsWith("messages/")) {
+        } else if (url.startsWith('messages/')) {
           return Promise.resolve(transcriptMessages);
         }
         return Promise.resolve(null);
@@ -674,37 +612,37 @@ describe("Transcript", () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Resume recording")).toBeInTheDocument();
-        expect(screen.getByText("Resume")).toBeInTheDocument();
+        expect(screen.getByLabelText('Resume recording')).toBeInTheDocument();
+        expect(screen.getByText('Resume')).toBeInTheDocument();
       });
     });
 
-    it("opens confirmation modal when pause button is clicked", async () => {
+    it('opens confirmation modal when pause button is clicked', async () => {
       const user = setupUser();
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Pause recording")).toBeInTheDocument();
+        expect(screen.getByLabelText('Pause recording')).toBeInTheDocument();
       });
 
-      const pauseButton = screen.getByLabelText("Pause recording");
+      const pauseButton = screen.getByLabelText('Pause recording');
       await user.click(pauseButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Pause transcription?")).toBeInTheDocument();
-        expect(screen.getByText("Yes, Pause")).toBeInTheDocument();
+        expect(screen.getByText('Pause transcription?')).toBeInTheDocument();
+        expect(screen.getByText('Yes, Pause')).toBeInTheDocument();
       });
     });
 
-    it("opens confirmation modal when resume button is clicked", async () => {
+    it('opens confirmation modal when resume button is clicked', async () => {
       const user = setupUser();
       (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-        if (url.startsWith("conversations/")) {
+        if (url.startsWith('conversations/')) {
           return Promise.resolve({
-            name: "Test Conversation",
-            transcript: { status: "paused" },
+            name: 'Test Conversation',
+            transcript: { status: 'paused' },
           });
-        } else if (url.startsWith("messages/")) {
+        } else if (url.startsWith('messages/')) {
           return Promise.resolve(transcriptMessages);
         }
         return Promise.resolve(null);
@@ -713,27 +651,27 @@ describe("Transcript", () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Resume recording")).toBeInTheDocument();
+        expect(screen.getByLabelText('Resume recording')).toBeInTheDocument();
       });
 
-      const resumeButton = screen.getByLabelText("Resume recording");
+      const resumeButton = screen.getByLabelText('Resume recording');
       await user.click(resumeButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Resume transcription?")).toBeInTheDocument();
-        expect(screen.getByText("Yes, Resume")).toBeInTheDocument();
+        expect(screen.getByText('Resume transcription?')).toBeInTheDocument();
+        expect(screen.getByText('Yes, Resume')).toBeInTheDocument();
       });
     });
 
-    it("opens confirmation modal when delete button is clicked", async () => {
+    it('opens confirmation modal when delete button is clicked', async () => {
       const user = setupUser();
       (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-        if (url.startsWith("conversations/")) {
+        if (url.startsWith('conversations/')) {
           return Promise.resolve({
-            name: "Test Conversation",
-            transcript: { status: "paused" },
+            name: 'Test Conversation',
+            transcript: { status: 'paused' },
           });
-        } else if (url.startsWith("messages/")) {
+        } else if (url.startsWith('messages/')) {
           return Promise.resolve(transcriptMessages);
         }
         return Promise.resolve(null);
@@ -742,26 +680,26 @@ describe("Transcript", () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Delete transcript")).toBeInTheDocument();
+        expect(screen.getByLabelText('Delete transcript')).toBeInTheDocument();
       });
 
-      const deleteButton = screen.getByLabelText("Delete transcript");
+      const deleteButton = screen.getByLabelText('Delete transcript');
       await user.click(deleteButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Delete transcription?")).toBeInTheDocument();
-        expect(screen.getByText("Yes, Delete")).toBeInTheDocument();
+        expect(screen.getByText('Delete transcription?')).toBeInTheDocument();
+        expect(screen.getByText('Yes, Delete')).toBeInTheDocument();
       });
     });
 
-    it("disables delete button when transcript is active", async () => {
+    it('disables delete button when transcript is active', async () => {
       (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-        if (url.startsWith("conversations/")) {
+        if (url.startsWith('conversations/')) {
           return Promise.resolve({
-            name: "Test Conversation",
-            transcript: { status: "active" },
+            name: 'Test Conversation',
+            transcript: { status: 'active' },
           });
-        } else if (url.startsWith("messages/")) {
+        } else if (url.startsWith('messages/')) {
           return Promise.resolve(transcriptMessages);
         }
         return Promise.resolve(null);
@@ -770,19 +708,19 @@ describe("Transcript", () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        const deleteButton = screen.getByLabelText("Delete transcript");
+        const deleteButton = screen.getByLabelText('Delete transcript');
         expect(deleteButton).toBeDisabled();
       });
     });
 
-    it("enables delete button when transcript is paused", async () => {
+    it('enables delete button when transcript is paused', async () => {
       (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-        if (url.startsWith("conversations/")) {
+        if (url.startsWith('conversations/')) {
           return Promise.resolve({
-            name: "Test Conversation",
-            transcript: { status: "paused" },
+            name: 'Test Conversation',
+            transcript: { status: 'paused' },
           });
-        } else if (url.startsWith("messages/")) {
+        } else if (url.startsWith('messages/')) {
           return Promise.resolve(transcriptMessages);
         }
         return Promise.resolve(null);
@@ -791,31 +729,31 @@ describe("Transcript", () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        const deleteButton = screen.getByLabelText("Delete transcript");
+        const deleteButton = screen.getByLabelText('Delete transcript');
         expect(deleteButton).not.toBeDisabled();
       });
     });
 
-    it("downloads transcript when download button is clicked", async () => {
+    it('downloads transcript when download button is clicked', async () => {
       const user = setupUser();
-      const mockTranscriptText = "Test transcript content\nLine 2";
+      const mockTranscriptText = 'Test transcript content\nLine 2';
 
       (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-        if (url.startsWith("conversations/")) {
+        if (url.startsWith('conversations/')) {
           return Promise.resolve({
-            name: "Test Conversation",
-            transcript: { status: "active" },
+            name: 'Test Conversation',
+            transcript: { status: 'active' },
           });
-        } else if (url.startsWith("messages/")) {
+        } else if (url.startsWith('messages/')) {
           return Promise.resolve(transcriptMessages);
-        } else if (url.startsWith("transcript/")) {
+        } else if (url.startsWith('transcript/')) {
           return Promise.resolve(mockTranscriptText);
         }
         return Promise.resolve(null);
       });
 
       // Mock URL.createObjectURL and revokeObjectURL
-      const mockCreateObjectURL = jest.fn(() => "blob:mock-url");
+      const mockCreateObjectURL = jest.fn(() => 'blob:mock-url');
       const mockRevokeObjectURL = jest.fn();
       global.URL.createObjectURL = mockCreateObjectURL;
       global.URL.revokeObjectURL = mockRevokeObjectURL;
@@ -828,41 +766,35 @@ describe("Transcript", () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(
-          screen.getByLabelText("Download transcript"),
-        ).toBeInTheDocument();
+        expect(screen.getByLabelText('Download transcript')).toBeInTheDocument();
       });
 
-      const downloadButton = screen.getByLabelText("Download transcript");
+      const downloadButton = screen.getByLabelText('Download transcript');
       await user.click(downloadButton);
 
       await waitFor(() => {
-        expect(RetrieveData).toHaveBeenCalledWith(
-          `transcript/${baseProps.conversationId}`,
-          "token",
-          "text",
-        );
+        expect(RetrieveData).toHaveBeenCalledWith(`transcript/${baseProps.conversationId}`, 'token', 'text');
         expect(mockCreateObjectURL).toHaveBeenCalled();
         expect(mockClick).toHaveBeenCalled();
-        expect(mockRevokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
+        expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
       });
 
       // Cleanup
       HTMLAnchorElement.prototype.click = originalClick;
     });
 
-    it("shows error message when download fails", async () => {
+    it('shows error message when download fails', async () => {
       const user = setupUser();
 
       (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-        if (url.startsWith("conversations/")) {
+        if (url.startsWith('conversations/')) {
           return Promise.resolve({
-            name: "Test Conversation",
-            transcript: { status: "active" },
+            name: 'Test Conversation',
+            transcript: { status: 'active' },
           });
-        } else if (url.startsWith("messages/")) {
+        } else if (url.startsWith('messages/')) {
           return Promise.resolve(transcriptMessages);
-        } else if (url.startsWith("transcript/")) {
+        } else if (url.startsWith('transcript/')) {
           return Promise.resolve(null);
         }
         return Promise.resolve(null);
@@ -871,30 +803,26 @@ describe("Transcript", () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(
-          screen.getByLabelText("Download transcript"),
-        ).toBeInTheDocument();
+        expect(screen.getByLabelText('Download transcript')).toBeInTheDocument();
       });
 
-      const downloadButton = screen.getByLabelText("Download transcript");
+      const downloadButton = screen.getByLabelText('Download transcript');
       await user.click(downloadButton);
 
       await waitFor(() => {
-        expect(
-          screen.getByText("Failed to fetch transcript for download"),
-        ).toBeInTheDocument();
+        expect(screen.getByText('Failed to fetch transcript for download')).toBeInTheDocument();
       });
     });
 
-    it("closes confirmation modal when cancel is clicked", async () => {
+    it('closes confirmation modal when cancel is clicked', async () => {
       const user = setupUser();
       (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-        if (url.startsWith("conversations/")) {
+        if (url.startsWith('conversations/')) {
           return Promise.resolve({
-            name: "Test Conversation",
-            transcript: { status: "paused" },
+            name: 'Test Conversation',
+            transcript: { status: 'paused' },
           });
-        } else if (url.startsWith("messages/")) {
+        } else if (url.startsWith('messages/')) {
           return Promise.resolve(transcriptMessages);
         }
         return Promise.resolve(null);
@@ -903,38 +831,36 @@ describe("Transcript", () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Delete transcript")).toBeInTheDocument();
+        expect(screen.getByLabelText('Delete transcript')).toBeInTheDocument();
       });
 
-      const deleteButton = screen.getByLabelText("Delete transcript");
+      const deleteButton = screen.getByLabelText('Delete transcript');
       await user.click(deleteButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Delete transcription?")).toBeInTheDocument();
+        expect(screen.getByText('Delete transcription?')).toBeInTheDocument();
       });
 
-      const cancelButton = screen.getByText("Cancel");
+      const cancelButton = screen.getByText('Cancel');
       await user.click(cancelButton);
 
       await waitFor(() => {
-        expect(
-          screen.queryByText("Delete transcription?"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText('Delete transcription?')).not.toBeInTheDocument();
       });
     });
 
-    it("dismisses error message when X is clicked", async () => {
+    it('dismisses error message when X is clicked', async () => {
       const user = setupUser();
 
       (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-        if (url.startsWith("conversations/")) {
+        if (url.startsWith('conversations/')) {
           return Promise.resolve({
-            name: "Test Conversation",
-            transcript: { status: "active" },
+            name: 'Test Conversation',
+            transcript: { status: 'active' },
           });
-        } else if (url.startsWith("messages/")) {
+        } else if (url.startsWith('messages/')) {
           return Promise.resolve(transcriptMessages);
-        } else if (url.startsWith("transcript/")) {
+        } else if (url.startsWith('transcript/')) {
           return Promise.resolve(null);
         }
         return Promise.resolve(null);
@@ -943,69 +869,59 @@ describe("Transcript", () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(
-          screen.getByLabelText("Download transcript"),
-        ).toBeInTheDocument();
+        expect(screen.getByLabelText('Download transcript')).toBeInTheDocument();
       });
 
-      const downloadButton = screen.getByLabelText("Download transcript");
+      const downloadButton = screen.getByLabelText('Download transcript');
       await user.click(downloadButton);
 
       await waitFor(() => {
-        expect(
-          screen.getByText("Failed to fetch transcript for download"),
-        ).toBeInTheDocument();
+        expect(screen.getByText('Failed to fetch transcript for download')).toBeInTheDocument();
       });
 
-      const dismissButton = screen.getByLabelText("Dismiss error");
+      const dismissButton = screen.getByLabelText('Dismiss error');
       await user.click(dismissButton);
 
       await waitFor(() => {
-        expect(
-          screen.queryByText("Failed to fetch transcript for download"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText('Failed to fetch transcript for download')).not.toBeInTheDocument();
       });
     });
 
-    it("calls pause API when pause is confirmed", async () => {
+    it('calls pause API when pause is confirmed', async () => {
       const user = setupUser();
       (SendData as jest.Mock).mockResolvedValue({ success: true });
 
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Pause recording")).toBeInTheDocument();
+        expect(screen.getByLabelText('Pause recording')).toBeInTheDocument();
       });
 
-      const pauseButton = screen.getByLabelText("Pause recording");
+      const pauseButton = screen.getByLabelText('Pause recording');
       await user.click(pauseButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Yes, Pause")).toBeInTheDocument();
+        expect(screen.getByText('Yes, Pause')).toBeInTheDocument();
       });
 
-      const confirmButton = screen.getByText("Yes, Pause");
+      const confirmButton = screen.getByText('Yes, Pause');
       await user.click(confirmButton);
 
       await waitFor(() => {
-        expect(SendData).toHaveBeenCalledWith(
-          `transcript/${baseProps.conversationId}/pause`,
-          {},
-          "token",
-        );
+        expect(SendData).toHaveBeenCalledWith(`transcript/${baseProps.conversationId}/pause`, {}, 'token');
       });
     });
 
-    it("calls resume API when resume is confirmed", async () => {
+    it('calls resume API when resume is confirmed', async () => {
       const user = setupUser();
       (SendData as jest.Mock).mockResolvedValue({ success: true });
       (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-        if (url.startsWith("conversations/")) {
+        if (url.startsWith('conversations/')) {
           return Promise.resolve({
-            name: "Test Conversation",
-            transcript: { status: "paused" },
+            name: 'Test Conversation',
+            transcript: { status: 'paused' },
           });
-        } else if (url.startsWith("messages/")) {
+        } else if (url.startsWith('messages/')) {
           return Promise.resolve(transcriptMessages);
         }
         return Promise.resolve(null);
@@ -1014,38 +930,34 @@ describe("Transcript", () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Resume recording")).toBeInTheDocument();
+        expect(screen.getByLabelText('Resume recording')).toBeInTheDocument();
       });
 
-      const resumeButton = screen.getByLabelText("Resume recording");
+      const resumeButton = screen.getByLabelText('Resume recording');
       await user.click(resumeButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Yes, Resume")).toBeInTheDocument();
+        expect(screen.getByText('Yes, Resume')).toBeInTheDocument();
       });
 
-      const confirmButton = screen.getByText("Yes, Resume");
+      const confirmButton = screen.getByText('Yes, Resume');
       await user.click(confirmButton);
 
       await waitFor(() => {
-        expect(SendData).toHaveBeenCalledWith(
-          `transcript/${baseProps.conversationId}/resume`,
-          {},
-          "token",
-        );
+        expect(SendData).toHaveBeenCalledWith(`transcript/${baseProps.conversationId}/resume`, {}, 'token');
       });
     });
 
-    it("calls delete API when delete is confirmed", async () => {
+    it('calls delete API when delete is confirmed', async () => {
       const user = setupUser();
       (SendData as jest.Mock).mockResolvedValue({ success: true });
       (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-        if (url.startsWith("conversations/")) {
+        if (url.startsWith('conversations/')) {
           return Promise.resolve({
-            name: "Test Conversation",
-            transcript: { status: "paused" },
+            name: 'Test Conversation',
+            transcript: { status: 'paused' },
           });
-        } else if (url.startsWith("messages/")) {
+        } else if (url.startsWith('messages/')) {
           return Promise.resolve(transcriptMessages);
         }
         return Promise.resolve(null);
@@ -1054,70 +966,65 @@ describe("Transcript", () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Delete transcript")).toBeInTheDocument();
+        expect(screen.getByLabelText('Delete transcript')).toBeInTheDocument();
       });
 
-      const deleteButton = screen.getByLabelText("Delete transcript");
+      const deleteButton = screen.getByLabelText('Delete transcript');
       await user.click(deleteButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Yes, Delete")).toBeInTheDocument();
+        expect(screen.getByText('Yes, Delete')).toBeInTheDocument();
       });
 
-      const confirmButton = screen.getByText("Yes, Delete");
+      const confirmButton = screen.getByText('Yes, Delete');
       await user.click(confirmButton);
 
       await waitFor(() => {
-        expect(SendData).toHaveBeenCalledWith(
-          `transcript/${baseProps.conversationId}`,
-          {},
-          "token",
-          { method: "DELETE" },
-        );
+        expect(SendData).toHaveBeenCalledWith(`transcript/${baseProps.conversationId}`, {}, 'token', { method: 'DELETE' });
       });
     });
 
-    it("shows error when pause API fails", async () => {
+    it('shows error when pause API fails', async () => {
       const user = setupUser();
       (SendData as jest.Mock).mockResolvedValue({
         error: true,
-        message: "Network error",
+        message: 'Network error',
       });
 
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Pause recording")).toBeInTheDocument();
+        expect(screen.getByLabelText('Pause recording')).toBeInTheDocument();
       });
 
-      const pauseButton = screen.getByLabelText("Pause recording");
+      const pauseButton = screen.getByLabelText('Pause recording');
       await user.click(pauseButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Yes, Pause")).toBeInTheDocument();
+        expect(screen.getByText('Yes, Pause')).toBeInTheDocument();
       });
 
-      const confirmButton = screen.getByText("Yes, Pause");
+      const confirmButton = screen.getByText('Yes, Pause');
       await user.click(confirmButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Network error")).toBeInTheDocument();
+        expect(screen.getByText('Network error')).toBeInTheDocument();
       });
     });
 
-    it("shows error when resume API fails", async () => {
+    it('shows error when resume API fails', async () => {
       const user = setupUser();
       (SendData as jest.Mock).mockResolvedValue({
         error: true,
-        message: "Network error",
+        message: 'Network error',
       });
       (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-        if (url.startsWith("conversations/")) {
+        if (url.startsWith('conversations/')) {
           return Promise.resolve({
-            name: "Test Conversation",
-            transcript: { status: "paused" },
+            name: 'Test Conversation',
+            transcript: { status: 'paused' },
           });
-        } else if (url.startsWith("messages/")) {
+        } else if (url.startsWith('messages/')) {
           return Promise.resolve(transcriptMessages);
         }
         return Promise.resolve(null);
@@ -1126,37 +1033,37 @@ describe("Transcript", () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Resume recording")).toBeInTheDocument();
+        expect(screen.getByLabelText('Resume recording')).toBeInTheDocument();
       });
 
-      const resumeButton = screen.getByLabelText("Resume recording");
+      const resumeButton = screen.getByLabelText('Resume recording');
       await user.click(resumeButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Yes, Resume")).toBeInTheDocument();
+        expect(screen.getByText('Yes, Resume')).toBeInTheDocument();
       });
 
-      const confirmButton = screen.getByText("Yes, Resume");
+      const confirmButton = screen.getByText('Yes, Resume');
       await user.click(confirmButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Network error")).toBeInTheDocument();
+        expect(screen.getByText('Network error')).toBeInTheDocument();
       });
     });
 
-    it("shows error when delete API fails", async () => {
+    it('shows error when delete API fails', async () => {
       const user = setupUser();
       (SendData as jest.Mock).mockResolvedValue({
         error: true,
-        message: "Network error",
+        message: 'Network error',
       });
       (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-        if (url.startsWith("conversations/")) {
+        if (url.startsWith('conversations/')) {
           return Promise.resolve({
-            name: "Test Conversation",
-            transcript: { status: "paused" },
+            name: 'Test Conversation',
+            transcript: { status: 'paused' },
           });
-        } else if (url.startsWith("messages/")) {
+        } else if (url.startsWith('messages/')) {
           return Promise.resolve(transcriptMessages);
         }
         return Promise.resolve(null);
@@ -1165,95 +1072,89 @@ describe("Transcript", () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Delete transcript")).toBeInTheDocument();
+        expect(screen.getByLabelText('Delete transcript')).toBeInTheDocument();
       });
 
-      const deleteButton = screen.getByLabelText("Delete transcript");
+      const deleteButton = screen.getByLabelText('Delete transcript');
       await user.click(deleteButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Yes, Delete")).toBeInTheDocument();
+        expect(screen.getByText('Yes, Delete')).toBeInTheDocument();
       });
 
-      const confirmButton = screen.getByText("Yes, Delete");
+      const confirmButton = screen.getByText('Yes, Delete');
       await user.click(confirmButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Network error")).toBeInTheDocument();
+        expect(screen.getByText('Network error')).toBeInTheDocument();
       });
     });
 
-    it("updates transcript status when socket receives transcript:status event", async () => {
+    it('updates transcript status when socket receives transcript:status event', async () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Pause recording")).toBeInTheDocument();
+        expect(screen.getByLabelText('Pause recording')).toBeInTheDocument();
       });
 
       // Find the transcript:status handler
-      const statusHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === "transcript:status",
-      )?.[1];
+      const statusHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'transcript:status')?.[1];
 
       // Simulate receiving a paused status
-      statusHandler?.({ status: "paused" });
+      statusHandler?.({ status: 'paused' });
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Resume recording")).toBeInTheDocument();
+        expect(screen.getByLabelText('Resume recording')).toBeInTheDocument();
       });
     });
 
-    it("clears messages when socket receives deleted status", async () => {
+    it('clears messages when socket receives deleted status', async () => {
       render(<Transcript {...controlsProps} />);
 
       await waitFor(() => {
-        expect(screen.getByText("Hello world")).toBeInTheDocument();
+        expect(screen.getByText('Hello world')).toBeInTheDocument();
       });
 
       // Find the transcript:status handler
-      const statusHandler = mockSocket.on.mock.calls.find(
-        (call) => call[0] === "transcript:status",
-      )?.[1];
+      const statusHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'transcript:status')?.[1];
 
       // Simulate receiving a deleted status
-      statusHandler?.({ status: "deleted" });
+      statusHandler?.({ status: 'deleted' });
 
       await waitFor(() => {
-        expect(screen.queryByText("Hello world")).not.toBeInTheDocument();
+        expect(screen.queryByText('Hello world')).not.toBeInTheDocument();
       });
     });
   });
 
-  describe("hideToggle prop", () => {
-    it("hides the open/close toggle button when hideToggle is true", async () => {
+  describe('hideToggle prop', () => {
+    it('hides the open/close toggle button when hideToggle is true', async () => {
       render(<Transcript {...baseProps} hideToggle={true} />);
 
       await waitFor(() => {
-        expect(screen.queryByRole("button", { name: /transcript/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /transcript/i })).not.toBeInTheDocument();
       });
     });
 
-    it("shows the open/close toggle button when hideToggle is false (default)", async () => {
+    it('shows the open/close toggle button when hideToggle is false (default)', async () => {
       render(<Transcript {...baseProps} />);
 
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /Close transcript/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Close transcript/i })).toBeInTheDocument();
       });
     });
 
-    it("uses full width container when hideToggle is true", async () => {
+    it('uses full width container when hideToggle is true', async () => {
       const { container } = render(<Transcript {...baseProps} hideToggle={true} />);
 
       const transcriptContainer = container.firstChild as HTMLElement;
-      expect(transcriptContainer.className).toContain("h-full");
-      expect(transcriptContainer.className).toContain("w-full");
+      expect(transcriptContainer.className).toContain('h-full');
+      expect(transcriptContainer.className).toContain('w-full');
     });
   });
 
   // New tests for scroll analytics functionality
-  describe("Analytics Tracking", () => {
+  describe('Analytics Tracking', () => {
     beforeEach(() => {
       // Clear analytics tracking mocks but keep hook mocks configured
       (trackConversationEvent as jest.Mock).mockClear();
@@ -1263,12 +1164,12 @@ describe("Transcript", () => {
       mockStop.mockClear();
     });
 
-    it("starts tracking durations on initial load", async () => {
+    it('starts tracking durations on initial load', async () => {
       render(<Transcript {...baseProps} />);
 
       // Wait for messages to load
       await waitFor(() => {
-        expect(screen.getByText("Hello world")).toBeInTheDocument();
+        expect(screen.getByText('Hello world')).toBeInTheDocument();
       });
 
       // Should have called start() for both transcript open and autoscroll
@@ -1276,14 +1177,14 @@ describe("Transcript", () => {
       expect(mockStart).toHaveBeenCalledTimes(2);
     });
 
-    it("tracks transcript open and close events with duration", async () => {
+    it('tracks transcript open and close events with duration', async () => {
       const user = setupUser();
 
       render(<Transcript {...baseProps} />);
 
       // Wait for initial load
       await waitFor(() => {
-        expect(screen.getByText("Hello world")).toBeInTheDocument();
+        expect(screen.getByText('Hello world')).toBeInTheDocument();
       });
 
       // Should start open, so trackFeatureUsage for open should NOT be called on initial render
@@ -1294,64 +1195,60 @@ describe("Transcript", () => {
       mockStart.mockClear();
 
       // Close the transcript
-      const closeButton = screen.getByRole("button", {
+      const closeButton = screen.getByRole('button', {
         name: /Close transcript/i,
       });
 
       await user.click(closeButton);
 
       // Should track close with duration and stop timers
-      expect(trackFeatureUsage).toHaveBeenCalledWith(
-        "transcript",
-        "close",
-        expect.any(Number),
-      );
+      expect(trackFeatureUsage).toHaveBeenCalledWith('transcript', 'close', expect.any(Number));
       expect(mockStop).toHaveBeenCalled();
       mockStart.mockClear();
       mockStop.mockClear();
 
       // Open it again
-      const openButton = screen.getByRole("button", {
+      const openButton = screen.getByRole('button', {
         name: /Open transcript/i,
       });
       await user.click(openButton);
 
       // Should track open and restart timers (transcript open + autoscroll)
-      expect(trackFeatureUsage).toHaveBeenCalledWith("transcript", "open");
+      expect(trackFeatureUsage).toHaveBeenCalledWith('transcript', 'open');
       expect(mockStart).toHaveBeenCalledTimes(2);
     });
 
-    it("uses correct category when provided", async () => {
+    it('uses correct category when provided', async () => {
       render(<Transcript {...baseProps} category="moderator" />);
 
       // Wait for messages to load
       await waitFor(() => {
-        expect(screen.getByText("Hello world")).toBeInTheDocument();
+        expect(screen.getByText('Hello world')).toBeInTheDocument();
       });
 
       // Verify the component renders correctly with the provided category
       // The actual scroll tracking is tested separately
-      expect(screen.getByText("LIVE TRANSCRIPT")).toBeInTheDocument();
+      expect(screen.getByText('LIVE TRANSCRIPT')).toBeInTheDocument();
     });
 
-    it("uses fallback category when not provided", async () => {
+    it('uses fallback category when not provided', async () => {
       render(<Transcript {...baseProps} />);
 
       // Wait for component to render
       await waitFor(() => {
-        expect(screen.getByText("Hello world")).toBeInTheDocument();
+        expect(screen.getByText('Hello world')).toBeInTheDocument();
       });
 
       // Verify component renders without explicit category
-      expect(screen.getByText("LIVE TRANSCRIPT")).toBeInTheDocument();
+      expect(screen.getByText('LIVE TRANSCRIPT')).toBeInTheDocument();
     });
 
-    it("tracks manual scroll and return to autoscroll with duration", async () => {
+    it('tracks manual scroll and return to autoscroll with duration', async () => {
       render(<Transcript {...baseProps} category="assistant" />);
 
       // Wait for component to render
       await waitFor(() => {
-        expect(screen.getByText("Hello world")).toBeInTheDocument();
+        expect(screen.getByText('Hello world')).toBeInTheDocument();
       });
 
       // Verify that the visibility-aware duration hooks are available
@@ -1360,14 +1257,12 @@ describe("Transcript", () => {
       expect(mockGetActiveDuration).toBeDefined();
     });
 
-    it("tracks focus scroll events when focusTimeRange is set", async () => {
-      const { rerender } = render(
-        <Transcript {...baseProps} category="moderator" />,
-      );
+    it('tracks focus scroll events when focusTimeRange is set', async () => {
+      const { rerender } = render(<Transcript {...baseProps} category="moderator" />);
 
       // Wait for messages to load first
       await waitFor(() => {
-        expect(screen.getByText("Hello world")).toBeInTheDocument();
+        expect(screen.getByText('Hello world')).toBeInTheDocument();
       });
 
       // Now set focusTimeRange to trigger the focus scroll
@@ -1376,8 +1271,8 @@ describe("Transcript", () => {
           {...baseProps}
           category="moderator"
           focusTimeRange={{
-            start: new Date("2025-10-17T12:00:30Z"),
-            end: new Date("2025-10-17T12:01:30Z"),
+            start: new Date('2025-10-17T12:00:30Z'),
+            end: new Date('2025-10-17T12:01:30Z'),
           }}
         />,
       );
@@ -1386,42 +1281,38 @@ describe("Transcript", () => {
       await waitFor(
         () => {
           expect(trackConversationEvent).toHaveBeenCalledWith(
-            "conversation-1",
-            "moderator",
-            "scroll_to_focus",
-            "focus_triggered",
+            'conversation-1',
+            'moderator',
+            'scroll_to_focus',
+            'focus_triggered',
           );
         },
         { timeout: 1000 },
       );
     });
 
-    it("does not track scroll events when transcript is closed", async () => {
+    it('does not track scroll events when transcript is closed', async () => {
       const user = setupUser();
       const { container } = render(<Transcript {...baseProps} />);
 
       // Close the transcript
-      const closeButton = screen.getByRole("button", {
+      const closeButton = screen.getByRole('button', {
         name: /Close transcript/i,
       });
       await user.click(closeButton);
 
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /Open transcript/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Open transcript/i })).toBeInTheDocument();
       });
 
-      const messagesContainer = container.querySelector(
-        '[class*="overflow-y-auto"]',
-      ) as HTMLElement;
+      const messagesContainer = container.querySelector('[class*="overflow-y-auto"]') as HTMLElement;
 
       if (messagesContainer) {
         // Clear previous calls
         jest.clearAllMocks();
 
         // Try to trigger scroll event when closed
-        Object.defineProperty(messagesContainer, "scrollTop", {
+        Object.defineProperty(messagesContainer, 'scrollTop', {
           value: -10,
           writable: true,
         });
@@ -1435,18 +1326,18 @@ describe("Transcript", () => {
       }
     });
 
-    it("debounces scroll events to prevent excessive analytics calls", async () => {
+    it('debounces scroll events to prevent excessive analytics calls', async () => {
       render(<Transcript {...baseProps} />);
 
       // Wait for component to render
       await waitFor(() => {
-        expect(screen.getByText("Hello world")).toBeInTheDocument();
+        expect(screen.getByText('Hello world')).toBeInTheDocument();
       });
 
       // Verify the component has the scroll container
       // The actual debouncing behavior is implemented and tested via the 150ms timeout
       // Testing DOM scroll simulation in jsdom is unreliable, so we verify structure instead
-      expect(screen.getByText("LIVE TRANSCRIPT")).toBeInTheDocument();
+      expect(screen.getByText('LIVE TRANSCRIPT')).toBeInTheDocument();
     });
   });
 });

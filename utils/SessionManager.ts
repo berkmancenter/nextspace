@@ -1,12 +1,7 @@
-import { Api } from "./Helpers";
-import TokenManagerDefault from "./TokenManager";
+import { Api } from './Helpers';
+import TokenManagerDefault from './TokenManager';
 
-type SessionState =
-  | "uninitialized"
-  | "initializing"
-  | "guest"
-  | "authenticated"
-  | "cleared";
+type SessionState = 'uninitialized' | 'initializing' | 'guest' | 'authenticated' | 'cleared';
 
 type SessionInfo = {
   userId: string;
@@ -15,7 +10,7 @@ type SessionInfo = {
 
 class SessionManager {
   private static _instance: SessionManager;
-  private sessionState: SessionState = "uninitialized";
+  private sessionState: SessionState = 'uninitialized';
   private initializationPromise: Promise<SessionInfo | null> | null = null;
   private currentSession: SessionInfo | null = null;
 
@@ -38,19 +33,17 @@ class SessionManager {
    * @param options.skipCreation - If true, don't create a new guest session if none exists
    * @returns SessionInfo if session exists, null otherwise
    */
-  async restoreSession(options?: {
-    skipCreation?: boolean;
-  }): Promise<SessionInfo | null> {
+  async restoreSession(options?: { skipCreation?: boolean }): Promise<SessionInfo | null> {
     // Prevent multiple simultaneous initialization attempts
     if (this.initializationPromise) {
       return await this.initializationPromise;
     }
 
-    if (this.sessionState !== "uninitialized") {
+    if (this.sessionState !== 'uninitialized') {
       return this.currentSession; // Already initialized
     }
 
-    this.sessionState = "initializing";
+    this.sessionState = 'initializing';
     this.initializationPromise = this._restoreSession(options?.skipCreation);
 
     try {
@@ -61,29 +54,19 @@ class SessionManager {
     }
   }
 
-  private async _restoreSession(
-    skipCreation?: boolean,
-  ): Promise<SessionInfo | null> {
+  private async _restoreSession(skipCreation?: boolean): Promise<SessionInfo | null> {
     try {
-      const response = await fetch("/api/cookie");
+      const response = await fetch('/api/cookie');
       const data = await response.json();
 
       if (response.status === 200 && data.tokens) {
         // Valid session cookie exists — restore tokens with expiry info so
         // TokenManager can schedule the proactive refresh correctly.
-        Api.get().SetTokens(
-          data.tokens.access,
-          data.tokens.refresh,
-          data.tokens.accessExpires,
-          data.tokens.refreshExpires
-        );
+        Api.get().SetTokens(data.tokens.access, data.tokens.refresh, data.tokens.accessExpires, data.tokens.refreshExpires);
 
         // Determine if this is a guest or authenticated user using the
         // authType field stored in the cookie (set when the session was created).
-        this.sessionState =
-          data.authType && data.authType !== "guest"
-            ? "authenticated"
-            : "guest";
+        this.sessionState = data.authType && data.authType !== 'guest' ? 'authenticated' : 'guest';
 
         this.currentSession = {
           userId: data.userId,
@@ -94,17 +77,17 @@ class SessionManager {
         return this.currentSession;
       } else if (data.requiresNewSession) {
         // Cookie was invalid/malformed and has been cleared by the API
-        console.warn("Invalid cookie detected and cleared:", data.error, data.reason);
+        console.warn('Invalid cookie detected and cleared:', data.error, data.reason);
         Api.get().ClearTokens();
       }
     } catch (error) {
-      console.error("Failed to restore session:", error);
+      console.error('Failed to restore session:', error);
     }
 
     // No existing session - create a new guest session only if allowed
     if (skipCreation) {
-      console.log("Skipping guest session creation (blocklisted page)");
-      this.sessionState = "cleared";
+      console.log('Skipping guest session creation (blocklisted page)');
+      this.sessionState = 'cleared';
       return null;
     }
 
@@ -116,25 +99,22 @@ class SessionManager {
    */
   private async _createGuestSession(): Promise<SessionInfo> {
     try {
-      console.log("Creating new guest session...");
+      console.log('Creating new guest session...');
 
       // Get new pseudonym from API
-      const pseudonymResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/newPseudonym`,
-      ).then((res) => res.json());
+      const pseudonymResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/newPseudonym`).then((res) =>
+        res.json(),
+      );
 
       // Register as guest
-      const registerResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/register`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            token: pseudonymResponse.token,
-            pseudonym: pseudonymResponse.pseudonym,
-          }),
-        },
-      ).then((res) => res.json());
+      const registerResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: pseudonymResponse.token,
+          pseudonym: pseudonymResponse.pseudonym,
+        }),
+      }).then((res) => res.json());
 
       // Set tokens in memory (with expiry so TokenManager can schedule refresh)
       Api.get().SetTokens(
@@ -146,9 +126,9 @@ class SessionManager {
 
       // Set encrypted cookie via API route, including expiry timestamps so
       // the client can schedule proactive refresh correctly.
-      await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      await fetch('/api/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username: pseudonymResponse.pseudonym,
           userId: registerResponse.user.id,
@@ -156,22 +136,22 @@ class SessionManager {
           refreshToken: registerResponse.tokens.refresh.token,
           accessExpires: registerResponse.tokens.access.expires,
           refreshExpires: registerResponse.tokens.refresh.expires,
-          authType: "guest",
+          authType: 'guest',
           expirationFromNow: 60 * 60 * 24 * 30, // 30 days like Vue app
         }),
       });
 
-      this.sessionState = "guest";
+      this.sessionState = 'guest';
       this.currentSession = {
         userId: registerResponse.user.id,
         username: pseudonymResponse.pseudonym,
       };
 
-      console.log("Guest session created:", pseudonymResponse.pseudonym);
+      console.log('Guest session created:', pseudonymResponse.pseudonym);
       return this.currentSession;
     } catch (error) {
-      console.error("Failed to create guest session:", error);
-      this.sessionState = "cleared";
+      console.error('Failed to create guest session:', error);
+      this.sessionState = 'cleared';
       throw error;
     }
   }
@@ -187,9 +167,7 @@ class SessionManager {
    * Check if a session exists (either guest or authenticated)
    */
   hasSession(): boolean {
-    return (
-      this.sessionState === "guest" || this.sessionState === "authenticated"
-    );
+    return this.sessionState === 'guest' || this.sessionState === 'authenticated';
   }
 
   /**
@@ -198,7 +176,7 @@ class SessionManager {
    * @param userId - The authenticated user's ID
    */
   markAuthenticated(username?: string, userId?: string): void {
-    this.sessionState = "authenticated";
+    this.sessionState = 'authenticated';
 
     // Update session info if provided
     if (username !== undefined && userId !== undefined) {
@@ -213,14 +191,14 @@ class SessionManager {
    * Mark session as guest (called after guest registration)
    */
   markGuest(): void {
-    this.sessionState = "guest";
+    this.sessionState = 'guest';
   }
 
   /**
    * Clear session state (called on logout)
    */
   clearSession(): void {
-    this.sessionState = "cleared";
+    this.sessionState = 'cleared';
     this.currentSession = null;
     // ClearTokens() delegates to TokenManager which also cancels the
     // proactive refresh timer and clears the BroadcastChannel state.

@@ -1,24 +1,19 @@
-import { JWTDecryptResult } from "jose";
+import { JWTDecryptResult } from 'jose';
 
 /**
  * Current cookie version - increment this when cookie structure changes
  */
-export const CURRENT_COOKIE_VERSION = "1";
+export const CURRENT_COOKIE_VERSION = '1';
 
 /**
  * Required fields that must be present in a valid cookie payload
  */
-const REQUIRED_COOKIE_FIELDS = [
-  "access",
-  "refresh",
-  "userId",
-  "authType",
-] as const;
+const REQUIRED_COOKIE_FIELDS = ['access', 'refresh', 'userId', 'authType'] as const;
 
 /**
  * Valid authType values
  */
-const VALID_AUTH_TYPES = ["guest", "user", "admin"] as const;
+const VALID_AUTH_TYPES = ['guest', 'user', 'admin'] as const;
 
 /**
  * Interface for cookie payload validation
@@ -39,23 +34,21 @@ export interface CookiePayload {
  * @param cookie - The decrypted JWT cookie result
  * @returns Object with isValid boolean and optional error message
  */
-export function validateCookie(
-  cookie: JWTDecryptResult | null
-): { isValid: boolean; error?: string } {
+export function validateCookie(cookie: JWTDecryptResult | null): { isValid: boolean; error?: string } {
   // Cookie is null or undefined
   if (!cookie) {
-    return { isValid: false, error: "Cookie is null or undefined" };
+    return { isValid: false, error: 'Cookie is null or undefined' };
   }
 
   // Check if payload exists
   if (!cookie.payload) {
-    return { isValid: false, error: "Cookie payload is missing" };
+    return { isValid: false, error: 'Cookie payload is missing' };
   }
 
   const payload = cookie.payload as unknown as CookiePayload;
 
   // Check cookie version
-  const cookieVersion = payload.version || "0"; // Treat missing version as version 0 (legacy)
+  const cookieVersion = payload.version || '0'; // Treat missing version as version 0 (legacy)
   if (cookieVersion !== CURRENT_COOKIE_VERSION) {
     return {
       isValid: false,
@@ -73,7 +66,7 @@ export function validateCookie(
     }
 
     // Additional type checking for string fields
-    if (typeof payload[field] !== "string") {
+    if (typeof payload[field] !== 'string') {
       return {
         isValid: false,
         error: `Field '${field}' must be a string`,
@@ -85,23 +78,23 @@ export function validateCookie(
   if (!VALID_AUTH_TYPES.includes(payload.authType as any)) {
     return {
       isValid: false,
-      error: `Invalid authType: '${payload.authType}'. Must be one of: ${VALID_AUTH_TYPES.join(", ")}`,
+      error: `Invalid authType: '${payload.authType}'. Must be one of: ${VALID_AUTH_TYPES.join(', ')}`,
     };
   }
 
   // Validate token format (should be non-empty strings)
-  if (payload.access.trim() === "" || payload.refresh.trim() === "") {
+  if (payload.access.trim() === '' || payload.refresh.trim() === '') {
     return {
       isValid: false,
-      error: "Access or refresh token is empty",
+      error: 'Access or refresh token is empty',
     };
   }
 
   // Validate userId format (should be non-empty string)
-  if (payload.userId.trim() === "") {
+  if (payload.userId.trim() === '') {
     return {
       isValid: false,
-      error: "UserId is empty",
+      error: 'UserId is empty',
     };
   }
 
@@ -111,7 +104,7 @@ export function validateCookie(
     if (payload.exp < currentTime) {
       return {
         isValid: false,
-        error: "Cookie has expired",
+        error: 'Cookie has expired',
       };
     }
   }

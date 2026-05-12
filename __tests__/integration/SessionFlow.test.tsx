@@ -3,34 +3,34 @@
  * Tests the scenarios documented in IMPLEMENTATION_IMPROVEMENTS.md
  */
 
-import { render, waitFor, act } from "@testing-library/react";
-import { useRouter } from "next/router";
-import SessionManager from "../../utils/SessionManager";
-import { Api } from "../../utils/Helpers";
+import { render, waitFor, act } from '@testing-library/react';
+import { useRouter } from 'next/router';
+import SessionManager from '../../utils/SessionManager';
+import { Api } from '../../utils/Helpers';
 
 // Mock Next.js router
 const mockPush = jest.fn();
 const mockRouter = {
   push: mockPush,
-  pathname: "/assistant",
+  pathname: '/assistant',
   query: {},
   isReady: true,
 };
 
-jest.mock("next/router", () => ({
+jest.mock('next/router', () => ({
   useRouter: () => mockRouter,
 }));
 
 // Mock SessionManager
-jest.mock("../../utils/SessionManager");
+jest.mock('../../utils/SessionManager');
 
 // Mock Api
-jest.mock("../../utils/Helpers", () => ({
+jest.mock('../../utils/Helpers', () => ({
   Api: {
     get: jest.fn(() => ({
       SetTokens: jest.fn(),
-      GetTokens: jest.fn(() => ({ access: "mock-token", refresh: "refresh" })),
-      getAccessToken: jest.fn(() => "mock-token"),
+      GetTokens: jest.fn(() => ({ access: 'mock-token', refresh: 'refresh' })),
+      getAccessToken: jest.fn(() => 'mock-token'),
       ClearTokens: jest.fn(),
     })),
   },
@@ -38,13 +38,13 @@ jest.mock("../../utils/Helpers", () => ({
 
 // Mock TokenManager — the real integration concern is that SetTokens →
 // TokenManager stores expiry so proactive refresh can be scheduled.
-jest.mock("../../utils/TokenManager", () => ({
+jest.mock('../../utils/TokenManager', () => ({
   __esModule: true,
   default: {
     setTokens: jest.fn(),
     setTokensFromStrings: jest.fn(),
-    getTokens: jest.fn(() => ({ access: "mock-token", refresh: "refresh" })),
-    getAccessToken: jest.fn(() => "mock-token"),
+    getTokens: jest.fn(() => ({ access: 'mock-token', refresh: 'refresh' })),
+    getAccessToken: jest.fn(() => 'mock-token'),
     getFullTokens: jest.fn(() => null),
     isAccessTokenFresh: jest.fn(() => true),
     clearTokens: jest.fn(),
@@ -53,32 +53,31 @@ jest.mock("../../utils/TokenManager", () => ({
   },
   TokenManager: { get: jest.fn() },
 }));
-import TokenManagerDefault from "../../utils/TokenManager";
+import TokenManagerDefault from '../../utils/TokenManager';
 
 // Mock fetch
 global.fetch = jest.fn();
 
-describe("Session Management Integration Tests", () => {
+describe('Session Management Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (global.fetch as jest.Mock).mockClear();
     mockPush.mockReset();
   });
 
-  describe("Test Scenario 1: New visitor → visits home page", () => {
-    it("should NOT create session on blocklisted page", async () => {
-      mockRouter.pathname = "/";
+  describe('Test Scenario 1: New visitor → visits home page', () => {
+    it('should NOT create session on blocklisted page', async () => {
+      mockRouter.pathname = '/';
 
       const mockSessionManager = {
         restoreSession: jest.fn(),
-        getState: jest.fn().mockReturnValue("ready"),
+        getState: jest.fn().mockReturnValue('ready'),
       };
 
       (SessionManager.get as jest.Mock).mockReturnValue(mockSessionManager);
 
       // Simulate _app.tsx logic
-      const shouldSkipSession = (pathname: string) =>
-        ["/", "/_error", "/404", "/login", "/signup"].includes(pathname);
+      const shouldSkipSession = (pathname: string) => ['/', '/_error', '/404', '/login', '/signup'].includes(pathname);
 
       if (shouldSkipSession(mockRouter.pathname)) {
         // Session initialization should be skipped
@@ -91,36 +90,35 @@ describe("Session Management Integration Tests", () => {
     });
   });
 
-  describe("Test Scenario 2: Visitor navigates home → assistant", () => {
-    it("should create guest session when reaching interactive page", async () => {
+  describe('Test Scenario 2: Visitor navigates home → assistant', () => {
+    it('should create guest session when reaching interactive page', async () => {
       const mockSessionManager = {
         restoreSession: jest.fn().mockResolvedValue(true),
-        getState: jest.fn().mockReturnValue("guest"),
+        getState: jest.fn().mockReturnValue('guest'),
         hasSession: jest.fn().mockReturnValue(true),
       };
 
       (SessionManager.get as jest.Mock).mockReturnValue(mockSessionManager);
 
       // User navigates to assistant page
-      mockRouter.pathname = "/assistant";
+      mockRouter.pathname = '/assistant';
 
-      const shouldSkipSession = (pathname: string) =>
-        ["/", "/_error", "/404", "/login", "/signup"].includes(pathname);
+      const shouldSkipSession = (pathname: string) => ['/', '/_error', '/404', '/login', '/signup'].includes(pathname);
 
       if (!shouldSkipSession(mockRouter.pathname)) {
         await mockSessionManager.restoreSession();
       }
 
       expect(mockSessionManager.restoreSession).toHaveBeenCalled();
-      expect(mockSessionManager.getState()).toBe("guest");
+      expect(mockSessionManager.getState()).toBe('guest');
     });
   });
 
-  describe("Test Scenario 3: New visitor → joins assistant directly", () => {
-    it("should create guest session on direct navigation", async () => {
+  describe('Test Scenario 3: New visitor → joins assistant directly', () => {
+    it('should create guest session on direct navigation', async () => {
       const mockSessionManager = {
         restoreSession: jest.fn().mockResolvedValue(true),
-        getState: jest.fn().mockReturnValue("guest"),
+        getState: jest.fn().mockReturnValue('guest'),
         hasSession: jest.fn().mockReturnValue(true),
       };
 
@@ -129,37 +127,37 @@ describe("Session Management Integration Tests", () => {
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce({
           status: 401,
-          json: async () => ({ error: "No session" }),
+          json: async () => ({ error: 'No session' }),
         })
         .mockResolvedValueOnce({
-          json: async () => ({ token: "new-token", pseudonym: "Guest123" }),
+          json: async () => ({ token: 'new-token', pseudonym: 'Guest123' }),
         })
         .mockResolvedValueOnce({
           json: async () => ({
             tokens: {
-              access: { token: "access-token" },
-              refresh: { token: "refresh-token" },
+              access: { token: 'access-token' },
+              refresh: { token: 'refresh-token' },
             },
-            user: { id: "user-456" },
+            user: { id: 'user-456' },
           }),
         })
         .mockResolvedValueOnce({
           status: 200,
-          json: async () => ({ message: "Session created" }),
+          json: async () => ({ message: 'Session created' }),
         });
 
       await mockSessionManager.restoreSession();
 
-      expect(mockSessionManager.getState()).toBe("guest");
+      expect(mockSessionManager.getState()).toBe('guest');
       expect(mockSessionManager.restoreSession).toHaveBeenCalled();
     });
   });
 
-  describe("Test Scenario 4: Guest refreshes page", () => {
-    it("should restore session from cookie without creating new account", async () => {
+  describe('Test Scenario 4: Guest refreshes page', () => {
+    it('should restore session from cookie without creating new account', async () => {
       const mockSessionManager = {
         restoreSession: jest.fn().mockResolvedValue(true),
-        getState: jest.fn().mockReturnValue("guest"),
+        getState: jest.fn().mockReturnValue('guest'),
         hasSession: jest.fn().mockReturnValue(true),
       };
 
@@ -168,37 +166,37 @@ describe("Session Management Integration Tests", () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         status: 200,
         json: async () => ({
-          tokens: { access: "existing-access", refresh: "existing-refresh" },
-          userId: "guest-789",
-          username: "Guest789",
+          tokens: { access: 'existing-access', refresh: 'existing-refresh' },
+          userId: 'guest-789',
+          username: 'Guest789',
         }),
       });
 
       await mockSessionManager.restoreSession();
 
-      expect(mockSessionManager.getState()).toBe("guest");
+      expect(mockSessionManager.getState()).toBe('guest');
       expect(mockSessionManager.hasSession()).toBe(true);
     });
   });
 
-  describe("Test Scenario 5: Guest navigates quickly between pages", () => {
-    it("should use same session without duplicates", async () => {
+  describe('Test Scenario 5: Guest navigates quickly between pages', () => {
+    it('should use same session without duplicates', async () => {
       const mockSessionManager = {
         restoreSession: jest.fn().mockResolvedValue(true),
-        getState: jest.fn().mockReturnValue("guest"),
+        getState: jest.fn().mockReturnValue('guest'),
         hasSession: jest.fn().mockReturnValue(true),
       };
 
       (SessionManager.get as jest.Mock).mockReturnValue(mockSessionManager);
 
       // Simulate rapid navigation
-      mockRouter.pathname = "/assistant";
+      mockRouter.pathname = '/assistant';
       await mockSessionManager.restoreSession();
 
-      mockRouter.pathname = "/backchannel";
+      mockRouter.pathname = '/backchannel';
       await mockSessionManager.restoreSession();
 
-      mockRouter.pathname = "/moderator";
+      mockRouter.pathname = '/moderator';
       await mockSessionManager.restoreSession();
 
       // restoreSession should return immediately after first call
@@ -207,39 +205,36 @@ describe("Session Management Integration Tests", () => {
     });
   });
 
-  describe("Test Scenario 6: Guest navigates to home page", () => {
-    it("should maintain session but not create new one", async () => {
+  describe('Test Scenario 6: Guest navigates to home page', () => {
+    it('should maintain session but not create new one', async () => {
       const mockSessionManager = {
         restoreSession: jest.fn().mockResolvedValue(true),
-        getState: jest.fn().mockReturnValue("guest"),
+        getState: jest.fn().mockReturnValue('guest'),
         hasSession: jest.fn().mockReturnValue(true),
       };
 
       (SessionManager.get as jest.Mock).mockReturnValue(mockSessionManager);
 
       // Start on interactive page
-      mockRouter.pathname = "/assistant";
+      mockRouter.pathname = '/assistant';
       await mockSessionManager.restoreSession();
 
-      const initialCallCount =
-        mockSessionManager.restoreSession.mock.calls.length;
+      const initialCallCount = mockSessionManager.restoreSession.mock.calls.length;
 
       // Navigate to home
-      mockRouter.pathname = "/";
+      mockRouter.pathname = '/';
       // Home page should skip session initialization
 
-      expect(mockSessionManager.restoreSession).toHaveBeenCalledTimes(
-        initialCallCount,
-      );
+      expect(mockSessionManager.restoreSession).toHaveBeenCalledTimes(initialCallCount);
       expect(mockSessionManager.hasSession()).toBe(true);
     });
   });
 
-  describe("Test Scenario 7: Guest closes browser, returns next day", () => {
-    it("should restore guest session if within expiration", async () => {
+  describe('Test Scenario 7: Guest closes browser, returns next day', () => {
+    it('should restore guest session if within expiration', async () => {
       const mockSessionManager = {
         restoreSession: jest.fn().mockResolvedValue(true),
-        getState: jest.fn().mockReturnValue("guest"),
+        getState: jest.fn().mockReturnValue('guest'),
         hasSession: jest.fn().mockReturnValue(true),
       };
 
@@ -247,16 +242,16 @@ describe("Session Management Integration Tests", () => {
 
       await mockSessionManager.restoreSession();
 
-      expect(mockSessionManager.getState()).toBe("guest");
+      expect(mockSessionManager.getState()).toBe('guest');
       expect(mockSessionManager.hasSession()).toBe(true);
     });
   });
 
-  describe("Test Scenario 8: Guest logs in", () => {
-    it("should convert to authenticated user and maintain session", async () => {
+  describe('Test Scenario 8: Guest logs in', () => {
+    it('should convert to authenticated user and maintain session', async () => {
       const mockSessionManager = {
         restoreSession: jest.fn().mockResolvedValue(true),
-        getState: jest.fn().mockReturnValue("guest"),
+        getState: jest.fn().mockReturnValue('guest'),
         markAuthenticated: jest.fn(),
         hasSession: jest.fn().mockReturnValue(true),
       };
@@ -265,22 +260,22 @@ describe("Session Management Integration Tests", () => {
 
       // Start as guest
       await mockSessionManager.restoreSession();
-      expect(mockSessionManager.getState()).toBe("guest");
+      expect(mockSessionManager.getState()).toBe('guest');
 
       // User logs in
       mockSessionManager.markAuthenticated();
-      mockSessionManager.getState.mockReturnValue("authenticated");
+      mockSessionManager.getState.mockReturnValue('authenticated');
 
       expect(mockSessionManager.markAuthenticated).toHaveBeenCalled();
-      expect(mockSessionManager.getState()).toBe("authenticated");
+      expect(mockSessionManager.getState()).toBe('authenticated');
     });
   });
 
-  describe("Test Scenario 9: Authenticated user refreshes", () => {
-    it("should restore authenticated session", async () => {
+  describe('Test Scenario 9: Authenticated user refreshes', () => {
+    it('should restore authenticated session', async () => {
       const mockSessionManager = {
         restoreSession: jest.fn().mockResolvedValue(true),
-        getState: jest.fn().mockReturnValue("authenticated"),
+        getState: jest.fn().mockReturnValue('authenticated'),
         hasSession: jest.fn().mockReturnValue(true),
       };
 
@@ -288,27 +283,27 @@ describe("Session Management Integration Tests", () => {
 
       await mockSessionManager.restoreSession();
 
-      expect(mockSessionManager.getState()).toBe("authenticated");
+      expect(mockSessionManager.getState()).toBe('authenticated');
       expect(mockSessionManager.hasSession()).toBe(true);
     });
   });
 
-  describe("Test Scenario 10: User logs out", () => {
-    it("should clear session and redirect", async () => {
+  describe('Test Scenario 10: User logs out', () => {
+    it('should clear session and redirect', async () => {
       const mockSessionManager = {
         clearSession: jest.fn(),
-        getState: jest.fn().mockReturnValue("ready"),
+        getState: jest.fn().mockReturnValue('ready'),
       };
 
       (SessionManager.get as jest.Mock).mockReturnValue(mockSessionManager);
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ message: "Logged out" }),
+        json: async () => ({ message: 'Logged out' }),
       });
 
       // Simulate logout
-      await fetch("/api/logout", { method: "POST" });
+      await fetch('/api/logout', { method: 'POST' });
       mockSessionManager.clearSession();
 
       expect(mockSessionManager.clearSession).toHaveBeenCalled();
@@ -317,25 +312,20 @@ describe("Session Management Integration Tests", () => {
     });
   });
 
-  describe("Test Scenario 11: Admin login → participant page token continuity", () => {
-    it("stores tokens with expiry in TokenManager after admin login so participant pages can use them", async () => {
+  describe('Test Scenario 11: Admin login → participant page token continuity', () => {
+    it('stores tokens with expiry in TokenManager after admin login so participant pages can use them', async () => {
       // Simulate what login.tsx does after a successful admin login:
       // it calls Api.get().SetTokens(...) with all 4 args including expiry.
       const mockApiInstance = (Api.get as jest.Mock)();
-      const accessToken = "admin-access-token";
-      const refreshToken = "admin-refresh-token";
+      const accessToken = 'admin-access-token';
+      const refreshToken = 'admin-refresh-token';
       const accessExpires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
       const refreshExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
       mockApiInstance.SetTokens(accessToken, refreshToken, accessExpires, refreshExpires);
 
       // Verify SetTokens was called with all 4 args (expiry included)
-      expect(mockApiInstance.SetTokens).toHaveBeenCalledWith(
-        accessToken,
-        refreshToken,
-        accessExpires,
-        refreshExpires
-      );
+      expect(mockApiInstance.SetTokens).toHaveBeenCalledWith(accessToken, refreshToken, accessExpires, refreshExpires);
 
       // Simulate navigation to participant/assistant page:
       // the page calls Api.get().GetTokens() to get the current token.
@@ -349,38 +339,38 @@ describe("Session Management Integration Tests", () => {
       expect(tokens.refresh).toBe(refreshToken);
     });
 
-    it("does not lose tokens when navigating from admin page to assistant page", async () => {
+    it('does not lose tokens when navigating from admin page to assistant page', async () => {
       const mockSessionManager = {
         restoreSession: jest.fn().mockResolvedValue({
-          userId: "admin-user",
-          username: "adminuser",
+          userId: 'admin-user',
+          username: 'adminuser',
         }),
-        getState: jest.fn().mockReturnValue("authenticated"),
+        getState: jest.fn().mockReturnValue('authenticated'),
         hasSession: jest.fn().mockReturnValue(true),
         getSessionInfo: jest.fn().mockReturnValue({
-          userId: "admin-user",
-          username: "adminuser",
+          userId: 'admin-user',
+          username: 'adminuser',
         }),
       };
 
       (SessionManager.get as jest.Mock).mockReturnValue(mockSessionManager);
 
       // Admin page: session is restored
-      mockRouter.pathname = "/admin/events";
+      mockRouter.pathname = '/admin/events';
       await mockSessionManager.restoreSession();
-      expect(mockSessionManager.getState()).toBe("authenticated");
+      expect(mockSessionManager.getState()).toBe('authenticated');
 
       // Navigate to assistant page: session should still exist
-      mockRouter.pathname = "/assistant";
+      mockRouter.pathname = '/assistant';
       const session = mockSessionManager.getSessionInfo();
       expect(session).not.toBeNull();
-      expect(session?.userId).toBe("admin-user");
+      expect(session?.userId).toBe('admin-user');
       expect(mockSessionManager.hasSession()).toBe(true);
     });
   });
 
-  describe("Race Condition Prevention", () => {
-    it("prevents duplicate session creation during rapid page navigation", async () => {
+  describe('Race Condition Prevention', () => {
+    it('prevents duplicate session creation during rapid page navigation', async () => {
       const initializationDelay = 100;
       let initializationCount = 0;
 
@@ -392,7 +382,7 @@ describe("Session Management Integration Tests", () => {
               setTimeout(() => resolve(true), initializationDelay);
             }),
         ),
-        getState: jest.fn().mockReturnValue("initializing"),
+        getState: jest.fn().mockReturnValue('initializing'),
       };
 
       (SessionManager.get as jest.Mock).mockReturnValue(mockSessionManager);

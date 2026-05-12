@@ -1,4 +1,4 @@
-import { WhatsNewEntry } from "../types.internal";
+import { WhatsNewEntry } from '../types.internal';
 
 /**
  * User-facing "What's New" entries shown in the Quick Guide panel.
@@ -20,14 +20,14 @@ import { WhatsNewEntry } from "../types.internal";
  */
 export const whatsNewEntries: WhatsNewEntry[] = [
   {
-    title: "Quick Guide",
-    body: "You found the new guide! This is a quick guide to all the Nextspace features and recent updates.",
-    releasedAt: "2026-04-27",
+    title: 'Quick Guide',
+    body: 'You found the new guide! This is a quick guide to all the Nextspace features and recent updates.',
+    releasedAt: '2026-04-27',
   },
   {
-    title: "Resources Tab",
-    body: "Find reading recommendations and other resources surfaced during the event in the new Resources tab.",
-    releasedAt: "2026-04-27",
+    title: 'Resources Tab',
+    body: 'Find reading recommendations and other resources surfaced during the event in the new Resources tab.',
+    releasedAt: '2026-04-27',
   },
 ];
 
@@ -38,10 +38,7 @@ export const whatsNewEntries: WhatsNewEntry[] = [
  * Comparison is purely date-based (no time component) using UTC calendar days,
  * so developers can enter any YYYY-MM-DD date without worrying about timezones.
  */
-export function getRecentEntries(
-  windowDays = 14,
-  entries = whatsNewEntries,
-): WhatsNewEntry[] {
+export function getRecentEntries(windowDays = 14, entries = whatsNewEntries): WhatsNewEntry[] {
   // Use Date.now() explicitly so tests can mock it; new Date() reads the real clock.
   const todayStr = new Date(Date.now()).toISOString().slice(0, 10); // today in UTC, YYYY-MM-DD
 
@@ -53,8 +50,6 @@ export function getRecentEntries(
   // YYYY-MM-DD strings sort lexicographically in chronological order,
   // so string comparison is equivalent to date comparison here.
   return entries
-    .filter(
-      (entry) => entry.releasedAt <= todayStr && entry.releasedAt >= cutoffStr,
-    )
+    .filter((entry) => entry.releasedAt <= todayStr && entry.releasedAt >= cutoffStr)
     .sort((a, b) => b.releasedAt.localeCompare(a.releasedAt));
 }

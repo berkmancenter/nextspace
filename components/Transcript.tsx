@@ -1,19 +1,11 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Pause,
-  PlayArrow,
-  Delete,
-  ReportProblem,
-  Download,
-} from "@mui/icons-material";
-import { Dialog, Button } from "@mui/material";
-import { Socket } from "socket.io-client";
-import { PseudonymousMessage } from "../types.internal";
-import { Api, RetrieveData, SendData } from "../utils";
-import { trackFeatureUsage, trackConversationEvent } from "../utils/analytics";
-import { useVisibilityAwareDuration } from "../hooks/useVisibilityAwareDuration";
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, Pause, PlayArrow, Delete, ReportProblem, Download } from '@mui/icons-material';
+import { Dialog, Button } from '@mui/material';
+import { Socket } from 'socket.io-client';
+import { PseudonymousMessage } from '../types.internal';
+import { Api, RetrieveData, SendData } from '../utils';
+import { trackFeatureUsage, trackConversationEvent } from '../utils/analytics';
+import { useVisibilityAwareDuration } from '../hooks/useVisibilityAwareDuration';
 
 /**
  * Transcript component - Sidebar style
@@ -42,13 +34,11 @@ export function Transcript(props: {
   const [isOpen, setIsOpen] = useState<boolean>(true);
   const [focusedMessageIds, setFocusedMessageIds] = useState<string[]>([]);
   const [isAtBottom, setIsAtBottom] = useState<boolean>(true);
-  const [isInManualScrollMode, setIsInManualScrollMode] =
-    useState<boolean>(false);
+  const [isInManualScrollMode, setIsInManualScrollMode] = useState<boolean>(false);
   const [transcriptActive, setTranscriptActive] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
-  const [showPauseResumeConfirm, setShowPauseResumeConfirm] =
-    useState<boolean>(false);
+  const [showPauseResumeConfirm, setShowPauseResumeConfirm] = useState<boolean>(false);
   const topRef = useRef<HTMLDivElement | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const preserveScrollRef = useRef<{
@@ -67,7 +57,7 @@ export function Transcript(props: {
     if (newOpenState) {
       // Opening transcript - start tracking duration
       transcriptOpenDuration.start();
-      trackFeatureUsage("transcript", "open");
+      trackFeatureUsage('transcript', 'open');
 
       // Start autoscroll duration (transcript always opens at bottom)
       if (!isInManualScrollMode) {
@@ -76,7 +66,7 @@ export function Transcript(props: {
     } else {
       // Closing transcript - stop tracking and get active duration
       const activeDuration = transcriptOpenDuration.stop();
-      trackFeatureUsage("transcript", "close", activeDuration);
+      trackFeatureUsage('transcript', 'close', activeDuration);
 
       // Stop any active scroll duration tracking
       if (isInManualScrollMode) {
@@ -88,10 +78,7 @@ export function Transcript(props: {
     setIsOpen(newOpenState);
   };
 
-  const applyFocusAndScroll = (
-    messagesToFilter: PseudonymousMessage[],
-    shouldScroll: boolean = false,
-  ) => {
+  const applyFocusAndScroll = (messagesToFilter: PseudonymousMessage[], shouldScroll: boolean = false) => {
     if (!props.focusTimeRange || messagesToFilter.length === 0) {
       setFocusedMessageIds([]);
       return;
@@ -100,10 +87,7 @@ export function Transcript(props: {
     const messagesInRange = messagesToFilter.filter((message) => {
       if (!message.createdAt) return false;
       const messageTime = new Date(message.createdAt).getTime();
-      return (
-        messageTime >= props.focusTimeRange!.start.getTime() &&
-        messageTime <= props.focusTimeRange!.end.getTime()
-      );
+      return messageTime >= props.focusTimeRange!.start.getTime() && messageTime <= props.focusTimeRange!.end.getTime();
     });
 
     if (messagesInRange.length > 0) {
@@ -113,13 +97,11 @@ export function Transcript(props: {
       if (shouldScroll) {
         const earliestMessage = messagesInRange[messagesInRange.length - 1];
         setTimeout(() => {
-          document
-            .getElementById(`transcript-message-${earliestMessage.id}`)
-            ?.scrollIntoView({
-              behavior: "smooth",
-              block: "nearest",
-              inline: "start",
-            });
+          document.getElementById(`transcript-message-${earliestMessage.id}`)?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'start',
+          });
         }, 500);
       }
     } else {
@@ -129,8 +111,8 @@ export function Transcript(props: {
 
   const scrollToBottom = () => {
     topRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
+      behavior: 'smooth',
+      block: 'start',
     });
   };
 
@@ -141,7 +123,7 @@ export function Transcript(props: {
 
   // Helper function to get category with fallback
   const getCategory = (): string => {
-    return props.category || "transcript";
+    return props.category || 'transcript';
   };
 
   // Track manual scroll session start
@@ -150,60 +132,31 @@ export function Transcript(props: {
       // Stop autoscroll duration tracking
       const autoScrollTime = autoScrollDuration.stop();
       if (autoScrollTime > 0) {
-        trackConversationEvent(
-          props.conversationId,
-          getCategory(),
-          "scroll_auto_end",
-          "user_initiated",
-          autoScrollTime,
-        );
+        trackConversationEvent(props.conversationId, getCategory(), 'scroll_auto_end', 'user_initiated', autoScrollTime);
       }
 
       setIsInManualScrollMode(true);
       manualScrollDuration.start();
-      trackConversationEvent(
-        props.conversationId,
-        getCategory(),
-        "scroll_manual",
-        "user_initiated",
-      );
+      trackConversationEvent(props.conversationId, getCategory(), 'scroll_manual', 'user_initiated');
     }
-  }, [
-    isInManualScrollMode,
-    props.conversationId,
-    manualScrollDuration,
-    autoScrollDuration,
-  ]);
+  }, [isInManualScrollMode, props.conversationId, manualScrollDuration, autoScrollDuration]);
 
   // Track return to autoscroll
   const trackReturnToAutoScroll = useCallback(() => {
     if (isInManualScrollMode) {
       const activeDuration = manualScrollDuration.stop();
       setIsInManualScrollMode(false);
-      trackConversationEvent(
-        props.conversationId,
-        getCategory(),
-        "scroll_return_auto",
-        "user_initiated",
-        activeDuration,
-      );
+      trackConversationEvent(props.conversationId, getCategory(), 'scroll_return_auto', 'user_initiated', activeDuration);
 
       // Start autoscroll duration tracking
       autoScrollDuration.start();
     }
-  }, [
-    isInManualScrollMode,
-    props.conversationId,
-    manualScrollDuration,
-    autoScrollDuration,
-  ]);
+  }, [isInManualScrollMode, props.conversationId, manualScrollDuration, autoScrollDuration]);
 
   // Recording indicator component
-  const RecordingIndicator = ({ size = "w-3 h-3" }: { size?: string }) => (
+  const RecordingIndicator = ({ size = 'w-3 h-3' }: { size?: string }) => (
     <div
-      className={`${size} rounded-full ${
-        transcriptActive ? "bg-red-500" : "bg-gray-400"
-      }`}
+      className={`${size} rounded-full ${transcriptActive ? 'bg-red-500' : 'bg-gray-400'}`}
       aria-label="Recording status indicator"
     />
   );
@@ -213,17 +166,13 @@ export function Transcript(props: {
     setShowPauseResumeConfirm(false);
     setError(null);
     try {
-      const response = await SendData(
-        `transcript/${props.conversationId}/pause`,
-        {},
-        Api.get().getAccessToken(),
-      );
+      const response = await SendData(`transcript/${props.conversationId}/pause`, {}, Api.get().getAccessToken());
       if (response && response.error) {
-        setError(response.message || "Failed to pause transcript");
+        setError(response.message || 'Failed to pause transcript');
       }
     } catch (error) {
-      console.error("Error pausing transcript:", error);
-      setError("Failed to pause transcript");
+      console.error('Error pausing transcript:', error);
+      setError('Failed to pause transcript');
     }
   };
 
@@ -232,17 +181,13 @@ export function Transcript(props: {
     setShowPauseResumeConfirm(false);
     setError(null);
     try {
-      const response = await SendData(
-        `transcript/${props.conversationId}/resume`,
-        {},
-        Api.get().getAccessToken(),
-      );
+      const response = await SendData(`transcript/${props.conversationId}/resume`, {}, Api.get().getAccessToken());
       if (response && response.error) {
-        setError(response.message || "Failed to resume transcript");
+        setError(response.message || 'Failed to resume transcript');
       }
     } catch (error) {
-      console.error("Error resuming transcript:", error);
-      setError("Failed to resume transcript");
+      console.error('Error resuming transcript:', error);
+      setError('Failed to resume transcript');
     }
   };
 
@@ -251,18 +196,15 @@ export function Transcript(props: {
     setShowDeleteConfirm(false);
     setError(null);
     try {
-      const response = await SendData(
-        `transcript/${props.conversationId}`,
-        {},
-        Api.get().getAccessToken(),
-        { method: "DELETE" },
-      );
+      const response = await SendData(`transcript/${props.conversationId}`, {}, Api.get().getAccessToken(), {
+        method: 'DELETE',
+      });
       if (response && response.error) {
-        setError(response.message || "Failed to delete transcript");
+        setError(response.message || 'Failed to delete transcript');
       }
     } catch (error) {
-      console.error("Error deleting transcript:", error);
-      setError("Failed to delete transcript");
+      console.error('Error deleting transcript:', error);
+      setError('Failed to delete transcript');
     }
   };
 
@@ -271,23 +213,19 @@ export function Transcript(props: {
     setError(null);
     try {
       // Fetch the formatted transcript text
-      const textContent = await RetrieveData(
-        `transcript/${props.conversationId}`,
-        Api.get().getAccessToken(),
-        "text",
-      );
+      const textContent = await RetrieveData(`transcript/${props.conversationId}`, Api.get().getAccessToken(), 'text');
 
-      if (!textContent || typeof textContent !== "string") {
-        setError("Failed to fetch transcript for download");
+      if (!textContent || typeof textContent !== 'string') {
+        setError('Failed to fetch transcript for download');
         return;
       }
 
       // Create blob and download
-      const blob = new Blob([textContent], { type: "text/plain" });
+      const blob = new Blob([textContent], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
+      const link = document.createElement('a');
       link.href = url;
-      link.download = `transcript_${props.conversationId}_${new Date().toISOString().split("T")[0]}.txt`;
+      link.download = `transcript_${props.conversationId}_${new Date().toISOString().split('T')[0]}.txt`;
 
       // Trigger download
       document.body.appendChild(link);
@@ -297,8 +235,8 @@ export function Transcript(props: {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Error downloading transcript:", error);
-      setError("Failed to download transcript");
+      console.error('Error downloading transcript:', error);
+      setError('Failed to download transcript');
     }
   };
 
@@ -325,19 +263,13 @@ export function Transcript(props: {
         trackManualScrollStart();
       }
     }, 150); // 150ms debounce
-  }, [
-    isOpen,
-    isInManualScrollMode,
-    trackManualScrollStart,
-    trackReturnToAutoScroll,
-  ]);
+  }, [isOpen, isInManualScrollMode, trackManualScrollStart, trackReturnToAutoScroll]);
 
   // Preserve scroll position when new messages arrive
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (container && preserveScrollRef.current) {
-      const { scrollHeight: oldScrollHeight, scrollTop: oldScrollTop } =
-        preserveScrollRef.current;
+      const { scrollHeight: oldScrollHeight, scrollTop: oldScrollTop } = preserveScrollRef.current;
       const newScrollHeight = container.scrollHeight;
       const heightDifference = newScrollHeight - oldScrollHeight;
 
@@ -350,12 +282,7 @@ export function Transcript(props: {
   // Fetch conversation state and messages. Extracted so it can be called both
   // on initial mount and when a gap-reconnect signals missed messages.
   const fetchTranscriptData = async () => {
-    if (
-      !props.conversationId ||
-      !Api.get().getAccessToken() ||
-      !props.transcriptPasscode
-    )
-      return;
+    if (!props.conversationId || !Api.get().getAccessToken() || !props.transcriptPasscode) return;
 
     try {
       const conversationResponse: any = await RetrieveData(
@@ -363,10 +290,8 @@ export function Transcript(props: {
         Api.get().getAccessToken(),
       );
 
-      if (conversationResponse && !("error" in conversationResponse)) {
-        setTranscriptActive(
-          conversationResponse.transcript?.status === "active",
-        );
+      if (conversationResponse && !('error' in conversationResponse)) {
+        setTranscriptActive(conversationResponse.transcript?.status === 'active');
       }
 
       const transcriptMessages = await RetrieveData(
@@ -387,18 +312,13 @@ export function Transcript(props: {
         }
       }
     } catch (error) {
-      console.error("Error fetching transcript data:", error);
+      console.error('Error fetching transcript data:', error);
     }
   };
 
   // Fetch initial conversation state and messages on mount
   useEffect(() => {
-    if (
-      !props.conversationId ||
-      !Api.get().getAccessToken() ||
-      !props.transcriptPasscode
-    )
-      return;
+    if (!props.conversationId || !Api.get().getAccessToken() || !props.transcriptPasscode) return;
 
     const fetchInitialData = async () => {
       await fetchTranscriptData();
@@ -419,7 +339,7 @@ export function Transcript(props: {
   // to fill any messages that arrived while the client was disconnected.
   useEffect(() => {
     if (!props.lastReconnectTime) return;
-    console.log("Transcript re-fetching history after gap-reconnect...");
+    console.log('Transcript re-fetching history after gap-reconnect...');
     fetchTranscriptData();
   }, [props.lastReconnectTime]);
 
@@ -428,11 +348,11 @@ export function Transcript(props: {
     const container = messagesContainerRef.current;
     if (!container || !isOpen) return;
 
-    container.addEventListener("scroll", handleScroll);
+    container.addEventListener('scroll', handleScroll);
 
     // Cleanup
     return () => {
-      container.removeEventListener("scroll", handleScroll);
+      container.removeEventListener('scroll', handleScroll);
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
@@ -454,23 +374,17 @@ export function Transcript(props: {
 
     // Track focus scroll event
     if (messages.length > 0) {
-      trackConversationEvent(
-        props.conversationId,
-        getCategory(),
-        "scroll_to_focus",
-        "focus_triggered",
-      );
+      trackConversationEvent(props.conversationId, getCategory(), 'scroll_to_focus', 'focus_triggered');
     }
   }, [props.focusTimeRange]);
 
   // Subscribe to transcript channel
   useEffect(() => {
-    if (!props.socket || !props.conversationId || !Api.get().getAccessToken())
-      return;
+    if (!props.socket || !props.conversationId || !Api.get().getAccessToken()) return;
 
     const channel = {
-      name: "transcript",
-      passcode: props.transcriptPasscode || "",
+      name: 'transcript',
+      passcode: props.transcriptPasscode || '',
     };
 
     const joinChannel = () => {
@@ -478,20 +392,20 @@ export function Transcript(props: {
         // Always use the freshest available token so re-joins after token
         // refresh succeed rather than failing with an expired token.
         const freshToken = Api.get().getAccessToken();
-        props.socket!.emit("channel:join", {
+        props.socket!.emit('channel:join', {
           conversationId: props.conversationId,
           token: freshToken,
           channel,
         });
 
-        console.log("Joined transcript channel", {
+        console.log('Joined transcript channel', {
           conversationId: props.conversationId,
           channel,
           socketId: props.socket!.id,
           connected: props.socket!.connected,
         });
       } catch (error) {
-        console.error("Error joining transcript channel:", error);
+        console.error('Error joining transcript channel:', error);
       }
     };
 
@@ -501,11 +415,11 @@ export function Transcript(props: {
     }
     // Re-join on every (re)connect — covers both initial connection when the
     // socket isn't ready yet and subsequent reconnections after token refresh.
-    props.socket.on("connect", joinChannel);
+    props.socket.on('connect', joinChannel);
 
     const messageHandler = (data: PseudonymousMessage) => {
-      if (data.channels && data.channels.includes("transcript")) {
-        console.log("New transcript message:", data);
+      if (data.channels && data.channels.includes('transcript')) {
+        console.log('New transcript message:', data);
         // Capture scroll state before adding message
         const container = messagesContainerRef.current;
         if (container) {
@@ -525,40 +439,38 @@ export function Transcript(props: {
       }
     };
 
-    props.socket.on("message:new", messageHandler);
+    props.socket.on('message:new', messageHandler);
 
-    const transcriptStatusHandler = (data: {
-      status: "active" | "paused" | "stopped" | "deleted";
-    }) => {
-      console.log("Transcript status update:", data);
+    const transcriptStatusHandler = (data: { status: 'active' | 'paused' | 'stopped' | 'deleted' }) => {
+      console.log('Transcript status update:', data);
 
       // Always handle deleted status - clear all messages
-      if (data.status === "deleted") {
+      if (data.status === 'deleted') {
         setMessages([]);
         return;
       }
 
       // Track active/paused status
-      setTranscriptActive(data.status === "active");
+      setTranscriptActive(data.status === 'active');
     };
 
-    console.log("Setting up transcript:status listener", {
+    console.log('Setting up transcript:status listener', {
       socketId: props.socket.id,
       conversationId: props.conversationId,
     });
-    props.socket.on("transcript:status", transcriptStatusHandler);
+    props.socket.on('transcript:status', transcriptStatusHandler);
 
     // Add catch-all listener to see all events
     const catchAllHandler = (eventName: string, ...args: any[]) => {
-      console.log("Socket received event:", eventName, args);
+      console.log('Socket received event:', eventName, args);
     };
     props.socket.onAny(catchAllHandler);
 
     return () => {
       // Use off (not once) to remove the persistent reconnect listener
-      props.socket?.off("connect", joinChannel);
-      props.socket?.off("message:new", messageHandler);
-      props.socket?.off("transcript:status", transcriptStatusHandler);
+      props.socket?.off('connect', joinChannel);
+      props.socket?.off('message:new', messageHandler);
+      props.socket?.off('transcript:status', transcriptStatusHandler);
       props.socket?.offAny(catchAllHandler);
     };
   }, [props.socket, props.conversationId, props.transcriptPasscode]);
@@ -566,17 +478,13 @@ export function Transcript(props: {
   return (
     <div
       className={`bg-[#200434] text-white transition-all duration-300 ease-in-out flex flex-col ${
-        props.hideToggle
-          ? "h-full w-full"
-          : isOpen
-            ? "h-[40vh] lg:h-full lg:w-[33vw]"
-            : "flex-shrink-0 lg:h-full lg:w-16"
+        props.hideToggle ? 'h-full w-full' : isOpen ? 'h-[40vh] lg:h-full lg:w-[33vw]' : 'flex-shrink-0 lg:h-full lg:w-16'
       }`}
     >
       {/* Header with toggle */}
       <div
         className={`border-b border-white/10 bg-[#200434] relative before:absolute before:inset-0 before:bg-white/20 before:pointer-events-none flex-shrink-0 ${
-          isOpen && props.showControls ? "px-4 pt-2 pb-4" : "px-4 py-2"
+          isOpen && props.showControls ? 'px-4 pt-2 pb-4' : 'px-4 py-2'
         }`}
       >
         {isOpen ? (
@@ -584,9 +492,7 @@ export function Transcript(props: {
             <div className="flex items-center justify-between py-2">
               <div className="flex items-center gap-3">
                 <RecordingIndicator />
-                <h2 className="text-xl font-semibold tracking-wide">
-                  LIVE TRANSCRIPT
-                </h2>
+                <h2 className="text-xl font-semibold tracking-wide">LIVE TRANSCRIPT</h2>
               </div>
               {!props.hideToggle && (
                 <button
@@ -605,9 +511,7 @@ export function Transcript(props: {
                   <button
                     onClick={() => setShowPauseResumeConfirm(true)}
                     className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 border-2 border-white rounded-lg text-white hover:bg-white/10 transition-colors"
-                    aria-label={
-                      transcriptActive ? "Pause recording" : "Resume recording"
-                    }
+                    aria-label={transcriptActive ? 'Pause recording' : 'Resume recording'}
                   >
                     {transcriptActive ? (
                       <>
@@ -630,9 +534,7 @@ export function Transcript(props: {
                       }}
                       disabled={transcriptActive}
                       className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 border-2 border-white rounded-lg text-white transition-colors ${
-                        transcriptActive
-                          ? "opacity-50 cursor-not-allowed"
-                          : "hover:bg-white/10"
+                        transcriptActive ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10'
                       }`}
                       aria-label="Delete transcript"
                     >
@@ -676,9 +578,7 @@ export function Transcript(props: {
           <div className="flex items-center justify-between lg:justify-center w-full">
             <div className="flex-1 flex items-center justify-center gap-2 lg:hidden">
               <RecordingIndicator size="w-2 h-2" />
-              <div className="text-xs font-semibold tracking-widest">
-                LIVE TRANSCRIPT
-              </div>
+              <div className="text-xs font-semibold tracking-widest">LIVE TRANSCRIPT</div>
             </div>
             <button
               onClick={handleToggle}
@@ -712,22 +612,18 @@ export function Transcript(props: {
             <div
               id={`transcript-message-${message.id}`}
               key={`message-${i}`}
-              className={`mb-4 ${
-                focusedMessageIds.includes(message.id!) ? "bg-[#4A0979]" : ""
-              }`}
+              className={`mb-4 ${focusedMessageIds.includes(message.id!) ? 'bg-[#4A0979]' : ''}`}
             >
               <div className="text-gray-300 text-sm mb-1">
                 {message.createdAt
                   ? new Date(message.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
+                      hour: '2-digit',
+                      minute: '2-digit',
                       hour12: true,
                     })
-                  : ""}
+                  : ''}
               </div>
-              <p className="text-white text-base">
-                {message.body.text ? message.body.text : message.body}
-              </p>
+              <p className="text-white text-base">{message.body.text ? message.body.text : message.body}</p>
             </div>
           ))}
         </div>
@@ -742,39 +638,36 @@ export function Transcript(props: {
         slotProps={{
           paper: {
             sx: {
-              borderRadius: "16px",
-              padding: "32px 24px",
-              maxWidth: "440px",
-              textAlign: "center",
+              borderRadius: '16px',
+              padding: '32px 24px',
+              maxWidth: '440px',
+              textAlign: 'center',
             },
           },
         }}
       >
         <div className="flex flex-col items-center gap-4">
           <div className="w-16 h-16 rounded-full border-2 border-red-400 flex items-center justify-center">
-            <ReportProblem sx={{ fontSize: 40, color: "#f87171" }} />
+            <ReportProblem sx={{ fontSize: 40, color: '#f87171' }} />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            Delete transcription?
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-900">Delete transcription?</h2>
           <p className="text-gray-600 text-base leading-relaxed max-w-sm">
-            This will permanently delete the transcription feed for all
-            participants and cannot be undone.
+            This will permanently delete the transcription feed for all participants and cannot be undone.
           </p>
           <div className="flex flex-col gap-3 w-full mt-2">
             <Button
               onClick={handleDelete}
               variant="contained"
               sx={{
-                backgroundColor: "#b91c1c",
-                color: "white",
-                padding: "12px 24px",
-                borderRadius: "8px",
-                textTransform: "none",
-                fontSize: "16px",
+                backgroundColor: '#b91c1c',
+                color: 'white',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                textTransform: 'none',
+                fontSize: '16px',
                 fontWeight: 600,
-                "&:hover": {
-                  backgroundColor: "#991b1b",
+                '&:hover': {
+                  backgroundColor: '#991b1b',
                 },
               }}
               autoFocus
@@ -784,14 +677,14 @@ export function Transcript(props: {
             <Button
               onClick={() => setShowDeleteConfirm(false)}
               sx={{
-                color: "#4b5563",
-                textTransform: "none",
-                fontSize: "16px",
+                color: '#4b5563',
+                textTransform: 'none',
+                fontSize: '16px',
                 fontWeight: 500,
-                textDecoration: "underline",
-                "&:hover": {
-                  backgroundColor: "transparent",
-                  textDecoration: "underline",
+                textDecoration: 'underline',
+                '&:hover': {
+                  backgroundColor: 'transparent',
+                  textDecoration: 'underline',
                 },
               }}
             >
@@ -810,59 +703,57 @@ export function Transcript(props: {
         slotProps={{
           paper: {
             sx: {
-              borderRadius: "16px",
-              padding: "32px 24px",
-              maxWidth: "440px",
-              textAlign: "center",
+              borderRadius: '16px',
+              padding: '32px 24px',
+              maxWidth: '440px',
+              textAlign: 'center',
             },
           },
         }}
       >
         <div className="flex flex-col items-center gap-4">
           <div className="w-16 h-16 rounded-full border-2 border-red-400 flex items-center justify-center">
-            <ReportProblem sx={{ fontSize: 40, color: "#f87171" }} />
+            <ReportProblem sx={{ fontSize: 40, color: '#f87171' }} />
           </div>
           <h2 className="text-2xl font-bold text-gray-900">
-            {transcriptActive
-              ? "Pause transcription?"
-              : "Resume transcription?"}
+            {transcriptActive ? 'Pause transcription?' : 'Resume transcription?'}
           </h2>
           <p className="text-gray-600 text-base leading-relaxed max-w-sm">
             {transcriptActive
               ? "This will pause the transcription feed for all participants and will affect the bot's ability to engage."
-              : "This will resume the transcription feed for all participants."}
+              : 'This will resume the transcription feed for all participants.'}
           </p>
           <div className="flex flex-col gap-3 w-full mt-2">
             <Button
               onClick={transcriptActive ? handlePause : handleResume}
               variant="contained"
               sx={{
-                backgroundColor: "#b91c1c",
-                color: "white",
-                padding: "12px 24px",
-                borderRadius: "8px",
-                textTransform: "none",
-                fontSize: "16px",
+                backgroundColor: '#b91c1c',
+                color: 'white',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                textTransform: 'none',
+                fontSize: '16px',
                 fontWeight: 600,
-                "&:hover": {
-                  backgroundColor: "#991b1b",
+                '&:hover': {
+                  backgroundColor: '#991b1b',
                 },
               }}
               autoFocus
             >
-              {transcriptActive ? "Yes, Pause" : "Yes, Resume"}
+              {transcriptActive ? 'Yes, Pause' : 'Yes, Resume'}
             </Button>
             <Button
               onClick={() => setShowPauseResumeConfirm(false)}
               sx={{
-                color: "#4b5563",
-                textTransform: "none",
-                fontSize: "16px",
+                color: '#4b5563',
+                textTransform: 'none',
+                fontSize: '16px',
                 fontWeight: 500,
-                textDecoration: "underline",
-                "&:hover": {
-                  backgroundColor: "transparent",
-                  textDecoration: "underline",
+                textDecoration: 'underline',
+                '&:hover': {
+                  backgroundColor: 'transparent',
+                  textDecoration: 'underline',
                 },
               }}
             >

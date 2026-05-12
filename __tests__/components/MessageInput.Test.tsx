@@ -1,35 +1,32 @@
-import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { MessageInput } from "../../components/MessageInput";
-import {
-  SlashCommand,
-  createSlashCommandEnhancer,
-} from "../../components/enhancers/slashCommandEnhancer";
+import React from 'react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MessageInput } from '../../components/MessageInput';
+import { SlashCommand, createSlashCommandEnhancer } from '../../components/enhancers/slashCommandEnhancer';
 
 // Mock scrollIntoView (not available in jsdom)
 Element.prototype.scrollIntoView = jest.fn();
 
-describe("MessageInput Component", () => {
+describe('MessageInput Component', () => {
   const mockOnSendMessage = jest.fn();
   const mockOnExitControlledMode = jest.fn();
 
   const mockSlashCommands: SlashCommand[] = [
     {
-      command: "mod",
-      description: "Submit a question to the moderator",
-      value: "/mod ",
-      conversationTypes: ["eventAssistant"],
+      command: 'mod',
+      description: 'Submit a question to the moderator',
+      value: '/mod ',
+      conversationTypes: ['eventAssistant'],
     },
     {
-      command: "test",
-      description: "Test command",
-      value: "/test ",
+      command: 'test',
+      description: 'Test command',
+      value: '/test ',
     },
   ];
 
   const defaultProps = {
-    pseudonym: "TestUser",
+    pseudonym: 'TestUser',
     enhancers: [createSlashCommandEnhancer(mockSlashCommands)],
     onSendMessage: mockOnSendMessage,
     waitingForResponse: false,
@@ -41,238 +38,198 @@ describe("MessageInput Component", () => {
     jest.clearAllMocks();
   });
 
-  describe("Basic Rendering", () => {
-    it("renders with pseudonym", () => {
-      render(
-        <MessageInput {...defaultProps} />
-      );
+  describe('Basic Rendering', () => {
+    it('renders with pseudonym', () => {
+      render(<MessageInput {...defaultProps} />);
 
       expect(screen.getByText(/Writing as TestUser/i)).toBeInTheDocument();
-      expect(
-        screen.getByPlaceholderText("Enter your message here")
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Enter your message here')).toBeInTheDocument();
     });
 
-    it("does not render when pseudonym is null", () => {
-      const { container } = render(
-        <MessageInput {...defaultProps} pseudonym={null} />
-      );
+    it('does not render when pseudonym is null', () => {
+      const { container } = render(<MessageInput {...defaultProps} pseudonym={null} />);
 
       expect(container.firstChild).toBeNull();
     });
   });
 
-  describe("Button State", () => {
-    it("disables send button when message is empty", () => {
-      render(
-        <MessageInput {...defaultProps} />
-      );
+  describe('Button State', () => {
+    it('disables send button when message is empty', () => {
+      render(<MessageInput {...defaultProps} />);
 
-      const sendButton = screen.getByLabelText("send message");
+      const sendButton = screen.getByLabelText('send message');
       expect(sendButton).toBeDisabled();
     });
 
-    it("enables send button when message has content", async () => {
+    it('enables send button when message has content', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText("Enter your message here");
-      const sendButton = screen.getByLabelText("send message");
+      const input = screen.getByPlaceholderText('Enter your message here');
+      const sendButton = screen.getByLabelText('send message');
 
       expect(sendButton).toBeDisabled();
 
-      await user.type(input, "Hello");
+      await user.type(input, 'Hello');
 
       expect(sendButton).not.toBeDisabled();
     });
 
-    it("disables send button while waiting for response", async () => {
+    it('disables send button while waiting for response', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} waitingForResponse={true} />
-      );
+      render(<MessageInput {...defaultProps} waitingForResponse={true} />);
 
-      const input = screen.getByPlaceholderText("Enter your message here");
-      const sendButton = screen.getByLabelText("send message");
+      const input = screen.getByPlaceholderText('Enter your message here');
+      const sendButton = screen.getByLabelText('send message');
 
-      await user.type(input, "Hello");
+      await user.type(input, 'Hello');
 
       // Should still be disabled even with text because waitingForResponse is true
       expect(sendButton).toBeDisabled();
     });
   });
 
-  describe("Message Sending", () => {
-    it("sends message when send button is clicked", async () => {
+  describe('Message Sending', () => {
+    it('sends message when send button is clicked', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText("Enter your message here");
-      const sendButton = screen.getByLabelText("send message");
+      const input = screen.getByPlaceholderText('Enter your message here');
+      const sendButton = screen.getByLabelText('send message');
 
-      await user.type(input, "Test message");
+      await user.type(input, 'Test message');
       await user.click(sendButton);
 
-      expect(mockOnSendMessage).toHaveBeenCalledWith("Test message");
+      expect(mockOnSendMessage).toHaveBeenCalledWith('Test message');
     });
 
-    it("sends message when Enter key is pressed", async () => {
+    it('sends message when Enter key is pressed', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText("Enter your message here");
+      const input = screen.getByPlaceholderText('Enter your message here');
 
-      await user.type(input, "Test message{Enter}");
+      await user.type(input, 'Test message{Enter}');
 
-      expect(mockOnSendMessage).toHaveBeenCalledWith("Test message");
+      expect(mockOnSendMessage).toHaveBeenCalledWith('Test message');
     });
 
-    it("clears input after sending message", async () => {
+    it('clears input after sending message', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText(
-        "Enter your message here"
-      ) as HTMLInputElement;
-      const sendButton = screen.getByLabelText("send message");
+      const input = screen.getByPlaceholderText('Enter your message here') as HTMLInputElement;
+      const sendButton = screen.getByLabelText('send message');
 
-      await user.type(input, "Test message");
+      await user.type(input, 'Test message');
       await user.click(sendButton);
 
       await waitFor(() => {
-        expect(input.value).toBe("");
+        expect(input.value).toBe('');
       });
     });
 
-    it("does not send empty message", async () => {
+    it('does not send empty message', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText("Enter your message here");
+      const input = screen.getByPlaceholderText('Enter your message here');
 
       // Try to send with just Enter (no message)
       await user.click(input);
-      await user.keyboard("{Enter}");
+      await user.keyboard('{Enter}');
 
       expect(mockOnSendMessage).not.toHaveBeenCalled();
     });
 
-    it("sends message with slash command prefix", async () => {
+    it('sends message with slash command prefix', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText("Enter your message here");
-      await user.type(input, "/mod my question");
-      await user.keyboard("{Enter}");
+      const input = screen.getByPlaceholderText('Enter your message here');
+      await user.type(input, '/mod my question');
+      await user.keyboard('{Enter}');
 
-      expect(mockOnSendMessage).toHaveBeenCalledWith("/mod my question");
+      expect(mockOnSendMessage).toHaveBeenCalledWith('/mod my question');
     });
   });
 
-  describe("Slash Command Functionality", () => {
+  describe('Slash Command Functionality', () => {
     it("shows slash command menu when typing '/'", async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText("Enter your message here");
-      await user.type(input, "/");
+      const input = screen.getByPlaceholderText('Enter your message here');
+      await user.type(input, '/');
 
       await waitFor(() => {
-        expect(screen.getByText("/mod")).toBeInTheDocument();
-        expect(
-          screen.getByText("Submit a question to the moderator")
-        ).toBeInTheDocument();
+        expect(screen.getByText('/mod')).toBeInTheDocument();
+        expect(screen.getByText('Submit a question to the moderator')).toBeInTheDocument();
       });
     });
 
-    it("hides slash command menu when space is typed after command", async () => {
+    it('hides slash command menu when space is typed after command', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText("Enter your message here");
-      await user.type(input, "/mod ");
+      const input = screen.getByPlaceholderText('Enter your message here');
+      await user.type(input, '/mod ');
 
       await waitFor(() => {
-        expect(screen.queryByText("Submit a question to the moderator")).not.toBeInTheDocument();
+        expect(screen.queryByText('Submit a question to the moderator')).not.toBeInTheDocument();
       });
     });
 
-    it("hides slash command menu when input is cleared", async () => {
+    it('hides slash command menu when input is cleared', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText("Enter your message here");
-      await user.type(input, "/");
+      const input = screen.getByPlaceholderText('Enter your message here');
+      await user.type(input, '/');
 
       await waitFor(() => {
-        expect(screen.getByText("/mod")).toBeInTheDocument();
+        expect(screen.getByText('/mod')).toBeInTheDocument();
       });
 
       await user.clear(input);
 
       await waitFor(() => {
-        expect(screen.queryByText("/mod")).not.toBeInTheDocument();
+        expect(screen.queryByText('/mod')).not.toBeInTheDocument();
       });
     });
 
-    it("selects slash command when clicked", async () => {
+    it('selects slash command when clicked', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText(
-        "Enter your message here"
-      ) as HTMLInputElement;
-      await user.type(input, "/");
+      const input = screen.getByPlaceholderText('Enter your message here') as HTMLInputElement;
+      await user.type(input, '/');
 
       await waitFor(() => {
-        expect(screen.getByText("/mod")).toBeInTheDocument();
+        expect(screen.getByText('/mod')).toBeInTheDocument();
       });
 
-      const modCommand = screen.getByText("/mod");
+      const modCommand = screen.getByText('/mod');
       await user.click(modCommand);
 
       await waitFor(() => {
-        expect(input.value).toBe("/mod ");
-        expect(screen.queryByText("Submit a question to the moderator")).not.toBeInTheDocument();
+        expect(input.value).toBe('/mod ');
+        expect(screen.queryByText('Submit a question to the moderator')).not.toBeInTheDocument();
       });
     });
 
-    it("positions cursor at end of command after selection", async () => {
+    it('positions cursor at end of command after selection', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText(
-        "Enter your message here"
-      ) as HTMLInputElement;
-      await user.type(input, "/");
+      const input = screen.getByPlaceholderText('Enter your message here') as HTMLInputElement;
+      await user.type(input, '/');
 
       await waitFor(() => {
-        expect(screen.getByText("/mod")).toBeInTheDocument();
+        expect(screen.getByText('/mod')).toBeInTheDocument();
       });
 
-      const modCommand = screen.getByText("/mod");
+      const modCommand = screen.getByText('/mod');
       await user.click(modCommand);
 
       await waitFor(() => {
@@ -281,145 +238,123 @@ describe("MessageInput Component", () => {
       });
     });
 
-    it("allows typing after slash command selection", async () => {
+    it('allows typing after slash command selection', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText(
-        "Enter your message here"
-      ) as HTMLInputElement;
-      await user.type(input, "/");
+      const input = screen.getByPlaceholderText('Enter your message here') as HTMLInputElement;
+      await user.type(input, '/');
 
       await waitFor(() => {
-        expect(screen.getByText("/mod")).toBeInTheDocument();
+        expect(screen.getByText('/mod')).toBeInTheDocument();
       });
 
-      const modCommand = screen.getByText("/mod");
+      const modCommand = screen.getByText('/mod');
       await user.click(modCommand);
 
       await waitFor(() => {
-        expect(input.value).toBe("/mod ");
+        expect(input.value).toBe('/mod ');
       });
 
-      await user.type(input, "my question");
+      await user.type(input, 'my question');
 
-      expect(input.value).toBe("/mod my question");
+      expect(input.value).toBe('/mod my question');
     });
 
-    it("filters commands based on typed text", async () => {
+    it('filters commands based on typed text', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText("Enter your message here");
-      await user.type(input, "/m");
+      const input = screen.getByPlaceholderText('Enter your message here');
+      await user.type(input, '/m');
 
       await waitFor(() => {
-        expect(screen.getByText("/mod")).toBeInTheDocument();
-        expect(screen.queryByText("/test")).not.toBeInTheDocument();
+        expect(screen.getByText('/mod')).toBeInTheDocument();
+        expect(screen.queryByText('/test')).not.toBeInTheDocument();
       });
     });
 
-    it("does not show slash menu when typing regular text", async () => {
+    it('does not show slash menu when typing regular text', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText("Enter your message here");
-      await user.type(input, "regular message");
+      const input = screen.getByPlaceholderText('Enter your message here');
+      await user.type(input, 'regular message');
 
-      expect(screen.queryByText("/mod")).not.toBeInTheDocument();
+      expect(screen.queryByText('/mod')).not.toBeInTheDocument();
     });
 
-    it("does not show slash menu when typing slash mid-message", async () => {
+    it('does not show slash menu when typing slash mid-message', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText("Enter your message here");
-      await user.type(input, "check out http://example.com");
+      const input = screen.getByPlaceholderText('Enter your message here');
+      await user.type(input, 'check out http://example.com');
 
-      expect(screen.queryByText("/mod")).not.toBeInTheDocument();
+      expect(screen.queryByText('/mod')).not.toBeInTheDocument();
     });
 
-    it("selects slash command when Tab is pressed", async () => {
+    it('selects slash command when Tab is pressed', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText(
-        "Enter your message here"
-      ) as HTMLInputElement;
-      await user.type(input, "/");
+      const input = screen.getByPlaceholderText('Enter your message here') as HTMLInputElement;
+      await user.type(input, '/');
 
       await waitFor(() => {
-        expect(screen.getByText("/mod")).toBeInTheDocument();
+        expect(screen.getByText('/mod')).toBeInTheDocument();
       });
 
       // Press Tab to select the highlighted command
-      await user.keyboard("{Tab}");
+      await user.keyboard('{Tab}');
 
       await waitFor(() => {
-        expect(input.value).toBe("/mod ");
-        expect(screen.queryByText("Submit a question to the moderator")).not.toBeInTheDocument();
+        expect(input.value).toBe('/mod ');
+        expect(screen.queryByText('Submit a question to the moderator')).not.toBeInTheDocument();
       });
 
       // Message should not have been sent yet
       expect(mockOnSendMessage).not.toHaveBeenCalled();
     });
 
-    it("sends message with a single Enter after Tab completes a command", async () => {
+    it('sends message with a single Enter after Tab completes a command', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText(
-        "Enter your message here"
-      ) as HTMLInputElement;
+      const input = screen.getByPlaceholderText('Enter your message here') as HTMLInputElement;
 
       // Type slash, Tab-complete to "/mod ", then add text and send with one Enter
-      await user.type(input, "/");
-      await waitFor(() => expect(screen.getByText("/mod")).toBeInTheDocument());
+      await user.type(input, '/');
+      await waitFor(() => expect(screen.getByText('/mod')).toBeInTheDocument());
 
-      await user.keyboard("{Tab}");
-      await waitFor(() => expect(input.value).toBe("/mod "));
+      await user.keyboard('{Tab}');
+      await waitFor(() => expect(input.value).toBe('/mod '));
 
-      await user.type(input, "my question");
-      await user.keyboard("{Enter}");
+      await user.type(input, 'my question');
+      await user.keyboard('{Enter}');
 
       await waitFor(() => {
         expect(mockOnSendMessage).toHaveBeenCalledTimes(1);
-        expect(mockOnSendMessage).toHaveBeenCalledWith("/mod my question");
+        expect(mockOnSendMessage).toHaveBeenCalledWith('/mod my question');
       });
     });
 
-    it("does not send message when Enter selects a slash command", async () => {
+    it('does not send message when Enter selects a slash command', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText(
-        "Enter your message here"
-      ) as HTMLInputElement;
-      await user.type(input, "/");
+      const input = screen.getByPlaceholderText('Enter your message here') as HTMLInputElement;
+      await user.type(input, '/');
 
       await waitFor(() => {
-        expect(screen.getByText("/mod")).toBeInTheDocument();
+        expect(screen.getByText('/mod')).toBeInTheDocument();
       });
 
       // Press Enter to select the command
-      await user.keyboard("{Enter}");
+      await user.keyboard('{Enter}');
 
       await waitFor(() => {
-        expect(input.value).toBe("/mod ");
+        expect(input.value).toBe('/mod ');
       });
 
       // Message should not have been sent
@@ -427,53 +362,45 @@ describe("MessageInput Component", () => {
     });
   });
 
-  describe("Controlled Mode", () => {
-    it("displays controlled mode label", () => {
+  describe('Controlled Mode', () => {
+    it('displays controlled mode label', () => {
       const controlledMode = {
-        prefix: "/feedback|",
+        prefix: '/feedback|',
         icon: <span>📝</span>,
-        label: "Feedback Mode",
+        label: 'Feedback Mode',
       };
 
-      render(
-        <MessageInput {...defaultProps} controlledMode={controlledMode} />
-      );
+      render(<MessageInput {...defaultProps} controlledMode={controlledMode} />);
 
       expect(screen.getByText(/Feedback Mode/i)).toBeInTheDocument();
     });
 
-    it("shows exit button in controlled mode", () => {
+    it('shows exit button in controlled mode', () => {
       const controlledMode = {
-        prefix: "/feedback|",
+        prefix: '/feedback|',
         icon: null,
-        label: "Feedback Mode",
+        label: 'Feedback Mode',
       };
 
-      render(
-        <MessageInput {...defaultProps} controlledMode={controlledMode} />
-      );
+      render(<MessageInput {...defaultProps} controlledMode={controlledMode} />);
 
-      const closeButton = screen.getByRole("button", { name: "" });
+      const closeButton = screen.getByRole('button', { name: '' });
       expect(closeButton).toBeInTheDocument();
     });
 
-    it("calls onExitControlledMode when exit button is clicked", async () => {
+    it('calls onExitControlledMode when exit button is clicked', async () => {
       const user = userEvent.setup();
       const controlledMode = {
-        prefix: "/feedback|",
+        prefix: '/feedback|',
         icon: null,
-        label: "Feedback Mode",
+        label: 'Feedback Mode',
       };
 
-      render(
-        <MessageInput {...defaultProps} controlledMode={controlledMode} />
-      );
+      render(<MessageInput {...defaultProps} controlledMode={controlledMode} />);
 
       // Find the close icon button
-      const closeButtons = screen.getAllByRole("button");
-      const exitButton = closeButtons.find((button) =>
-        button.querySelector("svg[data-testid='CloseIcon']")
-      );
+      const closeButtons = screen.getAllByRole('button');
+      const exitButton = closeButtons.find((button) => button.querySelector("svg[data-testid='CloseIcon']"));
 
       expect(exitButton).toBeDefined();
       await user.click(exitButton!);
@@ -481,55 +408,47 @@ describe("MessageInput Component", () => {
       expect(mockOnExitControlledMode).toHaveBeenCalled();
     });
 
-    it("clears input when entering controlled mode", async () => {
-      const { rerender } = render(
-        <MessageInput {...defaultProps} />
-      );
+    it('clears input when entering controlled mode', async () => {
+      const { rerender } = render(<MessageInput {...defaultProps} />);
 
       const user = userEvent.setup();
-      const input = screen.getByPlaceholderText(
-        "Enter your message here"
-      ) as HTMLInputElement;
+      const input = screen.getByPlaceholderText('Enter your message here') as HTMLInputElement;
 
-      await user.type(input, "Some text");
-      expect(input.value).toBe("Some text");
+      await user.type(input, 'Some text');
+      expect(input.value).toBe('Some text');
 
       // Enter controlled mode
       const controlledMode = {
-        prefix: "/feedback|",
+        prefix: '/feedback|',
         icon: null,
-        label: "Feedback Mode",
+        label: 'Feedback Mode',
       };
 
-      rerender(
-        <MessageInput {...defaultProps} controlledMode={controlledMode} />
-      );
+      rerender(<MessageInput {...defaultProps} controlledMode={controlledMode} />);
 
       await waitFor(() => {
-        expect(input.value).toBe("");
+        expect(input.value).toBe('');
       });
     });
   });
 
-  describe("Multiple Messages", () => {
-    it("allows typing and sending multiple messages", async () => {
+  describe('Multiple Messages', () => {
+    it('allows typing and sending multiple messages', async () => {
       const user = userEvent.setup();
-      render(
-        <MessageInput {...defaultProps} />
-      );
+      render(<MessageInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText("Enter your message here");
+      const input = screen.getByPlaceholderText('Enter your message here');
 
       // Send first message
-      await user.type(input, "First message{Enter}");
+      await user.type(input, 'First message{Enter}');
       await waitFor(() => {
-        expect(mockOnSendMessage).toHaveBeenCalledWith("First message");
+        expect(mockOnSendMessage).toHaveBeenCalledWith('First message');
       });
 
       // Send second message
-      await user.type(input, "Second message{Enter}");
+      await user.type(input, 'Second message{Enter}');
       await waitFor(() => {
-        expect(mockOnSendMessage).toHaveBeenCalledWith("Second message");
+        expect(mockOnSendMessage).toHaveBeenCalledWith('Second message');
       });
 
       expect(mockOnSendMessage).toHaveBeenCalledTimes(2);

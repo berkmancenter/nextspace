@@ -1,14 +1,14 @@
-import { renderHook, act } from "@testing-library/react";
-import { useVisibilityAwareDuration } from "../../hooks/useVisibilityAwareDuration";
+import { renderHook, act } from '@testing-library/react';
+import { useVisibilityAwareDuration } from '../../hooks/useVisibilityAwareDuration';
 
-describe("useVisibilityAwareDuration", () => {
+describe('useVisibilityAwareDuration', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     // Set initial visibility state
-    Object.defineProperty(document, "visibilityState", {
+    Object.defineProperty(document, 'visibilityState', {
       writable: true,
       configurable: true,
-      value: "visible",
+      value: 'visible',
     });
   });
 
@@ -17,14 +17,14 @@ describe("useVisibilityAwareDuration", () => {
     jest.restoreAllMocks();
   });
 
-  it("should initialize with duration of 0", () => {
+  it('should initialize with duration of 0', () => {
     const { result } = renderHook(() => useVisibilityAwareDuration());
 
     expect(result.current.isRunning()).toBe(false);
     expect(result.current.getActiveDuration()).toBe(0);
   });
 
-  it("should start tracking duration", () => {
+  it('should start tracking duration', () => {
     const { result } = renderHook(() => useVisibilityAwareDuration());
 
     act(() => {
@@ -34,7 +34,7 @@ describe("useVisibilityAwareDuration", () => {
     expect(result.current.isRunning()).toBe(true);
   });
 
-  it("should calculate duration when stopped", () => {
+  it('should calculate duration when stopped', () => {
     const { result } = renderHook(() => useVisibilityAwareDuration());
 
     act(() => {
@@ -55,7 +55,7 @@ describe("useVisibilityAwareDuration", () => {
     expect(result.current.isRunning()).toBe(false);
   });
 
-  it("should return current duration without stopping", () => {
+  it('should return current duration without stopping', () => {
     const { result } = renderHook(() => useVisibilityAwareDuration());
 
     act(() => {
@@ -71,7 +71,7 @@ describe("useVisibilityAwareDuration", () => {
     expect(result.current.isRunning()).toBe(true);
   });
 
-  it("should pause duration tracking when page becomes hidden", () => {
+  it('should pause duration tracking when page becomes hidden', () => {
     const { result } = renderHook(() => useVisibilityAwareDuration());
 
     act(() => {
@@ -85,12 +85,12 @@ describe("useVisibilityAwareDuration", () => {
 
     // Simulate page becoming hidden
     act(() => {
-      Object.defineProperty(document, "visibilityState", {
+      Object.defineProperty(document, 'visibilityState', {
         writable: true,
         configurable: true,
-        value: "hidden",
+        value: 'hidden',
       });
-      document.dispatchEvent(new Event("visibilitychange"));
+      document.dispatchEvent(new Event('visibilitychange'));
     });
 
     // Advance time while hidden (should not count)
@@ -102,7 +102,7 @@ describe("useVisibilityAwareDuration", () => {
     expect(duration).toBe(2); // Only the 2 seconds before hiding
   });
 
-  it("should resume duration tracking when page becomes visible again", () => {
+  it('should resume duration tracking when page becomes visible again', () => {
     const { result } = renderHook(() => useVisibilityAwareDuration());
 
     act(() => {
@@ -116,12 +116,12 @@ describe("useVisibilityAwareDuration", () => {
 
     // Simulate page becoming hidden
     act(() => {
-      Object.defineProperty(document, "visibilityState", {
+      Object.defineProperty(document, 'visibilityState', {
         writable: true,
         configurable: true,
-        value: "hidden",
+        value: 'hidden',
       });
-      document.dispatchEvent(new Event("visibilitychange"));
+      document.dispatchEvent(new Event('visibilitychange'));
     });
 
     // Time passes while hidden (should not count)
@@ -131,12 +131,12 @@ describe("useVisibilityAwareDuration", () => {
 
     // Simulate page becoming visible again
     act(() => {
-      Object.defineProperty(document, "visibilityState", {
+      Object.defineProperty(document, 'visibilityState', {
         writable: true,
         configurable: true,
-        value: "visible",
+        value: 'visible',
       });
-      document.dispatchEvent(new Event("visibilitychange"));
+      document.dispatchEvent(new Event('visibilitychange'));
     });
 
     // Track for 3 more seconds while visible
@@ -152,7 +152,7 @@ describe("useVisibilityAwareDuration", () => {
     expect(duration).toBe(5); // 2 seconds before + 3 seconds after = 5 total active seconds
   });
 
-  it("should handle multiple pause/resume cycles", () => {
+  it('should handle multiple pause/resume cycles', () => {
     const { result } = renderHook(() => useVisibilityAwareDuration());
 
     act(() => {
@@ -166,37 +166,37 @@ describe("useVisibilityAwareDuration", () => {
 
     // First hidden period: 5 seconds (should not count)
     act(() => {
-      Object.defineProperty(document, "visibilityState", {
-        value: "hidden",
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'hidden',
       });
-      document.dispatchEvent(new Event("visibilitychange"));
+      document.dispatchEvent(new Event('visibilitychange'));
       jest.advanceTimersByTime(5000);
     });
 
     // Second active period: 3 seconds
     act(() => {
-      Object.defineProperty(document, "visibilityState", {
-        value: "visible",
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'visible',
       });
-      document.dispatchEvent(new Event("visibilitychange"));
+      document.dispatchEvent(new Event('visibilitychange'));
       jest.advanceTimersByTime(3000);
     });
 
     // Second hidden period: 10 seconds (should not count)
     act(() => {
-      Object.defineProperty(document, "visibilityState", {
-        value: "hidden",
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'hidden',
       });
-      document.dispatchEvent(new Event("visibilitychange"));
+      document.dispatchEvent(new Event('visibilitychange'));
       jest.advanceTimersByTime(10000);
     });
 
     // Third active period: 1 second
     act(() => {
-      Object.defineProperty(document, "visibilityState", {
-        value: "visible",
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'visible',
       });
-      document.dispatchEvent(new Event("visibilitychange"));
+      document.dispatchEvent(new Event('visibilitychange'));
       jest.advanceTimersByTime(1000);
     });
 
@@ -208,7 +208,7 @@ describe("useVisibilityAwareDuration", () => {
     expect(duration).toBe(6); // 2 + 3 + 1 = 6 seconds total active time
   });
 
-  it("should not track duration when not started", () => {
+  it('should not track duration when not started', () => {
     const { result } = renderHook(() => useVisibilityAwareDuration());
 
     // Try to get duration without starting
@@ -222,7 +222,7 @@ describe("useVisibilityAwareDuration", () => {
     });
   });
 
-  it("should reset duration after stopping", () => {
+  it('should reset duration after stopping', () => {
     const { result } = renderHook(() => useVisibilityAwareDuration());
 
     act(() => {
@@ -236,7 +236,7 @@ describe("useVisibilityAwareDuration", () => {
     expect(result.current.isRunning()).toBe(false);
   });
 
-  it("should be able to start again after stopping", () => {
+  it('should be able to start again after stopping', () => {
     const { result } = renderHook(() => useVisibilityAwareDuration());
 
     // First session
@@ -260,7 +260,7 @@ describe("useVisibilityAwareDuration", () => {
     expect(duration).toBe(2); // Only the second session
   });
 
-  it("should not start multiple times", () => {
+  it('should not start multiple times', () => {
     const { result } = renderHook(() => useVisibilityAwareDuration());
 
     act(() => {
@@ -278,29 +278,29 @@ describe("useVisibilityAwareDuration", () => {
     expect(duration).toBe(5); // Should count all time, not restart
   });
 
-  it("should not accumulate duration when visibility changes without being started", () => {
+  it('should not accumulate duration when visibility changes without being started', () => {
     const { result } = renderHook(() => useVisibilityAwareDuration());
 
     // Simulate visibility changes without starting
     act(() => {
-      Object.defineProperty(document, "visibilityState", {
-        value: "hidden",
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'hidden',
       });
-      document.dispatchEvent(new Event("visibilitychange"));
+      document.dispatchEvent(new Event('visibilitychange'));
       jest.advanceTimersByTime(5000);
     });
 
     act(() => {
-      Object.defineProperty(document, "visibilityState", {
-        value: "visible",
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'visible',
       });
-      document.dispatchEvent(new Event("visibilitychange"));
+      document.dispatchEvent(new Event('visibilitychange'));
     });
 
     expect(result.current.getActiveDuration()).toBe(0);
   });
 
-  it("should return a stable object reference across re-renders", () => {
+  it('should return a stable object reference across re-renders', () => {
     const { result, rerender } = renderHook(() => useVisibilityAwareDuration());
 
     const firstReference = result.current;
@@ -314,9 +314,7 @@ describe("useVisibilityAwareDuration", () => {
     expect(firstReference).toBe(secondReference);
     expect(firstReference.start).toBe(secondReference.start);
     expect(firstReference.stop).toBe(secondReference.stop);
-    expect(firstReference.getActiveDuration).toBe(
-      secondReference.getActiveDuration,
-    );
+    expect(firstReference.getActiveDuration).toBe(secondReference.getActiveDuration);
     expect(firstReference.isRunning).toBe(secondReference.isRunning);
   });
 });

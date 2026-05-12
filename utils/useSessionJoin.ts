@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { io, Socket } from "socket.io-client";
-import { Api } from "./";
-import SessionManager from "./SessionManager";
-import TokenManagerDefault from "./TokenManager";
+import { useEffect, useRef, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
+import { Api } from './';
+import SessionManager from './SessionManager';
+import TokenManagerDefault from './TokenManager';
 
 // Disconnections shorter than this are treated as transient network blips that
 // Socket.io's own reconnect loop handles cleanly. Longer gaps mean the client
@@ -31,7 +31,7 @@ const RECONNECT_GAP_THRESHOLD_MS = 10_000; // 10 seconds
 export function useSessionJoin(
   isAuthenticated?: boolean,
   onSuccess?: (result: { userId: string; pseudonym: string }) => void,
-  onError?: (error: string) => void
+  onError?: (error: string) => void,
 ) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [pseudonym, setPseudonym] = useState<string | null>(null);
@@ -47,9 +47,7 @@ export function useSessionJoin(
    * has occurred yet). Pages watch this value in a useEffect to trigger a
    * message-history re-fetch only when it changes.
    */
-  const [lastReconnectTime, setLastReconnectTime] = useState<number | null>(
-    null
-  );
+  const [lastReconnectTime, setLastReconnectTime] = useState<number | null>(null);
   // Records when the socket disconnected so we can measure gap duration on reconnect.
   const disconnectedAtRef = useRef<number | null>(null);
   // Keep a stable ref to the socket for use inside closures.
@@ -68,7 +66,7 @@ export function useSessionJoin(
     const sessionInfo = SessionManager.get().getSessionInfo();
 
     if (!sessionInfo) {
-      const error = "No session available";
+      const error = 'No session available';
       setErrorMessage(error);
       onError?.(error);
       return;
@@ -76,7 +74,7 @@ export function useSessionJoin(
 
     const tokens = Api.get().GetTokens();
     if (!tokens.access) {
-      const error = "No access token available";
+      const error = 'No access token available';
       setErrorMessage(error);
       onError?.(error);
       return;
@@ -121,9 +119,7 @@ export function useSessionJoin(
       if (disconnectedAt !== null) {
         const gapMs = Date.now() - disconnectedAt;
         if (gapMs >= RECONNECT_GAP_THRESHOLD_MS) {
-          console.log(
-            `Reconnected after ${Math.round(gapMs / 1000)}s gap — signalling history re-fetch`
-          );
+          console.log(`Reconnected after ${Math.round(gapMs / 1000)}s gap — signalling history re-fetch`);
           setLastReconnectTime(Date.now());
         }
         disconnectedAtRef.current = null;
@@ -137,7 +133,7 @@ export function useSessionJoin(
     };
 
     const handleError = (error: string) => {
-      console.error("Socket error:", error);
+      console.error('Socket error:', error);
     };
 
     /**
@@ -148,16 +144,16 @@ export function useSessionJoin(
      * retry the connection.
      */
     const handleConnectError = async (error: Error) => {
-      console.error("Socket connect_error:", error.message);
+      console.error('Socket connect_error:', error.message);
 
       const isAuthError =
-        error.message?.includes("401") ||
-        error.message?.includes("Unauthorized") ||
-        error.message?.includes("authentication") ||
-        error.message?.toLowerCase().includes("auth");
+        error.message?.includes('401') ||
+        error.message?.includes('Unauthorized') ||
+        error.message?.includes('authentication') ||
+        error.message?.toLowerCase().includes('auth');
 
       if (isAuthError) {
-        console.log("Socket auth error detected, refreshing token via TokenManager…");
+        console.log('Socket auth error detected, refreshing token via TokenManager…');
         const refreshed = await TokenManagerDefault.refresh();
         if (refreshed) {
           const newToken = TokenManagerDefault.getAccessToken();
@@ -165,24 +161,24 @@ export function useSessionJoin(
             // Update socket.auth so the next automatic reconnection attempt
             // uses the refreshed token
             (socket as any).auth = { token: newToken };
-            console.log("Socket auth token updated after connect_error");
+            console.log('Socket auth token updated after connect_error');
           }
         } else {
-          console.error("Token refresh failed during socket reconnect");
+          console.error('Token refresh failed during socket reconnect');
         }
       }
     };
 
-    socket.on("error", handleError);
-    socket.on("connect", handleConnect);
-    socket.on("disconnect", handleDisconnect);
-    socket.on("connect_error", handleConnectError);
+    socket.on('error', handleError);
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('connect_error', handleConnectError);
 
     return () => {
-      socket.off("error", handleError);
-      socket.off("connect", handleConnect);
-      socket.off("disconnect", handleDisconnect);
-      socket.off("connect_error", handleConnectError);
+      socket.off('error', handleError);
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('connect_error', handleConnectError);
     };
   }, [socket]);
 
@@ -206,12 +202,12 @@ export function useSessionJoin(
       if (newToken) {
         // Keep socket.auth up to date for the next reconnection attempt.
         (socket as any).auth = { token: newToken };
-        console.log("Socket auth token updated from TokenManager");
+        console.log('Socket auth token updated from TokenManager');
 
         // If the socket is currently disconnected (e.g. the tab was hidden
         // and the socket dropped), reconnect now that we have a fresh token.
         if (!socket.connected) {
-          console.log("Socket disconnected — reconnecting with fresh token…");
+          console.log('Socket disconnected — reconnecting with fresh token…');
           socket.connect();
         }
       }
@@ -228,20 +224,18 @@ export function useSessionJoin(
    */
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        console.log("Tab became visible — checking token expiry via TokenManager…");
+      if (document.visibilityState === 'visible') {
+        console.log('Tab became visible — checking token expiry via TokenManager…');
         // TokenManager will refresh if the token is expired or within the
         // 2-minute buffer, otherwise it's a no-op.
-        TokenManagerDefault.getValidToken().catch((err) =>
-          console.error("Visibility-change token check failed:", err)
-        );
+        TokenManagerDefault.getValidToken().catch((err) => console.error('Visibility-change token check failed:', err));
       }
     };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 

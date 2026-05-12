@@ -1,5 +1,5 @@
-"use client";
-import React, { useState, useRef, useEffect } from "react";
+'use client';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Alert,
   Autocomplete,
@@ -24,26 +24,21 @@ import {
   useTheme,
   useMediaQuery,
   MobileStepper,
-} from "@mui/material";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
-import dayjs from "dayjs";
-import { useRouter } from "next/router";
-import { Request } from "../utils";
-import { EventStatus } from "./";
-import { components } from "../types";
-import { Conversation } from "../types.internal";
-import { createConversationFromData, Api, SendData } from "../utils/Helpers";
-import SessionManager from "../utils/SessionManager";
-import { NewTopicForm, NewTopicFormValues } from "./NewTopicForm";
+} from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import dayjs from 'dayjs';
+import { useRouter } from 'next/router';
+import { Request } from '../utils';
+import { EventStatus } from './';
+import { components } from '../types';
+import { Conversation } from '../types.internal';
+import { createConversationFromData, Api, SendData } from '../utils/Helpers';
+import SessionManager from '../utils/SessionManager';
+import { NewTopicForm, NewTopicFormValues } from './NewTopicForm';
 
-const steps = [
-  "Event Details",
-  "Conversation Setup",
-  "Configuration",
-  "Moderators & Speakers",
-];
+const steps = ['Event Details', 'Conversation Setup', 'Configuration', 'Moderators & Speakers'];
 
 /**
  * EventCreationForm component
@@ -58,74 +53,59 @@ const steps = [
 export const EventCreationForm: React.FC = ({}) => {
   const router = useRouter();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const [activeStep, setActiveStep] = useState(0);
 
   const [eventNameHasError, setEventNameHasError] = useState<boolean>(false);
-  const [eventName, setEventName] = useState<string>("");
-  const [eventDescription, setEventDescription] = useState<string>("");
+  const [eventName, setEventName] = useState<string>('');
+  const [eventDescription, setEventDescription] = useState<string>('');
 
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [selectedConvType, setSelectedConvType] = useState<string | null>(null);
-  const [supportedModels, setSupportedModels] = useState<
-    components["schemas"]["LlmModelDetails"][] | null
-  >(null);
-  const [availablePlatforms, setAvailablePlatforms] = useState<
-    components["schemas"]["PlatformConfig"][] | null
-  >(null);
-  const [conversationTypes, setConversationTypes] = useState<
-    components["schemas"]["ConversationType"][] | null
-  >(null);
+  const [supportedModels, setSupportedModels] = useState<components['schemas']['LlmModelDetails'][] | null>(null);
+  const [availablePlatforms, setAvailablePlatforms] = useState<components['schemas']['PlatformConfig'][] | null>(null);
+  const [conversationTypes, setConversationTypes] = useState<components['schemas']['ConversationType'][] | null>(null);
 
-  const [zoomMeetingUrl, setZoomMeetingUrl] = useState<string>("");
-  const [zoomMeetingUrlHasError, setZoomMeetingUrlHasError] =
-    useState<boolean>(false);
-  const [zoomMeetingTime, setZoomMeetingTime] = useState<string>("");
-  const [scheduledEndTime, setScheduledEndTime] = useState<string>("");
-  const [scheduledEndTimeHasError, setScheduledEndTimeHasError] =
-    useState<boolean>(false);
-  const [zoomMeetingTimeHasError, setZoomMeetingTimeHasError] =
-    useState<boolean>(false);
-  const [zoomMeetingTimeErrorMessage, setZoomMeetingTimeErrorMessage] =
-    useState<string>("Meeting Start Time is required when an end time is provided.");
+  const [zoomMeetingUrl, setZoomMeetingUrl] = useState<string>('');
+  const [zoomMeetingUrlHasError, setZoomMeetingUrlHasError] = useState<boolean>(false);
+  const [zoomMeetingTime, setZoomMeetingTime] = useState<string>('');
+  const [scheduledEndTime, setScheduledEndTime] = useState<string>('');
+  const [scheduledEndTimeHasError, setScheduledEndTimeHasError] = useState<boolean>(false);
+  const [zoomMeetingTimeHasError, setZoomMeetingTimeHasError] = useState<boolean>(false);
+  const [zoomMeetingTimeErrorMessage, setZoomMeetingTimeErrorMessage] = useState<string>(
+    'Meeting Start Time is required when an end time is provided.',
+  );
 
-  const [dynamicPropertyValues, setDynamicPropertyValues] = useState<
-    Record<string, any>
-  >({});
+  const [dynamicPropertyValues, setDynamicPropertyValues] = useState<Record<string, any>>({});
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [conversationData, setConversationData] = useState<Conversation | null>(
-    null,
-  );
+  const [conversationData, setConversationData] = useState<Conversation | null>(null);
 
   const [formGroupsErrors, setFormGroupsErrors] = useState({
     platforms: false,
     conversationType: false,
   });
-  const [platformsPreviouslyChecked, setPlatformsPreviouslyChecked] =
-    useState(false);
+  const [platformsPreviouslyChecked, setPlatformsPreviouslyChecked] = useState(false);
 
   // Moderators and Speakers state
-  const [moderators, setModerators] = useState<
-    Array<{ name: string; bio: string; alternateName?: string }>
-  >([{ name: "", bio: "" }]);
-  const [speakers, setSpeakers] = useState<
-    Array<{ name: string; bio: string; alternateName?: string }>
-  >([{ name: "", bio: "" }]);
+  const [moderators, setModerators] = useState<Array<{ name: string; bio: string; alternateName?: string }>>([
+    { name: '', bio: '' },
+  ]);
+  const [speakers, setSpeakers] = useState<Array<{ name: string; bio: string; alternateName?: string }>>([
+    { name: '', bio: '' },
+  ]);
   const [showModerators, setShowModerators] = useState<boolean>(false);
 
   // Topic (Event Series) state
-  const [topicMode, setTopicMode] = useState<"existing" | "new">("existing");
-  const [availableTopics, setAvailableTopics] = useState<
-    components["schemas"]["Topic"][] | null
-  >(null);
+  const [topicMode, setTopicMode] = useState<'existing' | 'new'>('existing');
+  const [availableTopics, setAvailableTopics] = useState<components['schemas']['Topic'][] | null>(null);
   const [topicsLoading, setTopicsLoading] = useState<boolean>(false);
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [topicHasError, setTopicHasError] = useState<boolean>(false);
   const [newTopic, setNewTopic] = useState<NewTopicFormValues>({
-    name: "",
-    description: "",
+    name: '',
+    description: '',
     public: false,
   });
 
@@ -142,10 +122,10 @@ export const EventCreationForm: React.FC = ({}) => {
         // Initialize dynamic property values with defaults
         const initialValues: Record<string, any> = {};
         type.properties?.forEach((prop) => {
-          if (prop.name !== "zoomMeetingUrl") {
+          if (prop.name !== 'zoomMeetingUrl') {
             if (prop.default !== undefined) {
               initialValues[prop.name] = prop.default;
-            } else if (prop.type === "enum" && prop.options) {
+            } else if (prop.type === 'enum' && prop.options) {
               // For enum types (single-choice like llmModel)
               if (Array.isArray(prop.options) && prop.options.length > 0) {
                 const firstOption = prop.options[0];
@@ -153,11 +133,7 @@ export const EventCreationForm: React.FC = ({}) => {
                   // Extract values using validationKeys
                   const defaultValue: Record<string, any> = {};
                   prop.validationKeys.forEach((key) => {
-                    if (
-                      typeof firstOption === "object" &&
-                      firstOption !== null &&
-                      key in firstOption
-                    ) {
+                    if (typeof firstOption === 'object' && firstOption !== null && key in firstOption) {
                       defaultValue[key] = (firstOption as any)[key];
                     }
                   });
@@ -166,9 +142,9 @@ export const EventCreationForm: React.FC = ({}) => {
                   initialValues[prop.name] = firstOption;
                 }
               }
-            } else if (prop.type === "object" && prop.schema) {
+            } else if (prop.type === 'object' && prop.schema) {
               // For object types with schema (multi-item like interventionCategories)
-              const itemKey = prop.itemKey || "name";
+              const itemKey = prop.itemKey || 'name';
               const categoryDefaults: Record<string, any> = {};
 
               prop.schema.forEach((schemaItem: any) => {
@@ -176,10 +152,9 @@ export const EventCreationForm: React.FC = ({}) => {
                   // Build default object from the schema item's default* properties
                   const itemValue: Record<string, any> = {};
                   Object.keys(schemaItem).forEach((key) => {
-                    if (key.startsWith("default")) {
+                    if (key.startsWith('default')) {
                       const actualKey =
-                        key.replace("default", "").charAt(0).toLowerCase() +
-                        key.replace("default", "").slice(1);
+                        key.replace('default', '').charAt(0).toLowerCase() + key.replace('default', '').slice(1);
                       itemValue[actualKey] = schemaItem[key];
                     }
                   });
@@ -222,19 +197,17 @@ export const EventCreationForm: React.FC = ({}) => {
     async function fetchServerConfig() {
       try {
         const config = await Api.get().GetConfig();
-        const { supportedModels, availablePlatforms, conversationTypes } =
-          config;
+        const { supportedModels, availablePlatforms, conversationTypes } = config;
 
         setSupportedModels(supportedModels);
         setAvailablePlatforms(availablePlatforms);
         setConversationTypes(conversationTypes);
       } catch (error) {
-        setFormError("Failed to load configuration.");
+        setFormError('Failed to load configuration.');
       }
     }
 
-    if (!supportedModels || !availablePlatforms || !conversationTypes)
-      fetchServerConfig();
+    if (!supportedModels || !availablePlatforms || !conversationTypes) fetchServerConfig();
   }, [supportedModels, availablePlatforms, conversationTypes]);
 
   useEffect(() => {
@@ -242,25 +215,14 @@ export const EventCreationForm: React.FC = ({}) => {
       setTopicsLoading(true);
       try {
         const userId = SessionManager.get().getSessionInfo()?.userId;
-        const [allData, userData] = await Promise.all([
-          Request("topics"),
-          Request("topics/userTopics"),
-        ]);
+        const [allData, userData] = await Promise.all([Request('topics'), Request('topics/userTopics')]);
 
-        const allTopics: components["schemas"]["Topic"][] = Array.isArray(
-          allData,
-        )
-          ? allData
-          : [];
-        const userTopics: components["schemas"]["Topic"][] = Array.isArray(
-          userData,
-        )
-          ? userData
-          : [];
+        const allTopics: components['schemas']['Topic'][] = Array.isArray(allData) ? allData : [];
+        const userTopics: components['schemas']['Topic'][] = Array.isArray(userData) ? userData : [];
 
         // Merge, deduplicate by id, exclude archived
         const seen = new Set<string>();
-        const merged: components["schemas"]["Topic"][] = [];
+        const merged: components['schemas']['Topic'][] = [];
         for (const t of [...allTopics, ...userTopics]) {
           if (!t.id || seen.has(t.id) || t.archived || t.isDeleted) continue;
           // Keep public topics or private topics owned by current user
@@ -283,54 +245,54 @@ export const EventCreationForm: React.FC = ({}) => {
 
   const validateStep1 = () => {
     // Check that required fields are present
-    if (!eventName || eventName.trim() === "") {
-      setFormError("Event Name is required");
-      setFieldFocus("name");
+    if (!eventName || eventName.trim() === '') {
+      setFormError('Event Name is required');
+      setFieldFocus('name');
       return false;
     }
 
     // Check topic/series selection
-    if (topicMode === "existing") {
+    if (topicMode === 'existing') {
       if (!selectedTopicId) {
-        setFormError("An Event Series is required");
+        setFormError('An Event Series is required');
         setTopicHasError(true);
         return false;
       }
     } else {
       if (!newTopic.name.trim()) {
-        setFormError("Series name is required");
+        setFormError('Series name is required');
         return false;
       }
     }
 
     // Check zoom fields
     if (!zoomMeetingUrl) {
-      setFormError("Zoom Meeting URL is required");
-      setFieldFocus("zoomMeetingUrl");
+      setFormError('Zoom Meeting URL is required');
+      setFieldFocus('zoomMeetingUrl');
       return false;
     }
 
     if (zoomMeetingTime && new Date(zoomMeetingTime) < new Date(Date.now() + 10 * 60 * 1000)) {
-      setFormError("Meeting Start Time must be at least 10 minutes from now");
-      setZoomMeetingTimeErrorMessage("Meeting Start Time must be at least 10 minutes from now.");
+      setFormError('Meeting Start Time must be at least 10 minutes from now');
+      setZoomMeetingTimeErrorMessage('Meeting Start Time must be at least 10 minutes from now.');
       setZoomMeetingTimeHasError(true);
       return false;
     }
 
     if (scheduledEndTime && !zoomMeetingTime) {
-      setFormError("Meeting Start Time is required when an end time is provided");
-      setZoomMeetingTimeErrorMessage("Meeting Start Time is required when an end time is provided.");
+      setFormError('Meeting Start Time is required when an end time is provided');
+      setZoomMeetingTimeErrorMessage('Meeting Start Time is required when an end time is provided.');
       setZoomMeetingTimeHasError(true);
       return false;
     }
 
     if (zoomMeetingTime && !scheduledEndTime) {
-      setFormError("Meeting End Time is required when a start time is provided");
+      setFormError('Meeting End Time is required when a start time is provided');
       return false;
     }
 
     if (zoomMeetingTime && scheduledEndTime && scheduledEndTime <= zoomMeetingTime) {
-      setFormError("Meeting End Time must be after the start time");
+      setFormError('Meeting End Time must be after the start time');
       return false;
     }
 
@@ -342,23 +304,23 @@ export const EventCreationForm: React.FC = ({}) => {
   const validateStep2 = () => {
     // Check that at least one platform is selected
     if (selectedPlatforms.length === 0) {
-      setFormError("At least one platform must be selected");
-      setFieldFocus("nextspace");
+      setFormError('At least one platform must be selected');
+      setFieldFocus('nextspace');
       setFormGroupsErrors((prev) => ({ ...prev, platforms: true }));
       return false;
     }
 
     // Check that agent is selected
     if (!selectedConvType) {
-      setFormError("At least one agent must be selected");
-      setFieldFocus("agent-option-0");
+      setFormError('At least one agent must be selected');
+      setFieldFocus('agent-option-0');
       setFormGroupsErrors((prev) => ({ ...prev, conversationType: true }));
       return false;
     }
 
     // Check form validity using HTML validation
     if (!formRef.current?.checkValidity()) {
-      setFormError("Please fill out all required fields.");
+      setFormError('Please fill out all required fields.');
       return false;
     }
 
@@ -378,7 +340,7 @@ export const EventCreationForm: React.FC = ({}) => {
 
   // Moderator management functions
   const addModerator = () => {
-    setModerators([...moderators, { name: "", bio: "" }]);
+    setModerators([...moderators, { name: '', bio: '' }]);
   };
 
   const removeModerator = (index: number) => {
@@ -387,11 +349,7 @@ export const EventCreationForm: React.FC = ({}) => {
     }
   };
 
-  const updateModerator = (
-    index: number,
-    field: "name" | "bio" | "alternateName",
-    value: string,
-  ) => {
+  const updateModerator = (index: number, field: 'name' | 'bio' | 'alternateName', value: string) => {
     const updated = [...moderators];
     updated[index][field] = value;
     setModerators(updated);
@@ -399,7 +357,7 @@ export const EventCreationForm: React.FC = ({}) => {
 
   // Speaker management functions
   const addSpeaker = () => {
-    setSpeakers([...speakers, { name: "", bio: "" }]);
+    setSpeakers([...speakers, { name: '', bio: '' }]);
   };
 
   const removeSpeaker = (index: number) => {
@@ -408,11 +366,7 @@ export const EventCreationForm: React.FC = ({}) => {
     }
   };
 
-  const updateSpeaker = (
-    index: number,
-    field: "name" | "bio" | "alternateName",
-    value: string,
-  ) => {
+  const updateSpeaker = (index: number, field: 'name' | 'bio' | 'alternateName', value: string) => {
     const updated = [...speakers];
     updated[index][field] = value;
     setSpeakers(updated);
@@ -421,21 +375,18 @@ export const EventCreationForm: React.FC = ({}) => {
   // Helper function to render dynamic property fields.
   // Pass `namespace` (feature name) to scope sub-property keys and prevent
   // collisions when multiple features share the same property name.
-  const renderDynamicPropertyField = (
-    prop: components["schemas"]["ConfigProperty"],
-    namespace?: string,
-  ) => {
+  const renderDynamicPropertyField = (prop: components['schemas']['ConfigProperty'], namespace?: string) => {
     const stateKey = namespace ? `${namespace}.${prop.name}` : prop.name;
     const value = dynamicPropertyValues[stateKey];
 
     switch (prop.type) {
-      case "string":
+      case 'string':
         return (
           <TextField
             key={stateKey}
             name={stateKey}
             label={prop.label}
-            value={value || prop.default || ""}
+            value={value || prop.default || ''}
             helperText={prop.description}
             fullWidth
             variant="outlined"
@@ -450,16 +401,14 @@ export const EventCreationForm: React.FC = ({}) => {
           />
         );
 
-      case "number":
+      case 'number':
         return (
           <TextField
             key={stateKey}
             name={stateKey}
             label={prop.label}
             type="number"
-            value={
-              value === 0 || value === null || value === undefined ? "" : value
-            }
+            value={value === 0 || value === null || value === undefined ? '' : value}
             helperText={prop.description}
             fullWidth
             variant="outlined"
@@ -468,7 +417,7 @@ export const EventCreationForm: React.FC = ({}) => {
             slotProps={{ htmlInput: { min: 0, step: 1 } }}
             onChange={(e) => {
               const inputValue = e.target.value;
-              if (inputValue === "") {
+              if (inputValue === '') {
                 setDynamicPropertyValues((prev) => ({
                   ...prev,
                   [stateKey]: 0,
@@ -484,15 +433,13 @@ export const EventCreationForm: React.FC = ({}) => {
           />
         );
 
-      case "boolean":
+      case 'boolean':
         return (
           <FormControlLabel
             key={stateKey}
             control={
               <Checkbox
-                checked={
-                  value !== undefined ? Boolean(value) : Boolean(prop.default)
-                }
+                checked={value !== undefined ? Boolean(value) : Boolean(prop.default)}
                 onChange={(e) => {
                   setDynamicPropertyValues((prev) => ({
                     ...prev,
@@ -506,7 +453,7 @@ export const EventCreationForm: React.FC = ({}) => {
           />
         );
 
-      case "enum":
+      case 'enum':
         // Single-choice enum (like llmModel) - renders as radio buttons
         if (prop.options && Array.isArray(prop.options)) {
           return (
@@ -517,31 +464,27 @@ export const EventCreationForm: React.FC = ({}) => {
               margin="normal"
               required={prop.required}
               sx={{
-                border: "1px solid rgba(0, 0, 0, 0.23)",
+                border: '1px solid rgba(0, 0, 0, 0.23)',
                 borderRadius: 1,
                 p: 2,
-                "&:focus-within": {
-                  borderColor: "primary.main",
-                  borderWidth: "2px",
+                '&:focus-within': {
+                  borderColor: 'primary.main',
+                  borderWidth: '2px',
                 },
               }}
             >
               <FormLabel
                 component="legend"
                 sx={{
-                  fontSize: "0.875rem",
+                  fontSize: '0.875rem',
                   fontWeight: 500,
-                  color: "rgba(0, 0, 0, 0.87)",
+                  color: 'rgba(0, 0, 0, 0.87)',
                 }}
               >
                 {prop.label}
               </FormLabel>
               {prop.description && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ mb: 1, display: "block" }}
-                >
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
                   {prop.description}
                 </Typography>
               )}
@@ -556,7 +499,7 @@ export const EventCreationForm: React.FC = ({}) => {
                       [stateKey]: parsedValue,
                     }));
                   } catch (err) {
-                    console.error("Failed to parse radio value:", err);
+                    console.error('Failed to parse radio value:', err);
                   }
                 }}
                 sx={{ mt: 1 }}
@@ -566,11 +509,7 @@ export const EventCreationForm: React.FC = ({}) => {
                   const optionValue: Record<string, any> = {};
                   if (prop.validationKeys) {
                     prop.validationKeys.forEach((key) => {
-                      if (
-                        typeof option === "object" &&
-                        option !== null &&
-                        key in option
-                      ) {
+                      if (typeof option === 'object' && option !== null && key in option) {
                         optionValue[key] = option[key];
                       }
                     });
@@ -582,10 +521,8 @@ export const EventCreationForm: React.FC = ({}) => {
                           value={JSON.stringify(option)}
                           control={<Radio />}
                           label={
-                            typeof option === "object" && option !== null
-                              ? option.label ||
-                                option.name ||
-                                `Option ${idx + 1}`
+                            typeof option === 'object' && option !== null
+                              ? option.label || option.name || `Option ${idx + 1}`
                               : String(option)
                           }
                         />
@@ -598,15 +535,9 @@ export const EventCreationForm: React.FC = ({}) => {
                       <FormControlLabel
                         value={JSON.stringify(optionValue)}
                         control={<Radio />}
-                        label={
-                          option.label || option.name || `Option ${idx + 1}`
-                        }
+                        label={option.label || option.name || `Option ${idx + 1}`}
                       />
-                      {option.description && (
-                        <div className="text-gray-600 text-sm ml-8 -mt-2">
-                          {option.description}
-                        </div>
-                      )}
+                      {option.description && <div className="text-gray-600 text-sm ml-8 -mt-2">{option.description}</div>}
                     </div>
                   );
                 })}
@@ -616,30 +547,26 @@ export const EventCreationForm: React.FC = ({}) => {
         }
         return null;
 
-      case "object":
+      case 'object':
         // Multi-item object configuration (like interventionCategories)
         if (prop.schema && Array.isArray(prop.schema)) {
-          const itemKey = prop.itemKey || "name";
+          const itemKey = prop.itemKey || 'name';
 
           return (
             <Box key={stateKey} sx={{ mb: 3 }}>
               <FormLabel
                 sx={{
-                  fontSize: "0.875rem",
+                  fontSize: '0.875rem',
                   fontWeight: 500,
-                  color: "rgba(0, 0, 0, 0.87)",
+                  color: 'rgba(0, 0, 0, 0.87)',
                   mb: 1,
-                  display: "block",
+                  display: 'block',
                 }}
               >
                 {prop.label}
               </FormLabel>
               {prop.description && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ mb: 2, display: "block" }}
-                >
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
                   {prop.description}
                 </Typography>
               )}
@@ -653,10 +580,9 @@ export const EventCreationForm: React.FC = ({}) => {
                     (() => {
                       const defaults: Record<string, any> = {};
                       Object.keys(schemaItem).forEach((k) => {
-                        if (k.startsWith("default")) {
+                        if (k.startsWith('default')) {
                           const actualKey =
-                            k.replace("default", "").charAt(0).toLowerCase() +
-                            k.replace("default", "").slice(1);
+                            k.replace('default', '').charAt(0).toLowerCase() + k.replace('default', '').slice(1);
                           defaults[actualKey] = schemaItem[k];
                         }
                       });
@@ -666,13 +592,7 @@ export const EventCreationForm: React.FC = ({}) => {
                   // Get all editable fields (exclude metadata like name, label, description)
                   const editableFields = Object.keys(itemValue).filter(
                     (fieldKey) =>
-                      ![
-                        "name",
-                        "label",
-                        "description",
-                        "interventions",
-                        "requiresPrivateMessages",
-                      ].includes(fieldKey),
+                      !['name', 'label', 'description', 'interventions', 'requiresPrivateMessages'].includes(fieldKey),
                   );
 
                   return (
@@ -681,23 +601,16 @@ export const EventCreationForm: React.FC = ({}) => {
                       sx={{
                         mb: 2,
                         p: 2,
-                        border: "1px solid rgba(0, 0, 0, 0.12)",
+                        border: '1px solid rgba(0, 0, 0, 0.12)',
                         borderRadius: 1,
                       }}
                     >
                       <Box>
-                        <Typography
-                          variant="subtitle2"
-                          sx={{ fontWeight: 600 }}
-                        >
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                           {schemaItem.label || schemaItem.name || key}
                         </Typography>
                         {schemaItem.description && (
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: "block", mb: 1 }}
-                          >
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                             {schemaItem.description}
                           </Typography>
                         )}
@@ -709,7 +622,7 @@ export const EventCreationForm: React.FC = ({}) => {
                           const fieldValue = itemValue[fieldKey];
 
                           // Render boolean fields as checkboxes
-                          if (typeof fieldValue === "boolean") {
+                          if (typeof fieldValue === 'boolean') {
                             return (
                               <FormControlLabel
                                 key={fieldKey}
@@ -730,35 +643,29 @@ export const EventCreationForm: React.FC = ({}) => {
                                     }}
                                   />
                                 }
-                                label={
-                                  fieldKey.charAt(0).toUpperCase() +
-                                  fieldKey.slice(1)
-                                }
+                                label={fieldKey.charAt(0).toUpperCase() + fieldKey.slice(1)}
                               />
                             );
                           }
 
                           // Render numeric fields as number inputs
-                          if (typeof fieldValue === "number") {
+                          if (typeof fieldValue === 'number') {
                             return (
                               <TextField
                                 key={fieldKey}
-                                label={
-                                  fieldKey.charAt(0).toUpperCase() +
-                                  fieldKey.slice(1)
-                                }
+                                label={fieldKey.charAt(0).toUpperCase() + fieldKey.slice(1)}
                                 type="number"
-                                value={fieldValue === 0 ? "" : fieldValue}
+                                value={fieldValue === 0 ? '' : fieldValue}
                                 slotProps={{
                                   htmlInput: { min: 0, max: 10, step: 1 },
                                 }}
                                 size="small"
-                                sx={{ mt: 1, width: "100%" }}
+                                sx={{ mt: 1, width: '100%' }}
                                 onChange={(e) => {
                                   const inputValue = e.target.value;
 
                                   let newValue;
-                                  if (inputValue === "") {
+                                  if (inputValue === '') {
                                     newValue = 0;
                                   } else {
                                     const numValue = parseInt(inputValue, 10);
@@ -780,17 +687,14 @@ export const EventCreationForm: React.FC = ({}) => {
                           }
 
                           // Render string fields as text inputs
-                          if (typeof fieldValue === "string") {
+                          if (typeof fieldValue === 'string') {
                             return (
                               <TextField
                                 key={fieldKey}
-                                label={
-                                  fieldKey.charAt(0).toUpperCase() +
-                                  fieldKey.slice(1)
-                                }
+                                label={fieldKey.charAt(0).toUpperCase() + fieldKey.slice(1)}
                                 value={fieldValue}
                                 size="small"
-                                sx={{ mt: 1, width: "100%" }}
+                                sx={{ mt: 1, width: '100%' }}
                                 onChange={(e) => {
                                   setDynamicPropertyValues((prev) => ({
                                     ...prev,
@@ -848,7 +752,7 @@ export const EventCreationForm: React.FC = ({}) => {
 
     // Resolve topic ID: create new topic if needed
     let topicId = selectedTopicId;
-    if (topicMode === "new") {
+    if (topicMode === 'new') {
       const topicPayload: Record<string, any> = {
         name: newTopic.name,
         private: !newTopic.public,
@@ -860,27 +764,21 @@ export const EventCreationForm: React.FC = ({}) => {
         }),
       };
       try {
-        const topicResult = await Request("topics", topicPayload);
+        const topicResult = await Request('topics', topicPayload);
         if (!topicResult || topicResult.error) {
-          setFormError(
-            topicResult?.message?.message || "Failed to create Event Series.",
-          );
+          setFormError(topicResult?.message?.message || 'Failed to create Event Series.');
           return;
         }
         topicId = topicResult.id;
       } catch (error) {
-        setFormError("Failed to create Event Series");
+        setFormError('Failed to create Event Series');
         return;
       }
     }
 
     // Filter out empty moderators and speakers
-    const validModerators = showModerators
-      ? moderators.filter((m) => m.name.trim() !== "" || m.bio.trim() !== "")
-      : [];
-    const validSpeakers = speakers.filter(
-      (s) => s.name.trim() !== "" || s.bio.trim() !== "",
-    );
+    const validModerators = showModerators ? moderators.filter((m) => m.name.trim() !== '' || m.bio.trim() !== '') : [];
+    const validSpeakers = speakers.filter((s) => s.name.trim() !== '' || s.bio.trim() !== '');
 
     let body: any = {
       name: eventName,
@@ -899,13 +797,11 @@ export const EventCreationForm: React.FC = ({}) => {
       zoomMeetingUrl,
     };
 
-    const selectedType = conversationTypes?.find(
-      (type) => type.name === selectedConvType,
-    );
+    const selectedType = conversationTypes?.find((type) => type.name === selectedConvType);
 
     if (selectedType?.properties) {
       selectedType.properties.forEach((prop) => {
-        if (prop.name === "zoomMeetingUrl") {
+        if (prop.name === 'zoomMeetingUrl') {
           // Already handled above
           return;
         }
@@ -913,7 +809,7 @@ export const EventCreationForm: React.FC = ({}) => {
         const value = dynamicPropertyValues[prop.name];
 
         // Only include the property if it has a value or if it's required
-        if (value !== undefined && value !== null && value !== "") {
+        if (value !== undefined && value !== null && value !== '') {
           properties[prop.name] = value;
         } else if (prop.required && prop.default !== undefined) {
           properties[prop.name] = prop.default;
@@ -927,7 +823,7 @@ export const EventCreationForm: React.FC = ({}) => {
         const config: Record<string, any> = {};
         feature.properties?.forEach((prop) => {
           const value = dynamicPropertyValues[`${feature.name}.${prop.name}`];
-          if (value !== undefined && value !== null && value !== "") {
+          if (value !== undefined && value !== null && value !== '') {
             config[prop.name] = value;
           } else if (prop.default !== undefined) {
             config[prop.name] = prop.default;
@@ -942,16 +838,14 @@ export const EventCreationForm: React.FC = ({}) => {
       ...(features.length > 0 && { features }),
     };
 
-    Request("conversations/from-type", body)
+    Request('conversations/from-type', body)
       .then((data) => {
         if (!data) {
-          setFormError("Failed to send data. Please try again.");
+          setFormError('Failed to send data. Please try again.');
           return;
         }
-        if ("error" in data) {
-          setFormError(
-            data.message?.message || "Failed to create conversation.",
-          );
+        if ('error' in data) {
+          setFormError(data.message?.message || 'Failed to create conversation.');
           return;
         }
         createConversationFromData(data).then((conversation) => {
@@ -960,7 +854,7 @@ export const EventCreationForm: React.FC = ({}) => {
         });
       })
       .catch((error) => {
-        console.error("Error sending data:", error);
+        console.error('Error sending data:', error);
         setFormError(`Failed to send data. (${error.message})`);
       });
   };
@@ -974,10 +868,7 @@ export const EventCreationForm: React.FC = ({}) => {
       <Typography variant="h4" className="text-center" gutterBottom>
         Create Event
       </Typography>
-      <Paper
-        elevation={3}
-        sx={{ p: 4, maxWidth: 800, mx: "auto", mt: 4, mb: 4 }}
-      >
+      <Paper elevation={3} sx={{ p: 4, maxWidth: 800, mx: 'auto', mt: 4, mb: 4 }}>
         {isMobile ? (
           <MobileStepper
             variant="dots"
@@ -986,18 +877,14 @@ export const EventCreationForm: React.FC = ({}) => {
             activeStep={activeStep}
             sx={{
               mb: 2,
-              justifyContent: "center",
-              background: "transparent",
+              justifyContent: 'center',
+              background: 'transparent',
             }}
             nextButton={<span />}
             backButton={<span />}
           />
         ) : (
-          <Stepper
-            activeStep={activeStep}
-            orientation="horizontal"
-            sx={{ mb: 4 }}
-          >
+          <Stepper activeStep={activeStep} orientation="horizontal" sx={{ mb: 4 }}>
             {steps.map((label) => (
               <Step key={label}>
                 <StepLabel>{label}</StepLabel>
@@ -1010,7 +897,7 @@ export const EventCreationForm: React.FC = ({}) => {
           <Snackbar
             open={Boolean(formError)}
             autoHideDuration={4000}
-            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             onClose={() => {
               setFormError(null);
             }}
@@ -1045,17 +932,11 @@ export const EventCreationForm: React.FC = ({}) => {
                 required
                 value={eventName}
                 onChange={(e) => setEventName(e.target.value)}
-                helperText={
-                  eventNameHasError ? "Enter a name for your event." : null
-                }
+                helperText={eventNameHasError ? 'Enter a name for your event.' : null}
                 onBlur={() =>
                   setEventNameHasError(
-                    !formRef.current?.elements.namedItem("name") ||
-                      !(
-                        formRef.current.elements.namedItem(
-                          "name",
-                        ) as HTMLInputElement
-                      ).value,
+                    !formRef.current?.elements.namedItem('name') ||
+                      !(formRef.current.elements.namedItem('name') as HTMLInputElement).value,
                   )
                 }
                 error={eventNameHasError}
@@ -1082,23 +963,21 @@ export const EventCreationForm: React.FC = ({}) => {
                 margin="normal"
                 error={topicHasError}
                 sx={{
-                  border: topicHasError
-                    ? "2px solid red"
-                    : "1px solid rgba(0, 0, 0, 0.23)",
+                  border: topicHasError ? '2px solid red' : '1px solid rgba(0, 0, 0, 0.23)',
                   borderRadius: 1,
                   p: 2,
-                  "&:focus-within": {
-                    borderColor: "primary.main",
-                    borderWidth: "2px",
+                  '&:focus-within': {
+                    borderColor: 'primary.main',
+                    borderWidth: '2px',
                   },
                 }}
               >
                 <FormLabel
                   component="legend"
                   sx={{
-                    fontSize: "0.875rem",
+                    fontSize: '0.875rem',
                     fontWeight: 500,
-                    color: "rgba(0, 0, 0, 0.87)",
+                    color: 'rgba(0, 0, 0, 0.87)',
                   }}
                 >
                   Event Series *
@@ -1107,42 +986,25 @@ export const EventCreationForm: React.FC = ({}) => {
                   row
                   value={topicMode}
                   onChange={(e) => {
-                    setTopicMode(e.target.value as "existing" | "new");
+                    setTopicMode(e.target.value as 'existing' | 'new');
                     setTopicHasError(false);
                   }}
                   sx={{ mb: 1 }}
                 >
-                  <FormControlLabel
-                    value="existing"
-                    control={<Radio size="small" />}
-                    label="Choose existing series"
-                  />
-                  <FormControlLabel
-                    value="new"
-                    control={<Radio size="small" />}
-                    label="Create new series"
-                  />
+                  <FormControlLabel value="existing" control={<Radio size="small" />} label="Choose existing series" />
+                  <FormControlLabel value="new" control={<Radio size="small" />} label="Create new series" />
                 </RadioGroup>
 
-                {topicMode === "existing" && (
+                {topicMode === 'existing' && (
                   <Autocomplete
                     options={[...(availableTopics ?? [])].sort(
-                      (a, b) =>
-                        Number(a.private) - Number(b.private) ||
-                        a.name.localeCompare(b.name),
+                      (a, b) => Number(a.private) - Number(b.private) || a.name.localeCompare(b.name),
                     )}
                     loading={topicsLoading}
-                    groupBy={(option) =>
-                      option.private ? "Private (Yours)" : "Public"
-                    }
+                    groupBy={(option) => (option.private ? 'Private (Yours)' : 'Public')}
                     getOptionLabel={(option) => option.name}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    value={
-                      availableTopics?.find((t) => t.id === selectedTopicId) ??
-                      null
-                    }
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    value={availableTopics?.find((t) => t.id === selectedTopicId) ?? null}
                     onBlur={() => setTopicHasError(!selectedTopicId)}
                     onChange={(_, value) => {
                       setSelectedTopicId(value?.id ?? null);
@@ -1152,10 +1014,7 @@ export const EventCreationForm: React.FC = ({}) => {
                       <Box component="li" {...props} key={option.id}>
                         <Box sx={{ flexGrow: 1 }}>{option.name}</Box>
                         {option.private && (
-                          <Typography
-                            variant="caption"
-                            sx={{ color: "text.secondary", ml: 1 }}
-                          >
+                          <Typography variant="caption" sx={{ color: 'text.secondary', ml: 1 }}>
                             private
                           </Typography>
                         )}
@@ -1167,19 +1026,13 @@ export const EventCreationForm: React.FC = ({}) => {
                         label="Select a series"
                         required
                         error={topicHasError}
-                        helperText={
-                          topicHasError
-                            ? "Please select an Event Series."
-                            : undefined
-                        }
+                        helperText={topicHasError ? 'Please select an Event Series.' : undefined}
                         slotProps={{
                           input: {
                             ...params.InputProps,
                             endAdornment: (
                               <>
-                                {topicsLoading ? (
-                                  <CircularProgress color="inherit" size={18} />
-                                ) : null}
+                                {topicsLoading ? <CircularProgress color="inherit" size={18} /> : null}
                                 {params.InputProps.endAdornment}
                               </>
                             ),
@@ -1190,9 +1043,7 @@ export const EventCreationForm: React.FC = ({}) => {
                   />
                 )}
 
-                {topicMode === "new" && (
-                  <NewTopicForm values={newTopic} onChange={setNewTopic} />
-                )}
+                {topicMode === 'new' && <NewTopicForm values={newTopic} onChange={setNewTopic} />}
               </FormControl>
 
               <TextField
@@ -1204,16 +1055,10 @@ export const EventCreationForm: React.FC = ({}) => {
                 onChange={(e) => setZoomMeetingUrl(e.target.value)}
                 onBlur={() =>
                   // Check format on unfocus
-                  setZoomMeetingUrlHasError(
-                    !zoomMeetingUrl || zoomMeetingUrl.length < 10,
-                  )
+                  setZoomMeetingUrlHasError(!zoomMeetingUrl || zoomMeetingUrl.length < 10)
                 }
                 error={zoomMeetingUrlHasError}
-                helperText={
-                  zoomMeetingUrlHasError
-                    ? "Enter the Zoom Meeting URL for transcription purposes."
-                    : null
-                }
+                helperText={zoomMeetingUrlHasError ? 'Enter the Zoom Meeting URL for transcription purposes.' : null}
                 variant="outlined"
                 margin="normal"
                 required
@@ -1223,48 +1068,44 @@ export const EventCreationForm: React.FC = ({}) => {
                 <DateTimePicker
                   label="Meeting Day/Time"
                   value={zoomMeetingTime ? dayjs(zoomMeetingTime) : null}
-                  minDateTime={dayjs().add(10, "minute")}
+                  minDateTime={dayjs().add(10, 'minute')}
                   onChange={(newValue) => {
-                    const value = newValue?.isValid() ? newValue.toISOString() : "";
+                    const value = newValue?.isValid() ? newValue.toISOString() : '';
                     setZoomMeetingTime(value);
                     setZoomMeetingTimeHasError(!value && !!scheduledEndTime);
                     if (scheduledEndTime) {
-                      setScheduledEndTimeHasError(
-                        !!value && scheduledEndTime <= value,
-                      );
+                      setScheduledEndTimeHasError(!!value && scheduledEndTime <= value);
                     }
                   }}
                   slotProps={{
                     textField: {
-                      margin: "normal",
+                      margin: 'normal',
                       fullWidth: true,
                       error: zoomMeetingTimeHasError,
                       helperText: zoomMeetingTimeHasError
                         ? zoomMeetingTimeErrorMessage
-                        : "Enter the meeting start time if it begins more than 15 minutes from now.",
+                        : 'Enter the meeting start time if it begins more than 15 minutes from now.',
                     },
                   }}
                 />
                 <DateTimePicker
                   label="Meeting End Time"
                   value={scheduledEndTime ? dayjs(scheduledEndTime) : null}
-                  minDateTime={zoomMeetingTime ? dayjs(zoomMeetingTime).add(1, "minute") : undefined}
+                  minDateTime={zoomMeetingTime ? dayjs(zoomMeetingTime).add(1, 'minute') : undefined}
                   onChange={(newValue) => {
-                    const value = newValue?.isValid() ? newValue.toISOString() : "";
+                    const value = newValue?.isValid() ? newValue.toISOString() : '';
                     setScheduledEndTime(value);
-                    setScheduledEndTimeHasError(
-                      !!value && !!zoomMeetingTime && value <= zoomMeetingTime,
-                    );
+                    setScheduledEndTimeHasError(!!value && !!zoomMeetingTime && value <= zoomMeetingTime);
                     setZoomMeetingTimeHasError(!value ? false : !zoomMeetingTime);
                   }}
                   slotProps={{
                     textField: {
-                      margin: "normal",
+                      margin: 'normal',
                       fullWidth: true,
                       error: scheduledEndTimeHasError,
                       helperText: scheduledEndTimeHasError
-                        ? "Meeting End Time must be after the start time."
-                        : "Enter the scheduled end time for the meeting (optional).",
+                        ? 'Meeting End Time must be after the start time.'
+                        : 'Enter the scheduled end time for the meeting (optional).',
                     },
                   }}
                 />
@@ -1285,23 +1126,21 @@ export const EventCreationForm: React.FC = ({}) => {
                 fullWidth
                 margin="normal"
                 sx={{
-                  border: formGroupsErrors.platforms
-                    ? "2px solid red"
-                    : "1px solid rgba(0, 0, 0, 0.23)",
+                  border: formGroupsErrors.platforms ? '2px solid red' : '1px solid rgba(0, 0, 0, 0.23)',
                   borderRadius: 1,
                   p: 2,
-                  "&:focus-within": {
-                    borderColor: "primary.main",
-                    borderWidth: "2px",
+                  '&:focus-within': {
+                    borderColor: 'primary.main',
+                    borderWidth: '2px',
                   },
                 }}
               >
                 <FormLabel
                   component="legend"
                   sx={{
-                    fontSize: "0.875rem",
+                    fontSize: '0.875rem',
                     fontWeight: 500,
-                    color: "rgba(0, 0, 0, 0.87)",
+                    color: 'rgba(0, 0, 0, 0.87)',
                   }}
                 >
                   Where do you want your audience to interact?
@@ -1313,21 +1152,12 @@ export const EventCreationForm: React.FC = ({}) => {
                       control={
                         <Checkbox
                           name={platform.name.toLowerCase()}
-                          checked={
-                            selectedPlatforms.indexOf(platform.name) > -1
-                          }
+                          checked={selectedPlatforms.indexOf(platform.name) > -1}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedPlatforms([
-                                ...selectedPlatforms,
-                                platform.name,
-                              ]);
+                              setSelectedPlatforms([...selectedPlatforms, platform.name]);
                             } else {
-                              setSelectedPlatforms(
-                                selectedPlatforms.filter(
-                                  (item) => item !== platform.name,
-                                ),
-                              );
+                              setSelectedPlatforms(selectedPlatforms.filter((item) => item !== platform.name));
                             }
                           }}
                         />
@@ -1345,23 +1175,21 @@ export const EventCreationForm: React.FC = ({}) => {
                 required
                 margin="normal"
                 sx={{
-                  border: formGroupsErrors.conversationType
-                    ? "2px solid red"
-                    : "1px solid rgba(0, 0, 0, 0.23)",
+                  border: formGroupsErrors.conversationType ? '2px solid red' : '1px solid rgba(0, 0, 0, 0.23)',
                   borderRadius: 1,
                   p: 2,
-                  "&:focus-within": {
-                    borderColor: "primary.main",
-                    borderWidth: "2px",
+                  '&:focus-within': {
+                    borderColor: 'primary.main',
+                    borderWidth: '2px',
                   },
                 }}
               >
                 <FormLabel
                   component="legend"
                   sx={{
-                    fontSize: "0.875rem",
+                    fontSize: '0.875rem',
                     fontWeight: 500,
-                    color: "rgba(0, 0, 0, 0.87)",
+                    color: 'rgba(0, 0, 0, 0.87)',
                   }}
                 >
                   Agent that you will be using
@@ -1387,16 +1215,14 @@ export const EventCreationForm: React.FC = ({}) => {
                         sx={
                           index === 0
                             ? {
-                                "& .MuiFormControlLabel-asterisk": {
-                                  display: "none",
+                                '& .MuiFormControlLabel-asterisk': {
+                                  display: 'none',
                                 },
                               }
                             : {}
                         }
                       />
-                      <div className="text-gray-600 text-sm ml-8 -mt-2">
-                        {option.description}
-                      </div>
+                      <div className="text-gray-600 text-sm ml-8 -mt-2">{option.description}</div>
                     </div>
                   ))}
                 </RadioGroup>
@@ -1416,29 +1242,21 @@ export const EventCreationForm: React.FC = ({}) => {
 
               {conversationTypes
                 ?.find((type) => type.name === selectedConvType)
-                ?.properties?.filter((prop) => prop.name !== "zoomMeetingUrl")
+                ?.properties?.filter((prop) => prop.name !== 'zoomMeetingUrl')
                 .map((prop) => renderDynamicPropertyField(prop))}
 
               {(() => {
-                const features = conversationTypes?.find(
-                  (type) => type.name === selectedConvType,
-                )?.features?.filter((f) => f.userControlled === false);
+                const features = conversationTypes
+                  ?.find((type) => type.name === selectedConvType)
+                  ?.features?.filter((f) => f.userControlled === false);
                 if (!features?.length) return null;
                 return (
                   <Box sx={{ mt: 3 }}>
                     <Divider sx={{ mb: 2 }} />
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight={600}
-                      gutterBottom
-                    >
+                    <Typography variant="subtitle1" fontWeight={600} gutterBottom>
                       Features
                     </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 2 }}
-                    >
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                       Enable additional capabilities for this conversation
                     </Typography>
                     {features.map((feature) => (
@@ -1447,20 +1265,16 @@ export const EventCreationForm: React.FC = ({}) => {
                         sx={{
                           mb: 1,
                           p: 2,
-                          border: "1px solid",
-                          borderColor: dynamicPropertyValues[feature.name]
-                            ? "primary.main"
-                            : "divider",
+                          border: '1px solid',
+                          borderColor: dynamicPropertyValues[feature.name] ? 'primary.main' : 'divider',
                           borderRadius: 1,
-                          transition: "border-color 0.2s",
+                          transition: 'border-color 0.2s',
                         }}
                       >
                         <FormControlLabel
                           control={
                             <Checkbox
-                              checked={Boolean(
-                                dynamicPropertyValues[feature.name],
-                              )}
+                              checked={Boolean(dynamicPropertyValues[feature.name])}
                               onChange={(e) => {
                                 setDynamicPropertyValues((prev) => ({
                                   ...prev,
@@ -1471,14 +1285,9 @@ export const EventCreationForm: React.FC = ({}) => {
                           }
                           label={
                             <Box>
-                              <Typography fontWeight={500}>
-                                {feature.label}
-                              </Typography>
+                              <Typography fontWeight={500}>{feature.label}</Typography>
                               {feature.description && (
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                >
+                                <Typography variant="caption" color="text.secondary">
                                   {feature.description}
                                 </Typography>
                               )}
@@ -1486,9 +1295,7 @@ export const EventCreationForm: React.FC = ({}) => {
                           }
                         />
                         {dynamicPropertyValues[feature.name] &&
-                          feature.properties?.map((prop) =>
-                            renderDynamicPropertyField(prop, feature.name),
-                          )}
+                          feature.properties?.map((prop) => renderDynamicPropertyField(prop, feature.name))}
                       </Box>
                     ))}
                   </Box>
@@ -1499,7 +1306,7 @@ export const EventCreationForm: React.FC = ({}) => {
 
           {/* Step 4: Moderators & Speakers */}
           {activeStep === 3 && (
-            <Box sx={{ maxHeight: "600px", overflowY: "auto", pr: 1 }}>
+            <Box sx={{ maxHeight: '600px', overflowY: 'auto', pr: 1 }}>
               {/* About the Speakers Section */}
               <Typography variant="h5" component="h2" gutterBottom>
                 About the Speakers
@@ -1514,16 +1321,16 @@ export const EventCreationForm: React.FC = ({}) => {
                   sx={{
                     mb: 3,
                     p: 2,
-                    border: "1px solid rgba(0, 0, 0, 0.12)",
+                    border: '1px solid rgba(0, 0, 0, 0.12)',
                     borderRadius: 1,
-                    position: "relative",
+                    position: 'relative',
                   }}
                 >
                   <Box
                     sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
                       mb: 1,
                     }}
                   >
@@ -1531,11 +1338,7 @@ export const EventCreationForm: React.FC = ({}) => {
                       Speaker {index + 1}
                     </Typography>
                     {speakers.length > 1 && (
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() => removeSpeaker(index)}
-                      >
+                      <Button size="small" color="error" onClick={() => removeSpeaker(index)}>
                         Remove
                       </Button>
                     )}
@@ -1543,28 +1346,19 @@ export const EventCreationForm: React.FC = ({}) => {
                   <TextField
                     label="Name"
                     value={speaker.name}
-                    onChange={(e) =>
-                      updateSpeaker(index, "name", e.target.value)
-                    }
+                    onChange={(e) => updateSpeaker(index, 'name', e.target.value)}
                     fullWidth
                     variant="outlined"
                     margin="normal"
                   />
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 1, mb: 0.5 }}
-                  >
-                    Attendees or the live transcription might use a nickname,
-                    abbreviation, or misspelling. Adding it here helps the
-                    platform connect those references to the right person.
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 0.5 }}>
+                    Attendees or the live transcription might use a nickname, abbreviation, or misspelling. Adding it here
+                    helps the platform connect those references to the right person.
                   </Typography>
                   <TextField
                     label="Alternate Name"
-                    value={speaker.alternateName ?? ""}
-                    onChange={(e) =>
-                      updateSpeaker(index, "alternateName", e.target.value)
-                    }
+                    value={speaker.alternateName ?? ''}
+                    onChange={(e) => updateSpeaker(index, 'alternateName', e.target.value)}
                     fullWidth
                     variant="outlined"
                     placeholder="Separate multiple names with commas, e.g. Jon, Dr. Smith"
@@ -1572,9 +1366,7 @@ export const EventCreationForm: React.FC = ({}) => {
                   <TextField
                     label="Bio"
                     value={speaker.bio}
-                    onChange={(e) =>
-                      updateSpeaker(index, "bio", e.target.value)
-                    }
+                    onChange={(e) => updateSpeaker(index, 'bio', e.target.value)}
                     fullWidth
                     variant="outlined"
                     margin="normal"
@@ -1592,18 +1384,13 @@ export const EventCreationForm: React.FC = ({}) => {
               <Box sx={{ mt: 2 }}>
                 <Box
                   sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
                     mb: 2,
                   }}
                 >
-                  <Typography
-                    variant="h5"
-                    component="h2"
-                    gutterBottom
-                    sx={{ mb: 0 }}
-                  >
+                  <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 0 }}>
                     About the Moderators
                   </Typography>
 
@@ -1612,18 +1399,14 @@ export const EventCreationForm: React.FC = ({}) => {
                       size="small"
                       onClick={() => {
                         setShowModerators(false);
-                        setModerators([{ name: "", bio: "" }]);
+                        setModerators([{ name: '', bio: '' }]);
                       }}
                     >
                       Remove All
                     </Button>
                   )}
                 </Box>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 2 }}
-                >
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   Add information about the event moderators (optional)
                 </Typography>
 
@@ -1635,31 +1418,24 @@ export const EventCreationForm: React.FC = ({}) => {
                         sx={{
                           mb: 3,
                           p: 2,
-                          border: "1px solid rgba(0, 0, 0, 0.12)",
+                          border: '1px solid rgba(0, 0, 0, 0.12)',
                           borderRadius: 1,
-                          position: "relative",
+                          position: 'relative',
                         }}
                       >
                         <Box
                           sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
                             mb: 1,
                           }}
                         >
-                          <Typography
-                            variant="subtitle2"
-                            color="text.secondary"
-                          >
+                          <Typography variant="subtitle2" color="text.secondary">
                             Moderator {index + 1}
                           </Typography>
                           {moderators.length > 1 && (
-                            <Button
-                              size="small"
-                              color="error"
-                              onClick={() => removeModerator(index)}
-                            >
+                            <Button size="small" color="error" onClick={() => removeModerator(index)}>
                               Remove
                             </Button>
                           )}
@@ -1667,34 +1443,20 @@ export const EventCreationForm: React.FC = ({}) => {
                         <TextField
                           label="Name"
                           value={moderator.name}
-                          onChange={(e) =>
-                            updateModerator(index, "name", e.target.value)
-                          }
+                          onChange={(e) => updateModerator(index, 'name', e.target.value)}
                           fullWidth
                           variant="outlined"
                           margin="normal"
                           placeholder="Enter moderator's name"
                         />
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ mt: 1, mb: 0.5 }}
-                        >
-                          Attendees or the live transcription might use a
-                          nickname, abbreviation, or misspelling. Adding it
-                          here helps the platform connect those references to
-                          the right person.
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 0.5 }}>
+                          Attendees or the live transcription might use a nickname, abbreviation, or misspelling. Adding it
+                          here helps the platform connect those references to the right person.
                         </Typography>
                         <TextField
                           label="Alternate Name"
-                          value={moderator.alternateName ?? ""}
-                          onChange={(e) =>
-                            updateModerator(
-                              index,
-                              "alternateName",
-                              e.target.value,
-                            )
-                          }
+                          value={moderator.alternateName ?? ''}
+                          onChange={(e) => updateModerator(index, 'alternateName', e.target.value)}
                           fullWidth
                           variant="outlined"
                           placeholder="Separate multiple names with commas, e.g. Jon, Dr. Smith"
@@ -1702,9 +1464,7 @@ export const EventCreationForm: React.FC = ({}) => {
                         <TextField
                           label="Bio"
                           value={moderator.bio}
-                          onChange={(e) =>
-                            updateModerator(index, "bio", e.target.value)
-                          }
+                          onChange={(e) => updateModerator(index, 'bio', e.target.value)}
                           fullWidth
                           variant="outlined"
                           margin="normal"
@@ -1727,16 +1487,14 @@ export const EventCreationForm: React.FC = ({}) => {
                     }
                   }}
                 >
-                  {showModerators
-                    ? "+ Add Another Moderator"
-                    : "+ Add Moderators"}
+                  {showModerators ? '+ Add Another Moderator' : '+ Add Moderators'}
                 </Button>
               </Box>
             </Box>
           )}
 
           {/* Navigation Buttons */}
-          <Box sx={{ mt: 4, display: "flex", justifyContent: "space-between" }}>
+          <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
             <Button
               variant="outlined"
               disabled={activeStep === 0}
@@ -1757,7 +1515,7 @@ export const EventCreationForm: React.FC = ({}) => {
                 }}
                 sx={{
                   ml: { xs: 1, sm: 0 },
-                  fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                  fontSize: { xs: '0.75rem', sm: '0.875rem' },
                 }}
               >
                 Create Conversation

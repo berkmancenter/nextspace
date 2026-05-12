@@ -1,20 +1,9 @@
-import React, { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
-import {
-  Alert,
-  Box,
-  Button,
-  IconButton,
-  InputAdornment,
-  Link,
-  Paper,
-  Snackbar,
-  TextField,
-  Typography,
-} from "@mui/material";
-import { Visibility, VisibilityOff } from "@mui/icons-material";
-import { Api, Authenticate } from "../utils";
-import SessionManager from "../utils/SessionManager";
+import React, { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { Alert, Box, Button, IconButton, InputAdornment, Link, Paper, Snackbar, TextField, Typography } from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
+import { Api, Authenticate } from '../utils';
+import SessionManager from '../utils/SessionManager';
 
 /**
  * Login Page
@@ -43,16 +32,16 @@ export default function LoginPage() {
   };
 
   const formIsValid = (formData: FormData) => {
-    if (!formData.get("username")) {
-      setFormError("Username is required");
+    if (!formData.get('username')) {
+      setFormError('Username is required');
       return false;
     }
-    if (!formData.get("password")) {
-      setFormError("Password is required");
+    if (!formData.get('password')) {
+      setFormError('Password is required');
       return false;
     }
     if (!formRef.current?.checkValidity()) {
-      setFormError("Please fill out all required fields.");
+      setFormError('Please fill out all required fields.');
       return false;
     }
 
@@ -63,10 +52,7 @@ export default function LoginPage() {
   const sendData = async (formData: FormData) => {
     if (!formIsValid(formData)) return;
     try {
-      const response = await Authenticate(
-        formData.get("username")!.toString(),
-        formData.get("password")!.toString(),
-      );
+      const response = await Authenticate(formData.get('username')!.toString(), formData.get('password')!.toString());
       if (response.error) {
         setFormError(response.message);
         return;
@@ -84,12 +70,10 @@ export default function LoginPage() {
       const userId = response.user?.id || response.userId;
 
       // Get the active pseudonym for the user
-      const activePseudonym = response.user?.pseudonyms?.find(
-        (p: any) => p.active,
-      )?.pseudonym;
+      const activePseudonym = response.user?.pseudonyms?.find((p: any) => p.active)?.pseudonym;
 
       if (!activePseudonym) {
-        setFormError("No active pseudonym found for user.");
+        setFormError('No active pseudonym found for user.');
         return;
       }
 
@@ -98,10 +82,10 @@ export default function LoginPage() {
 
       // Set session cookie via local API route, including expiry timestamps
       // so the cookie-based proactive refresh can schedule correctly.
-      const sessionReq = await fetch("/api/session", {
-        method: "POST",
+      const sessionReq = await fetch('/api/session', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           username: activePseudonym,
@@ -110,76 +94,49 @@ export default function LoginPage() {
           refreshToken: response.tokens.refresh.token,
           accessExpires: response.tokens.access.expires,
           refreshExpires: response.tokens.refresh.expires,
-          authType: "admin",
+          authType: 'admin',
         }),
       });
       // Check if the session request was successful
       if (!sessionReq.ok) {
         const errorData = await sessionReq.json();
-        setFormError(errorData.error || "Failed to set session cookie.");
+        setFormError(errorData.error || 'Failed to set session cookie.');
         return;
       }
 
       setFormSuccess(true);
 
       // Redirect to events page after successful login
-      router.push("/admin/events");
+      router.push('/admin/events');
     } catch (error: any) {
-      console.error("Login failed:", error);
-      setFormError("An unexpected error occurred. Please try again later.");
+      console.error('Login failed:', error);
+      setFormError('An unexpected error occurred. Please try again later.');
     }
   };
 
   return (
-    <Paper elevation={3} sx={{ p: 4, maxWidth: 600, mx: "auto", mt: 4 }}>
+    <Paper elevation={3} sx={{ p: 4, maxWidth: 600, mx: 'auto', mt: 4 }}>
       {formError && (
-        <Snackbar
-          open={Boolean(formError)}
-          autoHideDuration={5000}
-          onClose={() => setFormError(null)}
-        >
-          <Alert
-            variant="filled"
-            severity="error"
-            onClose={() => setFormError(null)}
-            sx={{ mt: 2 }}
-          >
+        <Snackbar open={Boolean(formError)} autoHideDuration={5000} onClose={() => setFormError(null)}>
+          <Alert variant="filled" severity="error" onClose={() => setFormError(null)} sx={{ mt: 2 }}>
             {formError}
           </Alert>
         </Snackbar>
       )}
 
       {formSuccess && (
-        <Snackbar
-          open={formSuccess}
-          autoHideDuration={3000}
-          onClose={() => setFormSuccess(false)}
-        >
-          <Alert
-            variant="filled"
-            severity="success"
-            onClose={() => setFormSuccess(false)}
-            sx={{ mt: 2 }}
-          >
+        <Snackbar open={formSuccess} autoHideDuration={3000} onClose={() => setFormSuccess(false)}>
+          <Alert variant="filled" severity="success" onClose={() => setFormSuccess(false)} sx={{ mt: 2 }}>
             Login successful!
           </Alert>
         </Snackbar>
       )}
 
       <Box component="form" noValidate action="#" ref={formRef}>
-        <Typography
-          variant="h5"
-          component="h2"
-          gutterBottom
-          sx={{ textAlign: "center" }}
-        >
+        <Typography variant="h5" component="h2" gutterBottom sx={{ textAlign: 'center' }}>
           Log into NextSpace
         </Typography>
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ mb: 2, textAlign: "center" }}
-        >
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
           Don&apos;t have an account?&nbsp;
           <Link href="/signup" className="text-blue-600 hover:underline">
             Create one here
@@ -194,15 +151,11 @@ export default function LoginPage() {
           fullWidth
           variant="outlined"
           margin="normal"
-          helperText={usernameHasError ? "Enter a username." : null}
+          helperText={usernameHasError ? 'Enter a username.' : null}
           onBlur={() =>
             setUsernameHasError(
-              !formRef.current?.elements.namedItem("username") ||
-                !(
-                  formRef.current.elements.namedItem(
-                    "username",
-                  ) as HTMLInputElement
-                ).value,
+              !formRef.current?.elements.namedItem('username') ||
+                !(formRef.current.elements.namedItem('username') as HTMLInputElement).value,
             )
           }
           error={usernameHasError}
@@ -212,20 +165,16 @@ export default function LoginPage() {
           name="password"
           label="Password"
           id="password"
-          type={showPassword ? "text" : "password"}
+          type={showPassword ? 'text' : 'password'}
           required
           fullWidth
           variant="outlined"
           margin="normal"
-          helperText={passwordHasError ? "Enter a password." : null}
+          helperText={passwordHasError ? 'Enter a password.' : null}
           onBlur={() =>
             setPasswordHasError(
-              !formRef.current?.elements.namedItem("password") ||
-                !(
-                  formRef.current.elements.namedItem(
-                    "password",
-                  ) as HTMLInputElement
-                ).value,
+              !formRef.current?.elements.namedItem('password') ||
+                !(formRef.current.elements.namedItem('password') as HTMLInputElement).value,
             )
           }
           error={passwordHasError}
@@ -248,11 +197,11 @@ export default function LoginPage() {
           }}
         />
 
-        <Box sx={{ mt: 4, textAlign: "center" }}>
+        <Box sx={{ mt: 4, textAlign: 'center' }}>
           <Button
             type="submit"
             variant="outlined"
-            sx={{ width: 300, maxWidth: "100%" }}
+            sx={{ width: 300, maxWidth: '100%' }}
             onClick={(e) => {
               e.preventDefault();
               if (formRef.current) sendData(new FormData(formRef.current));

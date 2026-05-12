@@ -1,7 +1,7 @@
-import type { NextApiRequest, NextApiResponse } from "next";
-import { EncryptJWT, jwtDecrypt } from "jose";
-import { withEnvValidation } from "../../utils/withEnvValidation";
-import { CURRENT_COOKIE_VERSION } from "../../utils/cookieValidator";
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { EncryptJWT, jwtDecrypt } from 'jose';
+import { withEnvValidation } from '../../utils/withEnvValidation';
+import { CURRENT_COOKIE_VERSION } from '../../utils/cookieValidator';
 
 /**
  * API route to handle setting and updating the session cookie.
@@ -13,42 +13,33 @@ import { CURRENT_COOKIE_VERSION } from "../../utils/cookieValidator";
  */
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!process.env.SESSION_SECRET) {
-    console.log("SESSION_SECRET is not set");
-    res
-      .status(500)
-      .json({ error: "Internal server error: missing environment variable" });
+    console.log('SESSION_SECRET is not set');
+    res.status(500).json({ error: 'Internal server error: missing environment variable' });
     return;
   }
 
-  const secret = Buffer.from(process.env.SESSION_SECRET, "base64");
+  const secret = Buffer.from(process.env.SESSION_SECRET, 'base64');
   if (secret.length !== 32) {
-    console.error(
-      `SESSION_SECRET decoded to ${secret.length} bytes, expected 32`,
-    );
-    res
-      .status(500)
-      .json({
-        error: "Internal server error: invalid environment variable length",
-      });
+    console.error(`SESSION_SECRET decoded to ${secret.length} bytes, expected 32`);
+    res.status(500).json({
+      error: 'Internal server error: invalid environment variable length',
+    });
     return;
   }
 
   // Handle PATCH request - update tokens in existing session
-  if (req.method === "PATCH") {
-    const { accessToken, refreshToken, accessExpires, refreshExpires } =
-      req.body;
+  if (req.method === 'PATCH') {
+    const { accessToken, refreshToken, accessExpires, refreshExpires } = req.body;
 
     if (!accessToken || !refreshToken) {
-      res
-        .status(400)
-        .json({ error: "accessToken and refreshToken are required" });
+      res.status(400).json({ error: 'accessToken and refreshToken are required' });
       return;
     }
 
     // Get existing session cookie
-    const existingCookie = req.cookies["nextspace-session"];
+    const existingCookie = req.cookies['nextspace-session'];
     if (!existingCookie) {
-      res.status(401).json({ error: "No session found" });
+      res.status(401).json({ error: 'No session found' });
       return;
     }
 
@@ -65,56 +56,47 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         accessExpires: accessExpires || payload.accessExpires,
         refreshExpires: refreshExpires || payload.refreshExpires,
         userId: payload.userId,
-        authType: payload.authType || "guest",
+        authType: payload.authType || 'guest',
         version: CURRENT_COOKIE_VERSION,
       })
-        .setProtectedHeader({ alg: "dir", enc: "A128CBC-HS256" })
-        .setExpirationTime(payload.exp || "30d")
-        .setSubject(payload.sub || "")
+        .setProtectedHeader({ alg: 'dir', enc: 'A128CBC-HS256' })
+        .setExpirationTime(payload.exp || '30d')
+        .setSubject(payload.sub || '')
         .setIssuedAt()
         .encrypt(secret);
 
       // Calculate remaining maxAge from original expiration
-      const maxAge = payload.exp
-        ? Math.max(0, Number(payload.exp) - Math.floor(Date.now() / 1000))
-        : 30 * 24 * 60 * 60;
+      const maxAge = payload.exp ? Math.max(0, Number(payload.exp) - Math.floor(Date.now() / 1000)) : 30 * 24 * 60 * 60;
 
       res.setHeader(
-        "Set-Cookie",
+        'Set-Cookie',
         `nextspace-session=${cookie}; HttpOnly; ${
-          process.env.NODE_ENV === "production" ? "Secure" : ""
+          process.env.NODE_ENV === 'production' ? 'Secure' : ''
         }; SameSite=Strict; Max-Age=${maxAge}; Path=/`,
       );
-      res.status(200).json({ message: "Successfully updated session tokens!" });
+      res.status(200).json({ message: 'Successfully updated session tokens!' });
       return;
     } catch (error) {
-      console.error("Error updating session:", error);
-      res.status(500).json({ error: "Failed to update session" });
+      console.error('Error updating session:', error);
+      res.status(500).json({ error: 'Failed to update session' });
       return;
     }
   }
 
   // Handle POST request - create new session
-  if (req.method === "POST") {
+  if (req.method === 'POST') {
     const sessionData = req.body;
 
     // Check if expirationFromNow is a number if provided
-    if (
-      sessionData.expirationFromNow &&
-      typeof sessionData.expirationFromNow !== "number"
-    ) {
-      res
-        .status(400)
-        .json({ error: "expirationFromNow must be a number in seconds." });
+    if (sessionData.expirationFromNow && typeof sessionData.expirationFromNow !== 'number') {
+      res.status(400).json({ error: 'expirationFromNow must be a number in seconds.' });
       return;
     }
 
     // Validate authType
-    const authType = sessionData.authType || "guest";
-    if (!["guest", "user", "admin"].includes(authType)) {
-      res
-        .status(400)
-        .json({ error: "authType must be one of: guest, user, admin" });
+    const authType = sessionData.authType || 'guest';
+    if (!['guest', 'user', 'admin'].includes(authType)) {
+      res.status(400).json({ error: 'authType must be one of: guest, user, admin' });
       return;
     }
 
@@ -129,11 +111,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       authType: authType,
       version: CURRENT_COOKIE_VERSION,
     })
-      .setProtectedHeader({ alg: "dir", enc: "A128CBC-HS256" })
+      .setProtectedHeader({ alg: 'dir', enc: 'A128CBC-HS256' })
       .setExpirationTime(
-        sessionData.expirationFromNow
-          ? Math.floor(Date.now() / 1000) + sessionData.expirationFromNow
-          : "30d",
+        sessionData.expirationFromNow ? Math.floor(Date.now() / 1000) + sessionData.expirationFromNow : '30d',
       )
       .setSubject(sessionData.username)
       .setIssuedAt()
@@ -142,17 +122,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const maxAge = sessionData.expirationFromNow || 30 * 24 * 60 * 60;
 
     res.setHeader(
-      "Set-Cookie",
+      'Set-Cookie',
       `nextspace-session=${cookie}; HttpOnly; ${
-        process.env.NODE_ENV === "production" ? "Secure" : ""
+        process.env.NODE_ENV === 'production' ? 'Secure' : ''
       }; SameSite=Strict; Max-Age=${maxAge}; Path=/`,
     );
-    res.status(200).json({ message: "Successfully set cookie!" });
+    res.status(200).json({ message: 'Successfully set cookie!' });
     return;
   }
 
   // Method not allowed
-  res.status(405).json({ error: "Method not allowed" });
+  res.status(405).json({ error: 'Method not allowed' });
 }
 
-export default withEnvValidation(handler, ["SESSION_SECRET"]);
+export default withEnvValidation(handler, ['SESSION_SECRET']);

@@ -1,10 +1,10 @@
-"use client";
-import { createContext, useContext, useState } from "react";
-import { components } from "../types";
+'use client';
+import { createContext, useContext, useState } from 'react';
+import { components } from '../types';
 
-export type ConversationType = components["schemas"]["ConversationType"];
+export type ConversationType = components['schemas']['ConversationType'];
 
-const DEFAULT_BOT_NAME = "Berkie";
+const DEFAULT_BOT_NAME = 'Berkie';
 
 /**
  * Holds the resolved conversation type for the current event.
@@ -44,9 +44,7 @@ export function ConversationTypeProvider({
     <ConversationTypeContextSetter.Provider value={setType}>
       <ConversationTypeContext.Provider value={type}>
         <BotNameSetterContext.Provider value={setBotName}>
-          <BotNameValueContext.Provider value={botName}>
-            {children}
-          </BotNameValueContext.Provider>
+          <BotNameValueContext.Provider value={botName}>{children}</BotNameValueContext.Provider>
         </BotNameSetterContext.Provider>
       </ConversationTypeContext.Provider>
     </ConversationTypeContextSetter.Provider>

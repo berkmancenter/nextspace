@@ -26,7 +26,7 @@ let hasWarnedAboutMissingMatomo = false;
  * @returns true if analytics is enabled (default), false if explicitly disabled
  */
 function isAnalyticsEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_ENABLE_ANALYTICS !== "false";
+  return process.env.NEXT_PUBLIC_ENABLE_ANALYTICS !== 'false';
 }
 
 /**
@@ -34,10 +34,7 @@ function isAnalyticsEnabled(): boolean {
  * @returns true if URL is set, false otherwise
  */
 function isMatomoUrlConfigured(): boolean {
-  return (
-    typeof process.env.NEXT_PUBLIC_MATOMO_URL === "string" &&
-    process.env.NEXT_PUBLIC_MATOMO_URL.length > 0
-  );
+  return typeof process.env.NEXT_PUBLIC_MATOMO_URL === 'string' && process.env.NEXT_PUBLIC_MATOMO_URL.length > 0;
 }
 
 /**
@@ -45,15 +42,12 @@ function isMatomoUrlConfigured(): boolean {
  * @returns true if Matomo appears to be loaded, false otherwise
  */
 function isMatomoLoaded(): boolean {
-  if (typeof window === "undefined") return false;
+  if (typeof window === 'undefined') return false;
 
   // Check if Matomo's tracker array exists (indicates Matomo is loaded)
   // _paq is the standard Matomo tracking array
   return (
-    typeof window._paq !== "undefined" ||
-    (window._mtm &&
-      window._mtm.length > 0 &&
-      typeof window._mtm.push === "function")
+    typeof window._paq !== 'undefined' || (window._mtm && window._mtm.length > 0 && typeof window._mtm.push === 'function')
   );
 }
 
@@ -62,13 +56,13 @@ function isMatomoLoaded(): boolean {
  * Also checks if Matomo is properly loaded and warns if not
  */
 function ensureMTM(): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
 
   // Check if analytics is disabled
   if (!isAnalyticsEnabled()) {
-    if (process.env.NODE_ENV !== "production" && !hasWarnedAboutMissingMatomo) {
+    if (process.env.NODE_ENV !== 'production' && !hasWarnedAboutMissingMatomo) {
       console.log(
-        "[Analytics] Analytics is disabled via NEXT_PUBLIC_ENABLE_ANALYTICS environment variable. No tracking will occur.",
+        '[Analytics] Analytics is disabled via NEXT_PUBLIC_ENABLE_ANALYTICS environment variable. No tracking will occur.',
       );
       hasWarnedAboutMissingMatomo = true;
     }
@@ -80,8 +74,8 @@ function ensureMTM(): void {
     if (!hasWarnedAboutMissingMatomo) {
       hasWarnedAboutMissingMatomo = true;
       console.warn(
-        "[Analytics] Warning: Analytics is enabled but NEXT_PUBLIC_MATOMO_URL environment variable is not set. " +
-          "No tracking will occur. Please configure NEXT_PUBLIC_MATOMO_URL in your environment variables.",
+        '[Analytics] Warning: Analytics is enabled but NEXT_PUBLIC_MATOMO_URL environment variable is not set. ' +
+          'No tracking will occur. Please configure NEXT_PUBLIC_MATOMO_URL in your environment variables.',
       );
     }
     return;
@@ -96,12 +90,12 @@ function ensureMTM(): void {
   if (!hasWarnedAboutMissingMatomo && !isMatomoLoaded()) {
     hasWarnedAboutMissingMatomo = true;
 
-    if (process.env.NODE_ENV !== "production") {
+    if (process.env.NODE_ENV !== 'production') {
       console.warn(
-        "[Analytics] Warning: Matomo Tag Manager does not appear to be loaded. " +
-          "Analytics events will be queued but not sent to Matomo. " +
-          "The site will continue to function normally. " +
-          "Please check that the Matomo script in _document.tsx is loading correctly.",
+        '[Analytics] Warning: Matomo Tag Manager does not appear to be loaded. ' +
+          'Analytics events will be queued but not sent to Matomo. ' +
+          'The site will continue to function normally. ' +
+          'Please check that the Matomo script in _document.tsx is loading correctly.',
       );
     }
   }
@@ -112,27 +106,24 @@ function ensureMTM(): void {
  * @param pageName - Name of the page being viewed
  * @param customData - Additional data to track with the page view
  */
-export function trackPageView(
-  pageName: string,
-  customData?: Record<string, any>,
-): void {
+export function trackPageView(pageName: string, customData?: Record<string, any>): void {
   ensureMTM();
 
   // Return early if window._mtm was not initialized (analytics disabled or URL missing)
-  if (typeof window === "undefined" || !window._mtm) {
+  if (typeof window === 'undefined' || !window._mtm) {
     return;
   }
 
   const data: Record<string, any> = {
-    event: "mtm.PageView",
+    event: 'mtm.PageView',
     pageName,
     ...customData,
   };
 
   window._mtm.push(data);
 
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[Analytics] Page view:", data);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Analytics] Page view:', data);
   }
 }
 
@@ -143,16 +134,11 @@ export function trackPageView(
  * @param name - Event name for additional context
  * @param value - Optional numeric value
  */
-export function trackEvent(
-  category: string,
-  action: string,
-  name: string,
-  value?: number,
-): void {
+export function trackEvent(category: string, action: string, name: string, value?: number): void {
   ensureMTM();
 
   // Return early if analytics is disabled or not configured
-  if (typeof window === "undefined" || !window._mtm) {
+  if (typeof window === 'undefined' || !window._mtm) {
     return;
   }
 
@@ -163,10 +149,10 @@ export function trackEvent(
 
   // Use Matomo's native trackEvent API
   // This ensures custom dimensions set via _paq are attached to the event
-  window._paq.push(["trackEvent", category, action, name, value]);
+  window._paq.push(['trackEvent', category, action, name, value]);
 
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[Analytics] Event:", { category, action, name, value });
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Analytics] Event:', { category, action, name, value });
   }
 }
 
@@ -187,7 +173,7 @@ export function trackConversationEvent(
   value?: number,
 ): void {
   // Automatically set conversation ID as a custom dimension
-  setCustomDimension(6, "conversation_id", conversationId, "action");
+  setCustomDimension(6, 'conversation_id', conversationId, 'action');
 
   // Track the event
   trackEvent(category, action, name, value);
@@ -200,16 +186,11 @@ export function trackConversationEvent(
  * @param value - Dimension value
  * @param scope - Dimension scope ('visit' or 'action')
  */
-export function setCustomDimension(
-  index: number,
-  name: string,
-  value: string,
-  scope: "visit" | "action" = "visit",
-): void {
+export function setCustomDimension(index: number, name: string, value: string, scope: 'visit' | 'action' = 'visit'): void {
   ensureMTM();
 
   // Return early if analytics is disabled or not configured
-  if (typeof window === "undefined" || !window._mtm) {
+  if (typeof window === 'undefined' || !window._mtm) {
     return;
   }
 
@@ -220,10 +201,10 @@ export function setCustomDimension(
 
   // Use Matomo's native setCustomDimension API
   // This works for both visit and action scopes
-  window._paq.push(["setCustomDimension", index, value]);
+  window._paq.push(['setCustomDimension', index, value]);
 
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[Analytics] Custom dimension:", {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Analytics] Custom dimension:', {
       index,
       name,
       value,
@@ -240,7 +221,7 @@ export function setUserId(userId: string): void {
   ensureMTM();
 
   // Return early if analytics is disabled or not configured
-  if (typeof window === "undefined" || !window._mtm) {
+  if (typeof window === 'undefined' || !window._mtm) {
     return;
   }
 
@@ -250,10 +231,10 @@ export function setUserId(userId: string): void {
   }
 
   // Use Matomo's native setUserId API
-  window._paq.push(["setUserId", userId]);
+  window._paq.push(['setUserId', userId]);
 
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[Analytics] User ID set:", userId);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Analytics] User ID set:', userId);
   }
 }
 
@@ -262,16 +243,16 @@ export function setUserId(userId: string): void {
  * @param metadata - Additional session metadata
  */
 export function trackSessionStart(metadata?: Record<string, any>): void {
-  trackEvent("session", "start", "session_started");
+  trackEvent('session', 'start', 'session_started');
 
-  if (metadata && typeof window !== "undefined" && window._mtm) {
+  if (metadata && typeof window !== 'undefined' && window._mtm) {
     Object.entries(metadata).forEach(([key, value]) => {
       window._mtm.push({ [key]: value });
     });
   }
 
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[Analytics] Session started:", metadata);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Analytics] Session started:', metadata);
   }
 }
 
@@ -280,10 +261,10 @@ export function trackSessionStart(metadata?: Record<string, any>): void {
  * @param durationSeconds - Session duration in seconds
  */
 export function trackSessionEnd(durationSeconds: number): void {
-  trackEvent("session", "end", "session_ended", durationSeconds);
+  trackEvent('session', 'end', 'session_ended', durationSeconds);
 
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[Analytics] Session ended:", durationSeconds, "seconds");
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Analytics] Session ended:', durationSeconds, 'seconds');
   }
 }
 
@@ -292,17 +273,15 @@ export function trackSessionEnd(durationSeconds: number): void {
  * @param visible - Whether the page is visible
  */
 export function trackVisibilityChange(visible: boolean): void {
-  trackEvent("engagement", "visibility_change", visible ? "visible" : "hidden");
+  trackEvent('engagement', 'visibility_change', visible ? 'visible' : 'hidden');
 }
 
 /**
  * Tracks connection status change
  * @param status - Connection status ('connected', 'disconnected', 'error')
  */
-export function trackConnectionStatus(
-  status: "connected" | "disconnected" | "error",
-): void {
-  trackEvent("system", "connection_status", status);
+export function trackConnectionStatus(status: 'connected' | 'disconnected' | 'error'): void {
+  trackEvent('system', 'connection_status', status);
 }
 
 /**
@@ -311,12 +290,8 @@ export function trackConnectionStatus(
  * @param action - Action performed ('open', 'close', 'use')
  * @param durationSeconds - Optional duration in seconds
  */
-export function trackFeatureUsage(
-  feature: string,
-  action: "open" | "close" | "use",
-  durationSeconds?: number,
-): void {
-  trackEvent("feature", action, feature, durationSeconds);
+export function trackFeatureUsage(feature: string, action: 'open' | 'close' | 'use', durationSeconds?: number): void {
+  trackEvent('feature', action, feature, durationSeconds);
 }
 
 /**
@@ -324,19 +299,14 @@ export function trackFeatureUsage(
  * @param location - User location type ('local' or 'remote')
  * @param method - Detection method used ('ip', 'url', or 'default')
  */
-export function trackUserLocation(
-  location: "local" | "remote",
-  method: "ip" | "url" | "default",
-): void {
+export function trackUserLocation(location: 'local' | 'remote', method: 'ip' | 'url' | 'default'): void {
   // Track as custom dimension (index 2 for user_location)
-  setCustomDimension(2, "user_location", location, "visit");
+  setCustomDimension(2, 'user_location', location, 'visit');
 
   // Also track as an event for analytics
-  trackEvent("session", "location_detected", location);
+  trackEvent('session', 'location_detected', location);
 
-  if (process.env.NODE_ENV !== "production") {
-    console.log(
-      `[Analytics] User location: ${location} (detected via ${method})`,
-    );
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[Analytics] User location: ${location} (detected via ${method})`);
   }
 }

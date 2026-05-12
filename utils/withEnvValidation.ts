@@ -1,4 +1,4 @@
-import type { NextApiHandler, NextApiRequest, NextApiResponse } from "next";
+import type { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
 
 /**
  * Higher-order function that validates required environment variables before executing an API route handler.
@@ -17,16 +17,13 @@ import type { NextApiHandler, NextApiRequest, NextApiResponse } from "next";
  * export default withEnvValidation(handler, ['SESSION_SECRET', 'API_KEY']);
  * ```
  */
-export function withEnvValidation(
-  handler: NextApiHandler,
-  requiredVars: string[]
-): NextApiHandler {
+export function withEnvValidation(handler: NextApiHandler, requiredVars: string[]): NextApiHandler {
   return async (req: NextApiRequest, res: NextApiResponse) => {
     const missing = requiredVars.filter((v) => !process.env[v]);
 
     if (missing.length > 0) {
       return res.status(500).json({
-        error: `Missing required environment variables: ${missing.join(", ")}`,
+        error: `Missing required environment variables: ${missing.join(', ')}`,
       });
     }
 

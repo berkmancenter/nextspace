@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react';
 
 /**
  * BotIcon — custom robot SVG used throughout the app for the Event Assistant.
@@ -11,8 +11,8 @@ import React from "react";
  */
 export function BotIcon({
   size = 26,
-  color = "currentColor",
-  className = "",
+  color = 'currentColor',
+  className = '',
   bouncing = false,
 }: {
   size?: number;
@@ -29,17 +29,11 @@ export function BotIcon({
       fill="none"
       stroke={color}
       strokeWidth="1.5"
-      className={`${bouncing ? "overflow-visible" : ""}${className ? ` ${className}` : ""}` || undefined}
+      className={`${bouncing ? 'overflow-visible' : ''}${className ? ` ${className}` : ''}` || undefined}
       aria-hidden="true"
     >
       {/* Antenna dot — bounces independently when bouncing=true */}
-      <circle
-        cx="16"
-        cy="5.5"
-        r="2"
-        fill={color}
-        className={bouncing ? "animate-bounce" : undefined}
-      />
+      <circle cx="16" cy="5.5" r="2" fill={color} className={bouncing ? 'animate-bounce' : undefined} />
       {/* Antenna line */}
       <line x1="16" y1="7.5" x2="16" y2="10" />
       {/* Head */}

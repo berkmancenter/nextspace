@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState } from 'react';
 
 /**
  * Custom hook to handle automatic scrolling to bottom of messages
@@ -13,8 +13,7 @@ export function useAutoScroll<T extends any[]>(messages: T) {
 
   const scrollToBottom = () => {
     if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop =
-        messagesContainerRef.current.scrollHeight;
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   };
 
@@ -22,11 +21,7 @@ export function useAutoScroll<T extends any[]>(messages: T) {
     const currentLength = messages.length;
 
     // Only scroll if the length increased and the user is already at the bottom
-    if (
-      currentLength > prevLengthRef.current &&
-      currentLength > 0 &&
-      isAtBottomRef.current
-    ) {
+    if (currentLength > prevLengthRef.current && currentLength > 0 && isAtBottomRef.current) {
       scrollToBottom();
     }
 
@@ -49,9 +44,9 @@ export function useAutoScroll<T extends any[]>(messages: T) {
       setIsAtBottom(isScrolledToBottom);
     };
 
-    msgContainer.addEventListener("scroll", handleScroll, { passive: true });
+    msgContainer.addEventListener('scroll', handleScroll, { passive: true });
 
-    return () => msgContainer.removeEventListener("scroll", handleScroll);
+    return () => msgContainer.removeEventListener('scroll', handleScroll);
   }, []);
 
   return { messagesEndRef, messagesContainerRef, scrollToBottom, isAtBottom };

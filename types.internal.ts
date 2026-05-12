@@ -1,4 +1,4 @@
-import { components } from "./types";
+import { components } from './types';
 
 /**
  * Authentication type for user sessions
@@ -6,7 +6,7 @@ import { components } from "./types";
  * @property "user" - Logged-in regular user
  * @property "admin" - Logged-in admin user with access to admin features
  */
-export type AuthType = "guest" | "user" | "admin";
+export type AuthType = 'guest' | 'user' | 'admin';
 
 export interface BaseComponentProps {
   className?: string; // Optional Tailwind styling
@@ -35,10 +35,10 @@ export interface EventUrls {
   zoom?: EventUrl;
 }
 
-export type Conversation = components["schemas"]["Conversation"] & {
-  type: components["schemas"]["ConversationType"];
+export type Conversation = components['schemas']['Conversation'] & {
+  type: components['schemas']['ConversationType'];
   eventUrls: EventUrls;
-  platformTypes?: components["schemas"]["PlatformConfig"][];
+  platformTypes?: components['schemas']['PlatformConfig'][];
 };
 
 /**
@@ -60,10 +60,10 @@ export type ErrorMessage = {
 
 // Define a fixed type for page names
 // TODO: this is here just so the build succeeds; removed in PR #133
-export type PageName = "Conversation" | "Survey";
+export type PageName = 'Conversation' | 'Survey';
 
 export interface HeaderProps extends BaseComponentProps {
-  variant?: "transparent" | "solid"; // Optional styling variants
+  variant?: 'transparent' | 'solid'; // Optional styling variants
   authType?: AuthType; // Optional authentication type
 }
 
@@ -72,7 +72,7 @@ export interface HeaderProps extends BaseComponentProps {
  * Extends the base Message schema with additional properties.
  * @property {any} body - The body of the message.
  */
-export type PseudonymousMessage = components["schemas"]["Message"] & {
+export type PseudonymousMessage = components['schemas']['Message'] & {
   body: any;
 };
 
@@ -125,7 +125,7 @@ export type ModeratorInsightsMessage = PseudonymousMessage & {
 };
 
 export interface MessageProps {
-  message: components["schemas"]["Message"];
+  message: components['schemas']['Message'];
 }
 
 export interface ControlledInputConfig {
@@ -155,7 +155,7 @@ export interface FeedbackConfig {
  * @property {string} mimeType - MIME type of the media (e.g., "image/png", "audio/mp3")
  */
 export interface MediaItem {
-  type: "image" | "audio" | "video";
+  type: 'image' | 'audio' | 'video';
   data: string;
   mimeType: string;
 }

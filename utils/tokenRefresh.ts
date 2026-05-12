@@ -7,7 +7,7 @@
  * compatibility with existing callers.
  */
 
-import TokenManagerDefault from "./TokenManager";
+import TokenManagerDefault from './TokenManager';
 
 /**
  * Ensures that the current access token is valid.
@@ -58,18 +58,18 @@ export async function emitWithTokenRefresh(
   event: string,
   data: any,
   onSuccess?: (response?: any) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ) {
   // Ensure we have a fresh token before emitting.
   const freshToken = await TokenManagerDefault.getValidToken();
 
   if (!freshToken) {
-    console.warn("No valid token available for socket operation — skipping emit");
+    console.warn('No valid token available for socket operation — skipping emit');
     if (onError) {
       try {
-        onError(new Error("No valid token"));
+        onError(new Error('No valid token'));
       } catch (e) {
-        console.error("Error in onError callback:", e);
+        console.error('Error in onError callback:', e);
       }
     }
     return;
@@ -77,37 +77,37 @@ export async function emitWithTokenRefresh(
 
   // Update the data with the fresh token if it contains a token field.
   const dataWithFreshToken = { ...data };
-  if ("token" in dataWithFreshToken) {
+  if ('token' in dataWithFreshToken) {
     dataWithFreshToken.token = freshToken;
   }
 
   // Inner handler for auth errors received from the socket server.
   const handleAuthError = async (error: any) => {
     const isAuthError =
-      error?.message?.includes("401") ||
-      error?.message?.includes("Unauthorized") ||
-      error?.message?.includes("authentication");
+      error?.message?.includes('401') ||
+      error?.message?.includes('Unauthorized') ||
+      error?.message?.includes('authentication');
 
     if (isAuthError) {
-      console.log("Socket authentication failed, refreshing token via TokenManager…");
+      console.log('Socket authentication failed, refreshing token via TokenManager…');
 
       const refreshed = await TokenManagerDefault.refresh();
 
       if (refreshed) {
         // Retry with the new token.
         const newToken = TokenManagerDefault.getAccessToken();
-        if ("token" in dataWithFreshToken) {
+        if ('token' in dataWithFreshToken) {
           dataWithFreshToken.token = newToken;
         }
 
         socket.emit(event, dataWithFreshToken, (response: any) => {
           if (response?.error) {
-            console.warn("Socket emit failed after retry:", response.error);
+            console.warn('Socket emit failed after retry:', response.error);
             if (onError) {
               try {
                 onError(response.error);
               } catch (e) {
-                console.error("Error in onError callback:", e);
+                console.error('Error in onError callback:', e);
               }
             }
           } else {
@@ -115,18 +115,18 @@ export async function emitWithTokenRefresh(
               try {
                 onSuccess(response);
               } catch (e) {
-                console.error("Error in onSuccess callback:", e);
+                console.error('Error in onSuccess callback:', e);
               }
             }
           }
         });
       } else {
-        console.warn("Token refresh failed for socket operation");
+        console.warn('Token refresh failed for socket operation');
         if (onError) {
           try {
-            onError(new Error("Token refresh failed"));
+            onError(new Error('Token refresh failed'));
           } catch (e) {
-            console.error("Error in onError callback:", e);
+            console.error('Error in onError callback:', e);
           }
         }
       }
@@ -136,7 +136,7 @@ export async function emitWithTokenRefresh(
         try {
           onError(error);
         } catch (e) {
-          console.error("Error in onError callback:", e);
+          console.error('Error in onError callback:', e);
         }
       }
     }
@@ -151,7 +151,7 @@ export async function emitWithTokenRefresh(
         try {
           onSuccess(response);
         } catch (e) {
-          console.error("Error in onSuccess callback:", e);
+          console.error('Error in onSuccess callback:', e);
         }
       }
     }

@@ -1,4 +1,4 @@
-import { NextRouter } from "next/router";
+import { NextRouter } from 'next/router';
 
 /**
  * Checks if the router query parameters are valid for a conversation and returns an error message if they are not.
@@ -6,13 +6,11 @@ import { NextRouter } from "next/router";
  */
 export const QueryParamsError = (router: NextRouter) => {
   if (!router.query.conversationId || !router.query.passcode) {
-    let messageSuffix = "a Conversation ID";
-    if (!router.query.conversationId && !router.query.passcode)
-      messageSuffix = "both a Conversation ID and Passcode";
-    else if (router.query.conversationId && !router.query.passcode)
-      messageSuffix = "a Passcode";
+    let messageSuffix = 'a Conversation ID';
+    if (!router.query.conversationId && !router.query.passcode) messageSuffix = 'both a Conversation ID and Passcode';
+    else if (router.query.conversationId && !router.query.passcode) messageSuffix = 'a Passcode';
 
     return `Please provide ${messageSuffix}.`;
   }
-  return "Something went wrong";
+  return 'Something went wrong';
 };

@@ -12,12 +12,12 @@
  */
 function normalizeIp(ip: string): string {
   // Convert IPv6 localhost to IPv4
-  if (ip === "::1" || ip === "::ffff:127.0.0.1") {
-    return "127.0.0.1";
+  if (ip === '::1' || ip === '::ffff:127.0.0.1') {
+    return '127.0.0.1';
   }
 
   // Remove IPv6 prefix if present
-  if (ip.startsWith("::ffff:")) {
+  if (ip.startsWith('::ffff:')) {
     return ip.substring(7);
   }
 
@@ -33,13 +33,11 @@ function ipToInt(ip: string): number {
   // Normalize first to handle IPv6
   const normalizedIp = normalizeIp(ip);
 
-  const parts = normalizedIp.split(".").map(Number);
+  const parts = normalizedIp.split('.').map(Number);
   if (parts.length !== 4 || parts.some((p) => isNaN(p) || p < 0 || p > 255)) {
     throw new Error(`Invalid IP address: ${ip}`);
   }
-  return (
-    ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
-  );
+  return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
 }
 
 /**
@@ -50,7 +48,7 @@ function ipToInt(ip: string): number {
  */
 function isIpInCidr(ip: string, cidr: string): boolean {
   try {
-    const [range, prefixLengthStr] = cidr.split("/");
+    const [range, prefixLengthStr] = cidr.split('/');
     const prefixLength = parseInt(prefixLengthStr, 10);
 
     if (isNaN(prefixLength) || prefixLength < 0 || prefixLength > 32) {
@@ -75,18 +73,13 @@ function isIpInCidr(ip: string, cidr: string): boolean {
  * @param ranges - Array of CIDR ranges or comma-separated string
  * @returns true if IP matches any range, false otherwise
  */
-export function isIpInRanges(
-  ip: string,
-  ranges: string[] | string | undefined
-): boolean {
+export function isIpInRanges(ip: string, ranges: string[] | string | undefined): boolean {
   if (!ip || !ranges) {
     return false;
   }
 
   // Convert string to array if needed
-  const rangeArray = Array.isArray(ranges)
-    ? ranges
-    : ranges.split(",").map((r) => r.trim());
+  const rangeArray = Array.isArray(ranges) ? ranges : ranges.split(',').map((r) => r.trim());
 
   if (rangeArray.length === 0) {
     return false;
@@ -97,7 +90,7 @@ export function isIpInRanges(
     if (!range) return false;
 
     // Support both CIDR notation and single IPs
-    if (!range.includes("/")) {
+    if (!range.includes('/')) {
       // Single IP - add /32 to make it a valid CIDR
       range = `${range}/32`;
     }
@@ -113,25 +106,21 @@ export function isIpInRanges(
  * @param remoteAddress - Socket remote address fallback
  * @returns Client IP address or null if not found
  */
-export function getClientIp(
-  headers: Record<string, string | string[] | undefined>,
-  remoteAddress?: string
-): string | null {
+export function getClientIp(headers: Record<string, string | string[] | undefined>, remoteAddress?: string): string | null {
   // Priority order for IP extraction:
   // 1. x-real-ip (most reliable for single proxies)
   // 2. x-forwarded-for (first IP in the chain)
   // 3. socket remoteAddress (direct connection)
 
-  const xRealIp = headers["x-real-ip"];
-  if (xRealIp && typeof xRealIp === "string") {
+  const xRealIp = headers['x-real-ip'];
+  if (xRealIp && typeof xRealIp === 'string') {
     return xRealIp.trim();
   }
 
-  const xForwardedFor = headers["x-forwarded-for"];
+  const xForwardedFor = headers['x-forwarded-for'];
   if (xForwardedFor) {
-    const forwardedIp =
-      typeof xForwardedFor === "string" ? xForwardedFor : xForwardedFor[0];
-    const firstIp = forwardedIp?.split(",")[0]?.trim();
+    const forwardedIp = typeof xForwardedFor === 'string' ? xForwardedFor : xForwardedFor[0];
+    const firstIp = forwardedIp?.split(',')[0]?.trim();
     if (firstIp) {
       return firstIp;
     }

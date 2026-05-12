@@ -1,15 +1,10 @@
-import { PseudonymousMessage } from "../types.internal";
-import { parseMessageBody } from "./Helpers";
+import { PseudonymousMessage } from '../types.internal';
+import { parseMessageBody } from './Helpers';
 
 /**
  * Message types that should be excluded from feedback eligibility
  */
-export const INELIGIBLE_MESSAGE_TYPES = [
-  "intro",
-  "moderator_offered",
-  "moderator_submitted",
-  "moderator_declined",
-] as const;
+export const INELIGIBLE_MESSAGE_TYPES = ['intro', 'moderator_offered', 'moderator_submitted', 'moderator_declined'] as const;
 
 /**
  * Determine which messages should show feedback UI based on:
@@ -20,10 +15,7 @@ export const INELIGIBLE_MESSAGE_TYPES = [
  * @param feedbackFrequency - How often to show feedback (1 = all, 2 = every 2nd, etc.). Defaults to 1.
  * @returns Set of message IDs that should display feedback UI
  */
-export function getFeedbackEligibleMessages(
-  messages: PseudonymousMessage[],
-  feedbackFrequency: number = 1,
-): Set<string> {
+export function getFeedbackEligibleMessages(messages: PseudonymousMessage[], feedbackFrequency: number = 1): Set<string> {
   // If frequency is 0 or negative, never show feedback
   if (feedbackFrequency <= 0) {
     return new Set<string>();

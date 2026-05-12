@@ -1,5 +1,5 @@
-import { Box, Paper } from "@mui/material";
-import { FC, useEffect, useRef, ReactNode } from "react";
+import { Box, Paper } from '@mui/material';
+import { FC, useEffect, useRef, ReactNode } from 'react';
 
 interface GenericEnhancerMenuProps<T> {
   items: T[];
@@ -29,13 +29,11 @@ export const GenericEnhancerMenu = <T,>({
   // Scroll selected item into view
   useEffect(() => {
     if (open && menuRef.current) {
-      const selectedItem = menuRef.current.children[
-        selectedIndex
-      ] as HTMLElement;
+      const selectedItem = menuRef.current.children[selectedIndex] as HTMLElement;
       if (selectedItem) {
         selectedItem.scrollIntoView({
-          block: "nearest",
-          behavior: "smooth",
+          block: 'nearest',
+          behavior: 'smooth',
         });
       }
     }
@@ -62,25 +60,21 @@ export const GenericEnhancerMenu = <T,>({
       ref={menuRef}
       elevation={8}
       sx={{
-        position: "fixed",
+        position: 'fixed',
         bottom: `${window.innerHeight - rect.top + 8}px`,
         left: `${leftPos}px`,
         zIndex: 1400,
         maxHeight: 240,
         minWidth: 280,
-        overflow: "auto",
-        borderRadius: "8px",
-        border: "1px solid",
-        borderColor: "grey.300",
+        overflow: 'auto',
+        borderRadius: '8px',
+        border: '1px solid',
+        borderColor: 'grey.300',
       }}
     >
       <Box>
         {items.map((item, index) => (
-          <div
-            key={getItemKey(item, index)}
-            onClick={() => onSelect(item)}
-            style={{ cursor: "pointer" }}
-          >
+          <div key={getItemKey(item, index)} onClick={() => onSelect(item)} style={{ cursor: 'pointer' }}>
             {renderItem(item, index === selectedIndex)}
           </div>
         ))}

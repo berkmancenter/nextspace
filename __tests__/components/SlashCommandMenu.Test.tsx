@@ -1,26 +1,23 @@
-import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import {
-  SlashCommandMenu,
-  SlashCommand,
-} from "../../components/SlashCommandMenu";
+import React from 'react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { SlashCommandMenu, SlashCommand } from '../../components/SlashCommandMenu';
 
-describe("SlashCommandMenu", () => {
+describe('SlashCommandMenu', () => {
   const mockCommands: SlashCommand[] = [
     {
-      command: "mod",
-      description: "Submit a question to the moderator",
-      value: "/mod ",
+      command: 'mod',
+      description: 'Submit a question to the moderator',
+      value: '/mod ',
     },
     {
-      command: "help",
-      description: "Show available commands",
-      value: "/help ",
+      command: 'help',
+      description: 'Show available commands',
+      value: '/help ',
     },
     {
-      command: "feedback",
-      description: "Provide feedback",
+      command: 'feedback',
+      description: 'Provide feedback',
     },
   ];
 
@@ -32,10 +29,10 @@ describe("SlashCommandMenu", () => {
     // Mock scrollIntoView
     HTMLElement.prototype.scrollIntoView = jest.fn();
     // Create a mock anchor element
-    mockAnchorEl = document.createElement("div");
+    mockAnchorEl = document.createElement('div');
     document.body.appendChild(mockAnchorEl);
     // Set position for the anchor element
-    jest.spyOn(mockAnchorEl, "getBoundingClientRect").mockReturnValue({
+    jest.spyOn(mockAnchorEl, 'getBoundingClientRect').mockReturnValue({
       top: 500,
       left: 100,
       bottom: 520,
@@ -52,7 +49,7 @@ describe("SlashCommandMenu", () => {
     document.body.removeChild(mockAnchorEl);
   });
 
-  it("renders nothing when open is false", () => {
+  it('renders nothing when open is false', () => {
     const { container } = render(
       <SlashCommandMenu
         commands={mockCommands}
@@ -60,41 +57,29 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={false}
-      />
+      />,
     );
 
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders nothing when anchorEl is null", () => {
+  it('renders nothing when anchorEl is null', () => {
     const { container } = render(
-      <SlashCommandMenu
-        commands={mockCommands}
-        selectedIndex={0}
-        onSelect={mockOnSelect}
-        anchorEl={null}
-        open={true}
-      />
+      <SlashCommandMenu commands={mockCommands} selectedIndex={0} onSelect={mockOnSelect} anchorEl={null} open={true} />,
     );
 
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders nothing when commands array is empty", () => {
+  it('renders nothing when commands array is empty', () => {
     const { container } = render(
-      <SlashCommandMenu
-        commands={[]}
-        selectedIndex={0}
-        onSelect={mockOnSelect}
-        anchorEl={mockAnchorEl}
-        open={true}
-      />
+      <SlashCommandMenu commands={[]} selectedIndex={0} onSelect={mockOnSelect} anchorEl={mockAnchorEl} open={true} />,
     );
 
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders all commands when open", () => {
+  it('renders all commands when open', () => {
     render(
       <SlashCommandMenu
         commands={mockCommands}
@@ -102,20 +87,18 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
-    expect(screen.getByText("/mod")).toBeInTheDocument();
-    expect(
-      screen.getByText("Submit a question to the moderator")
-    ).toBeInTheDocument();
-    expect(screen.getByText("/help")).toBeInTheDocument();
-    expect(screen.getByText("Show available commands")).toBeInTheDocument();
-    expect(screen.getByText("/feedback")).toBeInTheDocument();
-    expect(screen.getByText("Provide feedback")).toBeInTheDocument();
+    expect(screen.getByText('/mod')).toBeInTheDocument();
+    expect(screen.getByText('Submit a question to the moderator')).toBeInTheDocument();
+    expect(screen.getByText('/help')).toBeInTheDocument();
+    expect(screen.getByText('Show available commands')).toBeInTheDocument();
+    expect(screen.getByText('/feedback')).toBeInTheDocument();
+    expect(screen.getByText('Provide feedback')).toBeInTheDocument();
   });
 
-  it("highlights the selected command", () => {
+  it('highlights the selected command', () => {
     const { rerender } = render(
       <SlashCommandMenu
         commands={mockCommands}
@@ -123,12 +106,12 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
     // First command should be selected
-    const firstMenuItem = screen.getByText("/mod").closest("li");
-    expect(firstMenuItem).toHaveClass("Mui-selected");
+    const firstMenuItem = screen.getByText('/mod').closest('li');
+    expect(firstMenuItem).toHaveClass('Mui-selected');
 
     // Rerender with different selected index
     rerender(
@@ -138,15 +121,15 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
     // Second command should now be selected
-    const secondMenuItem = screen.getByText("/help").closest("li");
-    expect(secondMenuItem).toHaveClass("Mui-selected");
+    const secondMenuItem = screen.getByText('/help').closest('li');
+    expect(secondMenuItem).toHaveClass('Mui-selected');
   });
 
-  it("calls onSelect when a command is clicked", async () => {
+  it('calls onSelect when a command is clicked', async () => {
     const user = userEvent.setup();
     render(
       <SlashCommandMenu
@@ -155,17 +138,17 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
-    const modCommand = screen.getByText("/mod");
+    const modCommand = screen.getByText('/mod');
     await user.click(modCommand);
 
     expect(mockOnSelect).toHaveBeenCalledTimes(1);
     expect(mockOnSelect).toHaveBeenCalledWith(mockCommands[0]);
   });
 
-  it("calls onSelect with correct command when different commands are clicked", async () => {
+  it('calls onSelect with correct command when different commands are clicked', async () => {
     const user = userEvent.setup();
     render(
       <SlashCommandMenu
@@ -174,17 +157,17 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
-    const helpCommand = screen.getByText("/help");
+    const helpCommand = screen.getByText('/help');
     await user.click(helpCommand);
 
     expect(mockOnSelect).toHaveBeenCalledTimes(1);
     expect(mockOnSelect).toHaveBeenCalledWith(mockCommands[1]);
   });
 
-  it("positions menu above the anchor element", () => {
+  it('positions menu above the anchor element', () => {
     const { container } = render(
       <SlashCommandMenu
         commands={mockCommands}
@@ -192,18 +175,18 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
     const menu = container.firstChild as HTMLElement;
-    expect(menu).toHaveStyle({ position: "fixed" });
+    expect(menu).toHaveStyle({ position: 'fixed' });
 
     // Menu should be positioned above the anchor (bottom style should be calculated)
     const computedStyle = window.getComputedStyle(menu);
-    expect(computedStyle.position).toBe("fixed");
+    expect(computedStyle.position).toBe('fixed');
   });
 
-  it("handles command without custom value", async () => {
+  it('handles command without custom value', async () => {
     const user = userEvent.setup();
     render(
       <SlashCommandMenu
@@ -212,17 +195,17 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
     // Click the feedback command which has no custom value
-    const feedbackCommand = screen.getByText("/feedback");
+    const feedbackCommand = screen.getByText('/feedback');
     await user.click(feedbackCommand);
 
     expect(mockOnSelect).toHaveBeenCalledWith(mockCommands[2]);
   });
 
-  it("displays commands with bold font weight", () => {
+  it('displays commands with bold font weight', () => {
     render(
       <SlashCommandMenu
         commands={mockCommands}
@@ -230,14 +213,14 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
-    const commandText = screen.getByText("/mod");
+    const commandText = screen.getByText('/mod');
     expect(commandText).toHaveStyle({ fontWeight: 600 });
   });
 
-  it("scrolls selected item into view when selectedIndex changes", async () => {
+  it('scrolls selected item into view when selectedIndex changes', async () => {
     const scrollIntoViewMock = jest.fn();
     HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
 
@@ -248,7 +231,7 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
     // Change selected index
@@ -259,7 +242,7 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -267,11 +250,11 @@ describe("SlashCommandMenu", () => {
     });
   });
 
-  it("renders with single command", () => {
+  it('renders with single command', () => {
     const singleCommand: SlashCommand[] = [
       {
-        command: "solo",
-        description: "Single command",
+        command: 'solo',
+        description: 'Single command',
       },
     ];
 
@@ -282,19 +265,19 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
-    expect(screen.getByText("/solo")).toBeInTheDocument();
-    expect(screen.getByText("Single command")).toBeInTheDocument();
+    expect(screen.getByText('/solo')).toBeInTheDocument();
+    expect(screen.getByText('Single command')).toBeInTheDocument();
   });
 
-  it("handles very long command descriptions", () => {
+  it('handles very long command descriptions', () => {
     const longDescriptionCommand: SlashCommand[] = [
       {
-        command: "long",
+        command: 'long',
         description:
-          "This is a very long description that might wrap to multiple lines and should be handled gracefully by the component",
+          'This is a very long description that might wrap to multiple lines and should be handled gracefully by the component',
       },
     ];
 
@@ -305,18 +288,18 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
-    expect(screen.getByText("/long")).toBeInTheDocument();
+    expect(screen.getByText('/long')).toBeInTheDocument();
     expect(
       screen.getByText(
-        "This is a very long description that might wrap to multiple lines and should be handled gracefully by the component"
-      )
+        'This is a very long description that might wrap to multiple lines and should be handled gracefully by the component',
+      ),
     ).toBeInTheDocument();
   });
 
-  it("handles hover states correctly", async () => {
+  it('handles hover states correctly', async () => {
     const user = userEvent.setup();
     render(
       <SlashCommandMenu
@@ -325,10 +308,10 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
-    const helpCommand = screen.getByText("/help").closest("li");
+    const helpCommand = screen.getByText('/help').closest('li');
 
     // Hover over the element
     await user.hover(helpCommand!);
@@ -337,7 +320,7 @@ describe("SlashCommandMenu", () => {
     expect(helpCommand).toBeInTheDocument();
   });
 
-  it("maintains menu visibility with many commands", () => {
+  it('maintains menu visibility with many commands', () => {
     const manyCommands: SlashCommand[] = Array.from({ length: 10 }, (_, i) => ({
       command: `cmd${i}`,
       description: `Description for command ${i}`,
@@ -350,16 +333,16 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
     // Menu should have max height constraint
     const menu = container.firstChild as HTMLElement;
-    expect(menu).toHaveStyle({ maxHeight: "240px" });
-    expect(menu).toHaveStyle({ overflow: "auto" });
+    expect(menu).toHaveStyle({ maxHeight: '240px' });
+    expect(menu).toHaveStyle({ overflow: 'auto' });
   });
 
-  it("handles rapid command selection", async () => {
+  it('handles rapid command selection', async () => {
     const user = userEvent.setup();
     render(
       <SlashCommandMenu
@@ -368,11 +351,11 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
-    const modCommand = screen.getByText("/mod");
-    const helpCommand = screen.getByText("/help");
+    const modCommand = screen.getByText('/mod');
+    const helpCommand = screen.getByText('/help');
 
     // Click multiple commands rapidly
     await user.click(modCommand);
@@ -383,7 +366,7 @@ describe("SlashCommandMenu", () => {
     expect(mockOnSelect).toHaveBeenNthCalledWith(2, mockCommands[1]);
   });
 
-  it("applies correct z-index for overlay", () => {
+  it('applies correct z-index for overlay', () => {
     const { container } = render(
       <SlashCommandMenu
         commands={mockCommands}
@@ -391,7 +374,7 @@ describe("SlashCommandMenu", () => {
         onSelect={mockOnSelect}
         anchorEl={mockAnchorEl}
         open={true}
-      />
+      />,
     );
 
     const menu = container.firstChild as HTMLElement;

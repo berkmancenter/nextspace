@@ -1,21 +1,22 @@
-import { FC, useState, useEffect } from "react";
-import { Box } from "@mui/material";
-import { CheckCircle, CheckCircleOutline } from "@mui/icons-material";
-import { MessageContent } from "./MessageContent";
-import { MessageProps } from "../../types.internal";
+import { FC, useState, useEffect } from 'react';
+import { Box } from '@mui/material';
+import { CheckCircle, CheckCircleOutline } from '@mui/icons-material';
+import { MessageContent } from './MessageContent';
+import { MessageProps } from '../../types.internal';
 
 export const BackchannelMessage: FC<MessageProps> = ({ message }) => {
   const [isMessageSent, setIsMessageSent] = useState(false);
 
-  const messageDate = message.createdAt
-    ? new Date(message.createdAt)
-    : new Date();
+  const messageDate = message.createdAt ? new Date(message.createdAt) : new Date();
 
   // Simulate message sent state
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setIsMessageSent(true);
-    }, Math.floor(Math.random() * 2200) + 500);
+    const timeout = setTimeout(
+      () => {
+        setIsMessageSent(true);
+      },
+      Math.floor(Math.random() * 2200) + 500,
+    );
 
     return () => clearTimeout(timeout);
   }, []);
@@ -29,11 +30,7 @@ export const BackchannelMessage: FC<MessageProps> = ({ message }) => {
       <p className="text-sm text-neutral-400 self-end">
         {messageDate.toLocaleTimeString()}
         <span className="ml-2">
-          {isMessageSent ? (
-            <CheckCircle fontSize="small" />
-          ) : (
-            <CheckCircleOutline fontSize="small" />
-          )}
+          {isMessageSent ? <CheckCircle fontSize="small" /> : <CheckCircleOutline fontSize="small" />}
         </span>
       </p>
     </Box>

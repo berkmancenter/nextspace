@@ -1,9 +1,9 @@
-import React, { FC, useState, useRef, useEffect } from "react";
-import { Reply, ChatBubbleOutline, ChevronRight } from "@mui/icons-material";
-import { IconButton } from "@mui/material";
-import { PseudonymousMessage, FeedbackConfig } from "../types.internal";
-import { normalizeAssistantPseudonym } from "../utils/Helpers";
-import { MessageFeedback } from "./MessageFeedback";
+import React, { FC, useState, useRef, useEffect } from 'react';
+import { Reply, ChatBubbleOutline, ChevronRight } from '@mui/icons-material';
+import { IconButton } from '@mui/material';
+import { PseudonymousMessage, FeedbackConfig } from '../types.internal';
+import { normalizeAssistantPseudonym } from '../utils/Helpers';
+import { MessageFeedback } from './MessageFeedback';
 
 interface ThreadedMessageProps {
   message: PseudonymousMessage;
@@ -13,10 +13,7 @@ interface ThreadedMessageProps {
   onMarkAsRead?: (messageId: string) => void;
   botName: string;
   renderAvatar: (msg: PseudonymousMessage) => React.ReactNode;
-  renderMessageContent: (
-    msg: PseudonymousMessage,
-    isHovered?: boolean,
-  ) => React.ReactNode;
+  renderMessageContent: (msg: PseudonymousMessage, isHovered?: boolean) => React.ReactNode;
   feedbackConfig?: FeedbackConfig;
   showTimestamp: boolean;
   isThreadOpen?: boolean;
@@ -155,9 +152,9 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
       {showTimestamp && (
         <div className="flex justify-center my-1">
           <span className="text-sm text-gray-400">
-            {new Date(message.createdAt!).toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
+            {new Date(message.createdAt!).toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
             })}
           </span>
         </div>
@@ -165,7 +162,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
 
       {/* Message with avatar - always left-aligned */}
       <div
-        className={`flex flex-row gap-1.5 p-2 rounded-[.5rem] transition-all ${isThreadOpen ? "bg-blue-50 border-l-4 border-blue-400 pl-2 py-2 -ml-2 rounded-r-lg" : `${showReplyButton && "bg-white"}`}`}
+        className={`flex flex-row gap-1.5 p-2 rounded-[.5rem] transition-all ${isThreadOpen ? 'bg-blue-50 border-l-4 border-blue-400 pl-2 py-2 -ml-2 rounded-r-lg' : `${showReplyButton && 'bg-white'}`}`}
       >
         {/* Avatar */}
         {renderAvatar(message)}
@@ -175,9 +172,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
           {/* Name */}
           <div className="text-sm font-bold mb-1 text-left">
             {displayName}
-            {isCurrentUser && (
-              <span className="text-gray-600 font-normal"> (You)</span>
-            )}
+            {isCurrentUser && <span className="text-gray-600 font-normal"> (You)</span>}
           </div>
 
           {/* Message bubble wrapper with hover state - extended to include button area */}
@@ -203,21 +198,21 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                   sx={{
                     width: 32,
                     height: 32,
-                    backgroundColor: "white",
-                    border: "1.5px solid #d1d5db",
-                    boxShadow: "0 4px 6px rgba(0,0,0,0.15)",
-                    transition: "all 0.2s ease",
-                    "&:hover": {
-                      backgroundColor: "#4A0979",
-                      borderColor: "#4A0979",
-                      boxShadow: "0 6px 12px rgba(74,9,121,0.3)",
-                      "& svg": {
-                        color: "white",
+                    backgroundColor: 'white',
+                    border: '1.5px solid #d1d5db',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.15)',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      backgroundColor: '#4A0979',
+                      borderColor: '#4A0979',
+                      boxShadow: '0 6px 12px rgba(74,9,121,0.3)',
+                      '& svg': {
+                        color: 'white',
                       },
                     },
                   }}
                 >
-                  <Reply sx={{ fontSize: 18, color: "#6b7280" }} />
+                  <Reply sx={{ fontSize: 18, color: '#6b7280' }} />
                 </IconButton>
               )}
             </div>
@@ -231,10 +226,10 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                 <div
                   className="absolute -left-[5px] top-2"
                   style={{
-                    width: "10px",
-                    height: "10px",
-                    borderRadius: "50%",
-                    backgroundColor: "#7C3AED",
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    backgroundColor: '#7C3AED',
                   }}
                 />
               )}
@@ -247,9 +242,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                   {/* Name */}
                   <div className="text-sm font-bold mb-1 text-left">
                     {normalizeAssistantPseudonym(replies[0], botName)}
-                    {replies[0].pseudonym === pseudonym && (
-                      <span className="text-gray-600 font-normal"> (You)</span>
-                    )}
+                    {replies[0].pseudonym === pseudonym && <span className="text-gray-600 font-normal"> (You)</span>}
                   </div>
 
                   {/* Message bubble */}
@@ -260,15 +253,11 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                     replies[0].id &&
                     feedbackConfig &&
                     feedbackConfig.eligibleMessageIds.has(replies[0].id) && (
-                      <div className="mt-0" style={{ width: "85%" }}>
+                      <div className="mt-0" style={{ width: '85%' }}>
                         <MessageFeedback
                           messageId={replies[0].id}
-                          initialRating={feedbackConfig.messageRatings.get(
-                            replies[0].id,
-                          )}
-                          onPopulateFeedbackText={
-                            feedbackConfig.onPopulateFeedbackText
-                          }
+                          initialRating={feedbackConfig.messageRatings.get(replies[0].id)}
+                          onPopulateFeedbackText={feedbackConfig.onPopulateFeedbackText}
                           onSendFeedbackRating={feedbackConfig.onSendRating}
                         />
                       </div>
@@ -299,19 +288,18 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                   }}
                   onTouchStart={() => setIsReplyIndicatorPressed(true)}
                   onTouchEnd={() => setIsReplyIndicatorPressed(false)}
-                  className={`mt-2 -ml-3 px-3 py-2 text-xs text-gray-600 hover:bg-white active:bg-white transition-colors cursor-pointer flex items-center justify-between w-[calc(100%+0.75rem)] group ${isReplyIndicatorPressed ? "bg-white" : ""} ${hasUnreadReplies && !isThreadOpen ? "font-bold" : "font-medium"}`}
-                  aria-label={`View ${replyCount - 1} more ${replyCount - 1 === 1 ? "reply" : "replies"}`}
+                  className={`mt-2 -ml-3 px-3 py-2 text-xs text-gray-600 hover:bg-white active:bg-white transition-colors cursor-pointer flex items-center justify-between w-[calc(100%+0.75rem)] group ${isReplyIndicatorPressed ? 'bg-white' : ''} ${hasUnreadReplies && !isThreadOpen ? 'font-bold' : 'font-medium'}`}
+                  aria-label={`View ${replyCount - 1} more ${replyCount - 1 === 1 ? 'reply' : 'replies'}`}
                 >
                   <div className="flex items-center gap-1">
                     <ChatBubbleOutline sx={{ fontSize: 14 }} />
                     <span>
-                      + {replyCount - 1} more{" "}
-                      {replyCount - 1 === 1 ? "reply" : "replies"}
+                      + {replyCount - 1} more {replyCount - 1 === 1 ? 'reply' : 'replies'}
                     </span>
                   </div>
                   <ChevronRight
                     sx={{ fontSize: 16 }}
-                    className={`transition-opacity ${showExpandButton ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                    className={`transition-opacity ${showExpandButton ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                   />
                 </button>
               )}
@@ -319,19 +307,16 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
           )}
 
           {/* Feedback - rendered below the bubble for Event Assistant messages */}
-          {isAssistant &&
-            message.id &&
-            feedbackConfig &&
-            feedbackConfig.eligibleMessageIds.has(message.id) && (
-              <div className="mt-0" style={{ width: "85%" }}>
-                <MessageFeedback
-                  messageId={message.id}
-                  initialRating={feedbackConfig.messageRatings.get(message.id)}
-                  onPopulateFeedbackText={feedbackConfig.onPopulateFeedbackText}
-                  onSendFeedbackRating={feedbackConfig.onSendRating}
-                />
-              </div>
-            )}
+          {isAssistant && message.id && feedbackConfig && feedbackConfig.eligibleMessageIds.has(message.id) && (
+            <div className="mt-0" style={{ width: '85%' }}>
+              <MessageFeedback
+                messageId={message.id}
+                initialRating={feedbackConfig.messageRatings.get(message.id)}
+                onPopulateFeedbackText={feedbackConfig.onPopulateFeedbackText}
+                onSendFeedbackRating={feedbackConfig.onSendRating}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

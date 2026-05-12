@@ -1,57 +1,57 @@
-import React, { act } from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { RetrieveData, SendData } from "../../../utils";
-import { EventStatus } from "../../../components";
-import { components } from "../../../types";
-import userEvent from "@testing-library/user-event";
-import { Conversation } from "../../../types.internal";
-import { platform } from "os";
+import React, { act } from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { RetrieveData, SendData } from '../../../utils';
+import { EventStatus } from '../../../components';
+import { components } from '../../../types';
+import userEvent from '@testing-library/user-event';
+import { Conversation } from '../../../types.internal';
+import { platform } from 'os';
 
 // Mock the SendData utility
-jest.mock("../../../utils", () => ({
+jest.mock('../../../utils', () => ({
   RetrieveData: jest.fn(),
   SendData: jest.fn(),
 }));
 
 // Mock window.location
 const mockLocation = {
-  protocol: "http:",
-  host: "localhost:8080",
+  protocol: 'http:',
+  host: 'localhost:8080',
 };
-Object.defineProperty(window, "location", {
+Object.defineProperty(window, 'location', {
   value: mockLocation,
   writable: true,
 });
 
-describe("EventStatus", () => {
+describe('EventStatus', () => {
   const mockConversationData: Conversation = {
-    id: "conv-123",
-    name: "Test Event",
+    id: 'conv-123',
+    name: 'Test Event',
     active: false,
     locked: false,
-    slug: "test-event",
+    slug: 'test-event',
     topic: {
-      name: "Test Topic",
+      name: 'Test Topic',
       conversations: [],
       votingAllowed: false,
-      owner: { username: "user1", password: "foo", pseudonyms: [] },
+      owner: { username: 'user1', password: 'foo', pseudonyms: [] },
       conversationCreationAllowed: false,
       private: false,
       archivable: false,
       followers: [],
     },
-    owner: { username: "user1", password: "foo", pseudonyms: [] },
-    createdAt: "2025-10-17T00:00:00Z",
-    channels: [{ name: "transcript", passcode: "trans-pass", direct: false }],
+    owner: { username: 'user1', password: 'foo', pseudonyms: [] },
+    createdAt: '2025-10-17T00:00:00Z',
+    channels: [{ name: 'transcript', passcode: 'trans-pass', direct: false }],
     agents: [
       {
-        agentType: "eventAssistant",
-        name: "Event Assistant",
-        description: "Assists",
+        agentType: 'eventAssistant',
+        name: 'Event Assistant',
+        description: 'Assists',
         pseudonyms: [],
-        llmPlatform: "openai",
-        llmModel: "gpt-4",
-        conversation: "conv-123",
+        llmPlatform: 'openai',
+        llmModel: 'gpt-4',
+        conversation: 'conv-123',
       },
     ],
     followed: undefined,
@@ -64,38 +64,38 @@ describe("EventStatus", () => {
     eventUrls: {
       moderator: [
         {
-          label: "Event Assistant Display",
-          url: "http://localhost:8080/assistant/?conversationId=conv-123",
+          label: 'Event Assistant Display',
+          url: 'http://localhost:8080/assistant/?conversationId=conv-123',
         },
       ],
       participant: [
         {
-          label: "Fake Participant Link",
-          url: "http://localhost:8080/fake/?conversationId=conv-123",
+          label: 'Fake Participant Link',
+          url: 'http://localhost:8080/fake/?conversationId=conv-123',
         },
       ],
     },
     type: {
-      name: "eventAssistant",
-      label: "Event Assistant",
-      description: "An assistant to answer questions about an event",
+      name: 'eventAssistant',
+      label: 'Event Assistant',
+      description: 'An assistant to answer questions about an event',
       platforms: [],
       properties: [],
     },
   };
 
-  const conversationTypes: components["schemas"]["ConversationType"][] = [
+  const conversationTypes: components['schemas']['ConversationType'][] = [
     {
-      name: "backChannel",
-      label: "Back Channel",
-      description: "An agent to analyze participant comments",
+      name: 'backChannel',
+      label: 'Back Channel',
+      description: 'An agent to analyze participant comments',
       platforms: [],
       properties: [],
     },
     {
-      name: "eventAssistant",
-      label: "Event Assistant",
-      description: "An assistant to answer questions about an event",
+      name: 'eventAssistant',
+      label: 'Event Assistant',
+      description: 'An assistant to answer questions about an event',
       platforms: [],
       properties: [],
     },
@@ -110,149 +110,112 @@ describe("EventStatus", () => {
     (RetrieveData as jest.Mock).mockResolvedValue(mockConfig);
   });
 
-  it("renders the component with correct initial status and URLs", () => {
+  it('renders the component with correct initial status and URLs', () => {
     render(<EventStatus conversationData={mockConversationData} />);
 
-    expect(screen.getByText("Event Status")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Event 'Test Event' includes the Event Assistant/)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("The event is currently not started.")
-    ).toBeInTheDocument();
+    expect(screen.getByText('Event Status')).toBeInTheDocument();
+    expect(screen.getByText(/Event 'Test Event' includes the Event Assistant/)).toBeInTheDocument();
+    expect(screen.getByText('The event is currently not started.')).toBeInTheDocument();
 
-    const moderatorLink = screen.getByRole("link", {
+    const moderatorLink = screen.getByRole('link', {
       name: /http:\/\/localhost:8080\/assistant\/\?conversationId=conv-123/i,
     });
     expect(moderatorLink).toBeInTheDocument();
-    expect(moderatorLink).toHaveAttribute(
-      "href",
-      "http://localhost:8080/assistant/?conversationId=conv-123"
-    );
-    const participantLink = screen.getByRole("link", {
+    expect(moderatorLink).toHaveAttribute('href', 'http://localhost:8080/assistant/?conversationId=conv-123');
+    const participantLink = screen.getByRole('link', {
       name: /http:\/\/localhost:8080\/fake\/\?conversationId=conv-123/i,
     });
     expect(participantLink).toBeInTheDocument();
-    expect(participantLink).toHaveAttribute(
-      "href",
-      "http://localhost:8080/fake/?conversationId=conv-123"
-    );
+    expect(participantLink).toHaveAttribute('href', 'http://localhost:8080/fake/?conversationId=conv-123');
   });
 
-  it("renders type labels correctly with platforms", () => {
+  it('renders type labels correctly with platforms', () => {
     const conversationWithPlatforms = {
       ...mockConversationData,
-      platforms: ["production", "staging"],
+      platforms: ['production', 'staging'],
       platformTypes: [
-        { name: "production", label: "Production" },
-        { name: "staging", label: "Staging" },
+        { name: 'production', label: 'Production' },
+        { name: 'staging', label: 'Staging' },
       ],
     };
     render(<EventStatus conversationData={conversationWithPlatforms} />);
 
     expect(
-      screen.getByText(
-        /Event 'Test Event' includes the Event Assistant in Production and Staging/
-      )
+      screen.getByText(/Event 'Test Event' includes the Event Assistant in Production and Staging/),
     ).toBeInTheDocument();
   });
 
   it("shows 'Start Event' button when conditions are met", () => {
     render(<EventStatus conversationData={mockConversationData} />);
-    expect(
-      screen.getByRole("button", { name: "Start Event" })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start Event' })).toBeInTheDocument();
   });
 
   it("does not show 'Start Event' button if event is already active", () => {
-    render(
-      <EventStatus
-        conversationData={{ ...mockConversationData, active: true }}
-      />
-    );
-    expect(
-      screen.queryByRole("button", { name: "Start Event" })
-    ).not.toBeInTheDocument();
+    render(<EventStatus conversationData={{ ...mockConversationData, active: true }} />);
+    expect(screen.queryByRole('button', { name: 'Start Event' })).not.toBeInTheDocument();
   });
 
   it("calls SendData and updates status on 'Start Event' button click", async () => {
     const user = userEvent.setup();
     render(<EventStatus conversationData={mockConversationData} />);
 
-    const startButton = screen.getByRole("button", { name: "Start Event" });
+    const startButton = screen.getByRole('button', { name: 'Start Event' });
 
     await user.click(startButton);
 
     await waitFor(() => {
-      expect(
-        screen.getByText("The event is currently active.")
-      ).toBeInTheDocument();
-      expect(screen.getByText("The event has started!")).toBeInTheDocument();
+      expect(screen.getByText('The event is currently active.')).toBeInTheDocument();
+      expect(screen.getByText('The event has started!')).toBeInTheDocument();
       expect(startButton).not.toBeInTheDocument();
-      expect(SendData).toHaveBeenCalledWith("conversations/conv-123/start", {});
+      expect(SendData).toHaveBeenCalledWith('conversations/conv-123/start', {});
     });
   });
 
-  it("handles API error when starting an event", async () => {
-    const consoleErrorSpy = jest
-      .spyOn(console, "error")
-      .mockImplementation(() => {});
-    (SendData as jest.Mock).mockRejectedValue(new Error("API Error"));
+  it('handles API error when starting an event', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    (SendData as jest.Mock).mockRejectedValue(new Error('API Error'));
 
     render(<EventStatus conversationData={mockConversationData} />);
 
-    const startButton = screen.getByRole("button", { name: "Start Event" });
+    const startButton = screen.getByRole('button', { name: 'Start Event' });
     await act(async () => {
       fireEvent.click(startButton);
     });
 
     await waitFor(() => {
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "Error sending data:",
-        expect.any(Error)
-      );
-      expect(
-        screen.getByText("The event is currently not started.")
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText("The event has started!")
-      ).not.toBeInTheDocument();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error sending data:', expect.any(Error));
+      expect(screen.getByText('The event is currently not started.')).toBeInTheDocument();
+      expect(screen.queryByText('The event has started!')).not.toBeInTheDocument();
     });
 
     consoleErrorSpy.mockRestore();
   });
 
-  it("displays active status if conversationData.active is true initially", () => {
-    render(
-      <EventStatus
-        conversationData={{ ...mockConversationData, active: true }}
-      />
-    );
-    expect(
-      screen.getByText("The event is currently active.")
-    ).toBeInTheDocument();
+  it('displays active status if conversationData.active is true initially', () => {
+    render(<EventStatus conversationData={{ ...mockConversationData, active: true }} />);
+    expect(screen.getByText('The event is currently active.')).toBeInTheDocument();
   });
 
-  it("renders zoom link when provided in eventUrls", () => {
+  it('renders zoom link when provided in eventUrls', () => {
     const conversationWithZoom = {
       ...mockConversationData,
       eventUrls: {
         ...mockConversationData.eventUrls,
         zoom: {
-          label: "Zoom Meeting",
-          url: "https://zoom.us/j/123456789",
+          label: 'Zoom Meeting',
+          url: 'https://zoom.us/j/123456789',
         },
       },
     };
 
     render(<EventStatus conversationData={conversationWithZoom} />);
 
-    expect(screen.getByText("Zoom Meeting:")).toBeInTheDocument();
-    const zoomLink = screen.getByRole("link", {
+    expect(screen.getByText('Zoom Meeting:')).toBeInTheDocument();
+    const zoomLink = screen.getByRole('link', {
       name: /https:\/\/zoom\.us\/j\/123456789/i,
     });
     expect(zoomLink).toBeInTheDocument();
-    expect(zoomLink).toHaveAttribute("href", "https://zoom.us/j/123456789");
-    expect(zoomLink).toHaveAttribute("target", "_blank");
+    expect(zoomLink).toHaveAttribute('href', 'https://zoom.us/j/123456789');
+    expect(zoomLink).toHaveAttribute('target', '_blank');
   });
 });

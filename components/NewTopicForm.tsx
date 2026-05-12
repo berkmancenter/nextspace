@@ -1,6 +1,6 @@
-"use client";
-import React from "react";
-import { Box, Checkbox, FormControlLabel, TextField } from "@mui/material";
+'use client';
+import React from 'react';
+import { Box, Checkbox, FormControlLabel, TextField } from '@mui/material';
 
 export interface NewTopicFormValues {
   name: string;
@@ -13,10 +13,7 @@ interface NewTopicFormProps {
   onChange: (values: NewTopicFormValues) => void;
 }
 
-export const NewTopicForm: React.FC<NewTopicFormProps> = ({
-  values,
-  onChange,
-}) => {
+export const NewTopicForm: React.FC<NewTopicFormProps> = ({ values, onChange }) => {
   const [nameHasError, setNameHasError] = React.useState(false);
 
   return (
@@ -29,7 +26,7 @@ export const NewTopicForm: React.FC<NewTopicFormProps> = ({
         margin="dense"
         value={values.name}
         error={nameHasError}
-        helperText={nameHasError ? "Series name is required." : undefined}
+        helperText={nameHasError ? 'Series name is required.' : undefined}
         onBlur={() => setNameHasError(!values.name.trim())}
         onChange={(e) => {
           setNameHasError(false);

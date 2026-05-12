@@ -1,7 +1,7 @@
-import React from "react";
-import { Button, Typography } from "@mui/material";
-import { SendData } from "../../utils";
-import { Conversation } from "../../types.internal";
+import React from 'react';
+import { Button, Typography } from '@mui/material';
+import { SendData } from '../../utils';
+import { Conversation } from '../../types.internal';
 
 /**
  * EventStatus component
@@ -20,10 +20,10 @@ export const EventStatus: React.FC<{
 
   // Format list with "and" before last item
   const formatList = (items: string[]) => {
-    if (items.length === 0) return "";
+    if (items.length === 0) return '';
     if (items.length === 1) return items[0];
-    if (items.length === 2) return items.join(" and ");
-    return items.slice(0, -1).join(", ") + ", and " + items.slice(-1);
+    if (items.length === 2) return items.join(' and ');
+    return items.slice(0, -1).join(', ') + ', and ' + items.slice(-1);
   };
 
   const StartEventButton: React.FC = () => {
@@ -33,25 +33,20 @@ export const EventStatus: React.FC<{
         .then((data) => {
           setStartingEvent(false);
           if (!data) {
-            console.error("No data returned from start event");
+            console.error('No data returned from start event');
             return;
           }
           setEventStarted(true);
         })
         .catch((error) => {
           setStartingEvent(false);
-          console.error("Error sending data:", error);
+          console.error('Error sending data:', error);
         });
     };
 
     if (!eventStarted && !conversationData.active)
       return (
-        <Button
-          variant="contained"
-          color="primary"
-          loading={startingEvent}
-          onClick={handleStartEvent}
-        >
+        <Button variant="contained" color="primary" loading={startingEvent} onClick={handleStartEvent}>
           Start Event
         </Button>
       );
@@ -65,21 +60,16 @@ export const EventStatus: React.FC<{
         Event Status
       </Typography>
       <p className="mt-2 text-center">
-        {`Event '${conversationData.name}' includes the ${
-          conversationData.type.label || conversationData.type.name
-        }${
+        {`Event '${conversationData.name}' includes the ${conversationData.type.label || conversationData.type.name}${
           conversationData.platformTypes?.length
             ? ` in ${formatList(
-                conversationData.platformTypes.map(
-                  (platformType) => platformType.label || platformType.name,
-                ),
+                conversationData.platformTypes.map((platformType) => platformType.label || platformType.name),
               )}`
-            : ""
+            : ''
         }.`}
       </p>
       <p className="mt-2 font-bold">
-        The event is currently{" "}
-        {eventStarted || conversationData.active ? "active" : "not started"}.
+        The event is currently {eventStarted || conversationData.active ? 'active' : 'not started'}.
       </p>
 
       <div className="wrap-anywhere w-3/4 mt-5">
@@ -87,11 +77,7 @@ export const EventStatus: React.FC<{
           <>
             <p className="mt-2">{conversationData.eventUrls.zoom.label}:</p>
             <p className="mt-2">
-              <a
-                href={conversationData.eventUrls.zoom.url}
-                target="_blank"
-                className="text-medium-slate-blue"
-              >
+              <a href={conversationData.eventUrls.zoom.url} target="_blank" className="text-medium-slate-blue">
                 {conversationData.eventUrls.zoom.url}
               </a>
             </p>
@@ -102,11 +88,7 @@ export const EventStatus: React.FC<{
             <p className="mt-2">The URL for the moderator is:</p>
             {conversationData.eventUrls.moderator.map((urlObj, index) => (
               <p key={index} className="mt-2">
-                <a
-                  href={urlObj.url}
-                  target="_blank"
-                  className="text-medium-slate-blue"
-                >
+                <a href={urlObj.url} target="_blank" className="text-medium-slate-blue">
                   {urlObj.url}
                 </a>
               </p>
@@ -118,11 +100,7 @@ export const EventStatus: React.FC<{
             <p className="mt-2">The URL for the participants is:</p>
             {conversationData.eventUrls.participant.map((urlObj, index) => (
               <p key={index} className="mt-2">
-                <a
-                  href={urlObj.url}
-                  target="_blank"
-                  className="text-medium-slate-blue"
-                >
+                <a href={urlObj.url} target="_blank" className="text-medium-slate-blue">
                   {urlObj.url}
                 </a>
               </p>

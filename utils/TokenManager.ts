@@ -23,7 +23,7 @@ const REFRESH_BUFFER_MS = 2 * 60 * 1000; // 2 minutes
 // Minimum time between refresh attempts to avoid hammering the server.
 const MIN_REFRESH_INTERVAL_MS = 10_000; // 10 seconds
 
-const BROADCAST_CHANNEL_NAME = "nextspace-token-refresh";
+const BROADCAST_CHANNEL_NAME = 'nextspace-token-refresh';
 
 export type TokenPair = {
   token: string;
@@ -41,9 +41,7 @@ type TokenChangeListener = (tokens: TokenSet) => void;
 /**
  * BroadcastChannel message types for cross-tab coordination.
  */
-type TabMessage =
-  | { type: "TOKENS_REFRESHED"; tokens: TokenSet }
-  | { type: "REFRESH_STARTING" };
+type TabMessage = { type: 'TOKENS_REFRESHED'; tokens: TokenSet } | { type: 'REFRESH_STARTING' };
 
 class TokenManagerClass {
   private static _instance: TokenManagerClass;
@@ -83,7 +81,7 @@ class TokenManagerClass {
     this._scheduleProactiveRefresh();
     this._notifyListeners(tokens);
     if (broadcast) {
-      this._broadcast({ type: "TOKENS_REFRESHED", tokens });
+      this._broadcast({ type: 'TOKENS_REFRESHED', tokens });
     }
   }
 
@@ -91,19 +89,12 @@ class TokenManagerClass {
    * Convenience overload for callers that only have token strings and expiry
    * info available at the same time.
    */
-  setTokensFromStrings(
-    accessToken: string,
-    refreshToken: string,
-    accessExpires?: string,
-    refreshExpires?: string
-  ): void {
+  setTokensFromStrings(accessToken: string, refreshToken: string, accessExpires?: string, refreshExpires?: string): void {
     // When expires info is unavailable (legacy callers) synthesise a plausible
     // expiry so scheduling still works — 30 min for access, 30 days for refresh.
     const now = Date.now();
-    const safeAccessExpires =
-      accessExpires ?? new Date(now + 30 * 60 * 1000).toISOString();
-    const safeRefreshExpires =
-      refreshExpires ?? new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const safeAccessExpires = accessExpires ?? new Date(now + 30 * 60 * 1000).toISOString();
+    const safeRefreshExpires = refreshExpires ?? new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString();
 
     this.setTokens({
       access: { token: accessToken, expires: safeAccessExpires },
@@ -116,7 +107,7 @@ class TokenManagerClass {
    * are stored.  Always read at point-of-use — never capture in a closure.
    */
   getAccessToken(): string {
-    return this._tokens?.access.token ?? "";
+    return this._tokens?.access.token ?? '';
   }
 
   /**
@@ -218,38 +209,34 @@ class TokenManagerClass {
     const cookieSynced = await this._syncFromCookie();
     if (cookieSynced && this.isAccessTokenFresh()) {
       // Another tab already took care of the refresh.
-      console.log("TokenManager: tokens already refreshed (cookie sync)");
+      console.log('TokenManager: tokens already refreshed (cookie sync)');
       return true;
     }
 
     // Step 2: Make sure we have a refresh token to use.
     let refreshToken = this._tokens?.refresh.token ?? null;
     if (!refreshToken) {
-      console.error("TokenManager: no refresh token available");
+      console.error('TokenManager: no refresh token available');
       return false;
     }
 
     // Step 3: Broadcast to other tabs that we are starting a refresh so they
     // can avoid sending their own concurrent request.
-    this._broadcast({ type: "REFRESH_STARTING" });
+    this._broadcast({ type: 'REFRESH_STARTING' });
 
     try {
-      console.log("TokenManager: refreshing access token…");
+      console.log('TokenManager: refreshing access token…');
       const response = await this._callRefreshApi(refreshToken);
 
       if (response?.access?.token && response?.refresh?.token) {
         const newTokens: TokenSet = {
           access: {
             token: response.access.token,
-            expires:
-              response.access.expires ??
-              new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+            expires: response.access.expires ?? new Date(Date.now() + 30 * 60 * 1000).toISOString(),
           },
           refresh: {
             token: response.refresh.token,
-            expires:
-              response.refresh.expires ??
-              new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            expires: response.refresh.expires ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           },
         };
 
@@ -260,14 +247,14 @@ class TokenManagerClass {
         // Persist to the cookie so server-side routes and other tabs can read.
         await this._patchCookie(newTokens);
 
-        console.log("TokenManager: token refresh successful");
+        console.log('TokenManager: token refresh successful');
         return true;
       }
 
-      console.error("TokenManager: refresh response missing tokens");
+      console.error('TokenManager: refresh response missing tokens');
       return false;
     } catch (err) {
-      console.error("TokenManager: refresh error:", err);
+      console.error('TokenManager: refresh error:', err);
       return false;
     }
   }
@@ -278,7 +265,7 @@ class TokenManagerClass {
    */
   private async _syncFromCookie(): Promise<boolean> {
     try {
-      const res = await fetch("/api/cookie");
+      const res = await fetch('/api/cookie');
       if (!res.ok) return false;
 
       const data = await res.json();
@@ -293,25 +280,21 @@ class TokenManagerClass {
           {
             access: {
               token: cookieAccess,
-              expires:
-                data.tokens.accessExpires ??
-                new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+              expires: data.tokens.accessExpires ?? new Date(Date.now() + 30 * 60 * 1000).toISOString(),
             },
             refresh: {
               token: cookieRefresh,
-              expires:
-                data.tokens.refreshExpires ??
-                new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+              expires: data.tokens.refreshExpires ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
             },
           },
-          false // don't re-broadcast — this came from the cookie
+          false, // don't re-broadcast — this came from the cookie
         );
         return true;
       }
 
       return false;
     } catch (err) {
-      console.error("TokenManager: cookie sync error:", err);
+      console.error('TokenManager: cookie sync error:', err);
       return false;
     }
   }
@@ -329,9 +312,9 @@ class TokenManagerClass {
     });
 
     const doFetch = () =>
-      fetch("/api/session", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+      fetch('/api/session', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         body,
       });
 
@@ -342,11 +325,11 @@ class TokenManagerClass {
         await doFetch();
       }
     } catch (err) {
-      console.warn("TokenManager: cookie PATCH failed, retrying…", err);
+      console.warn('TokenManager: cookie PATCH failed, retrying…', err);
       try {
         await doFetch();
       } catch (retryErr) {
-        console.error("TokenManager: cookie PATCH retry failed:", retryErr);
+        console.error('TokenManager: cookie PATCH retry failed:', retryErr);
       }
     }
   }
@@ -367,20 +350,14 @@ class TokenManagerClass {
     if (delay <= 0) {
       // Already expired or within the buffer — refresh immediately (async,
       // but don't block the caller).
-      this.refresh().catch((err) =>
-        console.error("TokenManager: immediate proactive refresh failed:", err)
-      );
+      this.refresh().catch((err) => console.error('TokenManager: immediate proactive refresh failed:', err));
       return;
     }
 
-    console.log(
-      `TokenManager: proactive refresh scheduled in ${Math.round(delay / 1000)}s`
-    );
+    console.log(`TokenManager: proactive refresh scheduled in ${Math.round(delay / 1000)}s`);
 
     this._proactiveTimer = setTimeout(() => {
-      this.refresh().catch((err) =>
-        console.error("TokenManager: proactive refresh failed:", err)
-      );
+      this.refresh().catch((err) => console.error('TokenManager: proactive refresh failed:', err));
     }, delay);
   }
 
@@ -394,18 +371,18 @@ class TokenManagerClass {
    * local logout route.
    */
   private async _callRefreshApi(refreshToken: string): Promise<any> {
-    const apiUrl = (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_URL) ?? "";
+    const apiUrl = (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) ?? '';
     try {
       const response = await fetch(`${apiUrl}/auth/refresh-tokens`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
       });
 
       if (response.status === 401) {
         // Refresh token itself has expired — log out completely.
-        console.error("TokenManager: refresh token expired, logging out");
-        await fetch("/api/logout", { method: "POST" }).catch(() => {});
+        console.error('TokenManager: refresh token expired, logging out');
+        await fetch('/api/logout', { method: 'POST' }).catch(() => {});
         this.clearTokens();
         return null;
       }
@@ -416,7 +393,7 @@ class TokenManagerClass {
 
       return await response.json();
     } catch (err) {
-      console.error("TokenManager: _callRefreshApi error:", err);
+      console.error('TokenManager: _callRefreshApi error:', err);
       throw err;
     }
   }
@@ -425,9 +402,7 @@ class TokenManagerClass {
    * Allows tests to override the refresh API call without mocking `fetch` globally.
    * Call with `null` to restore the default implementation.
    */
-  _setRefreshApiOverride(
-    fn: ((refreshToken: string) => Promise<any>) | null
-  ): void {
+  _setRefreshApiOverride(fn: ((refreshToken: string) => Promise<any>) | null): void {
     if (fn === null) {
       this._callRefreshApi = TokenManagerClass.prototype._callRefreshApi.bind(this);
     } else {
@@ -447,7 +422,7 @@ class TokenManagerClass {
       try {
         fn(tokens);
       } catch (err) {
-        console.error("TokenManager: listener error:", err);
+        console.error('TokenManager: listener error:', err);
       }
     });
   }
@@ -457,7 +432,7 @@ class TokenManagerClass {
   // ─────────────────────────────────────────────────────────────────────────
 
   private _initBroadcastChannel(): void {
-    if (typeof window === "undefined" || !("BroadcastChannel" in window)) {
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) {
       return; // SSR or unsupported browser — skip
     }
 
@@ -467,30 +442,26 @@ class TokenManagerClass {
         this._handleTabMessage(event.data);
       };
     } catch (err) {
-      console.warn("TokenManager: BroadcastChannel init failed:", err);
+      console.warn('TokenManager: BroadcastChannel init failed:', err);
     }
   }
 
   private _handleTabMessage(message: TabMessage): void {
     switch (message.type) {
-      case "TOKENS_REFRESHED": {
+      case 'TOKENS_REFRESHED': {
         // Another tab completed a refresh — adopt its tokens without triggering
         // our own refresh.  The `broadcast=false` flag prevents an echo loop.
-        console.log(
-          "TokenManager: received refreshed tokens from another tab"
-        );
+        console.log('TokenManager: received refreshed tokens from another tab');
         this.setTokens(message.tokens, false);
         break;
       }
 
-      case "REFRESH_STARTING": {
+      case 'REFRESH_STARTING': {
         // Another tab is about to refresh.  We don't need to do anything
         // proactively here — our own proactive timer will simply not fire
         // (because by the time it does the TOKENS_REFRESHED message will
         // have arrived and isAccessTokenFresh() will return true).
-        console.log(
-          "TokenManager: another tab is refreshing — standing by"
-        );
+        console.log('TokenManager: another tab is refreshing — standing by');
         break;
       }
     }
@@ -501,7 +472,7 @@ class TokenManagerClass {
       this._channel?.postMessage(message);
     } catch (err) {
       // Non-fatal — just means other tabs won't get the update via channel.
-      console.warn("TokenManager: broadcast failed:", err);
+      console.warn('TokenManager: broadcast failed:', err);
     }
   }
 }

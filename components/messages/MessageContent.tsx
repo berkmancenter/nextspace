@@ -1,9 +1,9 @@
-import { Box } from "@mui/material";
-import { FC, useMemo } from "react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { MarkmapView } from "../MarkmapView";
-import { parseMessageBody } from "../../utils/Helpers";
+import { Box } from '@mui/material';
+import { FC, useMemo } from 'react';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { MarkmapView } from '../MarkmapView';
+import { parseMessageBody } from '../../utils/Helpers';
 
 /**
  * Props for MessageContent component
@@ -17,37 +17,22 @@ interface MessageContentProps {
 /**
  * MessageContent component - renders message text with linkification
  */
-export const MessageContent: FC<MessageContentProps> = ({
-  text,
-  isFeedback = false,
-  onMarkmapClick,
-}) => {
+export const MessageContent: FC<MessageContentProps> = ({ text, isFeedback = false, onMarkmapClick }) => {
   const parsed = parseMessageBody(text);
-  const isFeedbackMessage = parsed.text.startsWith("/feedback");
-  const displayText = isFeedbackMessage ? "User feedback received." : parsed.text;
+  const isFeedbackMessage = parsed.text.startsWith('/feedback');
+  const displayText = isFeedbackMessage ? 'User feedback received.' : parsed.text;
 
   const markdownComponents = useMemo(
     () => ({
       a: ({ node, ...props }: any) => (
-        <a
-          {...props}
-          className="text-medium-slate-blue"
-          target="_blank"
-          rel="noopener noreferrer"
-        />
+        <a {...props} className="text-medium-slate-blue" target="_blank" rel="noopener noreferrer" />
       ),
       code: ({ node, className, children, ...props }: any) => {
-        const lang = /language-(\w+)/.exec(className || "")?.[1];
+        const lang = /language-(\w+)/.exec(className || '')?.[1];
         const content = String(children);
-        const hasMarkmapFrontMatter =
-          /^---\s*\n[\s\S]*?\bmarkmap\s*:[\s\S]*?\n---/.test(content);
-        if (lang === "markmap" || hasMarkmapFrontMatter) {
-          return (
-            <MarkmapView
-              markdown={content}
-              onClick={() => onMarkmapClick?.(content)}
-            />
-          );
+        const hasMarkmapFrontMatter = /^---\s*\n[\s\S]*?\bmarkmap\s*:[\s\S]*?\n---/.test(content);
+        if (lang === 'markmap' || hasMarkmapFrontMatter) {
+          return <MarkmapView markdown={content} onClick={() => onMarkmapClick?.(content)} />;
         }
         return (
           <code className={className} {...props}>
@@ -56,7 +41,7 @@ export const MessageContent: FC<MessageContentProps> = ({
         );
       },
     }),
-    [onMarkmapClick]
+    [onMarkmapClick],
   );
 
   if (isFeedbackMessage || isFeedback) {

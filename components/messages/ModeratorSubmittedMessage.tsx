@@ -1,8 +1,8 @@
-import { FC } from "react";
-import { Box, Typography } from "@mui/material";
-import { CheckCircleOutline } from "@mui/icons-material";
-import { MessageContent } from "./MessageContent";
-import { MessageProps } from "../../types.internal";
+import { FC } from 'react';
+import { Box, Typography } from '@mui/material';
+import { CheckCircleOutline } from '@mui/icons-material';
+import { MessageContent } from './MessageContent';
+import { MessageProps } from '../../types.internal';
 
 export const ModeratorSubmittedMessage: FC<MessageProps> = ({ message }) => {
   return (
@@ -11,15 +11,11 @@ export const ModeratorSubmittedMessage: FC<MessageProps> = ({ message }) => {
         <Box display="flex" alignItems="center" gap="8px" marginBottom="8px">
           <CheckCircleOutline
             sx={{
-              color: "#3B82F6",
-              fontSize: "20px",
+              color: '#3B82F6',
+              fontSize: '20px',
             }}
           />
-          <Typography
-            variant="caption"
-            component="p"
-            className="text-xs text-blue-600 font-bold uppercase"
-          >
+          <Typography variant="caption" component="p" className="text-xs text-blue-600 font-bold uppercase">
             Submitted
           </Typography>
         </Box>

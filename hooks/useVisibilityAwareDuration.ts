@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 
 /**
  * Custom hook for tracking duration with automatic pause/resume on tab visibility changes
@@ -89,7 +89,7 @@ export function useVisibilityAwareDuration() {
   // Handle page visibility changes
   useEffect(() => {
     const handleVisibilityChange = () => {
-      const isVisible = document.visibilityState === "visible";
+      const isVisible = document.visibilityState === 'visible';
       const wasVisible = isPageVisibleRef.current;
       isPageVisibleRef.current = isVisible;
 
@@ -98,9 +98,7 @@ export function useVisibilityAwareDuration() {
         if (!isVisible && wasVisible) {
           // Page becoming hidden - accumulate current session time
           if (startTimeRef.current > 0) {
-            const sessionDuration = Math.floor(
-              (Date.now() - startTimeRef.current) / 1000,
-            );
+            const sessionDuration = Math.floor((Date.now() - startTimeRef.current) / 1000);
             accumulatedTimeRef.current += sessionDuration;
           }
         } else if (isVisible && !wasVisible) {
@@ -110,10 +108,10 @@ export function useVisibilityAwareDuration() {
       }
     };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 

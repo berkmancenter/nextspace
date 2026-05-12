@@ -1,5 +1,5 @@
-import { Box, Paper, MenuItem, Typography } from "@mui/material";
-import { FC, useEffect, useRef } from "react";
+import { Box, Paper, MenuItem, Typography } from '@mui/material';
+import { FC, useEffect, useRef } from 'react';
 
 /**
  * Slash command configuration
@@ -37,25 +37,17 @@ interface SlashCommandMenuProps {
  * Displays a popup menu with available slash commands when user types "/"
  * Supports keyboard navigation (up/down arrows, enter, escape)
  */
-export const SlashCommandMenu: FC<SlashCommandMenuProps> = ({
-  commands,
-  selectedIndex,
-  onSelect,
-  anchorEl,
-  open,
-}) => {
+export const SlashCommandMenu: FC<SlashCommandMenuProps> = ({ commands, selectedIndex, onSelect, anchorEl, open }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Scroll selected item into view
   useEffect(() => {
     if (open && menuRef.current) {
-      const selectedItem = menuRef.current.children[
-        selectedIndex
-      ] as HTMLElement;
+      const selectedItem = menuRef.current.children[selectedIndex] as HTMLElement;
       if (selectedItem) {
         selectedItem.scrollIntoView({
-          block: "nearest",
-          behavior: "smooth",
+          block: 'nearest',
+          behavior: 'smooth',
         });
       }
     }
@@ -73,16 +65,16 @@ export const SlashCommandMenu: FC<SlashCommandMenuProps> = ({
       ref={menuRef}
       elevation={8}
       sx={{
-        position: "fixed",
+        position: 'fixed',
         bottom: `${window.innerHeight - rect.top + 8}px`,
         left: rect.left,
         zIndex: 1400,
         maxHeight: 240,
         minWidth: 280,
-        overflow: "auto",
-        borderRadius: "8px",
-        border: "1px solid",
-        borderColor: "grey.300",
+        overflow: 'auto',
+        borderRadius: '8px',
+        border: '1px solid',
+        borderColor: 'grey.300',
       }}
     >
       <Box>
@@ -92,9 +84,9 @@ export const SlashCommandMenu: FC<SlashCommandMenuProps> = ({
             selected={index === selectedIndex}
             onClick={() => onSelect(cmd)}
             sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-start",
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
               gap: 0.5,
             }}
           >

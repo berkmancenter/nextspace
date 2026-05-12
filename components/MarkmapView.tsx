@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, memo } from "react";
+import { useCallback, useEffect, useRef, memo } from 'react';
 
 interface MarkmapViewProps {
   markdown: string;
@@ -25,11 +25,11 @@ const MarkmapViewComponent = ({ markdown, onClick, fullscreen = false }: Markmap
     }
     mmRef.current = null;
 
-    svg.innerHTML = "";
+    svg.innerHTML = '';
 
     const render = async () => {
-      const { Transformer } = await import("markmap-lib");
-      const { Markmap, deriveOptions } = await import("markmap-view");
+      const { Transformer } = await import('markmap-lib');
+      const { Markmap, deriveOptions } = await import('markmap-view');
 
       const transformer = new Transformer();
       const { root, frontmatter } = transformer.transform(markdown);
@@ -72,7 +72,7 @@ const MarkmapViewComponent = ({ markdown, onClick, fullscreen = false }: Markmap
           });
         } catch (error) {
           // Silently handle SVG dimension errors during page rerenders
-          console.debug("Markmap creation skipped due to invalid SVG state");
+          console.debug('Markmap creation skipped due to invalid SVG state');
         }
       });
     };
@@ -107,13 +107,13 @@ const MarkmapViewComponent = ({ markdown, onClick, fullscreen = false }: Markmap
     <div
       className="w-full"
       onClick={onClick}
-      style={{ cursor: onClick ? "pointer" : "default" }}
-      role={onClick ? "button" : undefined}
+      style={{ cursor: onClick ? 'pointer' : 'default' }}
+      role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={
         onClick
           ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
+              if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 onClick();
               }
@@ -124,15 +124,15 @@ const MarkmapViewComponent = ({ markdown, onClick, fullscreen = false }: Markmap
       {/* Hidden text for screen readers */}
       <div
         style={{
-          position: "absolute",
-          width: "1px",
-          height: "1px",
-          padding: "0",
-          margin: "-1px",
-          overflow: "hidden",
-          clip: "rect(0, 0, 0, 0)",
-          whiteSpace: "nowrap",
-          border: "0",
+          position: 'absolute',
+          width: '1px',
+          height: '1px',
+          padding: '0',
+          margin: '-1px',
+          overflow: 'hidden',
+          clip: 'rect(0, 0, 0, 0)',
+          whiteSpace: 'nowrap',
+          border: '0',
         }}
       >
         {markdown}
@@ -178,8 +178,8 @@ const MarkmapViewComponent = ({ markdown, onClick, fullscreen = false }: Markmap
         <svg
           ref={svgRef}
           style={{
-            width: "100%",
-            height: fullscreen ? "calc(90vh - 120px)" : "400px",
+            width: '100%',
+            height: fullscreen ? 'calc(90vh - 120px)' : '400px',
           }}
         />
       </div>

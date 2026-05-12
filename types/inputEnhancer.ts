@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode } from 'react';
 
 /**
  * Represents where a trigger was detected and what text to replace

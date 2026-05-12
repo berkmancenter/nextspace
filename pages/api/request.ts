@@ -1,9 +1,9 @@
-import type { NextApiRequest, NextApiResponse } from "next";
-import decryptCookie from "../../utils/Decrypt";
-import { RetrieveData, SendData } from "../../utils";
-import { withEnvValidation } from "../../utils/withEnvValidation";
-import { EncryptJWT } from "jose";
-import { validateCookie, CURRENT_COOKIE_VERSION } from "../../utils/cookieValidator";
+import type { NextApiRequest, NextApiResponse } from 'next';
+import decryptCookie from '../../utils/Decrypt';
+import { RetrieveData, SendData } from '../../utils';
+import { withEnvValidation } from '../../utils/withEnvValidation';
+import { EncryptJWT } from 'jose';
+import { validateCookie, CURRENT_COOKIE_VERSION } from '../../utils/cookieValidator';
 
 /**
  * Refresh tokens using the refresh token from the cookie
@@ -12,28 +12,25 @@ import { validateCookie, CURRENT_COOKIE_VERSION } from "../../utils/cookieValida
  */
 async function refreshTokens(refreshToken: string) {
   try {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh-tokens`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          refreshToken,
-        }),
-      }
-    );
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh-tokens`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        refreshToken,
+      }),
+    });
 
     if (!response.ok) {
-      console.error("Failed to refresh tokens:", response.status);
+      console.error('Failed to refresh tokens:', response.status);
       return null;
     }
 
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error("Error refreshing tokens:", error);
+    console.error('Error refreshing tokens:', error);
     return null;
   }
 }
@@ -68,12 +65,12 @@ async function updateSessionCookie(
     accessExpires: accessExpires || existingCookie.accessExpires,
     refreshExpires: refreshExpires || existingCookie.refreshExpires,
     userId: existingCookie.userId,
-    authType: existingCookie.authType || "guest",
+    authType: existingCookie.authType || 'guest',
     version: CURRENT_COOKIE_VERSION,
   })
-    .setProtectedHeader({ alg: "dir", enc: "A128CBC-HS256" })
-    .setExpirationTime(existingCookie.exp || "30d")
-    .setSubject(existingCookie.sub || "")
+    .setProtectedHeader({ alg: 'dir', enc: 'A128CBC-HS256' })
+    .setExpirationTime(existingCookie.exp || '30d')
+    .setSubject(existingCookie.sub || '')
     .setIssuedAt()
     .encrypt(secret);
 
@@ -83,10 +80,10 @@ async function updateSessionCookie(
     : 30 * 24 * 60 * 60;
 
   res.setHeader(
-    "Set-Cookie",
+    'Set-Cookie',
     `nextspace-session=${cookie}; HttpOnly; ${
-      process.env.NODE_ENV === "production" ? "Secure" : ""
-    }; SameSite=Strict; Max-Age=${maxAge}; Path=/`
+      process.env.NODE_ENV === 'production' ? 'Secure' : ''
+    }; SameSite=Strict; Max-Age=${maxAge}; Path=/`,
   );
 }
 
@@ -97,61 +94,53 @@ async function updateSessionCookie(
  */
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   let apiResponse;
-  const token = req.cookies["nextspace-session"] || null;
+  const token = req.cookies['nextspace-session'] || null;
 
   if (!token) {
-    return res.status(401).json({ error: "No token found" });
+    return res.status(401).json({ error: 'No token found' });
   }
   const cookie = await decryptCookie(token);
 
   if (!cookie) {
-    return res.status(401).json({ error: "Invalid token" });
+    return res.status(401).json({ error: 'Invalid token' });
   }
 
   // Validate cookie structure
   const validation = validateCookie(cookie);
   if (!validation.isValid) {
-    console.warn("Invalid cookie in request API:", validation.error);
-    
+    console.warn('Invalid cookie in request API:', validation.error);
+
     // Clear the invalid cookie
     res.setHeader(
-      "Set-Cookie",
+      'Set-Cookie',
       `nextspace-session=; HttpOnly; ${
-        process.env.NODE_ENV === "production" ? "Secure;" : ""
-      } SameSite=Strict; Max-Age=0; Path=/`
+        process.env.NODE_ENV === 'production' ? 'Secure;' : ''
+      } SameSite=Strict; Max-Age=0; Path=/`,
     );
-    
-    return res.status(401).json({ 
-      error: "Invalid cookie format",
+
+    return res.status(401).json({
+      error: 'Invalid cookie format',
       reason: validation.error,
-      requiresNewSession: true
+      requiresNewSession: true,
     });
   }
 
   // Ensure the decrypted cookie has access token
   if (!cookie.payload?.access) {
-    return res.status(401).json({ error: "Not logged in" });
+    return res.status(401).json({ error: 'Not logged in' });
   }
 
   let accessToken = cookie.payload.access as string;
 
   // Determine if GET or POST request
-  if (req.method !== "POST")
-    apiResponse = await RetrieveData(
-      req.query.apiEndpoint as string,
-      accessToken
-    );
+  if (req.method !== 'POST') apiResponse = await RetrieveData(req.query.apiEndpoint as string, accessToken);
   else {
-    apiResponse = await SendData(
-      req.body.apiEndpoint,
-      req.body.payload,
-      accessToken
-    );
+    apiResponse = await SendData(req.body.apiEndpoint, req.body.payload, accessToken);
   }
 
   // If 401, try to refresh tokens and retry
   if (apiResponse?.status === 401 && cookie.payload?.refresh) {
-    console.log("Token expired on server-side, attempting refresh...");
+    console.log('Token expired on server-side, attempting refresh...');
 
     const tokensResponse = await refreshTokens(cookie.payload.refresh as string);
 
@@ -169,40 +158,30 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       // Signal to the client that tokens were refreshed server-side so it
       // can re-sync its in-memory TokenManager state from the cookie.
-      res.setHeader("X-Tokens-Refreshed", "true");
+      res.setHeader('X-Tokens-Refreshed', 'true');
 
       // Retry the original request with new access token
       accessToken = tokensResponse.access.token;
 
-      if (req.method !== "POST") {
-        apiResponse = await RetrieveData(
-          req.query.apiEndpoint as string,
-          accessToken
-        );
+      if (req.method !== 'POST') {
+        apiResponse = await RetrieveData(req.query.apiEndpoint as string, accessToken);
       } else {
-        apiResponse = await SendData(
-          req.body.apiEndpoint,
-          req.body.payload,
-          accessToken
-        );
+        apiResponse = await SendData(req.body.apiEndpoint, req.body.payload, accessToken);
       }
     } else {
       // Refresh failed, return unauthorized
-      return res.status(401).json({ error: "Token refresh failed" });
+      return res.status(401).json({ error: 'Token refresh failed' });
     }
   }
 
   // If still 401 after refresh attempt, return unauthorized
   if (apiResponse?.status === 401) {
-    return res.status(401).json({ error: "Unauthorized" });
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  if (!apiResponse)
-    return res
-      .status(500)
-      .json({ error: `Failed to retrieve data from API: ${apiResponse}` });
+  if (!apiResponse) return res.status(500).json({ error: `Failed to retrieve data from API: ${apiResponse}` });
 
   return res.status(200).json(apiResponse);
 }
 
-export default withEnvValidation(handler, ["SESSION_SECRET"]);
+export default withEnvValidation(handler, ['SESSION_SECRET']);

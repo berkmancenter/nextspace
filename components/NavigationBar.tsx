@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import React from "react";
-import { Badge } from "@mui/material";
-import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
-import GroupIcon from "@mui/icons-material/Group";
-import MenuBookOutlined from "@mui/icons-material/MenuBookOutlined";
-import MenuBook from "@mui/icons-material/MenuBook";
-import { BotIcon } from "./BotIcon";
-import { TranscriptIcon } from "./TranscriptIcon";
-export type NavTab = "assistant" | "chat" | "transcript" | "resources";
+import React from 'react';
+import { Badge } from '@mui/material';
+import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
+import GroupIcon from '@mui/icons-material/Group';
+import MenuBookOutlined from '@mui/icons-material/MenuBookOutlined';
+import MenuBook from '@mui/icons-material/MenuBook';
+import { BotIcon } from './BotIcon';
+import { TranscriptIcon } from './TranscriptIcon';
+export type NavTab = 'assistant' | 'chat' | 'transcript' | 'resources';
 
 interface NavItem {
   id: NavTab;
@@ -58,29 +58,29 @@ export function NavigationBar({
   const navItems: NavItem[] = (
     [
       {
-        id: "assistant" as NavTab,
+        id: 'assistant' as NavTab,
         label: botName,
         ActiveIcon: null,
         InactiveIcon: null,
         show: true,
       },
       {
-        id: "chat" as NavTab,
-        label: "Group Chat",
+        id: 'chat' as NavTab,
+        label: 'Group Chat',
         ActiveIcon: GroupIcon,
         InactiveIcon: GroupOutlinedIcon,
         show: showChat,
       },
       {
-        id: "transcript" as NavTab,
-        label: "Transcript",
+        id: 'transcript' as NavTab,
+        label: 'Transcript',
         ActiveIcon: null,
         InactiveIcon: null,
         show: showTranscript,
       },
       {
-        id: "resources" as NavTab,
-        label: "Resources",
+        id: 'resources' as NavTab,
+        label: 'Resources',
         ActiveIcon: MenuBook,
         InactiveIcon: MenuBookOutlined,
         show: showResources,
@@ -89,9 +89,9 @@ export function NavigationBar({
   ).filter((item) => item.show);
 
   const getUnseenCount = (id: NavTab) => {
-    if (id === "assistant") return unseenAssistantCount;
-    if (id === "chat") return unseenChatCount;
-    if (id === "resources") return unseenResourcesCount;
+    if (id === 'assistant') return unseenAssistantCount;
+    if (id === 'chat') return unseenChatCount;
+    if (id === 'resources') return unseenResourcesCount;
     return 0;
   };
 
@@ -102,71 +102,62 @@ export function NavigationBar({
     isActive: boolean,
     size: number,
   ) => {
-    const color = isActive ? "#1a1a1a" : "#9E9E9E";
-    if (id === "assistant") {
+    const color = isActive ? '#1a1a1a' : '#9E9E9E';
+    if (id === 'assistant') {
       return <BotIcon size={size} color={color} />;
     }
-    if (id === "transcript") {
+    if (id === 'transcript') {
       return <TranscriptIcon size={size} color={color} />;
     }
     const Icon = (isActive ? ActiveIcon : InactiveIcon)!;
     return <Icon sx={{ fontSize: size, color }} />;
   };
 
-  const NavButton = ({
-    item,
-    size,
-    fullWidth,
-  }: {
-    item: NavItem;
-    size: number;
-    fullWidth?: boolean;
-  }) => {
+  const NavButton = ({ item, size, fullWidth }: { item: NavItem; size: number; fullWidth?: boolean }) => {
     const { id, label, ActiveIcon, InactiveIcon } = item;
     const isActive = activeTab === id;
     const unseen = getUnseenCount(id);
 
     // For chat and assistant tabs, show badge if there are unread replies even when active
     // For other tabs, hide badge when active
-    const shouldShowBadge = id === "assistant"
-      ? unseen > 0 || (isActive && unreadAssistantReplyCount > 0)
-      : id === "chat"
-        ? unseen > 0 || (isActive && unreadChatReplyCount > 0)
-        : unseen > 0 && !isActive;
+    const shouldShowBadge =
+      id === 'assistant'
+        ? unseen > 0 || (isActive && unreadAssistantReplyCount > 0)
+        : id === 'chat'
+          ? unseen > 0 || (isActive && unreadChatReplyCount > 0)
+          : unseen > 0 && !isActive;
 
     return (
       <button
         onClick={() => onTabChange(id)}
         className={`flex flex-col items-center gap-1 transition-colors ${
-          fullWidth
-            ? "justify-center flex-1 h-full gap-0.5"
-            : "w-full px-1 py-3"
+          fullWidth ? 'justify-center flex-1 h-full gap-0.5' : 'w-full px-1 py-3'
         }`}
         style={{
-          background: isActive ? "#D1C4E9" : "transparent",
-          border: "none",
-          cursor: "pointer",
+          background: isActive ? '#D1C4E9' : 'transparent',
+          border: 'none',
+          cursor: 'pointer',
         }}
-        aria-current={isActive ? "page" : undefined}
+        aria-current={isActive ? 'page' : undefined}
         aria-label={label}
       >
         <Badge
           color="secondary"
           variant="dot"
           invisible={!shouldShowBadge}
-          sx={{ "& .MuiBadge-badge": { right: -2, top: 2 } }}
+          sx={{ '& .MuiBadge-badge': { right: -2, top: 2 } }}
         >
           {renderIcon(id, ActiveIcon, InactiveIcon, isActive, size)}
         </Badge>
         <span
           style={{
-            fontSize: "10px",
+            fontSize: '10px',
             fontWeight: isActive ? 700 : 400,
-            color: isActive ? "#1a1a1a" : "#9E9E9E",
-            letterSpacing: "0.03em",
-            textTransform: "uppercase",
+            color: isActive ? '#1a1a1a' : '#9E9E9E',
+            letterSpacing: '0.03em',
+            textTransform: 'uppercase',
             lineHeight: 1.2,
-            textAlign: "center",
+            textAlign: 'center',
           }}
         >
           {label}
@@ -181,10 +172,10 @@ export function NavigationBar({
       <nav
         className="hidden lg:flex flex-col items-center py-6 gap-2 flex-shrink-0"
         style={{
-          backgroundColor: "#EDE7F6",
-          width: "72px",
-          minHeight: "100%",
-          borderRight: "1px solid #D1C4E9",
+          backgroundColor: '#EDE7F6',
+          width: '72px',
+          minHeight: '100%',
+          borderRight: '1px solid #D1C4E9',
         }}
         aria-label="Main navigation"
       >
@@ -197,9 +188,9 @@ export function NavigationBar({
       <nav
         className="lg:hidden fixed bottom-0 left-0 right-0 flex flex-row items-center justify-around z-50"
         style={{
-          backgroundColor: "#EDE7F6",
-          borderTop: "1px solid #D1C4E9",
-          height: "60px",
+          backgroundColor: '#EDE7F6',
+          borderTop: '1px solid #D1C4E9',
+          height: '60px',
         }}
         aria-label="Main navigation"
       >

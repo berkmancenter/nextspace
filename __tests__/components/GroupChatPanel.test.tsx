@@ -1,14 +1,14 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { GroupChatPanel } from "../../components/GroupChatPanel";
-import { useAutoScroll } from "../../hooks/useAutoScroll";
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { GroupChatPanel } from '../../components/GroupChatPanel';
+import { useAutoScroll } from '../../hooks/useAutoScroll';
 
 /*
  * Mock useAutoScroll so GroupChatPanel tests focus on what the component
  * passes to the hook, not on scroll mechanics. Scroll behavior itself is
  * covered in __tests__/hooks/useAutoScroll.test.tsx.
  */
-jest.mock("../../hooks/useAutoScroll", () => ({
+jest.mock('../../hooks/useAutoScroll', () => ({
   useAutoScroll: jest.fn().mockReturnValue({
     messagesContainerRef: { current: null },
     messagesEndRef: { current: null },
@@ -18,16 +18,16 @@ jest.mock("../../hooks/useAutoScroll", () => ({
 }));
 
 // Mock MessageInput component
-jest.mock("../../components/MessageInput", () => ({
+jest.mock('../../components/MessageInput', () => ({
   MessageInput: ({ onSendMessage }: any) => (
     <div data-testid="message-input">
       <input
         data-testid="message-input-field"
         placeholder="Write a Comment"
         onKeyPress={(e) => {
-          if (e.key === "Enter" && e.currentTarget.value) {
+          if (e.key === 'Enter' && e.currentTarget.value) {
             onSendMessage(e.currentTarget.value);
-            e.currentTarget.value = "";
+            e.currentTarget.value = '';
           }
         }}
       />
@@ -36,22 +36,10 @@ jest.mock("../../components/MessageInput", () => ({
 }));
 
 // Mock MessageFeedback component
-jest.mock("../../components/MessageFeedback", () => ({
-  MessageFeedback: ({
-    messageId,
-    initialRating,
-    onPopulateFeedbackText,
-    onSendFeedbackRating,
-  }: any) => (
-    <div
-      data-testid="message-feedback"
-      data-message-id={messageId}
-      data-initial-rating={initialRating}
-    >
-      <button
-        data-testid={`rating-button-${messageId}`}
-        onClick={() => onSendFeedbackRating?.(messageId, 3)}
-      >
+jest.mock('../../components/MessageFeedback', () => ({
+  MessageFeedback: ({ messageId, initialRating, onPopulateFeedbackText, onSendFeedbackRating }: any) => (
+    <div data-testid="message-feedback" data-message-id={messageId} data-initial-rating={initialRating}>
+      <button data-testid={`rating-button-${messageId}`} onClick={() => onSendFeedbackRating?.(messageId, 3)}>
         Rate
       </button>
       <button
@@ -60,7 +48,7 @@ jest.mock("../../components/MessageFeedback", () => ({
           onPopulateFeedbackText?.({
             prefix: `/feedback|Text|${messageId}|`,
             icon: null,
-            label: "Feedback Mode",
+            label: 'Feedback Mode',
           })
         }
       >
@@ -70,13 +58,13 @@ jest.mock("../../components/MessageFeedback", () => ({
   ),
 }));
 
-describe("GroupChatPanel", () => {
+describe('GroupChatPanel', () => {
   const mockOnSendMessage = jest.fn();
 
   const baseProps = {
     messages: [],
-    pseudonym: "test-user",
-    eventName: "Tech Summit",
+    pseudonym: 'test-user',
+    eventName: 'Tech Summit',
     onSendMessage: mockOnSendMessage,
   };
 
@@ -84,22 +72,22 @@ describe("GroupChatPanel", () => {
     jest.clearAllMocks();
   });
 
-  it("renders without messages", () => {
+  it('renders without messages', () => {
     render(<GroupChatPanel {...baseProps} />);
 
-    expect(screen.getByTestId("message-input")).toBeInTheDocument();
+    expect(screen.getByTestId('message-input')).toBeInTheDocument();
   });
 
-  it("renders messages with sender name", () => {
+  it('renders messages with sender name', () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "Alice",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hello everyone" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "alice-1",
+        id: '1',
+        pseudonym: 'Alice',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Hello everyone' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'alice-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -110,20 +98,20 @@ describe("GroupChatPanel", () => {
 
     render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("Hello everyone")).toBeInTheDocument();
-    expect(screen.getByText("Alice")).toBeInTheDocument();
+    expect(screen.getByText('Hello everyone')).toBeInTheDocument();
+    expect(screen.getByText('Alice')).toBeInTheDocument();
   });
 
   it("shows '(You)' label for current user", () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "My message" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "test-1",
+        id: '1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'My message' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'test-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -134,20 +122,20 @@ describe("GroupChatPanel", () => {
 
     render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("My message")).toBeInTheDocument();
-    expect(screen.getByText("(You)")).toBeInTheDocument();
+    expect(screen.getByText('My message')).toBeInTheDocument();
+    expect(screen.getByText('(You)')).toBeInTheDocument();
   });
 
-  it("does not show loading indicator in chat mode", () => {
+  it('does not show loading indicator in chat mode', () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hello" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "test-1",
+        id: '1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Hello' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'test-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -156,27 +144,25 @@ describe("GroupChatPanel", () => {
       },
     ];
 
-    const { container } = render(
-      <GroupChatPanel {...baseProps} messages={messages} />,
-    );
+    const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
     // Should NOT show animated SVG loading indicator in chat mode
-    const loadingIndicator = container.querySelector(".animate-bounce");
+    const loadingIndicator = container.querySelector('.animate-bounce');
     expect(loadingIndicator).not.toBeInTheDocument();
   });
 
-  it("highlights single-word @mentions in messages", () => {
+  it('highlights single-word @mentions in messages', () => {
     // Both sender ("Alice") and mentioned user ("Bob") must be known contributors.
     // Contributors are derived from message senders, so include a message from Bob.
     const messages = [
       {
-        id: "1",
-        pseudonym: "Alice",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hey @Bob, how are you?" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "alice-1",
+        id: '1',
+        pseudonym: 'Alice',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Hey @Bob, how are you?' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'alice-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -184,13 +170,13 @@ describe("GroupChatPanel", () => {
         downVotes: [],
       },
       {
-        id: "2",
-        pseudonym: "Bob",
-        createdAt: "2025-10-17T12:01:00Z",
-        body: { text: "Hi Alice!" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "bob-1",
+        id: '2',
+        pseudonym: 'Bob',
+        createdAt: '2025-10-17T12:01:00Z',
+        body: { text: 'Hi Alice!' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'bob-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -199,31 +185,27 @@ describe("GroupChatPanel", () => {
       },
     ];
 
-    const { container } = render(
-      <GroupChatPanel {...baseProps} messages={messages} />,
-    );
+    const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
     // Check that mention has styling with font-semibold class
-    const mentionSpans = container.querySelectorAll(".font-semibold");
-    const bobMention = Array.from(mentionSpans).find((el) =>
-      el.textContent?.includes("@Bob"),
-    );
+    const mentionSpans = container.querySelectorAll('.font-semibold');
+    const bobMention = Array.from(mentionSpans).find((el) => el.textContent?.includes('@Bob'));
     expect(bobMention).toBeInTheDocument();
-    expect(bobMention?.textContent).toContain("@Bob");
+    expect(bobMention?.textContent).toContain('@Bob');
   });
 
-  it("highlights multi-word @mentions using the contributors list", () => {
+  it('highlights multi-word @mentions using the contributors list', () => {
     // "Bob Smith" is a known contributor — the mention should stop exactly at
     // the end of the handle and not consume the following words.
     const messages = [
       {
-        id: "1",
-        pseudonym: "Bob Smith",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hey @Bob Smith, how are you?" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "bob-smith-1",
+        id: '1',
+        pseudonym: 'Bob Smith',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Hey @Bob Smith, how are you?' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'bob-smith-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -232,28 +214,26 @@ describe("GroupChatPanel", () => {
       },
     ];
 
-    const { container } = render(
-      <GroupChatPanel {...baseProps} messages={messages} />,
-    );
+    const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-    const mentionSpan = container.querySelector(".font-semibold");
+    const mentionSpan = container.querySelector('.font-semibold');
     expect(mentionSpan).toBeInTheDocument();
     // Should be exactly "@Bob Smith" — the comma and following text are NOT included
-    expect(mentionSpan?.textContent).toBe("@Bob Smith");
+    expect(mentionSpan?.textContent).toBe('@Bob Smith');
   });
 
-  it("does not over-capture words following the handle", () => {
+  it('does not over-capture words following the handle', () => {
     // Without the contributors list the greedy regex would capture
     // "@Bob Smith please respond". With contributors it should stop at "@Bob Smith".
     const messages = [
       {
-        id: "1",
-        pseudonym: "Bob Smith",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "@Bob Smith please respond" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "bob-smith-1",
+        id: '1',
+        pseudonym: 'Bob Smith',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: '@Bob Smith please respond' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'bob-smith-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -262,28 +242,26 @@ describe("GroupChatPanel", () => {
       },
     ];
 
-    const { container } = render(
-      <GroupChatPanel {...baseProps} messages={messages} />,
-    );
+    const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-    const mentionSpan = container.querySelector(".font-semibold");
+    const mentionSpan = container.querySelector('.font-semibold');
     expect(mentionSpan).toBeInTheDocument();
-    expect(mentionSpan?.textContent).toBe("@Bob Smith");
+    expect(mentionSpan?.textContent).toBe('@Bob Smith');
     // The remaining text should NOT be highlighted
-    const nonMentionText = container.querySelector(".font-semibold + *");
-    expect(container.textContent).toContain("please respond");
+    const nonMentionText = container.querySelector('.font-semibold + *');
+    expect(container.textContent).toContain('please respond');
   });
 
-  it("highlights three-word @mentions from the contributors list", () => {
+  it('highlights three-word @mentions from the contributors list', () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "Charlie Brown Jr",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hello @Charlie Brown Jr please respond" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "charlie-1",
+        id: '1',
+        pseudonym: 'Charlie Brown Jr',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Hello @Charlie Brown Jr please respond' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'charlie-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -292,39 +270,37 @@ describe("GroupChatPanel", () => {
       },
     ];
 
-    const { container } = render(
-      <GroupChatPanel {...baseProps} messages={messages} />,
-    );
+    const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-    const mentionSpan = container.querySelector(".font-semibold");
+    const mentionSpan = container.querySelector('.font-semibold');
     expect(mentionSpan).toBeInTheDocument();
-    expect(mentionSpan?.textContent).toBe("@Charlie Brown Jr");
-    expect(container.textContent).toContain("please respond");
+    expect(mentionSpan?.textContent).toBe('@Charlie Brown Jr');
+    expect(container.textContent).toContain('please respond');
   });
 
-  it("calls onSendMessage when user sends a message", async () => {
+  it('calls onSendMessage when user sends a message', async () => {
     const user = userEvent.setup();
 
     render(<GroupChatPanel {...baseProps} />);
 
-    const input = screen.getByTestId("message-input-field");
+    const input = screen.getByTestId('message-input-field');
 
-    await user.type(input, "Test message");
-    await user.keyboard("{Enter}");
+    await user.type(input, 'Test message');
+    await user.keyboard('{Enter}');
 
-    expect(mockOnSendMessage).toHaveBeenCalledWith("Test message");
+    expect(mockOnSendMessage).toHaveBeenCalledWith('Test message');
   });
 
-  it("passes messages to useAutoScroll when messages arrive", () => {
+  it('passes messages to useAutoScroll when messages arrive', () => {
     const newMessages = [
       {
-        id: "1",
-        pseudonym: "Alice",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "New message" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "alice-1",
+        id: '1',
+        pseudonym: 'Alice',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'New message' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'alice-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -338,16 +314,16 @@ describe("GroupChatPanel", () => {
     expect(useAutoScroll).toHaveBeenCalledWith(newMessages);
   });
 
-  it("parses message body correctly for string input", () => {
+  it('parses message body correctly for string input', () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "Alice",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: "Simple string message",
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "alice-1",
+        id: '1',
+        pseudonym: 'Alice',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: 'Simple string message',
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'alice-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -358,19 +334,19 @@ describe("GroupChatPanel", () => {
 
     render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("Simple string message")).toBeInTheDocument();
+    expect(screen.getByText('Simple string message')).toBeInTheDocument();
   });
 
-  it("parses message body correctly for object input", () => {
+  it('parses message body correctly for object input', () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "Alice",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Object message", someField: "value" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "alice-1",
+        id: '1',
+        pseudonym: 'Alice',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Object message', someField: 'value' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'alice-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -381,19 +357,19 @@ describe("GroupChatPanel", () => {
 
     render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("Object message")).toBeInTheDocument();
+    expect(screen.getByText('Object message')).toBeInTheDocument();
   });
 
   it("normalizes 'Engagement Agent' to 'Berkie'", () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "Engagement Agent",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hello" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "em-plus-1",
+        id: '1',
+        pseudonym: 'Engagement Agent',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Hello' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'em-plus-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -404,20 +380,20 @@ describe("GroupChatPanel", () => {
 
     render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("Berkie")).toBeInTheDocument();
-    expect(screen.queryByText("Enagement Agent")).not.toBeInTheDocument();
+    expect(screen.getByText('Berkie')).toBeInTheDocument();
+    expect(screen.queryByText('Enagement Agent')).not.toBeInTheDocument();
   });
 
-  it("applies assistant avatar and background color to Event Assistant messages", () => {
+  it('applies assistant avatar and background color to Event Assistant messages', () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hello from Event Assistant" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: '1',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Hello from Event Assistant' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -426,29 +402,27 @@ describe("GroupChatPanel", () => {
       },
     ];
 
-    const { container } = render(
-      <GroupChatPanel {...baseProps} messages={messages} />,
-    );
+    const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
     // Check that the avatar has the purple background color (#DDD6FE)
-    const avatar = container.querySelector(".rounded-full");
-    expect(avatar).toHaveStyle({ backgroundColor: "#DDD6FE" });
+    const avatar = container.querySelector('.rounded-full');
+    expect(avatar).toHaveStyle({ backgroundColor: '#DDD6FE' });
 
     // Check that the message bubble has the purple background color (#DDD6FE)
-    const messageBubble = container.querySelector(".rounded-2xl");
-    expect(messageBubble).toHaveStyle({ backgroundColor: "#DDD6FE" });
+    const messageBubble = container.querySelector('.rounded-2xl');
+    expect(messageBubble).toHaveStyle({ backgroundColor: '#DDD6FE' });
   });
 
-  it("applies assistant avatar and background color to Event Mediator messages", () => {
+  it('applies assistant avatar and background color to Event Mediator messages', () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "Event Mediator",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hello from Event Mediator" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "em-1",
+        id: '1',
+        pseudonym: 'Event Mediator',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Hello from Event Mediator' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'em-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -457,39 +431,37 @@ describe("GroupChatPanel", () => {
       },
     ];
 
-    const { container } = render(
-      <GroupChatPanel {...baseProps} messages={messages} />,
-    );
+    const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
     // Check that the avatar has the purple background color (#DDD6FE)
-    const avatar = container.querySelector(".rounded-full");
-    expect(avatar).toHaveStyle({ backgroundColor: "#DDD6FE" });
+    const avatar = container.querySelector('.rounded-full');
+    expect(avatar).toHaveStyle({ backgroundColor: '#DDD6FE' });
 
     // Check that the message bubble has the purple background color (#DDD6FE)
-    const messageBubble = container.querySelector(".rounded-2xl");
-    expect(messageBubble).toHaveStyle({ backgroundColor: "#DDD6FE" });
+    const messageBubble = container.querySelector('.rounded-2xl');
+    expect(messageBubble).toHaveStyle({ backgroundColor: '#DDD6FE' });
   });
 
-  describe("Visual message handling (media)", () => {
-    it("renders single image in message body", () => {
+  describe('Visual message handling (media)', () => {
+    it('renders single image in message body', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "Check out this image",
+            text: 'Check out this image',
             media: [
               {
-                type: "image",
-                data: "base64imagedata",
-                mimeType: "image/png",
+                type: 'image',
+                data: 'base64imagedata',
+                mimeType: 'image/png',
               },
             ],
           },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -500,43 +472,40 @@ describe("GroupChatPanel", () => {
 
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-      expect(screen.getByText("Check out this image")).toBeInTheDocument();
-      const image = screen.getByAltText("Uploaded image");
-      expect(image).toHaveAttribute(
-        "src",
-        "data:image/png;base64,base64imagedata",
-      );
+      expect(screen.getByText('Check out this image')).toBeInTheDocument();
+      const image = screen.getByAltText('Uploaded image');
+      expect(image).toHaveAttribute('src', 'data:image/png;base64,base64imagedata');
     });
 
-    it("renders multiple images in message body", () => {
+    it('renders multiple images in message body', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "Multiple images",
+            text: 'Multiple images',
             media: [
               {
-                type: "image",
-                data: "image1data",
-                mimeType: "image/png",
+                type: 'image',
+                data: 'image1data',
+                mimeType: 'image/png',
               },
               {
-                type: "image",
-                data: "image2data",
-                mimeType: "image/jpeg",
+                type: 'image',
+                data: 'image2data',
+                mimeType: 'image/jpeg',
               },
               {
-                type: "image",
-                data: "image3data",
-                mimeType: "image/gif",
+                type: 'image',
+                data: 'image3data',
+                mimeType: 'image/gif',
               },
             ],
           },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -547,41 +516,32 @@ describe("GroupChatPanel", () => {
 
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-      const images = screen.getAllByAltText("Uploaded image");
+      const images = screen.getAllByAltText('Uploaded image');
       expect(images).toHaveLength(3);
-      expect(images[0]).toHaveAttribute(
-        "src",
-        "data:image/png;base64,image1data",
-      );
-      expect(images[1]).toHaveAttribute(
-        "src",
-        "data:image/jpeg;base64,image2data",
-      );
-      expect(images[2]).toHaveAttribute(
-        "src",
-        "data:image/gif;base64,image3data",
-      );
+      expect(images[0]).toHaveAttribute('src', 'data:image/png;base64,image1data');
+      expect(images[1]).toHaveAttribute('src', 'data:image/jpeg;base64,image2data');
+      expect(images[2]).toHaveAttribute('src', 'data:image/gif;base64,image3data');
     });
 
-    it("applies correct styling to media images", () => {
+    it('applies correct styling to media images', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "Styled image",
+            text: 'Styled image',
             media: [
               {
-                type: "image",
-                data: "styledimage",
-                mimeType: "image/png",
+                type: 'image',
+                data: 'styledimage',
+                mimeType: 'image/png',
               },
             ],
           },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -592,28 +552,28 @@ describe("GroupChatPanel", () => {
 
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-      const image = screen.getByAltText("Uploaded image");
+      const image = screen.getByAltText('Uploaded image');
       expect(image).toHaveStyle({
-        maxWidth: "100%",
-        height: "auto",
-        borderRadius: "8px",
-        border: "1px solid rgba(0, 0, 0, 0.1)",
+        maxWidth: '100%',
+        height: 'auto',
+        borderRadius: '8px',
+        border: '1px solid rgba(0, 0, 0, 0.1)',
       });
     });
 
-    it("does not render media when media array is empty", () => {
+    it('does not render media when media array is empty', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "No media here",
+            text: 'No media here',
             media: [],
           },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -624,23 +584,23 @@ describe("GroupChatPanel", () => {
 
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-      expect(screen.getByText("No media here")).toBeInTheDocument();
-      expect(screen.queryByAltText("Uploaded image")).not.toBeInTheDocument();
+      expect(screen.getByText('No media here')).toBeInTheDocument();
+      expect(screen.queryByAltText('Uploaded image')).not.toBeInTheDocument();
     });
 
-    it("does not render media when media is not an array", () => {
+    it('does not render media when media is not an array', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "Invalid media",
-            media: "not-an-array",
+            text: 'Invalid media',
+            media: 'not-an-array',
           },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -651,39 +611,39 @@ describe("GroupChatPanel", () => {
 
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-      expect(screen.getByText("Invalid media")).toBeInTheDocument();
-      expect(screen.queryByAltText("Uploaded image")).not.toBeInTheDocument();
+      expect(screen.getByText('Invalid media')).toBeInTheDocument();
+      expect(screen.queryByAltText('Uploaded image')).not.toBeInTheDocument();
     });
 
-    it("only renders image type media, ignoring audio and video", () => {
+    it('only renders image type media, ignoring audio and video', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "Mixed media",
+            text: 'Mixed media',
             media: [
               {
-                type: "image",
-                data: "imagedata",
-                mimeType: "image/png",
+                type: 'image',
+                data: 'imagedata',
+                mimeType: 'image/png',
               },
               {
-                type: "audio",
-                data: "audiodata",
-                mimeType: "audio/mp3",
+                type: 'audio',
+                data: 'audiodata',
+                mimeType: 'audio/mp3',
               },
               {
-                type: "video",
-                data: "videodata",
-                mimeType: "video/mp4",
+                type: 'video',
+                data: 'videodata',
+                mimeType: 'video/mp4',
               },
             ],
           },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -695,33 +655,30 @@ describe("GroupChatPanel", () => {
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       // Only the image should be rendered
-      const images = screen.getAllByAltText("Uploaded image");
+      const images = screen.getAllByAltText('Uploaded image');
       expect(images).toHaveLength(1);
-      expect(images[0]).toHaveAttribute(
-        "src",
-        "data:image/png;base64,imagedata",
-      );
+      expect(images[0]).toHaveAttribute('src', 'data:image/png;base64,imagedata');
     });
 
-    it("renders assistant message with media", () => {
+    it('renders assistant message with media', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
             text: "Here's the visualization",
             media: [
               {
-                type: "image",
-                data: "visualization",
-                mimeType: "image/png",
+                type: 'image',
+                data: 'visualization',
+                mimeType: 'image/png',
               },
             ],
           },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -733,28 +690,28 @@ describe("GroupChatPanel", () => {
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       expect(screen.getByText("Here's the visualization")).toBeInTheDocument();
-      expect(screen.getByAltText("Visual response")).toBeInTheDocument();
+      expect(screen.getByAltText('Visual response')).toBeInTheDocument();
     });
 
-    it("renders multiple messages with different media", () => {
+    it('renders multiple messages with different media', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "First image",
+            text: 'First image',
             media: [
               {
-                type: "image",
-                data: "image1",
-                mimeType: "image/png",
+                type: 'image',
+                data: 'image1',
+                mimeType: 'image/png',
               },
             ],
           },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -762,22 +719,22 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:01:00Z",
+          id: '2',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:01:00Z',
           body: {
-            text: "Second image",
+            text: 'Second image',
             media: [
               {
-                type: "image",
-                data: "image2",
-                mimeType: "image/jpeg",
+                type: 'image',
+                data: 'image2',
+                mimeType: 'image/jpeg',
               },
             ],
           },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -788,25 +745,25 @@ describe("GroupChatPanel", () => {
 
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-      expect(screen.getByText("First image")).toBeInTheDocument();
-      expect(screen.getByText("Second image")).toBeInTheDocument();
+      expect(screen.getByText('First image')).toBeInTheDocument();
+      expect(screen.getByText('Second image')).toBeInTheDocument();
 
       // Alice's user message has "Uploaded image" alt text
-      expect(screen.getByAltText("Uploaded image")).toBeInTheDocument();
+      expect(screen.getByAltText('Uploaded image')).toBeInTheDocument();
       // Event Assistant's message has "Visual response" alt text
-      expect(screen.getByAltText("Visual response")).toBeInTheDocument();
+      expect(screen.getByAltText('Visual response')).toBeInTheDocument();
     });
 
-    it("renders message without media alongside messages with media", () => {
+    it('renders message without media alongside messages with media', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Just text" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Just text' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -814,22 +771,22 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:01:00Z",
+          id: '2',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:01:00Z',
           body: {
-            text: "Text with image",
+            text: 'Text with image',
             media: [
               {
-                type: "image",
-                data: "imagedata",
-                mimeType: "image/png",
+                type: 'image',
+                data: 'imagedata',
+                mimeType: 'image/png',
               },
             ],
           },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -840,41 +797,35 @@ describe("GroupChatPanel", () => {
 
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-      expect(screen.getByText("Just text")).toBeInTheDocument();
-      expect(screen.getByText("Text with image")).toBeInTheDocument();
+      expect(screen.getByText('Just text')).toBeInTheDocument();
+      expect(screen.getByText('Text with image')).toBeInTheDocument();
 
-      const images = screen.getAllByAltText("Uploaded image");
+      const images = screen.getAllByAltText('Uploaded image');
       expect(images).toHaveLength(1);
     });
 
-    it("handles different image MIME types correctly", () => {
-      const mimeTypes = [
-        "image/png",
-        "image/jpeg",
-        "image/gif",
-        "image/webp",
-        "image/svg+xml",
-      ];
+    it('handles different image MIME types correctly', () => {
+      const mimeTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml'];
 
       mimeTypes.forEach((mimeType, index) => {
         const messages = [
           {
             id: `${index}`,
-            pseudonym: "Alice",
-            createdAt: "2025-10-17T12:00:00Z",
+            pseudonym: 'Alice',
+            createdAt: '2025-10-17T12:00:00Z',
             body: {
               text: `Image ${index}`,
               media: [
                 {
-                  type: "image",
-                  data: "testdata",
+                  type: 'image',
+                  data: 'testdata',
                   mimeType,
                 },
               ],
             },
-            channels: ["chat"],
-            conversation: "conv-1",
-            pseudonymId: "alice-1",
+            channels: ['chat'],
+            conversation: 'conv-1',
+            pseudonymId: 'alice-1',
             fromAgent: false,
             pause: false,
             visible: true,
@@ -883,40 +834,35 @@ describe("GroupChatPanel", () => {
           },
         ];
 
-        const { unmount } = render(
-          <GroupChatPanel {...baseProps} messages={messages} />,
-        );
+        const { unmount } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-        const image = screen.getByAltText("Uploaded image");
-        expect(image).toHaveAttribute(
-          "src",
-          `data:${mimeType};base64,testdata`,
-        );
+        const image = screen.getByAltText('Uploaded image');
+        expect(image).toHaveAttribute('src', `data:${mimeType};base64,testdata`);
 
         unmount();
       });
     });
 
-    it("handles messages with very long base64 data", () => {
-      const longBase64 = "a".repeat(10000);
+    it('handles messages with very long base64 data', () => {
+      const longBase64 = 'a'.repeat(10000);
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "Large image",
+            text: 'Large image',
             media: [
               {
-                type: "image",
+                type: 'image',
                 data: longBase64,
-                mimeType: "image/png",
+                mimeType: 'image/png',
               },
             ],
           },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -927,31 +873,28 @@ describe("GroupChatPanel", () => {
 
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-      const image = screen.getByAltText("Uploaded image");
-      expect(image).toHaveAttribute(
-        "src",
-        `data:image/png;base64,${longBase64}`,
-      );
+      const image = screen.getByAltText('Uploaded image');
+      expect(image).toHaveAttribute('src', `data:image/png;base64,${longBase64}`);
     });
 
-    it("handles malformed media objects gracefully", () => {
+    it('handles malformed media objects gracefully', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "Malformed media",
+            text: 'Malformed media',
             media: [
               {
-                type: "image",
+                type: 'image',
                 // Missing data and mimeType
               },
             ],
           },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -960,27 +903,25 @@ describe("GroupChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <GroupChatPanel {...baseProps} messages={messages} />,
-      );
+      const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-      expect(screen.getByText("Malformed media")).toBeInTheDocument();
+      expect(screen.getByText('Malformed media')).toBeInTheDocument();
       // Should not crash
       expect(container).toBeInTheDocument();
     });
   });
 
-  describe("Timestamp display", () => {
-    it("shows timestamp for the first message", () => {
+  describe('Timestamp display', () => {
+    it('shows timestamp for the first message', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "First message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'First message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -989,25 +930,23 @@ describe("GroupChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <GroupChatPanel {...baseProps} messages={messages} />,
-      );
+      const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       // Check timestamp is displayed
-      const timestamps = container.querySelectorAll(".text-gray-400");
+      const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(1);
     });
 
-    it("shows timestamp when minute changes", () => {
+    it('shows timestamp when minute changes', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "First message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'First message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1015,13 +954,13 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Bob",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "Second message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "bob-1",
+          id: '2',
+          pseudonym: 'Bob',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Second message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'bob-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1030,25 +969,23 @@ describe("GroupChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <GroupChatPanel {...baseProps} messages={messages} />,
-      );
+      const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       // Should show two timestamps (one for each different minute)
-      const timestamps = container.querySelectorAll(".text-gray-400");
+      const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(2);
     });
 
-    it("shows timestamp when hour changes", () => {
+    it('shows timestamp when hour changes', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:59:00Z",
-          body: { text: "First message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:59:00Z',
+          body: { text: 'First message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1056,13 +993,13 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Bob",
-          createdAt: "2025-10-17T13:00:00Z",
-          body: { text: "Second message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "bob-1",
+          id: '2',
+          pseudonym: 'Bob',
+          createdAt: '2025-10-17T13:00:00Z',
+          body: { text: 'Second message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'bob-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1071,25 +1008,23 @@ describe("GroupChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <GroupChatPanel {...baseProps} messages={messages} />,
-      );
+      const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       // Should show two timestamps (one for each different hour)
-      const timestamps = container.querySelectorAll(".text-gray-400");
+      const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(2);
     });
 
-    it("does not show timestamp when messages are in the same minute", () => {
+    it('does not show timestamp when messages are in the same minute', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "First message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'First message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1097,13 +1032,13 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Bob",
-          createdAt: "2025-10-17T12:00:30Z",
-          body: { text: "Second message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "bob-1",
+          id: '2',
+          pseudonym: 'Bob',
+          createdAt: '2025-10-17T12:00:30Z',
+          body: { text: 'Second message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'bob-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1112,25 +1047,23 @@ describe("GroupChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <GroupChatPanel {...baseProps} messages={messages} />,
-      );
+      const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       // Should only show one timestamp (for the first message)
-      const timestamps = container.querySelectorAll(".text-gray-400");
+      const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(1);
     });
 
-    it("shows timestamp for Event Assistant messages when minute changes", () => {
+    it('shows timestamp for Event Assistant messages when minute changes', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "First message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'First message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1138,13 +1071,13 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "Assistant response" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '2',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Assistant response' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1153,30 +1086,28 @@ describe("GroupChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <GroupChatPanel {...baseProps} messages={messages} />,
-      );
+      const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       // Should show two timestamps (one for each different minute)
-      const timestamps = container.querySelectorAll(".text-gray-400");
+      const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(2);
     });
   });
 
-  describe("Feedback Configuration in Group Chat", () => {
-    it("renders feedback UI for agent messages in eligibleMessageIds", () => {
+  describe('Feedback Configuration in Group Chat', () => {
+    it('renders feedback UI for agent messages in eligibleMessageIds', () => {
       const mockEnterControlledMode = jest.fn();
       const mockSendRating = jest.fn();
 
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "User message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'User message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1184,13 +1115,13 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "Agent message 1" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '2',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Agent message 1' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1198,13 +1129,13 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "3",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:02:00Z",
-          body: { text: "Agent message 2" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '3',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:02:00Z',
+          body: { text: 'Agent message 2' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1214,36 +1145,30 @@ describe("GroupChatPanel", () => {
       ];
 
       const feedbackConfig = {
-        eligibleMessageIds: new Set(["2"]), // Only message 2 eligible
+        eligibleMessageIds: new Set(['2']), // Only message 2 eligible
         messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendRating,
       };
 
-      render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<GroupChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
       // Should have 1 feedback element (for message 2 only)
-      const feedbackElements = screen.queryAllByTestId("message-feedback");
+      const feedbackElements = screen.queryAllByTestId('message-feedback');
       expect(feedbackElements).toHaveLength(1);
-      expect(feedbackElements[0]).toHaveAttribute("data-message-id", "2");
+      expect(feedbackElements[0]).toHaveAttribute('data-message-id', '2');
     });
 
-    it("does not render feedback UI when feedbackConfig is not provided", () => {
+    it('does not render feedback UI when feedbackConfig is not provided', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Agent message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Agent message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1255,22 +1180,22 @@ describe("GroupChatPanel", () => {
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       // Should not have any feedback elements
-      expect(screen.queryByTestId("message-feedback")).not.toBeInTheDocument();
+      expect(screen.queryByTestId('message-feedback')).not.toBeInTheDocument();
     });
 
-    it("does not render feedback for user messages even with feedbackConfig", () => {
+    it('does not render feedback for user messages even with feedbackConfig', () => {
       const mockEnterControlledMode = jest.fn();
       const mockSendRating = jest.fn();
 
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "User message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'User message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1280,37 +1205,31 @@ describe("GroupChatPanel", () => {
       ];
 
       const feedbackConfig = {
-        eligibleMessageIds: new Set(["1"]),
+        eligibleMessageIds: new Set(['1']),
         messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendRating,
       };
 
-      render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<GroupChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
       // Should not have feedback for user messages
-      expect(screen.queryByTestId("message-feedback")).not.toBeInTheDocument();
+      expect(screen.queryByTestId('message-feedback')).not.toBeInTheDocument();
     });
 
-    it("renders feedback for multiple eligible agent messages", () => {
+    it('renders feedback for multiple eligible agent messages', () => {
       const mockEnterControlledMode = jest.fn();
       const mockSendRating = jest.fn();
 
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Agent message 1" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Agent message 1' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1318,13 +1237,13 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "Agent message 2" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '2',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Agent message 2' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1332,13 +1251,13 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "3",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:02:00Z",
-          body: { text: "Agent message 3" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '3',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:02:00Z',
+          body: { text: 'Agent message 3' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1348,41 +1267,35 @@ describe("GroupChatPanel", () => {
       ];
 
       const feedbackConfig = {
-        eligibleMessageIds: new Set(["1", "3"]), // Messages 1 and 3 eligible
+        eligibleMessageIds: new Set(['1', '3']), // Messages 1 and 3 eligible
         messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendRating,
       };
 
-      render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<GroupChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
-      const feedbackElements = screen.queryAllByTestId("message-feedback");
+      const feedbackElements = screen.queryAllByTestId('message-feedback');
 
       // Should have 2 feedback elements
       expect(feedbackElements).toHaveLength(2);
-      expect(feedbackElements[0]).toHaveAttribute("data-message-id", "1");
-      expect(feedbackElements[1]).toHaveAttribute("data-message-id", "3");
+      expect(feedbackElements[0]).toHaveAttribute('data-message-id', '1');
+      expect(feedbackElements[1]).toHaveAttribute('data-message-id', '3');
     });
 
-    it("handles empty eligibleMessageIds set", () => {
+    it('handles empty eligibleMessageIds set', () => {
       const mockEnterControlledMode = jest.fn();
       const mockSendRating = jest.fn();
 
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Agent message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Agent message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1398,31 +1311,25 @@ describe("GroupChatPanel", () => {
         onSendRating: mockSendRating,
       };
 
-      render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<GroupChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
       // Should not have any feedback elements
-      expect(screen.queryByTestId("message-feedback")).not.toBeInTheDocument();
+      expect(screen.queryByTestId('message-feedback')).not.toBeInTheDocument();
     });
 
-    it("excludes feedback for intro type messages in chat", () => {
+    it('excludes feedback for intro type messages in chat', () => {
       const mockEnterControlledMode = jest.fn();
       const mockSendRating = jest.fn();
 
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Welcome message", type: "intro" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Welcome message', type: 'intro' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1430,13 +1337,13 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "Regular message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '2',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Regular message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1446,40 +1353,34 @@ describe("GroupChatPanel", () => {
       ];
 
       const feedbackConfig = {
-        eligibleMessageIds: new Set(["2"]), // Message 1 excluded by type
+        eligibleMessageIds: new Set(['2']), // Message 1 excluded by type
         messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendRating,
       };
 
-      render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<GroupChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
-      const feedbackElements = screen.queryAllByTestId("message-feedback");
+      const feedbackElements = screen.queryAllByTestId('message-feedback');
 
       // Should only have 1 feedback element (for message 2)
       expect(feedbackElements).toHaveLength(1);
-      expect(feedbackElements[0]).toHaveAttribute("data-message-id", "2");
+      expect(feedbackElements[0]).toHaveAttribute('data-message-id', '2');
     });
 
-    it("passes initial rating from messageRatings to MessageFeedback", () => {
+    it('passes initial rating from messageRatings to MessageFeedback', () => {
       const mockEnterControlledMode = jest.fn();
       const mockSendRating = jest.fn();
 
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Agent message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Agent message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1488,39 +1389,33 @@ describe("GroupChatPanel", () => {
         },
       ];
 
-      const messageRatings = new Map([["1", "WOW!"]]);
+      const messageRatings = new Map([['1', 'WOW!']]);
       const feedbackConfig = {
-        eligibleMessageIds: new Set(["1"]),
+        eligibleMessageIds: new Set(['1']),
         messageRatings,
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendRating,
       };
 
-      render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<GroupChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
       // MessageFeedback mock should be rendered
-      const feedbackElement = screen.getByTestId("message-feedback");
+      const feedbackElement = screen.getByTestId('message-feedback');
       expect(feedbackElement).toBeInTheDocument();
     });
 
-    it("synchronizes feedback ratings across parent message and thread panel", () => {
+    it('synchronizes feedback ratings across parent message and thread panel', () => {
       const mockEnterControlledMode = jest.fn();
       const mockSendRating = jest.fn();
 
       const parentMessage = {
-        id: "parent-1",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Parent agent message" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: 'parent-1',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Parent agent message' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -1531,39 +1426,33 @@ describe("GroupChatPanel", () => {
       const messages = [parentMessage];
 
       // Parent message has been rated
-      const messageRatings = new Map([["parent-1", "OK"]]);
+      const messageRatings = new Map([['parent-1', 'OK']]);
       const feedbackConfig = {
-        eligibleMessageIds: new Set(["parent-1"]),
+        eligibleMessageIds: new Set(['parent-1']),
         messageRatings,
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendRating,
       };
 
-      render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<GroupChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
       // Check that MessageFeedback receives the initialRating
-      const feedbackElements = screen.getAllByTestId("message-feedback");
-      expect(feedbackElements[0]).toHaveAttribute("data-initial-rating", "OK");
+      const feedbackElements = screen.getAllByTestId('message-feedback');
+      expect(feedbackElements[0]).toHaveAttribute('data-initial-rating', 'OK');
     });
 
-    it("synchronizes feedback ratings for reply messages in thread preview", () => {
+    it('synchronizes feedback ratings for reply messages in thread preview', () => {
       const mockEnterControlledMode = jest.fn();
       const mockSendRating = jest.fn();
 
       const parentMessage = {
-        id: "parent-1",
-        pseudonym: "Alice",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "User question" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "alice-1",
+        id: 'parent-1',
+        pseudonym: 'Alice',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'User question' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'alice-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -1572,14 +1461,14 @@ describe("GroupChatPanel", () => {
       };
 
       const replyMessage = {
-        id: "reply-1",
-        pseudonym: "Event Assistant",
-        parentMessage: "parent-1",
-        createdAt: "2025-10-17T12:01:00Z",
-        body: { text: "Agent reply" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: 'reply-1',
+        pseudonym: 'Event Assistant',
+        parentMessage: 'parent-1',
+        createdAt: '2025-10-17T12:01:00Z',
+        body: { text: 'Agent reply' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -1590,39 +1479,33 @@ describe("GroupChatPanel", () => {
       const messages = [parentMessage, replyMessage];
 
       // Reply has been rated
-      const messageRatings = new Map([["reply-1", "Meh"]]);
+      const messageRatings = new Map([['reply-1', 'Meh']]);
       const feedbackConfig = {
-        eligibleMessageIds: new Set(["reply-1"]),
+        eligibleMessageIds: new Set(['reply-1']),
         messageRatings,
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendRating,
       };
 
-      render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<GroupChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
       // Check that the reply preview's MessageFeedback receives the initialRating
-      const feedbackElements = screen.getAllByTestId("message-feedback");
-      expect(feedbackElements[0]).toHaveAttribute("data-initial-rating", "Meh");
+      const feedbackElements = screen.getAllByTestId('message-feedback');
+      expect(feedbackElements[0]).toHaveAttribute('data-initial-rating', 'Meh');
     });
   });
 
-  describe("Thread organization and reply count logic", () => {
-    it("correctly separates parent messages from replies", () => {
+  describe('Thread organization and reply count logic', () => {
+    it('correctly separates parent messages from replies', () => {
       const messages = [
         {
-          id: "parent-1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Parent message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: 'parent-1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Parent message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1630,14 +1513,14 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "reply-1",
-          pseudonym: "Bob",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "Reply to parent" },
-          parentMessage: "parent-1",
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "bob-1",
+          id: 'reply-1',
+          pseudonym: 'Bob',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Reply to parent' },
+          parentMessage: 'parent-1',
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'bob-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1649,22 +1532,22 @@ describe("GroupChatPanel", () => {
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       // Parent message should be visible
-      expect(screen.getByText("Parent message")).toBeInTheDocument();
+      expect(screen.getByText('Parent message')).toBeInTheDocument();
 
       // Reply should be shown as a preview under the parent
-      expect(screen.getByText("Reply to parent")).toBeInTheDocument();
+      expect(screen.getByText('Reply to parent')).toBeInTheDocument();
     });
 
-    it("builds threadMap correctly with multiple replies to same parent", () => {
+    it('builds threadMap correctly with multiple replies to same parent', () => {
       const messages = [
         {
-          id: "parent-1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Question" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: 'parent-1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Question' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1672,14 +1555,14 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "reply-1",
-          pseudonym: "Bob",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "First reply" },
-          parentMessage: "parent-1",
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "bob-1",
+          id: 'reply-1',
+          pseudonym: 'Bob',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'First reply' },
+          parentMessage: 'parent-1',
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'bob-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1687,14 +1570,14 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "reply-2",
-          pseudonym: "Charlie",
-          createdAt: "2025-10-17T12:02:00Z",
-          body: { text: "Second reply" },
-          parentMessage: "parent-1",
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "charlie-1",
+          id: 'reply-2',
+          pseudonym: 'Charlie',
+          createdAt: '2025-10-17T12:02:00Z',
+          body: { text: 'Second reply' },
+          parentMessage: 'parent-1',
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'charlie-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1706,22 +1589,22 @@ describe("GroupChatPanel", () => {
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       // First reply should be shown in preview
-      expect(screen.getByText("First reply")).toBeInTheDocument();
+      expect(screen.getByText('First reply')).toBeInTheDocument();
 
       // Should show "+1 more reply" indicator
-      expect(screen.getByText("+ 1 more reply")).toBeInTheDocument();
+      expect(screen.getByText('+ 1 more reply')).toBeInTheDocument();
     });
 
-    it("sorts replies by createdAt timestamp in threadMap", () => {
+    it('sorts replies by createdAt timestamp in threadMap', () => {
       const messages = [
         {
-          id: "parent-1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Question" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: 'parent-1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Question' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1730,14 +1613,14 @@ describe("GroupChatPanel", () => {
         },
         // Add replies in non-chronological order
         {
-          id: "reply-3",
-          pseudonym: "David",
-          createdAt: "2025-10-17T12:03:00Z",
-          body: { text: "Third reply" },
-          parentMessage: "parent-1",
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "david-1",
+          id: 'reply-3',
+          pseudonym: 'David',
+          createdAt: '2025-10-17T12:03:00Z',
+          body: { text: 'Third reply' },
+          parentMessage: 'parent-1',
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'david-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1745,14 +1628,14 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "reply-1",
-          pseudonym: "Bob",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "First reply" },
-          parentMessage: "parent-1",
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "bob-1",
+          id: 'reply-1',
+          pseudonym: 'Bob',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'First reply' },
+          parentMessage: 'parent-1',
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'bob-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1760,14 +1643,14 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "reply-2",
-          pseudonym: "Charlie",
-          createdAt: "2025-10-17T12:02:00Z",
-          body: { text: "Second reply" },
-          parentMessage: "parent-1",
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "charlie-1",
+          id: 'reply-2',
+          pseudonym: 'Charlie',
+          createdAt: '2025-10-17T12:02:00Z',
+          body: { text: 'Second reply' },
+          parentMessage: 'parent-1',
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'charlie-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1779,22 +1662,22 @@ describe("GroupChatPanel", () => {
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       // The first reply (chronologically) should be shown in the preview
-      expect(screen.getByText("First reply")).toBeInTheDocument();
+      expect(screen.getByText('First reply')).toBeInTheDocument();
 
       // Should show "+2 more replies" since there are 3 total replies
-      expect(screen.getByText("+ 2 more replies")).toBeInTheDocument();
+      expect(screen.getByText('+ 2 more replies')).toBeInTheDocument();
     });
 
-    it("handles multiple parent messages with their own replies", () => {
+    it('handles multiple parent messages with their own replies', () => {
       const messages = [
         {
-          id: "parent-1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "First question" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: 'parent-1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'First question' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1802,13 +1685,13 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "parent-2",
-          pseudonym: "Bob",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "Second question" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "bob-1",
+          id: 'parent-2',
+          pseudonym: 'Bob',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Second question' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'bob-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1816,14 +1699,14 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "reply-1-1",
-          pseudonym: "Charlie",
-          createdAt: "2025-10-17T12:02:00Z",
-          body: { text: "Reply to first" },
-          parentMessage: "parent-1",
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "charlie-1",
+          id: 'reply-1-1',
+          pseudonym: 'Charlie',
+          createdAt: '2025-10-17T12:02:00Z',
+          body: { text: 'Reply to first' },
+          parentMessage: 'parent-1',
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'charlie-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1831,14 +1714,14 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "reply-2-1",
-          pseudonym: "David",
-          createdAt: "2025-10-17T12:03:00Z",
-          body: { text: "Reply to second" },
-          parentMessage: "parent-2",
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "david-1",
+          id: 'reply-2-1',
+          pseudonym: 'David',
+          createdAt: '2025-10-17T12:03:00Z',
+          body: { text: 'Reply to second' },
+          parentMessage: 'parent-2',
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'david-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1850,24 +1733,24 @@ describe("GroupChatPanel", () => {
       render(<GroupChatPanel {...baseProps} messages={messages} />);
 
       // Both parent messages should be visible
-      expect(screen.getByText("First question")).toBeInTheDocument();
-      expect(screen.getByText("Second question")).toBeInTheDocument();
+      expect(screen.getByText('First question')).toBeInTheDocument();
+      expect(screen.getByText('Second question')).toBeInTheDocument();
 
       // Each reply should be under its respective parent
-      expect(screen.getByText("Reply to first")).toBeInTheDocument();
-      expect(screen.getByText("Reply to second")).toBeInTheDocument();
+      expect(screen.getByText('Reply to first')).toBeInTheDocument();
+      expect(screen.getByText('Reply to second')).toBeInTheDocument();
     });
 
-    it("passes messagesWithUnreadReplies to ThreadedMessage components", () => {
+    it('passes messagesWithUnreadReplies to ThreadedMessage components', () => {
       const messages = [
         {
-          id: "parent-1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Parent with unread replies" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: 'parent-1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Parent with unread replies' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1875,13 +1758,13 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "parent-2",
-          pseudonym: "Bob",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "Parent without unread replies" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "bob-1",
+          id: 'parent-2',
+          pseudonym: 'Bob',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Parent without unread replies' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'bob-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1890,7 +1773,7 @@ describe("GroupChatPanel", () => {
         },
       ];
 
-      const messagesWithUnreadReplies = new Set(["parent-1"]);
+      const messagesWithUnreadReplies = new Set(['parent-1']);
 
       const { container } = render(
         <GroupChatPanel
@@ -1902,24 +1785,20 @@ describe("GroupChatPanel", () => {
       );
 
       // Both messages should be rendered
-      expect(
-        screen.getByText("Parent with unread replies"),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText("Parent without unread replies"),
-      ).toBeInTheDocument();
+      expect(screen.getByText('Parent with unread replies')).toBeInTheDocument();
+      expect(screen.getByText('Parent without unread replies')).toBeInTheDocument();
     });
   });
 
-  describe("Voice reply banner", () => {
+  describe('Voice reply banner', () => {
     const agentMessage = (body: Record<string, unknown>) => ({
-      id: "1",
-      pseudonym: "Event Assistant",
-      createdAt: "2025-10-17T12:00:00Z",
+      id: '1',
+      pseudonym: 'Event Assistant',
+      createdAt: '2025-10-17T12:00:00Z',
       body,
-      channels: ["chat"],
-      conversation: "conv-1",
-      pseudonymId: "ea-1",
+      channels: ['chat'],
+      conversation: 'conv-1',
+      pseudonymId: 'ea-1',
       fromAgent: true,
       pause: false,
       visible: true,
@@ -1927,15 +1806,15 @@ describe("GroupChatPanel", () => {
       downVotes: [],
     });
 
-    it("shows voice banner with 🔊 prefix for bot message with source=voice", () => {
+    it('shows voice banner with 🔊 prefix for bot message with source=voice', () => {
       render(
         <GroupChatPanel
           {...baseProps}
           messages={[
             agentMessage({
-              text: "Here is my answer",
-              source: "voice",
-              sourceMessage: "What is the agenda?",
+              text: 'Here is my answer',
+              source: 'voice',
+              sourceMessage: 'What is the agenda?',
             }),
           ]}
         />,
@@ -1946,60 +1825,48 @@ describe("GroupChatPanel", () => {
       expect(screen.getByText(/What is the agenda\?/)).toBeInTheDocument();
     });
 
-    it("does not show banner when source is not voice", () => {
-      render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={[agentMessage({ text: "Just a normal response" })]}
-        />,
-      );
+    it('does not show banner when source is not voice', () => {
+      render(<GroupChatPanel {...baseProps} messages={[agentMessage({ text: 'Just a normal response' })]} />);
 
       expect(screen.queryByText(/In reply to:/)).not.toBeInTheDocument();
     });
 
-    it("does not show banner when sourceMessage is missing", () => {
-      render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={[agentMessage({ text: "Answer", source: "voice" })]}
-        />,
-      );
+    it('does not show banner when sourceMessage is missing', () => {
+      render(<GroupChatPanel {...baseProps} messages={[agentMessage({ text: 'Answer', source: 'voice' })]} />);
 
       expect(screen.queryByText(/In reply to:/)).not.toBeInTheDocument();
     });
 
-    it("truncates sourceMessage longer than 60 characters", () => {
-      const longQuestion = "a".repeat(80);
+    it('truncates sourceMessage longer than 60 characters', () => {
+      const longQuestion = 'a'.repeat(80);
       render(
         <GroupChatPanel
           {...baseProps}
           messages={[
             agentMessage({
-              text: "Answer",
-              source: "voice",
+              text: 'Answer',
+              source: 'voice',
               sourceMessage: longQuestion,
             }),
           ]}
         />,
       );
 
-      expect(
-        screen.getByText(new RegExp("a{60}\\.\\.\\.")),
-      ).toBeInTheDocument();
+      expect(screen.getByText(new RegExp('a{60}\\.\\.\\.'))).toBeInTheDocument();
     });
   });
 
-  describe("Thinking Bot Icon", () => {
-    it("shows thinking bot icon when waiting for non-threaded response", () => {
+  describe('Thinking Bot Icon', () => {
+    it('shows thinking bot icon when waiting for non-threaded response', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "User message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'User message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -2008,30 +1875,24 @@ describe("GroupChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={messages}
-          waitingForResponse={true}
-        />,
-      );
+      const { container } = render(<GroupChatPanel {...baseProps} messages={messages} waitingForResponse={true} />);
 
       // Should show thinking indicator with bouncing bot icon
-      const bouncingIcon = container.querySelector(".animate-bounce");
+      const bouncingIcon = container.querySelector('.animate-bounce');
       expect(bouncingIcon).toBeInTheDocument();
-      expect(screen.getByText("thinking...")).toBeInTheDocument();
+      expect(screen.getByText('thinking...')).toBeInTheDocument();
     });
 
-    it("does not show thinking bot icon when waitingForResponse is false", () => {
+    it('does not show thinking bot icon when waitingForResponse is false', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "User message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'User message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -2040,28 +1901,22 @@ describe("GroupChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={messages}
-          waitingForResponse={false}
-        />,
-      );
+      const { container } = render(<GroupChatPanel {...baseProps} messages={messages} waitingForResponse={false} />);
 
-      const bouncingIcon = container.querySelector(".animate-bounce");
+      const bouncingIcon = container.querySelector('.animate-bounce');
       expect(bouncingIcon).not.toBeInTheDocument();
-      expect(screen.queryByText("thinking...")).not.toBeInTheDocument();
+      expect(screen.queryByText('thinking...')).not.toBeInTheDocument();
     });
 
-    it("does not show thinking bot icon in main chat when waiting for threaded reply", () => {
+    it('does not show thinking bot icon in main chat when waiting for threaded reply', () => {
       const parentMessage = {
-        id: "parent-1",
-        pseudonym: "Alice",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Parent message" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "alice-1",
+        id: 'parent-1',
+        pseudonym: 'Alice',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Parent message' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'alice-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -2070,14 +1925,14 @@ describe("GroupChatPanel", () => {
       };
 
       const userReply = {
-        id: "reply-1",
-        pseudonym: "Alice",
-        createdAt: "2025-10-17T12:01:00Z",
-        body: { text: "User reply in thread" },
-        parentMessage: "parent-1",
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "alice-1",
+        id: 'reply-1',
+        pseudonym: 'Alice',
+        createdAt: '2025-10-17T12:01:00Z',
+        body: { text: 'User reply in thread' },
+        parentMessage: 'parent-1',
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'alice-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -2086,29 +1941,25 @@ describe("GroupChatPanel", () => {
       };
 
       const { container } = render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={[parentMessage, userReply]}
-          waitingForResponse={true}
-        />,
+        <GroupChatPanel {...baseProps} messages={[parentMessage, userReply]} waitingForResponse={true} />,
       );
 
       // Main chat should NOT show thinking indicator when waiting for threaded reply
-      const bouncingIcons = container.querySelectorAll(".animate-bounce");
+      const bouncingIcons = container.querySelectorAll('.animate-bounce');
       expect(bouncingIcons.length).toBe(0);
-      expect(screen.queryByText("thinking...")).not.toBeInTheDocument();
+      expect(screen.queryByText('thinking...')).not.toBeInTheDocument();
     });
 
-    it("shows thinking bot icon below the last parent message", () => {
+    it('shows thinking bot icon below the last parent message', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "First message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'First message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -2116,13 +1967,13 @@ describe("GroupChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Bob",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "Second message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "bob-1",
+          id: '2',
+          pseudonym: 'Bob',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Second message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'bob-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -2131,34 +1982,28 @@ describe("GroupChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={messages}
-          waitingForResponse={true}
-        />,
-      );
+      const { container } = render(<GroupChatPanel {...baseProps} messages={messages} waitingForResponse={true} />);
 
       // Both messages should be visible
-      expect(screen.getByText("First message")).toBeInTheDocument();
-      expect(screen.getByText("Second message")).toBeInTheDocument();
+      expect(screen.getByText('First message')).toBeInTheDocument();
+      expect(screen.getByText('Second message')).toBeInTheDocument();
 
       // Thinking indicator should also be visible
-      expect(screen.getByText("thinking...")).toBeInTheDocument();
-      const bouncingIcon = container.querySelector(".animate-bounce");
+      expect(screen.getByText('thinking...')).toBeInTheDocument();
+      const bouncingIcon = container.querySelector('.animate-bounce');
       expect(bouncingIcon).toBeInTheDocument();
     });
 
-    it("removes thinking indicator when bot response arrives", async () => {
+    it('removes thinking indicator when bot response arrives', async () => {
       const initialMessages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "User question" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'User question' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -2168,29 +2013,25 @@ describe("GroupChatPanel", () => {
       ];
 
       const { rerender, container } = render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={initialMessages}
-          waitingForResponse={true}
-        />,
+        <GroupChatPanel {...baseProps} messages={initialMessages} waitingForResponse={true} />,
       );
 
       // Verify thinking indicator is shown
-      expect(screen.getByText("thinking...")).toBeInTheDocument();
-      let bouncingIcon = container.querySelector(".animate-bounce");
+      expect(screen.getByText('thinking...')).toBeInTheDocument();
+      let bouncingIcon = container.querySelector('.animate-bounce');
       expect(bouncingIcon).toBeInTheDocument();
 
       // Add bot response and remove waiting state
       const messagesWithResponse = [
         ...initialMessages,
         {
-          id: "2",
-          pseudonym: "Berkie",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "Bot response" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "berkie-1",
+          id: '2',
+          pseudonym: 'Berkie',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Bot response' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'berkie-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -2199,35 +2040,29 @@ describe("GroupChatPanel", () => {
         },
       ];
 
-      rerender(
-        <GroupChatPanel
-          {...baseProps}
-          messages={messagesWithResponse}
-          waitingForResponse={false}
-        />,
-      );
+      rerender(<GroupChatPanel {...baseProps} messages={messagesWithResponse} waitingForResponse={false} />);
 
       // Verify thinking indicator is removed
       await waitFor(() => {
-        expect(screen.queryByText("thinking...")).not.toBeInTheDocument();
+        expect(screen.queryByText('thinking...')).not.toBeInTheDocument();
       });
-      bouncingIcon = container.querySelector(".animate-bounce");
+      bouncingIcon = container.querySelector('.animate-bounce');
       expect(bouncingIcon).not.toBeInTheDocument();
 
       // Verify bot response is displayed
-      expect(screen.getByText("Bot response")).toBeInTheDocument();
+      expect(screen.getByText('Bot response')).toBeInTheDocument();
     });
 
-    it("shows thinking indicator above message input area", () => {
+    it('shows thinking indicator above message input area', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Alice",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "User message" },
-          channels: ["chat"],
-          conversation: "conv-1",
-          pseudonymId: "alice-1",
+          id: '1',
+          pseudonym: 'Alice',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'User message' },
+          channels: ['chat'],
+          conversation: 'conv-1',
+          pseudonymId: 'alice-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -2236,22 +2071,16 @@ describe("GroupChatPanel", () => {
         },
       ];
 
-      render(
-        <GroupChatPanel
-          {...baseProps}
-          messages={messages}
-          waitingForResponse={true}
-        />,
-      );
+      render(<GroupChatPanel {...baseProps} messages={messages} waitingForResponse={true} />);
 
       // Both thinking indicator and message input should be present
-      expect(screen.getByText("thinking...")).toBeInTheDocument();
-      expect(screen.getByTestId("message-input")).toBeInTheDocument();
+      expect(screen.getByText('thinking...')).toBeInTheDocument();
+      expect(screen.getByTestId('message-input')).toBeInTheDocument();
     });
   });
 
-  describe("Scroll-to-bottom button", () => {
-    it("is not rendered when user is at the bottom", () => {
+  describe('Scroll-to-bottom button', () => {
+    it('is not rendered when user is at the bottom', () => {
       (useAutoScroll as jest.Mock).mockReturnValue({
         messagesContainerRef: { current: null },
         messagesEndRef: { current: null },
@@ -2261,12 +2090,10 @@ describe("GroupChatPanel", () => {
 
       render(<GroupChatPanel {...baseProps} />);
 
-      expect(
-        screen.queryByRole("button", { name: /scroll to latest messages/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /scroll to latest messages/i })).not.toBeInTheDocument();
     });
 
-    it("appears when the user has scrolled up", () => {
+    it('appears when the user has scrolled up', () => {
       (useAutoScroll as jest.Mock).mockReturnValue({
         messagesContainerRef: { current: null },
         messagesEndRef: { current: null },
@@ -2276,12 +2103,10 @@ describe("GroupChatPanel", () => {
 
       render(<GroupChatPanel {...baseProps} />);
 
-      expect(
-        screen.getByRole("button", { name: /scroll to latest messages/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /scroll to latest messages/i })).toBeInTheDocument();
     });
 
-    it("calls scrollToBottom when clicked", async () => {
+    it('calls scrollToBottom when clicked', async () => {
       const mockScrollToBottom = jest.fn();
       (useAutoScroll as jest.Mock).mockReturnValue({
         messagesContainerRef: { current: null },
@@ -2293,14 +2118,12 @@ describe("GroupChatPanel", () => {
       const user = userEvent.setup();
       render(<GroupChatPanel {...baseProps} />);
 
-      await user.click(
-        screen.getByRole("button", { name: /scroll to latest messages/i }),
-      );
+      await user.click(screen.getByRole('button', { name: /scroll to latest messages/i }));
 
       expect(mockScrollToBottom).toHaveBeenCalledTimes(1);
     });
 
-    it("moves focus to the message input when clicked", async () => {
+    it('moves focus to the message input when clicked', async () => {
       (useAutoScroll as jest.Mock).mockReturnValue({
         messagesContainerRef: { current: null },
         messagesEndRef: { current: null },
@@ -2311,32 +2134,28 @@ describe("GroupChatPanel", () => {
       const user = userEvent.setup();
       render(<GroupChatPanel {...baseProps} />);
 
-      await user.click(
-        screen.getByRole("button", { name: /scroll to latest messages/i }),
-      );
+      await user.click(screen.getByRole('button', { name: /scroll to latest messages/i }));
 
       /* The handler focuses the first focusable input inside the MessageInput
          wrapper. In tests the mock renders an <input data-testid="message-input-field">,
          so that element should receive focus. */
-      expect(document.activeElement).toBe(
-        screen.getByTestId("message-input-field"),
-      );
+      expect(document.activeElement).toBe(screen.getByTestId('message-input-field'));
     });
   });
 
-  describe("useAutoScroll integration", () => {
-    it("passes all messages to useAutoScroll, including thread replies", () => {
+  describe('useAutoScroll integration', () => {
+    it('passes all messages to useAutoScroll, including thread replies', () => {
       // If GroupChatPanel only passed parentMessages, the hook would never see
       // thread replies — meaning Berkie's threaded responses wouldn't trigger
       // a scroll even when the user is pinned to the bottom.
       const parentMessage = {
-        id: "parent-1",
-        pseudonym: "Alice",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "User question" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "alice-1",
+        id: 'parent-1',
+        pseudonym: 'Alice',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'User question' },
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'alice-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -2345,14 +2164,14 @@ describe("GroupChatPanel", () => {
       };
 
       const threadReply = {
-        id: "reply-1",
-        pseudonym: "Berkie",
-        parentMessage: "parent-1",
-        createdAt: "2025-10-17T12:01:00Z",
+        id: 'reply-1',
+        pseudonym: 'Berkie',
+        parentMessage: 'parent-1',
+        createdAt: '2025-10-17T12:01:00Z',
         body: { text: "Berkie's threaded reply" },
-        channels: ["chat"],
-        conversation: "conv-1",
-        pseudonymId: "berkie-1",
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'berkie-1',
         fromAgent: true,
         pause: false,
         visible: true,

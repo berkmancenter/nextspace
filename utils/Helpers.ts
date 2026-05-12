@@ -1,15 +1,8 @@
-import { ParsedUrlQuery } from "querystring";
-import { fetchWithTokenRefresh, RetrieveData, Request } from "./";
-import { components } from "../types";
-import {
-  Conversation,
-  EventUrl,
-  EventUrls,
-  PseudonymousMessage,
-  MediaItem,
-  AgentChannelConfig,
-} from "../types.internal";
-import TokenManagerDefault from "./TokenManager";
+import { ParsedUrlQuery } from 'querystring';
+import { fetchWithTokenRefresh, RetrieveData, Request } from './';
+import { components } from '../types';
+import { Conversation, EventUrl, EventUrls, PseudonymousMessage, MediaItem, AgentChannelConfig } from '../types.internal';
+import TokenManagerDefault from './TokenManager';
 
 /**
  * Parsed message body structure
@@ -36,11 +29,11 @@ export interface ParsedMessageBody {
  */
 export const parseMessageBody = (body: string | object): ParsedMessageBody => {
   // Handle object input
-  if (body && typeof body === "object") {
+  if (body && typeof body === 'object') {
     const obj = body as Record<string, any>;
 
     return {
-      text: obj.text?.toString() || "",
+      text: obj.text?.toString() || '',
       type: obj.type?.toString(),
       message: obj.message?.toString(),
       media: Array.isArray(obj.media) ? obj.media : undefined,
@@ -52,7 +45,7 @@ export const parseMessageBody = (body: string | object): ParsedMessageBody => {
 
   // Handle string input
   return {
-    text: typeof body === "string" ? body : String(body),
+    text: typeof body === 'string' ? body : String(body),
   };
 };
 
@@ -77,9 +70,9 @@ export class Api {
   private static _instance: Api;
 
   private configCache: {
-    conversationTypes: components["schemas"]["ConversationType"][];
-    availablePlatforms: components["schemas"]["PlatformConfig"][];
-    supportedModels: components["schemas"]["LlmModelDetails"][];
+    conversationTypes: components['schemas']['ConversationType'][];
+    availablePlatforms: components['schemas']['PlatformConfig'][];
+    supportedModels: components['schemas']['LlmModelDetails'][];
     conversationBotName: string;
   } | null = null;
 
@@ -93,18 +86,8 @@ export class Api {
    * @param accessExpires Optional ISO-8601 expiry for the access token.
    * @param refreshExpires Optional ISO-8601 expiry for the refresh token.
    */
-  SetTokens(
-    access: string,
-    refresh: string,
-    accessExpires?: string,
-    refreshExpires?: string,
-  ) {
-    TokenManagerDefault.setTokensFromStrings(
-      access,
-      refresh,
-      accessExpires,
-      refreshExpires,
-    );
+  SetTokens(access: string, refresh: string, accessExpires?: string, refreshExpires?: string) {
+    TokenManagerDefault.setTokensFromStrings(access, refresh, accessExpires, refreshExpires);
   }
 
   /**
@@ -126,7 +109,7 @@ export class Api {
 
   /** Returns true if the user has a valid access token (via TokenManager). */
   IsLoggedIn() {
-    return TokenManagerDefault.getAccessToken() !== "";
+    return TokenManagerDefault.getAccessToken() !== '';
   }
 
   /** Clears all regular (non-admin) tokens from `TokenManager`. */
@@ -136,15 +119,15 @@ export class Api {
 
   async GetConfig() {
     if (!this.configCache) {
-      const config = await RetrieveData("/config");
-      if (!config || "error" in config) {
-        throw new Error("Failed to fetch config");
+      const config = await RetrieveData('/config');
+      if (!config || 'error' in config) {
+        throw new Error('Failed to fetch config');
       }
       this.configCache = {
         conversationTypes: config.conversationTypes,
         availablePlatforms: config.availablePlatforms,
         supportedModels: config.supportedModels,
-        conversationBotName: config.conversationBotName ?? "Berkie",
+        conversationBotName: config.conversationBotName ?? 'Berkie',
       };
     }
     return this.configCache;
@@ -172,25 +155,21 @@ export class Api {
  * @param setErrorMessage - Function to set an error message if needed.
  * @returns The passcode for the specified channel, or null if not found or error.
  */
-export const GetChannelPasscode = (
-  channel: string,
-  query: ParsedUrlQuery,
-  setErrorMessage: (err: string) => void,
-) => {
+export const GetChannelPasscode = (channel: string, query: ParsedUrlQuery, setErrorMessage: (err: string) => void) => {
   let hasChannel = false;
   let passcodeParam = null;
   let channelIndex = 0;
 
   if (!query.channel) {
-    setErrorMessage("Please provide channels.");
+    setErrorMessage('Please provide channels.');
     return null;
   }
 
   // Check if channel is a string or an array
-  if (typeof query.channel === "string") {
+  if (typeof query.channel === 'string') {
     hasChannel = query.channel.includes(channel);
     // If it's a string, split it by comma
-    if (hasChannel) passcodeParam = query.channel.split(",")[1];
+    if (hasChannel) passcodeParam = query.channel.split(',')[1];
   } else {
     // If it's an array, check if any of the channels is this channel and get the index
     hasChannel = !!query.channel.find((c, i) => {
@@ -202,8 +181,8 @@ export const GetChannelPasscode = (
   }
 
   if (hasChannel) {
-    if (typeof query.channel !== "string") {
-      passcodeParam = query.channel[channelIndex].split(",")[1];
+    if (typeof query.channel !== 'string') {
+      passcodeParam = query.channel[channelIndex].split(',')[1];
     }
     if (!passcodeParam) {
       setErrorMessage(`Please provide a ${channel} passcode.`);
@@ -226,14 +205,14 @@ export const SendData = async (
   payload: any,
   accessToken?: string,
   fetchOptions?: RequestInit,
-  method: string = "POST",
+  method: string = 'POST',
 ) => {
   const API_TOKENS = Api.get().GetTokens();
 
   let options: RequestInit = fetchOptions || {
     method,
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
   };
@@ -244,7 +223,7 @@ export const SendData = async (
   }
 
   // Add Authorization header; use provided accessToken if available
-  (options.headers as Record<string, string>)["Authorization"] = accessToken
+  (options.headers as Record<string, string>)['Authorization'] = accessToken
     ? `Bearer ${accessToken}`
     : `Bearer ${API_TOKENS.access}`;
 
@@ -257,7 +236,7 @@ export const SendData = async (
 
     // TODO: Handle other status codes as needed
     if (!response.ok) {
-      console.error("Error:", response);
+      console.error('Error:', response);
       return {
         error: true,
         status: response.status,
@@ -266,22 +245,19 @@ export const SendData = async (
     }
 
     // Handle responses with no content (204 or empty body)
-    if (
-      response.status === 204 ||
-      response.headers.get("Content-Length") === "0"
-    ) {
+    if (response.status === 204 || response.headers.get('Content-Length') === '0') {
       return { success: true };
     }
 
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error("There was a problem with the send operation:", error);
+    console.error('There was a problem with the send operation:', error);
   }
 };
 
 // Default easing class for animations
-export const DefaultEase = " ease-[cubic-bezier(0.075, 0.820, 0.165, 1.000)]";
+export const DefaultEase = ' ease-[cubic-bezier(0.075, 0.820, 0.165, 1.000)]';
 
 /**
  * Returns the conversation type for a particular conversation. Will use the conversationType property if set,
@@ -290,100 +266,75 @@ export const DefaultEase = " ease-[cubic-bezier(0.075, 0.820, 0.165, 1.000)]";
  * @returns ConversationType the type for the conversation
  */
 async function getTypeForConversation(
-  conversation: components["schemas"]["Conversation"],
-  conversationTypes: components["schemas"]["ConversationType"][],
-): Promise<components["schemas"]["ConversationType"]> {
+  conversation: components['schemas']['Conversation'],
+  conversationTypes: components['schemas']['ConversationType'][],
+): Promise<components['schemas']['ConversationType']> {
   if (conversation.conversationType) {
-    const type = conversationTypes.find(
-      (type) => type.name === conversation.conversationType,
-    );
+    const type = conversationTypes.find((type) => type.name === conversation.conversationType);
     if (type) return type;
     // backwards compatibility for removed conversation types
     return {
       name: conversation.conversationType,
-      description: "",
+      description: '',
       platforms: [],
       properties: [],
-    } as components["schemas"]["ConversationType"];
+    } as components['schemas']['ConversationType'];
   }
   const agentNames = conversation.agents.map((agent) => agent.agentType);
   // Bit of a hack to support legacy conversations without a type. Takes advantage of the fact that
   // backChannel and eventAssistant conversation types match their agent names
   // (both backChannelInsights and backChannelMetrics contain 'backChannel', the type name)
-  return conversationTypes.find((convType) =>
-    agentNames.some((agentName) => agentName.includes(convType.name)),
-  )!;
+  return conversationTypes.find((convType) => agentNames.some((agentName) => agentName.includes(convType.name)))!;
 }
 
-function generateEventUrls(
-  conversationData: Conversation,
-  botName: string,
-): EventUrls {
+function generateEventUrls(conversationData: Conversation, botName: string): EventUrls {
   const urlPrefix = `${window.location.protocol}//${window.location.host}`;
   const moderator: EventUrl[] = [];
   const participant: EventUrl[] = [];
 
-  const zoomAdapter = conversationData.adapters.find(
-    (adapter) => adapter.type === "zoom",
-  );
-  const zoom = zoomAdapter
-    ? { label: "Zoom", url: zoomAdapter.config?.meetingUrl as string }
-    : undefined;
+  const zoomAdapter = conversationData.adapters.find((adapter) => adapter.type === 'zoom');
+  const zoom = zoomAdapter ? { label: 'Zoom', url: zoomAdapter.config?.meetingUrl as string } : undefined;
 
   const convType = conversationData.type;
 
-  const transcriptPasscode = conversationData.channels.find(
-    (channel) => channel.name === "transcript",
-  )?.passcode;
+  const transcriptPasscode = conversationData.channels.find((channel) => channel.name === 'transcript')?.passcode;
   const hasTranscript = Boolean(transcriptPasscode);
 
-  const chatPasscode = conversationData.channels.find(
-    (channel) => channel.name === "chat",
-  )?.passcode;
+  const chatPasscode = conversationData.channels.find((channel) => channel.name === 'chat')?.passcode;
   const hasChat = Boolean(chatPasscode);
 
-  const resourcesPasscode = conversationData.channels.find(
-    (channel) => channel.name === "resources",
-  )?.passcode;
+  const resourcesPasscode = conversationData.channels.find((channel) => channel.name === 'resources')?.passcode;
   const hasResources = Boolean(resourcesPasscode);
 
-  const modPasscode = conversationData.channels.find(
-    (channel) => channel.name === "moderator",
-  )?.passcode;
+  const modPasscode = conversationData.channels.find((channel) => channel.name === 'moderator')?.passcode;
 
   const modUrl = modPasscode
-    ? `${urlPrefix}/moderator/?conversationId=${
-        conversationData.id
-      }&channel=moderator,${modPasscode}${
-        hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
+    ? `${urlPrefix}/moderator/?conversationId=${conversationData.id}&channel=moderator,${modPasscode}${
+        hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ''
       }`
-    : "";
+    : '';
 
-  if (convType && convType.name === "backChannel") {
-    const participantPasscode = conversationData.channels.find(
-      (channel) => channel.name === "participant",
-    )?.passcode;
+  if (convType && convType.name === 'backChannel') {
+    const participantPasscode = conversationData.channels.find((channel) => channel.name === 'participant')?.passcode;
 
     if (participantPasscode) {
       participant.push({
-        label: "Back Channel",
+        label: 'Back Channel',
         url: `${urlPrefix}/backchannel/?conversationId=${conversationData.id}&channel=participant,${participantPasscode}`,
       });
     }
     if (modPasscode) {
       moderator.push({
-        label: "Back Channel",
+        label: 'Back Channel',
         url: modUrl,
       });
     }
-  } else if (convType && convType.name === "eventAssistant") {
+  } else if (convType && convType.name === 'eventAssistant') {
     const eventAssistantUrl = {
       label: botName,
       url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
-        hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ""
-      }${hasChat ? `&channel=chat,${chatPasscode}` : ""}${
-        hasResources ? `&channel=resources,${resourcesPasscode}` : ""
-      }`,
+        hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ''
+      }${hasChat ? `&channel=chat,${chatPasscode}` : ''}${hasResources ? `&channel=resources,${resourcesPasscode}` : ''}`,
     };
     participant.push(eventAssistantUrl);
     if (modPasscode) {
@@ -401,25 +352,17 @@ function generateEventUrls(
   };
 }
 
-export const getConversation = async (
-  id: string,
-): Promise<Conversation | null> => {
+export const getConversation = async (id: string): Promise<Conversation | null> => {
   const response = await Request(`conversations/${id}`);
-  if (response && "error" in response) {
-    console.error(
-      `Error fetching conversation data for ID ${id}:`,
-      response.message,
-    );
+  if (response && 'error' in response) {
+    console.error(`Error fetching conversation data for ID ${id}:`, response.message);
     return null;
   }
   return await createConversationFromData(response);
 };
 
-export const createConversationFromData = async (
-  data: components["schemas"]["Conversation"],
-): Promise<Conversation> => {
-  const { conversationTypes, availablePlatforms, conversationBotName } =
-    await Api.get().GetConfig();
+export const createConversationFromData = async (data: components['schemas']['Conversation']): Promise<Conversation> => {
+  const { conversationTypes, availablePlatforms, conversationBotName } = await Api.get().GetConfig();
 
   const type = await getTypeForConversation(data, conversationTypes);
   const eventUrls = generateEventUrls(
@@ -434,9 +377,7 @@ export const createConversationFromData = async (
     ...data,
     type,
     eventUrls,
-    platformTypes: availablePlatforms.filter((platform) =>
-      data.platforms?.some((p) => p === platform.name),
-    ),
+    platformTypes: availablePlatforms.filter((platform) => data.platforms?.some((p) => p === platform.name)),
   };
 };
 
@@ -445,8 +386,7 @@ export const createConversationFromData = async (
  * @returns An object containing the authType property
  */
 export const CheckAuthHeader = (headers: Record<string, string>) => {
-  const authType =
-    headers && headers["x-auth-type"] ? headers["x-auth-type"] : "guest";
+  const authType = headers && headers['x-auth-type'] ? headers['x-auth-type'] : 'guest';
   return {
     props: {
       authType,
@@ -467,19 +407,17 @@ export const CheckAuthHeader = (headers: Record<string, string>) => {
  * @returns The resolved bot name string
  */
 export const resolveConversationBotName = (
-  conversation: { agents: components["schemas"]["Agent"][] },
+  conversation: { agents: components['schemas']['Agent'][] },
   configBotName: string,
 ): string => {
   const firstAgent = conversation.agents[0];
   if (
     firstAgent?.agentConfig &&
-    typeof firstAgent.agentConfig === "object" &&
-    typeof (firstAgent.agentConfig as Record<string, unknown>).botName ===
-      "string" &&
-    (firstAgent.agentConfig as Record<string, unknown>).botName !== ""
+    typeof firstAgent.agentConfig === 'object' &&
+    typeof (firstAgent.agentConfig as Record<string, unknown>).botName === 'string' &&
+    (firstAgent.agentConfig as Record<string, unknown>).botName !== ''
   ) {
-    return (firstAgent.agentConfig as Record<string, unknown>)
-      .botName as string;
+    return (firstAgent.agentConfig as Record<string, unknown>).botName as string;
   }
   return configBotName;
 };
@@ -490,11 +428,8 @@ export const resolveConversationBotName = (
  * @param botName - The display name for the bot, from `conversationBotName` in config
  * @returns botName if the message is from an agent, otherwise the original pseudonym
  */
-export const normalizeAssistantPseudonym = (
-  message: PseudonymousMessage,
-  botName: string,
-): string => {
-  if (!message || !message.pseudonym) return "";
+export const normalizeAssistantPseudonym = (message: PseudonymousMessage, botName: string): string => {
+  if (!message || !message.pseudonym) return '';
   return message.fromAgent ? botName : message.pseudonym;
 };
 
@@ -502,11 +437,9 @@ export const buildDirectChannels = (
   userId: string,
   agents: AgentChannelConfig[],
   preferences: Record<string, boolean>,
-): components["schemas"]["Channel"][] => {
+): components['schemas']['Channel'][] => {
   return agents
-    .filter((agent) =>
-      agent.preferenceKey ? preferences[agent.preferenceKey] === true : true,
-    )
+    .filter((agent) => (agent.preferenceKey ? preferences[agent.preferenceKey] === true : true))
     .map((agent) => ({
       name: `direct-${userId}-${agent.agentId}`,
       passcode: null,

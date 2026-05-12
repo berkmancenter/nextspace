@@ -1,29 +1,16 @@
-import { useRouter } from "next/router";
-import { useEffect, useRef, useState } from "react";
+import { useRouter } from 'next/router';
+import { useEffect, useRef, useState } from 'react';
 
-import {
-  PseudonymousMessage,
-  ModeratorInsightsMessage,
-  ModeratorMetricsMessage,
-  ErrorMessage,
-} from "../types.internal";
-import {
-  Api,
-  GetChannelPasscode,
-  RetrieveData,
-  QueryParamsError,
-  emitWithTokenRefresh,
-} from "../utils";
+import { PseudonymousMessage, ModeratorInsightsMessage, ModeratorMetricsMessage, ErrorMessage } from '../types.internal';
+import { Api, GetChannelPasscode, RetrieveData, QueryParamsError, emitWithTokenRefresh } from '../utils';
 
-import { Transcript } from "../components/";
-import { CheckAuthHeader, createConversationFromData } from "../utils/Helpers";
-import { useSessionJoin } from "../utils/useSessionJoin";
-import { AuthType } from "../types.internal";
-import { useAnalytics } from "../hooks/useAnalytics";
-import { useSetConversationType } from "../context/ConversationTypeContext";
-import {
-  trackConversationEvent,
-} from "../utils/analytics";
+import { Transcript } from '../components/';
+import { CheckAuthHeader, createConversationFromData } from '../utils/Helpers';
+import { useSessionJoin } from '../utils/useSessionJoin';
+import { AuthType } from '../types.internal';
+import { useAnalytics } from '../hooks/useAnalytics';
+import { useSetConversationType } from '../context/ConversationTypeContext';
+import { trackConversationEvent } from '../utils/analytics';
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -33,7 +20,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
   const router = useRouter();
 
   // Initialize page-level analytics
-  useAnalytics({ pageType: "moderator" });
+  useAnalytics({ pageType: 'moderator' });
 
   const setConversationType = useSetConversationType();
 
@@ -49,13 +36,13 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
 
   const [localError, setLocalError] = useState<string | null>(null);
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
-  const [conversationName, setConversationName] = useState<string>("");
+  const [conversationName, setConversationName] = useState<string>('');
 
   const [conversationActive, setConversationActive] = useState<boolean>(true);
   const [moderatorSupportEnabled, setModeratorSupportEnabled] = useState<boolean>(true);
 
-  const [transcriptPasscode, setTranscriptPasscode] = useState<string>("");
-  const [modPasscode, setModPasscode] = useState<string>("");
+  const [transcriptPasscode, setTranscriptPasscode] = useState<string>('');
+  const [modPasscode, setModPasscode] = useState<string>('');
   const [messageFocusTimeRange, setMessageFocusTimeRange] = useState<{
     start: Date;
     end: Date;
@@ -64,12 +51,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
   const scrollViewRef = useRef<HTMLDivElement>(null);
 
   // Use custom hook for session joining
-  const {
-    socket,
-    isConnected,
-    errorMessage: sessionError,
-    lastReconnectTime,
-  } = useSessionJoin();
+  const { socket, isConnected, errorMessage: sessionError, lastReconnectTime } = useSessionJoin();
 
   // Combine session and local errors
   const errorMessage = sessionError || localError;
@@ -78,41 +60,29 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
     if (!router.isReady || !socket || !Api.get().getAccessToken()) return;
 
     const messageHandler = (data: PseudonymousMessage) => {
-      console.log("New message:", data);
-      if (data.channels![0] === "moderator") {
+      console.log('New message:', data);
+      if (data.channels![0] === 'moderator') {
         setMessages((prevMessages) => [...prevMessages, data]);
         scrollViewRef.current?.scrollTo({
           top: scrollViewRef.current.scrollHeight,
-          behavior: "smooth",
+          behavior: 'smooth',
         });
       }
     };
 
     // Attach listener immediately, before async fetch
-    socket.on("message:new", messageHandler);
+    socket.on('message:new', messageHandler);
 
     async function fetchConversationData() {
       if (!router.isReady || !Api.get().getAccessToken()) return;
-      if (
-        !router.query.conversationId ||
-        !router.query.channel ||
-        router.query.channel.length === 0
-      ) {
+      if (!router.query.conversationId || !router.query.channel || router.query.channel.length === 0) {
         setLocalError(QueryParamsError(router));
         return;
       }
 
-      const transcriptPasscodeParam = GetChannelPasscode(
-        "transcript",
-        router.query,
-        setLocalError
-      );
+      const transcriptPasscodeParam = GetChannelPasscode('transcript', router.query, setLocalError);
 
-      const modPasscodeParam = GetChannelPasscode(
-        "moderator",
-        router.query,
-        setLocalError
-      );
+      const modPasscodeParam = GetChannelPasscode('moderator', router.query, setLocalError);
 
       // Store transcript passcode for Transcript component
       if (transcriptPasscodeParam) {
@@ -132,11 +102,11 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
         Api.get().getAccessToken(),
       );
 
-      if (conversationResponse && !("error" in conversationResponse)) {
-        setConversationName(conversationResponse.name || "");
+      if (conversationResponse && !('error' in conversationResponse)) {
+        setConversationName(conversationResponse.name || '');
         setConversationActive(conversationResponse.active ?? true);
         const hasModeratorSupport = (conversationResponse.features ?? []).some(
-          (f: { name: string; enabled: boolean }) => f.name === "moderatorSupport" && f.enabled === true
+          (f: { name: string; enabled: boolean }) => f.name === 'moderatorSupport' && f.enabled === true,
         );
         setModeratorSupportEnabled(hasModeratorSupport);
         // Needed so the Quick Guide can filter commands by type name —
@@ -146,28 +116,20 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
       }
 
       // Fetch messages
-      const conversationMessagesResponse: PseudonymousMessage[] | ErrorMessage =
-        await RetrieveData(
-          `messages/${router.query.conversationId}${moderatorChannelsQuery}`,
-          Api.get().getAccessToken(),
-        );
+      const conversationMessagesResponse: PseudonymousMessage[] | ErrorMessage = await RetrieveData(
+        `messages/${router.query.conversationId}${moderatorChannelsQuery}`,
+        Api.get().getAccessToken(),
+      );
 
-      if (
-        conversationMessagesResponse &&
-        "error" in conversationMessagesResponse
-      ) {
-        setLocalError(
-          conversationMessagesResponse.message?.message ||
-            "Failed to fetch conversation messages.",
-        );
+      if (conversationMessagesResponse && 'error' in conversationMessagesResponse) {
+        setLocalError(conversationMessagesResponse.message?.message || 'Failed to fetch conversation messages.');
         return;
       } else if (Array.isArray(conversationMessagesResponse)) {
         setMessages(
           (conversationMessagesResponse as PseudonymousMessage[]).filter(
             (message) =>
-              message.channels![0] === "moderator" &&
-              (message.body.hasOwnProperty("insights") ||
-                message.body.hasOwnProperty("metrics")),
+              message.channels![0] === 'moderator' &&
+              (message.body.hasOwnProperty('insights') || message.body.hasOwnProperty('metrics')),
           ),
         );
       }
@@ -180,36 +142,29 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
 
     // Cleanup
     return () => {
-      socket?.off("message:new", messageHandler);
+      socket?.off('message:new', messageHandler);
     };
   }, [router, socket]);
 
   // Re-fetch moderator message history when the socket reconnects after a
   // significant gap (user was on another tab/app for a while).
   useEffect(() => {
-    if (!lastReconnectTime || !router.query.conversationId || !modPasscode)
-      return;
+    if (!lastReconnectTime || !router.query.conversationId || !modPasscode) return;
 
-    console.log("Moderator re-fetching message history after gap-reconnect...");
-    RetrieveData(
-      `messages/${router.query.conversationId}?channel=moderator,${modPasscode}`,
-      Api.get().getAccessToken(),
-    )
+    console.log('Moderator re-fetching message history after gap-reconnect...');
+    RetrieveData(`messages/${router.query.conversationId}?channel=moderator,${modPasscode}`, Api.get().getAccessToken())
       .then((msgs) => {
         if (Array.isArray(msgs)) {
           setMessages(
             (msgs as PseudonymousMessage[]).filter(
               (message) =>
-                message.channels![0] === "moderator" &&
-                (message.body.hasOwnProperty("insights") ||
-                  message.body.hasOwnProperty("metrics")),
+                message.channels![0] === 'moderator' &&
+                (message.body.hasOwnProperty('insights') || message.body.hasOwnProperty('metrics')),
             ),
           );
         }
       })
-      .catch((err) =>
-        console.error("Error re-fetching moderator messages:", err),
-      );
+      .catch((err) => console.error('Error re-fetching moderator messages:', err));
   }, [lastReconnectTime]);
 
   // Join the moderator channel once the passcode is known, and re-join on
@@ -222,15 +177,14 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
       // new token rather than the one captured at socket-creation time.
       emitWithTokenRefresh(
         socket,
-        "conversation:join",
+        'conversation:join',
         {
           conversationId: router.query.conversationId,
           token: Api.get().getAccessToken(),
-          channel: { name: "moderator", passcode: modPasscode },
+          channel: { name: 'moderator', passcode: modPasscode },
         },
-        () => console.log("Successfully joined moderator conversation"),
-        (error) =>
-          console.error("Error sending conversation:join message:", error),
+        () => console.log('Successfully joined moderator conversation'),
+        (error) => console.error('Error sending conversation:join message:', error),
       );
     };
 
@@ -238,28 +192,26 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
     joinModerator();
 
     // Re-join on every subsequent reconnection (e.g. after token refresh)
-    socket.on("connect", joinModerator);
+    socket.on('connect', joinModerator);
 
     return () => {
-      socket.off("connect", joinModerator);
+      socket.off('connect', joinModerator);
     };
   }, [socket, router.query.conversationId, modPasscode]);
 
   const renderMessageBody = (message: PseudonymousMessage) => {
     // Check for insights array in body (handles multiple pseudonyms)
-    if (message.body.hasOwnProperty("insights") && Array.isArray(message.body.insights)) {
+    if (message.body.hasOwnProperty('insights') && Array.isArray(message.body.insights)) {
       return (
         <div>
-          {(message as ModeratorInsightsMessage).body.insights.map(
-            (insight: any, index: number) => (
-              <div key={index} className="mt-2">
-                {insight.value}
-              </div>
-            ),
-          )}
+          {(message as ModeratorInsightsMessage).body.insights.map((insight: any, index: number) => (
+            <div key={index} className="mt-2">
+              {insight.value}
+            </div>
+          ))}
         </div>
       );
-    } else if (message.body.hasOwnProperty("metrics") && Array.isArray(message.body.metrics)) {
+    } else if (message.body.hasOwnProperty('metrics') && Array.isArray(message.body.metrics)) {
       const metrics = message.body.metrics;
       const messages = metrics.map((m: any, i: number) => {
         const lastInList = i === metrics.length - 1;
@@ -267,7 +219,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
         return (
           <span key={`metric-${i}`}>
             &ldquo;{m.name.toWellFormed()}&rdquo;
-            {!lastInList ? ", " : ""}
+            {!lastInList ? ', ' : ''}
           </span>
         );
       });
@@ -278,18 +230,11 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
           {messages}.
         </div>
       );
-    } else if (
-      message.body.hasOwnProperty("preset") &&
-      message.body.hasOwnProperty("text")
-    ) {
-      return (
-        <div>
-          {(message.body as { text: string; preset: boolean }).text}
-        </div>
-      );
+    } else if (message.body.hasOwnProperty('preset') && message.body.hasOwnProperty('text')) {
+      return <div>{(message.body as { text: string; preset: boolean }).text}</div>;
     } else {
       // Log unknown message formats to console instead of displaying
-      console.log("Unknown message format:", message);
+      console.log('Unknown message format:', message);
       return null;
     }
   };
@@ -300,9 +245,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-96px)] overflow-hidden">
       {errorMessage ? (
-        <div className="text-medium-slate-blue text-lg font-bold mx-9">
-          {errorMessage}
-        </div>
+        <div className="text-medium-slate-blue text-lg font-bold mx-9">{errorMessage}</div>
       ) : (
         <>
           {/* Transcript view on top for mobile, right side for desktop - only render if enabled */}
@@ -327,63 +270,48 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
               <div ref={scrollViewRef} className="mt-2 max-w-full">
                 <h2 className="text-2xl font-bold mb-4">
                   Hi Mod! Welcome to your&nbsp;
-                  <span className="text-medium-slate-blue">
-                    {conversationName}
-                  </span>
+                  <span className="text-medium-slate-blue">{conversationName}</span>
                   &nbsp; event.
                 </h2>
                 {conversationActive && !moderatorSupportEnabled && (
                   <p className="font-medium mb-4">
-                    Moderator question submission is not enabled for this conversation. No audience questions will be received here.
+                    Moderator question submission is not enabled for this conversation. No audience questions will be
+                    received here.
                   </p>
                 )}
                 <div aria-live="polite">
-                  {messages.length > 0 ? (
-                    messages.map((message: ModeratorMetricsMessage, index) => (
-                      <div
-                        className={`flex flex-col lg:flex-row justify-start mb-4 p-3 ${
-                          transcriptEnabled &&
-                          "cursor-pointer hover:bg-yellow-50"
-                        }`}
-                        key={index}
-                        onClick={() => {
-                          // Track metrics click-through
-                          const conversationId = router.query
-                            .conversationId as string;
-                          trackConversationEvent(
-                            conversationId,
-                            "moderator",
-                            "metrics_clicked",
-                            "jump_to_transcript",
-                          );
+                  {messages.length > 0
+                    ? messages.map((message: ModeratorMetricsMessage, index) => (
+                        <div
+                          className={`flex flex-col lg:flex-row justify-start mb-4 p-3 ${
+                            transcriptEnabled && 'cursor-pointer hover:bg-yellow-50'
+                          }`}
+                          key={index}
+                          onClick={() => {
+                            // Track metrics click-through
+                            const conversationId = router.query.conversationId as string;
+                            trackConversationEvent(conversationId, 'moderator', 'metrics_clicked', 'jump_to_transcript');
 
-                          // Set the time range for the transcript to focus on
-                          setMessageFocusTimeRange({
-                            start: new Date(message.body.timestamp.start),
-                            end: new Date(message.body.timestamp.end),
-                          });
-                        }}
-                      >
-                        <span className="text-neutral-900 text-xs font-normal min-w-40">
-                          {typeof message.body === "object" &&
-                            "timestamp" in message.body && (
+                            // Set the time range for the transcript to focus on
+                            setMessageFocusTimeRange({
+                              start: new Date(message.body.timestamp.start),
+                              end: new Date(message.body.timestamp.end),
+                            });
+                          }}
+                        >
+                          <span className="text-neutral-900 text-xs font-normal min-w-40">
+                            {typeof message.body === 'object' && 'timestamp' in message.body && (
                               <>
-                                {`${new Date(
-                                  message.body.timestamp.start,
-                                ).toLocaleTimeString()} -`}
+                                {`${new Date(message.body.timestamp.start).toLocaleTimeString()} -`}
                                 <br />
-                                {`${new Date(
-                                  message.body.timestamp.end,
-                                ).toLocaleTimeString()}`}
+                                {`${new Date(message.body.timestamp.end).toLocaleTimeString()}`}
                               </>
                             )}
-                        </span>
-                        <div>{renderMessageBody(message)}</div>
-                      </div>
-                    ))
-                  ) : (
-                    moderatorSupportEnabled && <p>No messages yet.</p>
-                  )}
+                          </span>
+                          <div>{renderMessageBody(message)}</div>
+                        </div>
+                      ))
+                    : moderatorSupportEnabled && <p>No messages yet.</p>}
                 </div>
               </div>
             </div>

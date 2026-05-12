@@ -1,8 +1,8 @@
-"use client";
-import React from "react";
-import { Button, IconButton } from "@mui/material";
-import TipsAndUpdatesOutlinedIcon from "@mui/icons-material/TipsAndUpdatesOutlined";
-import { useRouter } from "next/router";
+'use client';
+import React from 'react';
+import { Button, IconButton } from '@mui/material';
+import TipsAndUpdatesOutlinedIcon from '@mui/icons-material/TipsAndUpdatesOutlined';
+import { useRouter } from 'next/router';
 
 interface QuickGuideIconButtonProps {
   /**
@@ -30,12 +30,12 @@ export const QuickGuideIconButton = ({ showLabel = false }: QuickGuideIconButton
         rel="noopener noreferrer"
         startIcon={<TipsAndUpdatesOutlinedIcon />}
         sx={{
-          textTransform: "capitalize",
-          justifyContent: "flex-start",
-          "&:hover": { color: "#4845d2" },
-          fontSize: "1rem",
-          color: "grey",
-          backgroundColor: "transparent",
+          textTransform: 'capitalize',
+          justifyContent: 'flex-start',
+          '&:hover': { color: '#4845d2' },
+          fontSize: '1rem',
+          color: 'grey',
+          backgroundColor: 'transparent',
         }}
       >
         Quick Guide
@@ -50,7 +50,7 @@ export const QuickGuideIconButton = ({ showLabel = false }: QuickGuideIconButton
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Open quick guide"
-      sx={{ "&:hover": { color: "#4845d2" } }}
+      sx={{ '&:hover': { color: '#4845d2' } }}
     >
       <TipsAndUpdatesOutlinedIcon />
     </IconButton>

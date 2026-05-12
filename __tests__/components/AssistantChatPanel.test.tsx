@@ -1,43 +1,27 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { AssistantChatPanel } from "../../components/AssistantChatPanel";
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { AssistantChatPanel } from '../../components/AssistantChatPanel';
 
 // Mock message components
-jest.mock("../../components/messages", () => ({
+jest.mock('../../components/messages', () => ({
   AssistantMessage: ({ message }: any) => {
-    const messageText =
-      typeof message.body === "string"
-        ? message.body
-        : message.body?.text || "";
-    return (
-      <div data-testid="assistant-message">
-        {messageText}
-      </div>
-    );
+    const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
+    return <div data-testid="assistant-message">{messageText}</div>;
   },
   SubmittedMessage: ({ message }: any) => {
-    const messageText =
-      typeof message.body === "string"
-        ? message.body
-        : message.body?.text || "";
+    const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
     return <div data-testid="submitted-message">{messageText}</div>;
   },
   ModeratorSubmittedMessage: ({ message }: any) => {
-    const messageText =
-      typeof message.body === "string"
-        ? message.body
-        : message.body?.text || "";
+    const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
     return <div data-testid="moderator-submitted-message">{messageText}</div>;
   },
   UserMessage: ({ message }: any) => {
-    const messageText =
-      typeof message.body === "string"
-        ? message.body
-        : message.body?.text || "";
+    const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
     return <div data-testid="user-message">{messageText}</div>;
   },
   JargonClarificationMessage: ({ message }: any) => {
-    const body = typeof message.body === "object" ? message.body : {};
+    const body = typeof message.body === 'object' ? message.body : {};
     return (
       <div data-testid="jargon-clarification-message">
         {body.sourceText && <div>{body.sourceText}</div>}
@@ -48,22 +32,10 @@ jest.mock("../../components/messages", () => ({
 }));
 
 // Mock MessageFeedback component
-jest.mock("../../components/MessageFeedback", () => ({
-  MessageFeedback: ({
-    messageId,
-    initialRating,
-    onPopulateFeedbackText,
-    onSendFeedbackRating,
-  }: any) => (
-    <div
-      data-testid="message-feedback"
-      data-message-id={messageId}
-      data-initial-rating={initialRating}
-    >
-      <button
-        data-testid="rating-button-3"
-        onClick={() => onSendFeedbackRating?.(messageId, 3)}
-      >
+jest.mock('../../components/MessageFeedback', () => ({
+  MessageFeedback: ({ messageId, initialRating, onPopulateFeedbackText, onSendFeedbackRating }: any) => (
+    <div data-testid="message-feedback" data-message-id={messageId} data-initial-rating={initialRating}>
+      <button data-testid="rating-button-3" onClick={() => onSendFeedbackRating?.(messageId, 3)}>
         3
       </button>
       <button
@@ -72,7 +44,7 @@ jest.mock("../../components/MessageFeedback", () => ({
           onPopulateFeedbackText?.({
             prefix: `/feedback|Text|${messageId}|`,
             icon: null,
-            label: "Feedback Mode",
+            label: 'Feedback Mode',
           })
         }
       >
@@ -83,16 +55,16 @@ jest.mock("../../components/MessageFeedback", () => ({
 }));
 
 // Mock MessageInput component
-jest.mock("../../components/MessageInput", () => ({
+jest.mock('../../components/MessageInput', () => ({
   MessageInput: ({ onSendMessage, waitingForResponse }: any) => (
     <div data-testid="message-input">
       <input
         data-testid="message-input-field"
         placeholder="Write a Comment"
         onKeyDown={(e) => {
-          if (e.key === "Enter" && e.currentTarget.value) {
+          if (e.key === 'Enter' && e.currentTarget.value) {
             onSendMessage(e.currentTarget.value);
-            e.currentTarget.value = "";
+            e.currentTarget.value = '';
           }
         }}
         disabled={waitingForResponse}
@@ -101,7 +73,7 @@ jest.mock("../../components/MessageInput", () => ({
   ),
 }));
 
-describe("AssistantChatPanel", () => {
+describe('AssistantChatPanel', () => {
   const mockOnSendMessage = jest.fn();
   const mockOnExitControlledMode = jest.fn();
   const mockOnPromptSelect = jest.fn();
@@ -110,41 +82,41 @@ describe("AssistantChatPanel", () => {
 
   const baseProps = {
     messages: [],
-    pseudonym: "test-user",
+    pseudonym: 'test-user',
     waitingForResponse: false,
     controlledMode: null,
     slashCommands: [],
-    eventName: "Tech Summit",
-    botName: "Berkie",
+    eventName: 'Tech Summit',
+    botName: 'Berkie',
     onSendMessage: mockOnSendMessage,
     onExitControlledMode: mockOnExitControlledMode,
     onPromptSelect: mockOnPromptSelect,
     enterControlledMode: mockEnterControlledMode,
     sendFeedbackRating: mockSendFeedbackRating,
-    userId: "test-user-id",
+    userId: 'test-user-id',
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it("renders without messages", () => {
+  it('renders without messages', () => {
     render(<AssistantChatPanel {...baseProps} />);
 
-    expect(screen.getByTestId("message-input")).toBeInTheDocument();
-    expect(screen.queryByTestId("assistant-message")).not.toBeInTheDocument();
+    expect(screen.getByTestId('message-input')).toBeInTheDocument();
+    expect(screen.queryByTestId('assistant-message')).not.toBeInTheDocument();
   });
 
-  it("renders assistant messages", () => {
+  it('renders assistant messages', () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: "Hello, how can I help?",
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: '1',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: 'Hello, how can I help?',
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -155,20 +127,20 @@ describe("AssistantChatPanel", () => {
 
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("Hello, how can I help?")).toBeInTheDocument();
-    expect(screen.getByTestId("assistant-message")).toBeInTheDocument();
+    expect(screen.getByText('Hello, how can I help?')).toBeInTheDocument();
+    expect(screen.getByTestId('assistant-message')).toBeInTheDocument();
   });
 
-  it("renders user messages", () => {
+  it('renders user messages', () => {
     const messages = [
       {
-        id: "2",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:01:00Z",
-        body: { text: "I need help" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: '2',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:01:00Z',
+        body: { text: 'I need help' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -179,23 +151,23 @@ describe("AssistantChatPanel", () => {
 
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("I need help")).toBeInTheDocument();
+    expect(screen.getByText('I need help')).toBeInTheDocument();
   });
 
-  it("renders moderator_submitted messages", () => {
+  it('renders moderator_submitted messages', () => {
     const messages = [
       {
-        id: "3",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:02:00Z",
+        id: '3',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:02:00Z',
         body: {
-          text: "This was submitted",
-          type: "moderator_submitted",
-          message: "1",
+          text: 'This was submitted',
+          type: 'moderator_submitted',
+          message: '1',
         },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -206,22 +178,20 @@ describe("AssistantChatPanel", () => {
 
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("This was submitted")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("moderator-submitted-message"),
-    ).toBeInTheDocument();
+    expect(screen.getByText('This was submitted')).toBeInTheDocument();
+    expect(screen.getByTestId('moderator-submitted-message')).toBeInTheDocument();
   });
 
-  it("renders submitted messages (referenced by moderator)", () => {
+  it('renders submitted messages (referenced by moderator)', () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Original message" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: '1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Original message' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -229,13 +199,13 @@ describe("AssistantChatPanel", () => {
         downVotes: [],
       },
       {
-        id: "2",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:01:00Z",
-        body: { text: "Response", type: "moderator_submitted", message: "1" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: '2',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:01:00Z',
+        body: { text: 'Response', type: 'moderator_submitted', message: '1' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -246,20 +216,20 @@ describe("AssistantChatPanel", () => {
 
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("Original message")).toBeInTheDocument();
-    expect(screen.getByTestId("submitted-message")).toBeInTheDocument();
+    expect(screen.getByText('Original message')).toBeInTheDocument();
+    expect(screen.getByTestId('submitted-message')).toBeInTheDocument();
   });
 
-  it("shows source context for multimodal messages with sourceMessage", () => {
+  it('shows source context for multimodal messages with sourceMessage', () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "What is the schedule?" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "tu-1",
+        id: '1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'What is the schedule?' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'tu-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -267,23 +237,23 @@ describe("AssistantChatPanel", () => {
         downVotes: [],
       },
       {
-        id: "2",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:01:00Z",
+        id: '2',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:01:00Z',
         body: {
-          text: "",
-          sourceMessage: "1",
+          text: '',
+          sourceMessage: '1',
           media: [
             {
-              type: "image",
-              data: "base64imagedata",
-              mimeType: "image/png",
+              type: 'image',
+              data: 'base64imagedata',
+              mimeType: 'image/png',
             },
           ],
         },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -295,25 +265,24 @@ describe("AssistantChatPanel", () => {
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
     // Original question appears twice: once in the message list, once in source context
-    const questionTexts = screen.getAllByText("What is the schedule?");
+    const questionTexts = screen.getAllByText('What is the schedule?');
     expect(questionTexts.length).toBeGreaterThanOrEqual(1);
 
     // Source context should show "In reply to:"
     expect(screen.getByText(/In reply to:/)).toBeInTheDocument();
   });
 
-  it("truncates long source messages in context display", () => {
-    const longMessage =
-      "This is a very long message that exceeds sixty characters and should be truncated";
+  it('truncates long source messages in context display', () => {
+    const longMessage = 'This is a very long message that exceeds sixty characters and should be truncated';
     const messages = [
       {
-        id: "1",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:00:00Z",
+        id: '1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:00:00Z',
         body: { text: longMessage },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "tu-1",
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'tu-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -321,23 +290,23 @@ describe("AssistantChatPanel", () => {
         downVotes: [],
       },
       {
-        id: "2",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:01:00Z",
+        id: '2',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:01:00Z',
         body: {
-          text: "",
-          sourceMessage: "1",
+          text: '',
+          sourceMessage: '1',
           media: [
             {
-              type: "image",
-              data: "base64imagedata",
-              mimeType: "image/png",
+              type: 'image',
+              data: 'base64imagedata',
+              mimeType: 'image/png',
             },
           ],
         },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -353,45 +322,41 @@ describe("AssistantChatPanel", () => {
 
     // Context should show truncated version with ellipsis (60 chars + "...")
     expect(screen.getByText(/In reply to:/)).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "This is a very long message that exceeds sixty characters an...",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText('This is a very long message that exceeds sixty characters an...')).toBeInTheDocument();
   });
 
-  it("filters out replies to singleChoice prompts", () => {
+  it('filters out replies to singleChoice prompts', () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Choose an option:" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: '1',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Choose an option:' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
         upVotes: [],
         downVotes: [],
         prompt: {
-          type: "singleChoice" as const,
+          type: 'singleChoice' as const,
           options: [
-            { label: "Option A", value: "a" },
-            { label: "Option B", value: "b" },
+            { label: 'Option A', value: 'a' },
+            { label: 'Option B', value: 'b' },
           ],
         },
       },
       {
-        id: "2",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:01:00Z",
-        body: { text: "Option A" },
-        channels: ["user"],
-        answersPrompt: "1",
-        conversation: "conv-1",
-        pseudonymId: "tu-1",
+        id: '2',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:01:00Z',
+        body: { text: 'Option A' },
+        channels: ['user'],
+        answersPrompt: '1',
+        conversation: 'conv-1',
+        pseudonymId: 'tu-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -403,59 +368,59 @@ describe("AssistantChatPanel", () => {
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
     // There should be only one instance of "Choose an option:" - the prompt message
-    const promptMessages = screen.getAllByText("Choose an option:");
+    const promptMessages = screen.getAllByText('Choose an option:');
     expect(promptMessages).toHaveLength(1);
 
     // The response "Option A" should not be visible
-    expect(screen.queryByText("Option A")).not.toBeInTheDocument();
+    expect(screen.queryByText('Option A')).not.toBeInTheDocument();
   });
 
-  it("filters out messages that have answersPrompt property", () => {
+  it('filters out messages that have answersPrompt property', () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: "Would you like more information?",
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: '1',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: 'Would you like more information?',
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
         upVotes: [],
         downVotes: [],
         prompt: {
-          type: "singleChoice" as const,
+          type: 'singleChoice' as const,
           options: [
-            { label: "Yes", value: "yes" },
-            { label: "No", value: "no" },
+            { label: 'Yes', value: 'yes' },
+            { label: 'No', value: 'no' },
           ],
         },
       },
       {
-        id: "2",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:01:00Z",
-        body: "Yes",
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "tu-1",
+        id: '2',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:01:00Z',
+        body: 'Yes',
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'tu-1',
         fromAgent: false,
         pause: false,
         visible: true,
         upVotes: [],
         downVotes: [],
-        answersPrompt: "1",
+        answersPrompt: '1',
       },
       {
-        id: "3",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:02:00Z",
-        body: "Here is more information...",
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: '3',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:02:00Z',
+        body: 'Here is more information...',
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -467,114 +432,96 @@ describe("AssistantChatPanel", () => {
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
     // Prompt question should be visible
-    expect(
-      screen.getByText("Would you like more information?"),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Would you like more information?')).toBeInTheDocument();
 
     // Response with answersPrompt should be filtered out
-    expect(screen.queryByText("Yes")).not.toBeInTheDocument();
+    expect(screen.queryByText('Yes')).not.toBeInTheDocument();
 
     // Follow-up message should be visible
-    expect(screen.getByText("Here is more information...")).toBeInTheDocument();
+    expect(screen.getByText('Here is more information...')).toBeInTheDocument();
   });
 
-  it("passes initialSelectedPrompt to AssistantMessage when a response exists", () => {
+  it('passes initialSelectedPrompt to AssistantMessage when a response exists', () => {
     // Mock AssistantMessage to capture props
-    const mockAssistantMessage = jest.fn(
-      ({ message, initialSelectedPrompt }: any) => {
-        const messageText =
-          typeof message.body === "string"
-            ? message.body
-            : message.body?.text || "";
-        return (
-          <div
-            data-testid="assistant-message"
-            data-initial-prompt={initialSelectedPrompt}
-          >
-            {messageText}
-          </div>
-        );
-      },
-    );
+    const mockAssistantMessage = jest.fn(({ message, initialSelectedPrompt }: any) => {
+      const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
+      return (
+        <div data-testid="assistant-message" data-initial-prompt={initialSelectedPrompt}>
+          {messageText}
+        </div>
+      );
+    });
 
-    jest.mock("../../components/messages", () => ({
+    jest.mock('../../components/messages', () => ({
       AssistantMessage: mockAssistantMessage,
       SubmittedMessage: ({ message }: any) => {
-        const messageText =
-          typeof message.body === "string"
-            ? message.body
-            : message.body?.text || "";
+        const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
         return <div data-testid="submitted-message">{messageText}</div>;
       },
       ModeratorSubmittedMessage: ({ message }: any) => {
-        const messageText =
-          typeof message.body === "string"
-            ? message.body
-            : message.body?.text || "";
-        return (
-          <div data-testid="moderator-submitted-message">{messageText}</div>
-        );
+        const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
+        return <div data-testid="moderator-submitted-message">{messageText}</div>;
       },
     }));
 
     const messages = [
       {
-        id: "prompt-1",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: "Do you need help?",
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: 'prompt-1',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: 'Do you need help?',
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
         upVotes: [],
         downVotes: [],
         prompt: {
-          type: "singleChoice" as const,
+          type: 'singleChoice' as const,
           options: [
-            { label: "Yes", value: "yes" },
-            { label: "No", value: "no" },
+            { label: 'Yes', value: 'yes' },
+            { label: 'No', value: 'no' },
           ],
         },
       },
       {
-        id: "response-1",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:01:00Z",
-        body: "Yes",
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "tu-1",
+        id: 'response-1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:01:00Z',
+        body: 'Yes',
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'tu-1',
         fromAgent: false,
         pause: false,
         visible: true,
         upVotes: [],
         downVotes: [],
-        answersPrompt: "prompt-1",
+        answersPrompt: 'prompt-1',
       },
     ];
 
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
     // The prompt message should be visible
-    expect(screen.getByText("Do you need help?")).toBeInTheDocument();
+    expect(screen.getByText('Do you need help?')).toBeInTheDocument();
 
     // The response message should be filtered out
-    expect(screen.queryByText("Yes")).not.toBeInTheDocument();
+    expect(screen.queryByText('Yes')).not.toBeInTheDocument();
   });
 
-  it("shows loading indicator when waiting for response", () => {
+  it('shows loading indicator when waiting for response', () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hello" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: '1',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Hello' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -582,13 +529,13 @@ describe("AssistantChatPanel", () => {
         downVotes: [],
       },
       {
-        id: "2",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:01:00Z",
-        body: { text: "Tell me more" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "tu-1",
+        id: '2',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:01:00Z',
+        body: { text: 'Tell me more' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'tu-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -597,44 +544,38 @@ describe("AssistantChatPanel", () => {
       },
     ];
 
-    const { container } = render(
-      <AssistantChatPanel
-        {...baseProps}
-        messages={messages}
-        waitingForResponse={true}
-      />,
-    );
+    const { container } = render(<AssistantChatPanel {...baseProps} messages={messages} waitingForResponse={true} />);
 
     // Should show animated SVG bot loading indicator below the user's message
-    const loadingIndicator = container.querySelector(".animate-bounce");
+    const loadingIndicator = container.querySelector('.animate-bounce');
     expect(loadingIndicator).toBeInTheDocument();
   });
 
-  it("calls onSendMessage when user sends a message", async () => {
+  it('calls onSendMessage when user sends a message', async () => {
     const user = userEvent.setup();
 
     render(<AssistantChatPanel {...baseProps} />);
 
-    const input = screen.getByTestId("message-input-field");
+    const input = screen.getByTestId('message-input-field');
 
-    await user.type(input, "Test message");
-    await user.keyboard("{Enter}");
+    await user.type(input, 'Test message');
+    await user.keyboard('{Enter}');
 
-    expect(mockOnSendMessage).toHaveBeenCalledWith("Test message");
+    expect(mockOnSendMessage).toHaveBeenCalledWith('Test message');
   });
 
-  it("calls sendFeedbackRating when rating button is clicked", async () => {
+  it('calls sendFeedbackRating when rating button is clicked', async () => {
     const user = userEvent.setup();
 
     const messages = [
       {
-        id: "1",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hello" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: '1',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Hello' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -644,24 +585,18 @@ describe("AssistantChatPanel", () => {
     ];
 
     const feedbackConfig = {
-      eligibleMessageIds: new Set(["1"]),
+      eligibleMessageIds: new Set(['1']),
       messageRatings: new Map(),
       onPopulateFeedbackText: mockEnterControlledMode,
       onSendRating: mockSendFeedbackRating,
     };
 
-    render(
-      <AssistantChatPanel
-        {...baseProps}
-        messages={messages}
-        feedbackConfig={feedbackConfig}
-      />,
-    );
+    render(<AssistantChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
-    const ratingButton = screen.getByTestId("rating-button-3");
+    const ratingButton = screen.getByTestId('rating-button-3');
     await user.click(ratingButton);
 
-    expect(mockSendFeedbackRating).toHaveBeenCalledWith("1", 3);
+    expect(mockSendFeedbackRating).toHaveBeenCalledWith('1', 3);
   });
 
   it("calls enterControlledMode when 'Say more' is clicked", async () => {
@@ -669,13 +604,13 @@ describe("AssistantChatPanel", () => {
 
     const messages = [
       {
-        id: "1",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Hello" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: '1',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Hello' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -685,47 +620,39 @@ describe("AssistantChatPanel", () => {
     ];
 
     const feedbackConfig = {
-      eligibleMessageIds: new Set(["1"]),
+      eligibleMessageIds: new Set(['1']),
       messageRatings: new Map(),
       onPopulateFeedbackText: mockEnterControlledMode,
       onSendRating: mockSendFeedbackRating,
     };
 
-    render(
-      <AssistantChatPanel
-        {...baseProps}
-        messages={messages}
-        feedbackConfig={feedbackConfig}
-      />,
-    );
+    render(<AssistantChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
-    const sayMoreButton = screen.getByTestId("say-more-button");
+    const sayMoreButton = screen.getByTestId('say-more-button');
     await user.click(sayMoreButton);
 
     expect(mockEnterControlledMode).toHaveBeenCalledWith(
       expect.objectContaining({
-        prefix: "/feedback|Text|1|",
-        label: "Feedback Mode",
+        prefix: '/feedback|Text|1|',
+        label: 'Feedback Mode',
       }),
     );
   });
 
-  it("scrolls to bottom when new messages arrive", async () => {
-    const { rerender, container } = render(
-      <AssistantChatPanel {...baseProps} messages={[]} />,
-    );
+  it('scrolls to bottom when new messages arrive', async () => {
+    const { rerender, container } = render(<AssistantChatPanel {...baseProps} messages={[]} />);
 
     // Get the scrollable messages container
-    const messagesContainer = container.querySelector(".overflow-y-auto");
+    const messagesContainer = container.querySelector('.overflow-y-auto');
 
     // Mock scrollTop and scrollHeight
-    Object.defineProperty(messagesContainer, "scrollHeight", {
+    Object.defineProperty(messagesContainer, 'scrollHeight', {
       configurable: true,
       value: 1000,
     });
 
     const scrollTopSpy = jest.fn();
-    Object.defineProperty(messagesContainer, "scrollTop", {
+    Object.defineProperty(messagesContainer, 'scrollTop', {
       configurable: true,
       set: scrollTopSpy,
       get: () => 0,
@@ -733,13 +660,13 @@ describe("AssistantChatPanel", () => {
 
     const newMessages = [
       {
-        id: "1",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "New message" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: '1',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'New message' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -755,16 +682,16 @@ describe("AssistantChatPanel", () => {
     });
   });
 
-  it("parses message body correctly for string input", () => {
+  it('parses message body correctly for string input', () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: "Simple string message",
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: '1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: 'Simple string message',
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -775,19 +702,19 @@ describe("AssistantChatPanel", () => {
 
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("Simple string message")).toBeInTheDocument();
+    expect(screen.getByText('Simple string message')).toBeInTheDocument();
   });
 
-  it("parses message body correctly for object input", () => {
+  it('parses message body correctly for object input', () => {
     const messages = [
       {
-        id: "1",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Object message", someField: "value" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: '1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Object message', someField: 'value' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
@@ -798,17 +725,14 @@ describe("AssistantChatPanel", () => {
 
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText("Object message")).toBeInTheDocument();
+    expect(screen.getByText('Object message')).toBeInTheDocument();
   });
 
-  describe("Visual message handling (media)", () => {
-    it("passes media prop to AssistantMessage component", () => {
+  describe('Visual message handling (media)', () => {
+    it('passes media prop to AssistantMessage component', () => {
       // Need to update the mock to capture the media prop
       const mockAssistantMessage = jest.fn(({ message, media }: any) => {
-        const messageText =
-          typeof message.body === "string"
-            ? message.body
-            : message.body?.text || "";
+        const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
         return (
           <div data-testid="assistant-message" data-has-media={!!media}>
             {messageText}
@@ -816,44 +740,36 @@ describe("AssistantChatPanel", () => {
         );
       });
 
-      jest.mock("../../components/messages", () => ({
+      jest.mock('../../components/messages', () => ({
         AssistantMessage: mockAssistantMessage,
         SubmittedMessage: ({ message }: any) => {
-          const messageText =
-            typeof message.body === "string"
-              ? message.body
-              : message.body?.text || "";
+          const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
           return <div data-testid="submitted-message">{messageText}</div>;
         },
         ModeratorSubmittedMessage: ({ message }: any) => {
-          const messageText =
-            typeof message.body === "string"
-              ? message.body
-              : message.body?.text || "";
-          return (
-            <div data-testid="moderator-submitted-message">{messageText}</div>
-          );
+          const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
+          return <div data-testid="moderator-submitted-message">{messageText}</div>;
         },
       }));
 
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
             text: "Here's an image",
             media: [
               {
-                type: "image",
-                data: "base64data",
-                mimeType: "image/png",
+                type: 'image',
+                data: 'base64data',
+                mimeType: 'image/png',
               },
             ],
           },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -867,25 +783,25 @@ describe("AssistantChatPanel", () => {
       expect(screen.getByText("Here's an image")).toBeInTheDocument();
     });
 
-    it("parses media from message body object", () => {
+    it('parses media from message body object', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "Check this out",
+            text: 'Check this out',
             media: [
               {
-                type: "image",
-                data: "imagedata",
-                mimeType: "image/png",
+                type: 'image',
+                data: 'imagedata',
+                mimeType: 'image/png',
               },
             ],
           },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -896,34 +812,34 @@ describe("AssistantChatPanel", () => {
 
       render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-      expect(screen.getByText("Check this out")).toBeInTheDocument();
-      expect(screen.getByTestId("assistant-message")).toBeInTheDocument();
+      expect(screen.getByText('Check this out')).toBeInTheDocument();
+      expect(screen.getByTestId('assistant-message')).toBeInTheDocument();
     });
 
-    it("handles messages with multiple media items", () => {
+    it('handles messages with multiple media items', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "Multiple images",
+            text: 'Multiple images',
             media: [
               {
-                type: "image",
-                data: "image1",
-                mimeType: "image/png",
+                type: 'image',
+                data: 'image1',
+                mimeType: 'image/png',
               },
               {
-                type: "image",
-                data: "image2",
-                mimeType: "image/jpeg",
+                type: 'image',
+                data: 'image2',
+                mimeType: 'image/jpeg',
               },
             ],
           },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -934,21 +850,21 @@ describe("AssistantChatPanel", () => {
 
       render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-      expect(screen.getByText("Multiple images")).toBeInTheDocument();
+      expect(screen.getByText('Multiple images')).toBeInTheDocument();
     });
 
-    it("handles messages without media", () => {
+    it('handles messages without media', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "Just text",
+            text: 'Just text',
           },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -959,19 +875,19 @@ describe("AssistantChatPanel", () => {
 
       render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-      expect(screen.getByText("Just text")).toBeInTheDocument();
+      expect(screen.getByText('Just text')).toBeInTheDocument();
     });
 
-    it("handles string body messages (no media)", () => {
+    it('handles string body messages (no media)', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: "Simple string message",
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: 'Simple string message',
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -982,22 +898,22 @@ describe("AssistantChatPanel", () => {
 
       render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-      expect(screen.getByText("Simple string message")).toBeInTheDocument();
+      expect(screen.getByText('Simple string message')).toBeInTheDocument();
     });
 
-    it("parses empty media array correctly", () => {
+    it('parses empty media array correctly', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "No media",
+            text: 'No media',
             media: [],
           },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1008,22 +924,22 @@ describe("AssistantChatPanel", () => {
 
       render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-      expect(screen.getByText("No media")).toBeInTheDocument();
+      expect(screen.getByText('No media')).toBeInTheDocument();
     });
 
-    it("parses non-array media value gracefully", () => {
+    it('parses non-array media value gracefully', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "Invalid media",
-            media: "not-an-array",
+            text: 'Invalid media',
+            media: 'not-an-array',
           },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1034,28 +950,28 @@ describe("AssistantChatPanel", () => {
 
       render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-      expect(screen.getByText("Invalid media")).toBeInTheDocument();
+      expect(screen.getByText('Invalid media')).toBeInTheDocument();
     });
 
-    it("extracts text from object body with media", () => {
+    it('extracts text from object body with media', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "Text with media",
+            text: 'Text with media',
             media: [
               {
-                type: "image",
-                data: "data",
-                mimeType: "image/png",
+                type: 'image',
+                data: 'data',
+                mimeType: 'image/png',
               },
             ],
           },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1066,28 +982,28 @@ describe("AssistantChatPanel", () => {
 
       render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-      expect(screen.getByText("Text with media")).toBeInTheDocument();
+      expect(screen.getByText('Text with media')).toBeInTheDocument();
     });
 
-    it("handles user messages with media in object body", () => {
+    it('handles user messages with media in object body', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "test-user",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "User uploaded image",
+            text: 'User uploaded image',
             media: [
               {
-                type: "image",
-                data: "userimage",
-                mimeType: "image/png",
+                type: 'image',
+                data: 'userimage',
+                mimeType: 'image/png',
               },
             ],
           },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "tu-1",
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'tu-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1098,28 +1014,28 @@ describe("AssistantChatPanel", () => {
 
       render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-      expect(screen.getByText("User uploaded image")).toBeInTheDocument();
+      expect(screen.getByText('User uploaded image')).toBeInTheDocument();
     });
 
-    it("does not pass media to non-assistant messages", () => {
+    it('does not pass media to non-assistant messages', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "test-user",
-          createdAt: "2025-10-17T12:00:00Z",
+          id: '1',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T12:00:00Z',
           body: {
-            text: "User message",
+            text: 'User message',
             media: [
               {
-                type: "image",
-                data: "data",
-                mimeType: "image/png",
+                type: 'image',
+                data: 'data',
+                mimeType: 'image/png',
               },
             ],
           },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "tu-1",
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'tu-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1128,27 +1044,25 @@ describe("AssistantChatPanel", () => {
         },
       ];
 
-      render(
-        <AssistantChatPanel {...baseProps} messages={messages} />,
-      );
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
       // User messages are rendered in a plain div without AssistantMessage component
-      expect(screen.getByText("User message")).toBeInTheDocument();
-      expect(screen.queryByTestId("assistant-message")).not.toBeInTheDocument();
+      expect(screen.getByText('User message')).toBeInTheDocument();
+      expect(screen.queryByTestId('assistant-message')).not.toBeInTheDocument();
     });
   });
 
-  describe("Timestamp display", () => {
-    it("shows timestamp for the first message", () => {
+  describe('Timestamp display', () => {
+    it('shows timestamp for the first message', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: "First message",
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: 'First message',
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1157,25 +1071,23 @@ describe("AssistantChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <AssistantChatPanel {...baseProps} messages={messages} />,
-      );
+      const { container } = render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
       // Check timestamp is displayed
-      const timestamps = container.querySelectorAll(".text-gray-400");
+      const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(1);
     });
 
-    it("shows timestamp when minute changes", () => {
+    it('shows timestamp when minute changes', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: "First message",
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: 'First message',
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1183,13 +1095,13 @@ describe("AssistantChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "test-user",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: "Second message",
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "tu-1",
+          id: '2',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: 'Second message',
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'tu-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1198,25 +1110,23 @@ describe("AssistantChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <AssistantChatPanel {...baseProps} messages={messages} />,
-      );
+      const { container } = render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
       // Should show two timestamps (one for each different minute)
-      const timestamps = container.querySelectorAll(".text-gray-400");
+      const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(2);
     });
 
-    it("shows timestamp when hour changes", () => {
+    it('shows timestamp when hour changes', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:59:00Z",
-          body: "First message",
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:59:00Z',
+          body: 'First message',
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1224,13 +1134,13 @@ describe("AssistantChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "test-user",
-          createdAt: "2025-10-17T13:00:00Z",
-          body: "Second message",
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "tu-1",
+          id: '2',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T13:00:00Z',
+          body: 'Second message',
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'tu-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1239,25 +1149,23 @@ describe("AssistantChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <AssistantChatPanel {...baseProps} messages={messages} />,
-      );
+      const { container } = render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
       // Should show two timestamps (one for each different hour)
-      const timestamps = container.querySelectorAll(".text-gray-400");
+      const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(2);
     });
 
-    it("does not show timestamp when messages are in the same minute", () => {
+    it('does not show timestamp when messages are in the same minute', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: "First message",
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: 'First message',
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1265,13 +1173,13 @@ describe("AssistantChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "test-user",
-          createdAt: "2025-10-17T12:00:30Z",
-          body: "Second message",
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "tu-1",
+          id: '2',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T12:00:30Z',
+          body: 'Second message',
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'tu-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1280,25 +1188,23 @@ describe("AssistantChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <AssistantChatPanel {...baseProps} messages={messages} />,
-      );
+      const { container } = render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
       // Should only show one timestamp (for the first message)
-      const timestamps = container.querySelectorAll(".text-gray-400");
+      const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(1);
     });
 
-    it("shows timestamp for moderator_submitted messages when minute changes", () => {
+    it('shows timestamp for moderator_submitted messages when minute changes', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: "First message",
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: 'First message',
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1306,17 +1212,17 @@ describe("AssistantChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "test-user",
-          createdAt: "2025-10-17T12:01:00Z",
+          id: '2',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T12:01:00Z',
           body: {
-            text: "Submitted message",
-            type: "moderator_submitted",
-            message: "1",
+            text: 'Submitted message',
+            type: 'moderator_submitted',
+            message: '1',
           },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "tu-1",
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'tu-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1325,25 +1231,23 @@ describe("AssistantChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <AssistantChatPanel {...baseProps} messages={messages} />,
-      );
+      const { container } = render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
       // Should show two timestamps (one for each different minute)
-      const timestamps = container.querySelectorAll(".text-gray-400");
+      const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(2);
     });
 
-    it("shows timestamp for submitted messages referenced by moderator when minute changes", () => {
+    it('shows timestamp for submitted messages referenced by moderator when minute changes', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "test-user",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Original message" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "tu-1",
+          id: '1',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Original message' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'tu-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1351,13 +1255,13 @@ describe("AssistantChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "Response", type: "moderator_submitted", message: "1" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '2',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Response', type: 'moderator_submitted', message: '1' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1366,25 +1270,23 @@ describe("AssistantChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <AssistantChatPanel {...baseProps} messages={messages} />,
-      );
+      const { container } = render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
       // Should show two timestamps (one for each different minute)
-      const timestamps = container.querySelectorAll(".text-gray-400");
+      const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(2);
     });
 
-    it("does not show timestamp for moderator_submitted messages in same minute", () => {
+    it('does not show timestamp for moderator_submitted messages in same minute', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: "First message",
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: 'First message',
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1392,17 +1294,17 @@ describe("AssistantChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "test-user",
-          createdAt: "2025-10-17T12:00:30Z",
+          id: '2',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T12:00:30Z',
           body: {
-            text: "Submitted message",
-            type: "moderator_submitted",
-            message: "1",
+            text: 'Submitted message',
+            type: 'moderator_submitted',
+            message: '1',
           },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "tu-1",
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'tu-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1411,27 +1313,25 @@ describe("AssistantChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <AssistantChatPanel {...baseProps} messages={messages} />,
-      );
+      const { container } = render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
       // Should only show one timestamp (for the first message)
-      const timestamps = container.querySelectorAll(".text-gray-400");
+      const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(1);
     });
   });
 
-  describe("Feedback Configuration", () => {
-    it("renders feedback UI only for messages in eligibleMessageIds set", () => {
+  describe('Feedback Configuration', () => {
+    it('renders feedback UI only for messages in eligibleMessageIds set', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Message 1" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Message 1' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1439,13 +1339,13 @@ describe("AssistantChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "Message 2" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '2',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Message 2' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1453,13 +1353,13 @@ describe("AssistantChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "3",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:02:00Z",
-          body: { text: "Message 3" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '3',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:02:00Z',
+          body: { text: 'Message 3' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1469,41 +1369,35 @@ describe("AssistantChatPanel", () => {
       ];
 
       const feedbackConfig = {
-        eligibleMessageIds: new Set(["1", "3"]), // Only messages 1 and 3 are eligible
+        eligibleMessageIds: new Set(['1', '3']), // Only messages 1 and 3 are eligible
         messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendFeedbackRating,
       };
 
-      render(
-        <AssistantChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<AssistantChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
       // Get all feedback elements
-      const feedbackElements = screen.getAllByTestId("message-feedback");
+      const feedbackElements = screen.getAllByTestId('message-feedback');
 
       // Should have 2 feedback elements (for messages 1 and 3)
       expect(feedbackElements).toHaveLength(2);
 
       // Verify they are for the correct messages
-      expect(feedbackElements[0]).toHaveAttribute("data-message-id", "1");
-      expect(feedbackElements[1]).toHaveAttribute("data-message-id", "3");
+      expect(feedbackElements[0]).toHaveAttribute('data-message-id', '1');
+      expect(feedbackElements[1]).toHaveAttribute('data-message-id', '3');
     });
 
-    it("does not render feedback UI when message is not in eligibleMessageIds", () => {
+    it('does not render feedback UI when message is not in eligibleMessageIds', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Message without feedback" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Message without feedback' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1519,28 +1413,22 @@ describe("AssistantChatPanel", () => {
         onSendRating: mockSendFeedbackRating,
       };
 
-      render(
-        <AssistantChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<AssistantChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
       // Should not have any feedback elements
-      expect(screen.queryByTestId("message-feedback")).not.toBeInTheDocument();
+      expect(screen.queryByTestId('message-feedback')).not.toBeInTheDocument();
     });
 
-    it("does not render feedback for messages with ineligible types even if fromAgent", () => {
+    it('does not render feedback for messages with ineligible types even if fromAgent', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Intro message", type: "intro" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Intro message', type: 'intro' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1548,13 +1436,13 @@ describe("AssistantChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: "Regular message",
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '2',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: 'Regular message',
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1564,39 +1452,33 @@ describe("AssistantChatPanel", () => {
       ];
 
       const feedbackConfig = {
-        eligibleMessageIds: new Set(["2"]), // Only message 2 is eligible (message 1 excluded by type)
+        eligibleMessageIds: new Set(['2']), // Only message 2 is eligible (message 1 excluded by type)
         messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendFeedbackRating,
       };
 
-      render(
-        <AssistantChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<AssistantChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
-      const feedbackElements = screen.queryAllByTestId("message-feedback");
+      const feedbackElements = screen.queryAllByTestId('message-feedback');
 
       // Should only have 1 feedback element (for message 2)
       expect(feedbackElements).toHaveLength(1);
-      expect(feedbackElements[0]).toHaveAttribute("data-message-id", "2");
+      expect(feedbackElements[0]).toHaveAttribute('data-message-id', '2');
     });
 
-    it("calls feedbackConfig callbacks when feedback buttons are clicked", async () => {
+    it('calls feedbackConfig callbacks when feedback buttons are clicked', async () => {
       const user = userEvent.setup();
 
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Message with feedback" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Message with feedback' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1606,48 +1488,42 @@ describe("AssistantChatPanel", () => {
       ];
 
       const feedbackConfig = {
-        eligibleMessageIds: new Set(["1"]),
+        eligibleMessageIds: new Set(['1']),
         messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendFeedbackRating,
       };
 
-      render(
-        <AssistantChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<AssistantChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
       // Click rating button
-      const ratingButton = screen.getByTestId("rating-button-3");
+      const ratingButton = screen.getByTestId('rating-button-3');
       await user.click(ratingButton);
 
-      expect(mockSendFeedbackRating).toHaveBeenCalledWith("1", 3);
+      expect(mockSendFeedbackRating).toHaveBeenCalledWith('1', 3);
 
       // Click "Say more" button
-      const sayMoreButton = screen.getByTestId("say-more-button");
+      const sayMoreButton = screen.getByTestId('say-more-button');
       await user.click(sayMoreButton);
 
       expect(mockEnterControlledMode).toHaveBeenCalledWith(
         expect.objectContaining({
-          prefix: "/feedback|Text|1|",
-          label: "Feedback Mode",
+          prefix: '/feedback|Text|1|',
+          label: 'Feedback Mode',
         }),
       );
     });
 
-    it("handles empty eligibleMessageIds set", () => {
+    it('handles empty eligibleMessageIds set', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Message 1" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Message 1' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1655,13 +1531,13 @@ describe("AssistantChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "Message 2" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '2',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Message 2' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1677,28 +1553,22 @@ describe("AssistantChatPanel", () => {
         onSendRating: mockSendFeedbackRating,
       };
 
-      render(
-        <AssistantChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<AssistantChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
       // No feedback UI should be rendered
-      expect(screen.queryByTestId("message-feedback")).not.toBeInTheDocument();
+      expect(screen.queryByTestId('message-feedback')).not.toBeInTheDocument();
     });
 
-    it("renders feedback for all agent messages when all are in eligibleMessageIds", () => {
+    it('renders feedback for all agent messages when all are in eligibleMessageIds', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Message 1" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Message 1' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1706,13 +1576,13 @@ describe("AssistantChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "Message 2" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '2',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Message 2' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1722,36 +1592,30 @@ describe("AssistantChatPanel", () => {
       ];
 
       const feedbackConfig = {
-        eligibleMessageIds: new Set(["1", "2"]),
+        eligibleMessageIds: new Set(['1', '2']),
         messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendFeedbackRating,
       };
 
-      render(
-        <AssistantChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<AssistantChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
-      const feedbackElements = screen.getAllByTestId("message-feedback");
+      const feedbackElements = screen.getAllByTestId('message-feedback');
 
       // Should have 2 feedback elements
       expect(feedbackElements).toHaveLength(2);
     });
 
-    it("does not render feedback for user messages even if in eligibleMessageIds", () => {
+    it('does not render feedback for user messages even if in eligibleMessageIds', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "test-user",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "User message" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "tu-1",
+          id: '1',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'User message' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'tu-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1759,13 +1623,13 @@ describe("AssistantChatPanel", () => {
           downVotes: [],
         },
         {
-          id: "2",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:01:00Z",
-          body: { text: "Agent message" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '2',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Agent message' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1775,37 +1639,31 @@ describe("AssistantChatPanel", () => {
       ];
 
       const feedbackConfig = {
-        eligibleMessageIds: new Set(["1", "2"]),
+        eligibleMessageIds: new Set(['1', '2']),
         messageRatings: new Map(),
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendFeedbackRating,
       };
 
-      render(
-        <AssistantChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<AssistantChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
-      const feedbackElements = screen.queryAllByTestId("message-feedback");
+      const feedbackElements = screen.queryAllByTestId('message-feedback');
 
       // Should only have 1 feedback element (for agent message)
       expect(feedbackElements).toHaveLength(1);
-      expect(feedbackElements[0]).toHaveAttribute("data-message-id", "2");
+      expect(feedbackElements[0]).toHaveAttribute('data-message-id', '2');
     });
 
-    it("passes initial rating from messageRatings to MessageFeedback", () => {
+    it('passes initial rating from messageRatings to MessageFeedback', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "Event Assistant",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "Agent message" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "ea-1",
+          id: '1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'Agent message' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
           fromAgent: true,
           pause: false,
           visible: true,
@@ -1814,38 +1672,32 @@ describe("AssistantChatPanel", () => {
         },
       ];
 
-      const messageRatings = new Map([["1", "OK"]]);
+      const messageRatings = new Map([['1', 'OK']]);
       const feedbackConfig = {
-        eligibleMessageIds: new Set(["1"]),
+        eligibleMessageIds: new Set(['1']),
         messageRatings,
         onPopulateFeedbackText: mockEnterControlledMode,
         onSendRating: mockSendFeedbackRating,
       };
 
-      render(
-        <AssistantChatPanel
-          {...baseProps}
-          messages={messages}
-          feedbackConfig={feedbackConfig}
-        />,
-      );
+      render(<AssistantChatPanel {...baseProps} messages={messages} feedbackConfig={feedbackConfig} />);
 
-      const feedbackElement = screen.getByTestId("message-feedback");
-      expect(feedbackElement).toHaveAttribute("data-initial-rating", "OK");
+      const feedbackElement = screen.getByTestId('message-feedback');
+      expect(feedbackElement).toHaveAttribute('data-initial-rating', 'OK');
     });
   });
 
-  describe("Threaded Replies", () => {
-    it("shows thinking bot icon in main chat when waiting for non-threaded response", () => {
+  describe('Threaded Replies', () => {
+    it('shows thinking bot icon in main chat when waiting for non-threaded response', () => {
       const messages = [
         {
-          id: "1",
-          pseudonym: "test-user",
-          createdAt: "2025-10-17T12:00:00Z",
-          body: { text: "User question" },
-          channels: ["user"],
-          conversation: "conv-1",
-          pseudonymId: "tu-1",
+          id: '1',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: { text: 'User question' },
+          channels: ['user'],
+          conversation: 'conv-1',
+          pseudonymId: 'tu-1',
           fromAgent: false,
           pause: false,
           visible: true,
@@ -1854,29 +1706,23 @@ describe("AssistantChatPanel", () => {
         },
       ];
 
-      const { container } = render(
-        <AssistantChatPanel
-          {...baseProps}
-          messages={messages}
-          waitingForResponse={true}
-        />,
-      );
+      const { container } = render(<AssistantChatPanel {...baseProps} messages={messages} waitingForResponse={true} />);
 
       // Should show thinking indicator with bouncing bot icon
-      const bouncingIcon = container.querySelector(".animate-bounce");
+      const bouncingIcon = container.querySelector('.animate-bounce');
       expect(bouncingIcon).toBeInTheDocument();
-      expect(screen.getByText("thinking...")).toBeInTheDocument();
+      expect(screen.getByText('thinking...')).toBeInTheDocument();
     });
 
-    it("does not show thinking bot icon in main chat when waiting for threaded reply", () => {
+    it('does not show thinking bot icon in main chat when waiting for threaded reply', () => {
       const parentMessage = {
-        id: "msg1",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Parent message" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "tu-1",
+        id: 'msg1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Parent message' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'tu-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -1885,15 +1731,15 @@ describe("AssistantChatPanel", () => {
       };
 
       const userReply = {
-        id: "reply1",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:01:00Z",
-        body: { text: "Reply in thread" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "tu-1",
+        id: 'reply1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:01:00Z',
+        body: { text: 'Reply in thread' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'tu-1',
         fromAgent: false,
-        parentMessage: "msg1",
+        parentMessage: 'msg1',
         pause: false,
         visible: true,
         upVotes: [],
@@ -1901,28 +1747,24 @@ describe("AssistantChatPanel", () => {
       };
 
       const { container } = render(
-        <AssistantChatPanel
-          {...baseProps}
-          messages={[parentMessage, userReply]}
-          waitingForResponse={true}
-        />,
+        <AssistantChatPanel {...baseProps} messages={[parentMessage, userReply]} waitingForResponse={true} />,
       );
 
       // Main chat should NOT show thinking indicator when waiting for threaded reply
-      const bouncingIcons = container.querySelectorAll(".animate-bounce");
+      const bouncingIcons = container.querySelectorAll('.animate-bounce');
       expect(bouncingIcons.length).toBe(0);
-      expect(screen.queryByText("thinking...")).not.toBeInTheDocument();
+      expect(screen.queryByText('thinking...')).not.toBeInTheDocument();
     });
 
-    it("organizes messages into parent messages and replies correctly", () => {
+    it('organizes messages into parent messages and replies correctly', () => {
       const parentMessage = {
-        id: "msg1",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Parent message" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "tu-1",
+        id: 'msg1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Parent message' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'tu-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -1931,15 +1773,15 @@ describe("AssistantChatPanel", () => {
       };
 
       const reply1 = {
-        id: "reply1",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:01:00Z",
-        body: { text: "First reply" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: 'reply1',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:01:00Z',
+        body: { text: 'First reply' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
-        parentMessage: "msg1",
+        parentMessage: 'msg1',
         pause: false,
         visible: true,
         upVotes: [],
@@ -1947,100 +1789,90 @@ describe("AssistantChatPanel", () => {
       };
 
       const reply2 = {
-        id: "reply2",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:02:00Z",
-        body: { text: "Second reply" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "tu-1",
+        id: 'reply2',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:02:00Z',
+        body: { text: 'Second reply' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'tu-1',
         fromAgent: false,
-        parentMessage: "msg1",
+        parentMessage: 'msg1',
         pause: false,
         visible: true,
         upVotes: [],
         downVotes: [],
       };
 
-      render(
-        <AssistantChatPanel
-          {...baseProps}
-          messages={[parentMessage, reply1, reply2]}
-        />,
-      );
+      render(<AssistantChatPanel {...baseProps} messages={[parentMessage, reply1, reply2]} />);
 
       // Parent message should be visible in main view
-      expect(screen.getByText("Parent message")).toBeInTheDocument();
+      expect(screen.getByText('Parent message')).toBeInTheDocument();
 
       // First reply should be shown in preview
-      expect(screen.getByText("First reply")).toBeInTheDocument();
+      expect(screen.getByText('First reply')).toBeInTheDocument();
 
       // Should show "+1 more reply" indicator for the second reply
-      expect(screen.getByText("+ 1 more reply")).toBeInTheDocument();
+      expect(screen.getByText('+ 1 more reply')).toBeInTheDocument();
     });
 
-    it("filters out prompt response messages from parent messages", () => {
+    it('filters out prompt response messages from parent messages', () => {
       const promptMessage = {
-        id: "prompt1",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Choose an option:" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: 'prompt1',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Choose an option:' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
         pause: false,
         visible: true,
         upVotes: [],
         downVotes: [],
         prompt: {
-          type: "singleChoice" as const,
+          type: 'singleChoice' as const,
           options: [
-            { label: "Option A", value: "a" },
-            { label: "Option B", value: "b" },
+            { label: 'Option A', value: 'a' },
+            { label: 'Option B', value: 'b' },
           ],
         },
       };
 
       const promptResponse = {
-        id: "response1",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:01:00Z",
-        body: { text: "Option A" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "tu-1",
+        id: 'response1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:01:00Z',
+        body: { text: 'Option A' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'tu-1',
         fromAgent: false,
-        answersPrompt: "prompt1",
+        answersPrompt: 'prompt1',
         pause: false,
         visible: true,
         upVotes: [],
         downVotes: [],
       };
 
-      render(
-        <AssistantChatPanel
-          {...baseProps}
-          messages={[promptMessage, promptResponse]}
-        />,
-      );
+      render(<AssistantChatPanel {...baseProps} messages={[promptMessage, promptResponse]} />);
 
       // Prompt should be visible
-      expect(screen.getByText("Choose an option:")).toBeInTheDocument();
+      expect(screen.getByText('Choose an option:')).toBeInTheDocument();
 
       // Response should be filtered out from parent messages
-      expect(screen.queryByText("Option A")).not.toBeInTheDocument();
+      expect(screen.queryByText('Option A')).not.toBeInTheDocument();
     });
 
-    it("sorts replies by creation time", () => {
+    it('sorts replies by creation time', () => {
       const parentMessage = {
-        id: "msg1",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:00:00Z",
-        body: { text: "Parent" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "tu-1",
+        id: 'msg1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'Parent' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'tu-1',
         fromAgent: false,
         pause: false,
         visible: true,
@@ -2049,15 +1881,15 @@ describe("AssistantChatPanel", () => {
       };
 
       const reply3 = {
-        id: "reply3",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:03:00Z",
-        body: { text: "Third" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "tu-1",
+        id: 'reply3',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:03:00Z',
+        body: { text: 'Third' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'tu-1',
         fromAgent: false,
-        parentMessage: "msg1",
+        parentMessage: 'msg1',
         pause: false,
         visible: true,
         upVotes: [],
@@ -2065,15 +1897,15 @@ describe("AssistantChatPanel", () => {
       };
 
       const reply1 = {
-        id: "reply1",
-        pseudonym: "Event Assistant",
-        createdAt: "2025-10-17T12:01:00Z",
-        body: { text: "First" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "ea-1",
+        id: 'reply1',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:01:00Z',
+        body: { text: 'First' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
         fromAgent: true,
-        parentMessage: "msg1",
+        parentMessage: 'msg1',
         pause: false,
         visible: true,
         upVotes: [],
@@ -2081,33 +1913,28 @@ describe("AssistantChatPanel", () => {
       };
 
       const reply2 = {
-        id: "reply2",
-        pseudonym: "test-user",
-        createdAt: "2025-10-17T12:02:00Z",
-        body: { text: "Second" },
-        channels: ["user"],
-        conversation: "conv-1",
-        pseudonymId: "tu-1",
+        id: 'reply2',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:02:00Z',
+        body: { text: 'Second' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'tu-1',
         fromAgent: false,
-        parentMessage: "msg1",
+        parentMessage: 'msg1',
         pause: false,
         visible: true,
         upVotes: [],
         downVotes: [],
       };
 
-      render(
-        <AssistantChatPanel
-          {...baseProps}
-          messages={[parentMessage, reply3, reply1, reply2]}
-        />,
-      );
+      render(<AssistantChatPanel {...baseProps} messages={[parentMessage, reply3, reply1, reply2]} />);
 
       // First reply (chronologically) should be shown in preview
-      expect(screen.getByText("First")).toBeInTheDocument();
+      expect(screen.getByText('First')).toBeInTheDocument();
 
       // Should show "+2 more replies" indicator for the remaining replies
-      expect(screen.getByText("+ 2 more replies")).toBeInTheDocument();
+      expect(screen.getByText('+ 2 more replies')).toBeInTheDocument();
     });
   });
 });

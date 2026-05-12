@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { useRouter } from "next/router";
+import { useEffect, useRef } from 'react';
+import { useRouter } from 'next/router';
 import {
   trackPageView,
   trackVisibilityChange,
@@ -7,8 +7,8 @@ import {
   trackSessionEnd,
   setCustomDimension,
   trackUserLocation,
-} from "../utils/analytics";
-import { useVisibilityAwareDuration } from "./useVisibilityAwareDuration";
+} from '../utils/analytics';
+import { useVisibilityAwareDuration } from './useVisibilityAwareDuration';
 
 interface UseAnalyticsOptions {
   pageName?: string;
@@ -51,34 +51,23 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
     return () => {
       const activeDuration = pageDuration.stop();
       if (activeDuration > 0) {
-        setCustomDimension(
-          4,
-          "page_duration",
-          activeDuration.toString(),
-          "action",
-        );
+        setCustomDimension(4, 'page_duration', activeDuration.toString(), 'action');
       }
     };
-  }, [
-    pageName,
-    router.pathname,
-    router.asPath,
-    router.query.conversationId,
-    pageDuration,
-  ]);
+  }, [pageName, router.pathname, router.asPath, router.query.conversationId, pageDuration]);
 
   // Page visibility tracking
   useEffect(() => {
     function handleVisibilityChange() {
-      const isVisible = document.visibilityState === "visible";
+      const isVisible = document.visibilityState === 'visible';
       trackVisibilityChange(isVisible);
     }
 
     // Listen for visibility changes
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
@@ -116,16 +105,14 @@ export function useSessionTracking() {
 
     // Track session end on beforeunload
     function handleBeforeUnload() {
-      const duration = Math.floor(
-        (Date.now() - sessionStartTime.current) / 1000,
-      );
+      const duration = Math.floor((Date.now() - sessionStartTime.current) / 1000);
       trackSessionEnd(duration);
     }
 
-    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
 }
@@ -138,10 +125,10 @@ async function detectUserLocation() {
   try {
     // Get current URL parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const locationParam = urlParams.get("location");
+    const locationParam = urlParams.get('location');
 
     // Build query string
-    const queryString = locationParam ? `?location=${locationParam}` : "";
+    const queryString = locationParam ? `?location=${locationParam}` : '';
 
     // Call location detection API
     const response = await fetch(`/api/check-location${queryString}`);
@@ -156,10 +143,10 @@ async function detectUserLocation() {
     trackUserLocation(data.location, data.method);
   } catch (error) {
     // On error, default to remote (privacy-preserving)
-    if (process.env.NODE_ENV !== "production") {
-      console.warn("[Analytics] Location detection failed:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[Analytics] Location detection failed:', error);
     }
-    trackUserLocation("remote", "default");
+    trackUserLocation('remote', 'default');
   }
 }
 // Track the location

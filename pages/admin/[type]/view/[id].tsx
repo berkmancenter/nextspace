@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
-import { useRouter } from "next/router";
-import { CircularProgress } from "@mui/material";
-import { CheckAuthHeader, getConversation } from "../../../../utils/Helpers";
-import { AuthType } from "../../../../types.internal";
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
+import { CircularProgress } from '@mui/material';
+import { CheckAuthHeader, getConversation } from '../../../../utils/Helpers';
+import { AuthType } from '../../../../types.internal';
 
-import { EventStatus } from "../../../../components";
-import { Conversation } from "../../../../types.internal";
+import { EventStatus } from '../../../../components';
+import { Conversation } from '../../../../types.internal';
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -15,9 +15,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
   const router = useRouter();
   const { id } = router.query;
 
-  const [conversationData, setConversationData] = useState<Conversation | null>(
-    null
-  );
+  const [conversationData, setConversationData] = useState<Conversation | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -27,7 +25,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
         const data = await getConversation(id as string);
         setConversationData(data);
       } catch (error) {
-        console.error("Error fetching thread data:", error);
+        console.error('Error fetching thread data:', error);
       }
     };
 

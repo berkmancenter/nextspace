@@ -1,9 +1,9 @@
-import type { NextApiRequest, NextApiResponse } from "next";
-import { getClientIp, isIpInRanges } from "../../utils/ipRangeChecker";
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { getClientIp, isIpInRanges } from '../../utils/ipRangeChecker';
 
 type LocationResponse = {
-  location: "local" | "remote";
-  method: "ip" | "url" | "default";
+  location: 'local' | 'remote';
+  method: 'ip' | 'url' | 'default';
 };
 
 /**
@@ -19,20 +19,17 @@ type LocationResponse = {
  * @param res The outgoing response object
  * @returns JSON response with location type and detection method
  */
-export default function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<LocationResponse>
-) {
+export default function handler(req: NextApiRequest, res: NextApiResponse<LocationResponse>) {
   // Only allow GET requests
-  if (req.method !== "GET") {
-    res.status(405).json({ location: "remote", method: "default" });
+  if (req.method !== 'GET') {
+    res.status(405).json({ location: 'remote', method: 'default' });
     return;
   }
 
   // Priority 1: Check URL parameter (manual override)
   const locationParam = req.query.location;
-  if (locationParam === "local") {
-    res.status(200).json({ location: "local", method: "url" });
+  if (locationParam === 'local') {
+    res.status(200).json({ location: 'local', method: 'url' });
     return;
   }
 
@@ -40,27 +37,22 @@ export default function handler(
   const localIpRanges = process.env.LOCAL_IP_RANGES;
 
   if (localIpRanges && localIpRanges.trim().length > 0) {
-    const clientIp = getClientIp(
-      req.headers as Record<string, string | string[] | undefined>,
-      req.socket.remoteAddress
-    );
+    const clientIp = getClientIp(req.headers as Record<string, string | string[] | undefined>, req.socket.remoteAddress);
 
     if (clientIp) {
       const isLocal = isIpInRanges(clientIp, localIpRanges);
 
-      if (process.env.NODE_ENV !== "production") {
-        console.log(
-          `[Location Check] IP: ${clientIp}, Local: ${isLocal}, Ranges: ${localIpRanges}`
-        );
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[Location Check] IP: ${clientIp}, Local: ${isLocal}, Ranges: ${localIpRanges}`);
       }
 
       if (isLocal) {
-        res.status(200).json({ location: "local", method: "ip" });
+        res.status(200).json({ location: 'local', method: 'ip' });
         return;
       }
     }
   }
 
   // Priority 3: Default to remote (privacy-preserving)
-  res.status(200).json({ location: "remote", method: "default" });
+  res.status(200).json({ location: 'remote', method: 'default' });
 }

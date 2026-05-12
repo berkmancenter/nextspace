@@ -3,8 +3,8 @@
  * @file Helper methods for fetching data from the LLM Facilitator API
  */
 
-import { Api } from "./Helpers";
-import TokenManagerDefault from "./TokenManager";
+import { Api } from './Helpers';
+import TokenManagerDefault from './TokenManager';
 
 /**
  * Wrapper for fetch that automatically handles token refresh on 401 responses.
@@ -21,7 +21,7 @@ import TokenManagerDefault from "./TokenManager";
 export const fetchWithTokenRefresh = async (
   url: string,
   options: RequestInit,
-  useStoredTokens: boolean = false
+  useStoredTokens: boolean = false,
 ): Promise<Response> => {
   const apiI = Api.get();
   let API_TOKENS = apiI.GetTokens();
@@ -32,8 +32,8 @@ export const fetchWithTokenRefresh = async (
       options.headers = {};
     }
     const headers = options.headers as Record<string, string>;
-    if (!headers["Authorization"]) {
-      headers["Authorization"] = `Bearer ${API_TOKENS.access}`;
+    if (!headers['Authorization']) {
+      headers['Authorization'] = `Bearer ${API_TOKENS.access}`;
     }
   }
 
@@ -44,7 +44,7 @@ export const fetchWithTokenRefresh = async (
   // TokenManager which deduplicates concurrent refresh calls across both
   // HTTP and WebSocket callers.
   if (response.status === 401 && API_TOKENS.refresh) {
-    console.log("Token expired (HTTP 401), requesting refresh via TokenManager…");
+    console.log('Token expired (HTTP 401), requesting refresh via TokenManager…');
 
     const refreshed = await TokenManagerDefault.refresh();
 
@@ -52,7 +52,7 @@ export const fetchWithTokenRefresh = async (
       // Retry with the freshly-issued access token
       const newToken = apiI.getAccessToken();
       const headers = new Headers(options.headers);
-      headers.set("Authorization", `Bearer ${newToken}`);
+      headers.set('Authorization', `Bearer ${newToken}`);
       response = await fetch(url, { ...options, headers });
     }
   }
@@ -66,10 +66,10 @@ export const fetchWithTokenRefresh = async (
  */
 export const Authenticate = async (username: string, password: string) => {
   const options = {
-    method: "POST",
+    method: 'POST',
     url: `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       username,
@@ -84,7 +84,7 @@ export const Authenticate = async (username: string, password: string) => {
   });
 
   if (!response.ok) {
-    console.error("Network response was not ok", response);
+    console.error('Network response was not ok', response);
     const errorData = await response.json();
     return {
       error: true,
@@ -93,7 +93,7 @@ export const Authenticate = async (username: string, password: string) => {
   }
 
   const data = await response.json();
-  console.log("Response:", data);
+  console.log('Response:', data);
   return data;
 };
 
@@ -104,10 +104,10 @@ export const Authenticate = async (username: string, password: string) => {
  */
 export const RefreshToken = async (refreshToken: string) => {
   const options = {
-    method: "POST",
+    method: 'POST',
     url: `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh-tokens`,
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       refreshToken,
@@ -123,10 +123,10 @@ export const RefreshToken = async (refreshToken: string) => {
 
     // If 401 Unauthorized, all tokens have expired, clear local session
     if (response.status === 401) {
-      const logoutResponse = await fetch("/api/logout", {
-        method: "POST",
+      const logoutResponse = await fetch('/api/logout', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
       });
 
@@ -134,22 +134,19 @@ export const RefreshToken = async (refreshToken: string) => {
       Api.get().ClearTokens();
 
       if (!logoutResponse.ok) {
-        throw new Error("Logout failed");
+        throw new Error('Logout failed');
       }
       return;
     }
 
     if (!response.ok) {
-      throw new Error("Network response was not ok");
+      throw new Error('Network response was not ok');
     }
 
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error(
-      "There was a problem with the refresh tokens operation:",
-      error
-    );
+    console.error('There was a problem with the refresh tokens operation:', error);
   }
 };
 
@@ -161,8 +158,8 @@ export const getUserTimezone = (): string => {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
   } catch (error) {
-    console.warn("Failed to get user timezone, defaulting to UTC:", error);
-    return "UTC";
+    console.warn('Failed to get user timezone, defaulting to UTC:', error);
+    return 'UTC';
   }
 };
 
@@ -173,13 +170,9 @@ export const getUserTimezone = (): string => {
  * @param dataType - Optional data type to specify how to parse the response (e.g., "json", "text").
  * @returns Promise<any>
  */
-export const RetrieveData = async (
-  urlSuffix: string,
-  token?: string,
-  dataType?: string
-) => {
+export const RetrieveData = async (urlSuffix: string, token?: string, dataType?: string) => {
   const headers: Record<string, string> = {
-    "X-Timezone": getUserTimezone(),
+    'X-Timezone': getUserTimezone(),
   };
 
   if (token) {
@@ -190,14 +183,14 @@ export const RetrieveData = async (
     const response = await fetchWithTokenRefresh(
       `${process.env.NEXT_PUBLIC_API_URL}/${urlSuffix}`,
       {
-        method: "GET",
+        method: 'GET',
         headers,
       },
-      !token // Use stored tokens if no explicit token provided
+      !token, // Use stored tokens if no explicit token provided
     );
 
     if (!response.ok) {
-      console.error("Network response was not ok");
+      console.error('Network response was not ok');
       const errorData = await response.json();
       return {
         error: true,
@@ -206,11 +199,11 @@ export const RetrieveData = async (
       };
     }
     let data;
-    if (!dataType || dataType === "json") data = await response.json();
-    else if (dataType === "text") data = await response.text();
+    if (!dataType || dataType === 'json') data = await response.json();
+    else if (dataType === 'text') data = await response.text();
     return data;
   } catch (error) {
-    console.error("There was a problem with the fetch operation:", error);
+    console.error('There was a problem with the fetch operation:', error);
   }
 };
 
@@ -227,16 +220,14 @@ export const RetrieveData = async (
  * @returns Promise<any>
  */
 export const Request = async (urlSuffix: string, payload?: any) => {
-  const url = payload
-    ? `/api/request`
-    : `/api/request?apiEndpoint=${encodeURIComponent(urlSuffix)}`;
+  const url = payload ? `/api/request` : `/api/request?apiEndpoint=${encodeURIComponent(urlSuffix)}`;
   const response = await fetch(
     url,
     payload
       ? {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             apiEndpoint: urlSuffix,
@@ -244,28 +235,28 @@ export const Request = async (urlSuffix: string, payload?: any) => {
           }),
         }
       : {
-          method: "GET",
-        }
+          method: 'GET',
+        },
   );
   if (!response) {
-    console.error("Network response was not ok", response);
+    console.error('Network response was not ok', response);
     return {
       error: true,
-      message: "No response received",
+      message: 'No response received',
     };
   }
 
   // If the server refreshed the tokens, sync the new tokens into TokenManager.
   // This prevents the next client-side API call from using a stale token.
-  if (response.headers?.get("X-Tokens-Refreshed") === "true") {
-    console.log("Server-side token refresh detected — syncing TokenManager from cookie…");
+  if (response.headers?.get('X-Tokens-Refreshed') === 'true') {
+    console.log('Server-side token refresh detected — syncing TokenManager from cookie…');
     TokenManagerDefault.refresh().catch((err) =>
-      console.error("Failed to sync TokenManager after server-side refresh:", err)
+      console.error('Failed to sync TokenManager after server-side refresh:', err),
     );
   }
 
   if (!response.ok) {
-    console.error("Network response was not ok");
+    console.error('Network response was not ok');
     const errorData = await response.json();
     return {
       error: true,
@@ -282,18 +273,15 @@ export const Request = async (urlSuffix: string, payload?: any) => {
  * @param onConnected - Callback function to execute when the connection state changes.
  * @returns A cleanup function to remove the event listeners.
  */
-export const SocketStateHandler = (
-  socket: any,
-  onConnected: (is: boolean) => any
-) => {
-  socket.on("error", (error: string) => {
-    console.error("Socket error:", error);
+export const SocketStateHandler = (socket: any, onConnected: (is: boolean) => any) => {
+  socket.on('error', (error: string) => {
+    console.error('Socket error:', error);
   });
-  socket.on("connect", onConnected(true));
-  socket.on("disconnect", onConnected(false));
+  socket.on('connect', onConnected(true));
+  socket.on('disconnect', onConnected(false));
 
   return () => {
-    socket.off("connect", onConnected(true));
-    socket.off("disconnect", onConnected(false));
+    socket.off('connect', onConnected(true));
+    socket.off('disconnect', onConnected(false));
   };
 };

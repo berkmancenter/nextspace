@@ -1,16 +1,16 @@
-import { FC } from "react";
-import { Box, Typography } from "@mui/material";
-import { MessageContent } from "./MessageContent";
-import { MessageProps } from "../../types.internal";
-import { getAvatarStyle } from "../../utils/avatarUtils";
+import { FC } from 'react';
+import { Box, Typography } from '@mui/material';
+import { MessageContent } from './MessageContent';
+import { MessageProps } from '../../types.internal';
+import { getAvatarStyle } from '../../utils/avatarUtils';
 
 // Helper function to darken a hex color
 const darkenColor = (hex: string, percent: number): string => {
-  const num = parseInt(hex.replace("#", ""), 16);
+  const num = parseInt(hex.replace('#', ''), 16);
   const r = Math.max(0, Math.floor((num >> 16) * (1 - percent)));
   const g = Math.max(0, Math.floor(((num >> 8) & 0x00ff) * (1 - percent)));
   const b = Math.max(0, Math.floor((num & 0x0000ff) * (1 - percent)));
-  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 };
 
 export const SubmittedMessage: FC<MessageProps> = ({ message }) => {
@@ -30,15 +30,11 @@ export const SubmittedMessage: FC<MessageProps> = ({ message }) => {
         <Box display="flex" alignItems="center" gap="8px" marginBottom="8px">
           <AvatarIcon
             sx={{
-              color: "#6B7280",
-              fontSize: "20px",
+              color: '#6B7280',
+              fontSize: '20px',
             }}
           />
-          <Typography
-            variant="caption"
-            component="p"
-            className="text-xs text-gray-600 font-bold uppercase"
-          >
+          <Typography variant="caption" component="p" className="text-xs text-gray-600 font-bold uppercase">
             You Asked Moderator
           </Typography>
         </Box>

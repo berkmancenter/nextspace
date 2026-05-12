@@ -1,18 +1,10 @@
-import {
-  FC,
-  useState,
-  useRef,
-  KeyboardEvent,
-  ChangeEvent,
-  useEffect,
-  useCallback,
-} from "react";
-import { Box, IconButton, InputAdornment, TextField } from "@mui/material";
-import { Send, Close } from "@mui/icons-material";
-import { ControlledInputConfig } from "../types.internal";
-import { ActiveEnhancerState, InputEnhancer } from "../types/inputEnhancer";
-import { GenericEnhancerMenu } from "./GenericEnhancerMenu";
-import { getAvatarStyle } from "../utils/avatarUtils";
+import { FC, useState, useRef, KeyboardEvent, ChangeEvent, useEffect, useCallback } from 'react';
+import { Box, IconButton, InputAdornment, TextField } from '@mui/material';
+import { Send, Close } from '@mui/icons-material';
+import { ControlledInputConfig } from '../types.internal';
+import { ActiveEnhancerState, InputEnhancer } from '../types/inputEnhancer';
+import { GenericEnhancerMenu } from './GenericEnhancerMenu';
+import { getAvatarStyle } from '../utils/avatarUtils';
 
 interface MessageInputProps {
   pseudonym: string | null;
@@ -37,13 +29,12 @@ export const MessageInput: FC<MessageInputProps> = ({
   onInputChange,
   disableWhileWaiting = true,
 }) => {
-  const [internalValue, setInternalValue] = useState("");
+  const [internalValue, setInternalValue] = useState('');
   const isControlled = inputValue !== undefined && onInputChange !== undefined;
   const currentMessage = isControlled ? inputValue : internalValue;
   const setCurrentMessage = isControlled ? onInputChange : setInternalValue;
 
-  const [activeEnhancer, setActiveEnhancer] =
-    useState<ActiveEnhancerState<any> | null>(null);
+  const [activeEnhancer, setActiveEnhancer] = useState<ActiveEnhancerState<any> | null>(null);
 
   const messageInputRef = useRef<HTMLInputElement>(null);
   const enterUsedForCommandRef = useRef(false);
@@ -80,7 +71,7 @@ export const MessageInput: FC<MessageInputProps> = ({
       // No triggers matched
       setActiveEnhancer(null);
     },
-    [enhancers]
+    [enhancers],
   );
 
   /** Handle input changes */
@@ -101,13 +92,8 @@ export const MessageInput: FC<MessageInputProps> = ({
   const handleEnhancerSelect = (item: any) => {
     if (!activeEnhancer) return;
 
-    const cursor =
-      messageInputRef.current?.selectionStart ?? currentMessage.length;
-    const result = activeEnhancer.enhancer.onSelect(
-      item,
-      currentMessage,
-      cursor
-    );
+    const cursor = messageInputRef.current?.selectionStart ?? currentMessage.length;
+    const result = activeEnhancer.enhancer.onSelect(item, currentMessage, cursor);
 
     setCurrentMessage(result.value);
     setActiveEnhancer(null);
@@ -115,10 +101,7 @@ export const MessageInput: FC<MessageInputProps> = ({
     // Set cursor position
     setTimeout(() => {
       messageInputRef.current?.focus();
-      messageInputRef.current?.setSelectionRange(
-        result.cursorPos,
-        result.cursorPos
-      );
+      messageInputRef.current?.setSelectionRange(result.cursorPos, result.cursorPos);
     }, 0);
   };
 
@@ -127,24 +110,19 @@ export const MessageInput: FC<MessageInputProps> = ({
     const canSend = disableWhileWaiting ? !waitingForResponse : true;
     if (currentMessage && currentMessage.length > 0 && canSend) {
       onSendMessage(currentMessage);
-      setCurrentMessage("");
+      setCurrentMessage('');
     }
   };
 
   /** Handle Enter key */
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Enter" && enterUsedForCommandRef.current) {
+    if (e.key === 'Enter' && enterUsedForCommandRef.current) {
       e.preventDefault();
       enterUsedForCommandRef.current = false;
       return;
     }
     const canSend = disableWhileWaiting ? !waitingForResponse : true;
-    if (
-      e.key === "Enter" &&
-      currentMessage.length > 0 &&
-      canSend &&
-      !activeEnhancer
-    ) {
+    if (e.key === 'Enter' && currentMessage.length > 0 && canSend && !activeEnhancer) {
       e.preventDefault();
       handleSend();
     }
@@ -158,63 +136,55 @@ export const MessageInput: FC<MessageInputProps> = ({
   /** Keyboard navigation for enhancer menus */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && controlledMode) onExitControlledMode();
-      if (e.key === "Escape") {
+      if (e.key === 'Escape' && controlledMode) onExitControlledMode();
+      if (e.key === 'Escape') {
         setActiveEnhancer(null);
       }
 
       // Menu navigation
       if (activeEnhancer && activeEnhancer.items.length > 0) {
-        if (e.key === "ArrowDown") {
+        if (e.key === 'ArrowDown') {
           e.preventDefault();
           setActiveEnhancer((prev) =>
             prev
               ? {
                   ...prev,
-                  selectedIndex:
-                    prev.selectedIndex < prev.items.length - 1
-                      ? prev.selectedIndex + 1
-                      : 0,
+                  selectedIndex: prev.selectedIndex < prev.items.length - 1 ? prev.selectedIndex + 1 : 0,
                 }
-              : null
+              : null,
           );
-        } else if (e.key === "ArrowUp") {
+        } else if (e.key === 'ArrowUp') {
           e.preventDefault();
           setActiveEnhancer((prev) =>
             prev
               ? {
                   ...prev,
-                  selectedIndex:
-                    prev.selectedIndex > 0
-                      ? prev.selectedIndex - 1
-                      : prev.items.length - 1,
+                  selectedIndex: prev.selectedIndex > 0 ? prev.selectedIndex - 1 : prev.items.length - 1,
                 }
-              : null
+              : null,
           );
-        } else if (e.key === "Enter" || e.key === "Tab") {
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
           e.preventDefault();
           // Only suppress the subsequent Enter keyup when Enter itself was used
           // for selection. When Tab is used, no Enter keyup follows, so the flag
           // must stay false — otherwise the next Enter press to send the message
           // gets eaten.
-          if (e.key === "Enter") {
+          if (e.key === 'Enter') {
             enterUsedForCommandRef.current = true;
           }
-          handleEnhancerSelect(
-            activeEnhancer.items[activeEnhancer.selectedIndex]
-          );
+          handleEnhancerSelect(activeEnhancer.items[activeEnhancer.selectedIndex]);
         }
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown as any);
-    return () => window.removeEventListener("keydown", handleKeyDown as any);
+    window.addEventListener('keydown', handleKeyDown as any);
+    return () => window.removeEventListener('keydown', handleKeyDown as any);
   }, [controlledMode, activeEnhancer, onExitControlledMode, currentMessage]);
 
   // Clear input and focus when entering controlled mode
   useEffect(() => {
     if (controlledMode) {
-      setCurrentMessage("");
+      setCurrentMessage('');
       setTimeout(() => messageInputRef.current?.focus(), 0);
     }
   }, [controlledMode]);
@@ -237,17 +207,13 @@ export const MessageInput: FC<MessageInputProps> = ({
                 Writing as {pseudonym}
                 {controlledMode && (
                   <span className="normal-case">
-                    {" • "}
+                    {' • '}
                     {controlledMode.icon} {controlledMode.label}
                   </span>
                 )}
               </span>
               {controlledMode && (
-                <IconButton
-                  size="small"
-                  onClick={onExitControlledMode}
-                  sx={{ padding: "4px" }}
-                >
+                <IconButton size="small" onClick={onExitControlledMode} sx={{ padding: '4px' }}>
                   <Close fontSize="small" />
                 </IconButton>
               )}
@@ -274,20 +240,12 @@ export const MessageInput: FC<MessageInputProps> = ({
                       <IconButton
                         key={enhancer.id}
                         onClick={() => {
-                          const cursor =
-                            messageInputRef.current?.selectionStart ??
-                            currentMessage.length;
-                          const result = enhancer.button.onClick(
-                            currentMessage,
-                            cursor
-                          );
+                          const cursor = messageInputRef.current?.selectionStart ?? currentMessage.length;
+                          const result = enhancer.button.onClick(currentMessage, cursor);
                           setCurrentMessage(result.value);
                           setTimeout(() => {
                             messageInputRef.current?.focus();
-                            messageInputRef.current?.setSelectionRange(
-                              result.cursorPos,
-                              result.cursorPos
-                            );
+                            messageInputRef.current?.setSelectionRange(result.cursorPos, result.cursorPos);
                             // Re-trigger detection after cursor is positioned
                             handleMessageChange(result.value);
                           }, 0);
@@ -295,18 +253,18 @@ export const MessageInput: FC<MessageInputProps> = ({
                         size="small"
                         title={enhancer.button.getTitle(isActive)}
                         sx={{
-                          padding: "6px",
-                          fontSize: "0.875rem",
-                          color: "#374151",
-                          backgroundColor: "#e5e7eb",
-                          borderRadius: "50%",
-                          width: "32px",
-                          height: "32px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          "&:hover": {
-                            backgroundColor: "#d1d5db",
+                          padding: '6px',
+                          fontSize: '0.875rem',
+                          color: '#374151',
+                          backgroundColor: '#e5e7eb',
+                          borderRadius: '50%',
+                          width: '32px',
+                          height: '32px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          '&:hover': {
+                            backgroundColor: '#d1d5db',
                           },
                         }}
                       >
@@ -325,11 +283,11 @@ export const MessageInput: FC<MessageInputProps> = ({
                   <Send
                     sx={{
                       opacity: !currentMessage ? 0.5 : 1,
-                      color: "white",
-                      backgroundColor: "#2f69c4",
-                      borderRadius: "50%",
-                      padding: "4px",
-                      transform: "rotate(-45deg)",
+                      color: 'white',
+                      backgroundColor: '#2f69c4',
+                      borderRadius: '50%',
+                      padding: '4px',
+                      transform: 'rotate(-45deg)',
                     }}
                   />
                 </IconButton>
@@ -343,9 +301,7 @@ export const MessageInput: FC<MessageInputProps> = ({
                 selectedIndex={activeEnhancer.selectedIndex}
                 onSelect={handleEnhancerSelect}
                 renderItem={activeEnhancer.enhancer.renderItem}
-                getItemKey={(_item, index) =>
-                  `${activeEnhancer.enhancer.id}-${index}`
-                }
+                getItemKey={(_item, index) => `${activeEnhancer.enhancer.id}-${index}`}
                 anchorEl={messageInputRef.current}
                 open={true}
               />

@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { BaseComponentProps } from "../types.internal";
+import { useState, useEffect } from 'react';
+import { BaseComponentProps } from '../types.internal';
 
 // Can't forget the easter egg!
 const useMousePosition = () => {
@@ -11,20 +11,20 @@ const useMousePosition = () => {
     const updateMousePosition = (ev: { clientX: any; clientY: any }) => {
       setMousePosition({ x: ev.clientX, y: ev.clientY });
     };
-    window.addEventListener("mousemove", updateMousePosition);
+    window.addEventListener('mousemove', updateMousePosition);
     return () => {
-      window.removeEventListener("mousemove", updateMousePosition);
+      window.removeEventListener('mousemove', updateMousePosition);
     };
   }, []);
   return mousePosition;
 };
 
 // Logo used for page headers
-export const Logo = ({ className = "" }: BaseComponentProps) => {
+export const Logo = ({ className = '' }: BaseComponentProps) => {
   const mousePosition = useMousePosition();
   const lolz = `translate(${Math.min(
     Math.max((mousePosition.x ?? 0) * 0.007, -1),
-    5
+    5,
   )}px, ${Math.min(Math.max((mousePosition.y ?? 0) * 0.005, -1), 10)}px)`;
 
   return (

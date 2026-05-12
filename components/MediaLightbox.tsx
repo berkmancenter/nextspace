@@ -1,15 +1,15 @@
-import { FC, useState, useCallback, useEffect, useRef } from "react";
-import { Dialog, IconButton, Box } from "@mui/material";
-import { Close as CloseIcon } from "@mui/icons-material";
-import { MarkmapView } from "./MarkmapView";
+import { FC, useState, useCallback, useEffect, useRef } from 'react';
+import { Dialog, IconButton, Box } from '@mui/material';
+import { Close as CloseIcon } from '@mui/icons-material';
+import { MarkmapView } from './MarkmapView';
 
 // Store the original viewport content
-let originalViewportContent = "";
+let originalViewportContent = '';
 
 interface MediaLightboxProps {
   open: boolean;
   onClose: () => void;
-  mediaType: "image" | "mindmap";
+  mediaType: 'image' | 'mindmap';
   mediaSrc: string;
   mimeType?: string;
   isMobile: boolean;
@@ -19,14 +19,7 @@ const ZOOM_STEP = 0.5;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 4;
 
-export const MediaLightbox: FC<MediaLightboxProps> = ({
-  open,
-  onClose,
-  mediaType,
-  mediaSrc,
-  mimeType,
-  isMobile,
-}) => {
+export const MediaLightbox: FC<MediaLightboxProps> = ({ open, onClose, mediaType, mediaSrc, mimeType, isMobile }) => {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -44,11 +37,8 @@ export const MediaLightbox: FC<MediaLightboxProps> = ({
       if (isMobile) {
         const viewportMeta = document.querySelector('meta[name="viewport"]');
         if (viewportMeta) {
-          originalViewportContent = viewportMeta.getAttribute("content") || "";
-          viewportMeta.setAttribute(
-            "content",
-            "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no",
-          );
+          originalViewportContent = viewportMeta.getAttribute('content') || '';
+          viewportMeta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
         }
       }
     } else {
@@ -56,7 +46,7 @@ export const MediaLightbox: FC<MediaLightboxProps> = ({
       if (isMobile && originalViewportContent) {
         const viewportMeta = document.querySelector('meta[name="viewport"]');
         if (viewportMeta) {
-          viewportMeta.setAttribute("content", originalViewportContent);
+          viewportMeta.setAttribute('content', originalViewportContent);
         }
       }
     }
@@ -78,12 +68,10 @@ export const MediaLightbox: FC<MediaLightboxProps> = ({
   // Mouse wheel zoom
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
-      if (mediaType !== "image") return;
+      if (mediaType !== 'image') return;
       e.preventDefault();
       const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
-      setZoomLevel((prev) =>
-        Math.max(MIN_ZOOM, Math.min(prev + delta, MAX_ZOOM)),
-      );
+      setZoomLevel((prev) => Math.max(MIN_ZOOM, Math.min(prev + delta, MAX_ZOOM)));
     },
     [mediaType],
   );
@@ -91,7 +79,7 @@ export const MediaLightbox: FC<MediaLightboxProps> = ({
   // Pan functionality
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (mediaType !== "image" || zoomLevel <= 1) return;
+      if (mediaType !== 'image' || zoomLevel <= 1) return;
       setIsDragging(true);
       setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
     },
@@ -115,22 +103,22 @@ export const MediaLightbox: FC<MediaLightboxProps> = ({
 
   // Keyboard controls
   useEffect(() => {
-    if (!open || mediaType !== "image") return;
+    if (!open || mediaType !== 'image') return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         onClose();
-      } else if (e.key === "+" || e.key === "=") {
+      } else if (e.key === '+' || e.key === '=') {
         handleZoomIn();
-      } else if (e.key === "-" || e.key === "_") {
+      } else if (e.key === '-' || e.key === '_') {
         handleZoomOut();
-      } else if (e.key === "0") {
+      } else if (e.key === '0') {
         handleReset();
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open, mediaType, onClose, handleZoomIn, handleZoomOut, handleReset]);
 
   return (
@@ -144,19 +132,19 @@ export const MediaLightbox: FC<MediaLightboxProps> = ({
       slotProps={{
         paper: {
           sx: {
-            backgroundColor: "rgba(0, 0, 0, 0.95)",
+            backgroundColor: 'rgba(0, 0, 0, 0.95)',
             ...(isMobile
               ? {}
-              : mediaType === "mindmap"
+              : mediaType === 'mindmap'
                 ? {
-                    width: "95vw",
-                    height: "90vh",
-                    margin: "auto",
+                    width: '95vw',
+                    height: '90vh',
+                    margin: 'auto',
                   }
                 : {
-                    maxWidth: "90vw",
-                    maxHeight: "90vh",
-                    margin: "auto",
+                    maxWidth: '90vw',
+                    maxHeight: '90vh',
+                    margin: 'auto',
                   }),
           },
         },
@@ -167,14 +155,14 @@ export const MediaLightbox: FC<MediaLightboxProps> = ({
         onClick={onClose}
         aria-label="Close lightbox"
         sx={{
-          position: "absolute",
+          position: 'absolute',
           bottom: 24,
           right: 16,
-          color: "white",
+          color: 'white',
           zIndex: 1,
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          "&:hover": {
-            backgroundColor: "rgba(0, 0, 0, 0.7)",
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          '&:hover': {
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
           },
         }}
       >
@@ -184,33 +172,28 @@ export const MediaLightbox: FC<MediaLightboxProps> = ({
       {/* Content */}
       <Box
         sx={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: "hidden",
-          position: "relative",
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          position: 'relative',
         }}
       >
-        {mediaType === "image" ? (
+        {mediaType === 'image' ? (
           <>
             {/* Image container */}
             <Box
               sx={{
                 flex: 1,
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                overflow: "hidden",
-                cursor:
-                  zoomLevel > 1
-                    ? isDragging
-                      ? "grabbing"
-                      : "grab"
-                    : "default",
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+                cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
               }}
               onWheel={handleWheel}
               onMouseDown={handleMouseDown}
@@ -223,14 +206,12 @@ export const MediaLightbox: FC<MediaLightboxProps> = ({
                 src={mediaSrc}
                 alt="Visual response"
                 style={{
-                  maxWidth: zoomLevel === 1 ? "100%" : "none",
-                  maxHeight: zoomLevel === 1 ? "100%" : "none",
-                  transform: `scale(${zoomLevel}) translate(${position.x / zoomLevel}px, ${
-                    position.y / zoomLevel
-                  }px)`,
-                  transition: isDragging ? "none" : "transform 0.2s ease-out",
-                  touchAction: "pan-x pan-y pinch-zoom",
-                  userSelect: "none",
+                  maxWidth: zoomLevel === 1 ? '100%' : 'none',
+                  maxHeight: zoomLevel === 1 ? '100%' : 'none',
+                  transform: `scale(${zoomLevel}) translate(${position.x / zoomLevel}px, ${position.y / zoomLevel}px)`,
+                  transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+                  touchAction: 'pan-x pan-y pinch-zoom',
+                  userSelect: 'none',
                 }}
               />
             </Box>
@@ -238,15 +219,15 @@ export const MediaLightbox: FC<MediaLightboxProps> = ({
             {/* Zoom controls */}
             <Box
               sx={{
-                position: "absolute",
+                position: 'absolute',
                 bottom: 24,
-                left: "50%",
-                transform: "translateX(-50%)",
-                display: "flex",
+                left: '50%',
+                transform: 'translateX(-50%)',
+                display: 'flex',
                 gap: 1,
-                backgroundColor: "rgba(0, 0, 0, 0.7)",
-                padding: "8px 12px",
-                borderRadius: "24px",
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                padding: '8px 12px',
+                borderRadius: '24px',
               }}
             >
               <button
@@ -278,11 +259,11 @@ export const MediaLightbox: FC<MediaLightboxProps> = ({
           // Mindmap
           <Box
             sx={{
-              width: "100%",
-              height: "100%",
+              width: '100%',
+              height: '100%',
               padding: isMobile ? 0.5 : 1,
               paddingTop: isMobile ? 0.5 : 1,
-              overflow: "auto",
+              overflow: 'auto',
             }}
           >
             <MarkmapView markdown={mediaSrc} fullscreen />

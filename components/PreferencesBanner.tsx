@@ -1,6 +1,6 @@
-import { FC, useState } from "react";
-import { Box, Button, Checkbox, FormControlLabel, alpha } from "@mui/material";
-import { Settings, ErrorOutline } from "@mui/icons-material";
+import { FC, useState } from 'react';
+import { Box, Button, Checkbox, FormControlLabel, alpha } from '@mui/material';
+import { Settings, ErrorOutline } from '@mui/icons-material';
 
 export interface PreferenceOption {
   value: string;
@@ -18,8 +18,8 @@ export interface PreferencesBannerProps {
 }
 
 export const PreferencesBanner: FC<PreferencesBannerProps> = ({
-  title = "Set Your Preferences",
-  description = "Help us personalize your experience by selecting your preferences below.",
+  title = 'Set Your Preferences',
+  description = 'Help us personalize your experience by selecting your preferences below.',
   options,
   onSubmit,
   onDismiss,
@@ -28,11 +28,7 @@ export const PreferencesBanner: FC<PreferencesBannerProps> = ({
   const [selected, setSelected] = useState<string[]>([]);
 
   const handleToggle = (value: string) => {
-    setSelected((prev) =>
-      prev.includes(value)
-        ? prev.filter((v) => v !== value)
-        : [...prev, value],
-    );
+    setSelected((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
   };
 
   const handleSubmit = () => {
@@ -42,31 +38,31 @@ export const PreferencesBanner: FC<PreferencesBannerProps> = ({
   return (
     <Box
       sx={{
-        backgroundColor: "#F8F5FC",
-        border: "2px solid #4A0979",
-        borderRadius: "8px",
-        padding: "0.75rem",
-        marginBottom: "1rem",
-        boxShadow: "0 2px 8px rgba(74, 9, 121, 0.1)",
+        backgroundColor: '#F8F5FC',
+        border: '2px solid #4A0979',
+        borderRadius: '8px',
+        padding: '0.75rem',
+        marginBottom: '1rem',
+        boxShadow: '0 2px 8px rgba(74, 9, 121, 0.1)',
       }}
     >
       {/* Header */}
       <Box
         sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          marginBottom: "0.5rem",
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          marginBottom: '0.5rem',
         }}
       >
-        <Settings sx={{ color: "#4A0979", fontSize: "1.25rem" }} />
+        <Settings sx={{ color: '#4A0979', fontSize: '1.25rem' }} />
         <Box>
           <h3
             style={{
               margin: 0,
-              fontSize: "1rem",
+              fontSize: '1rem',
               fontWeight: 700,
-              color: "#4A0979",
+              color: '#4A0979',
             }}
           >
             {title}
@@ -74,9 +70,9 @@ export const PreferencesBanner: FC<PreferencesBannerProps> = ({
           <p
             style={{
               margin: 0,
-              fontSize: "0.8125rem",
-              color: "#666",
-              marginTop: "0.125rem",
+              fontSize: '0.8125rem',
+              color: '#666',
+              marginTop: '0.125rem',
             }}
           >
             {description}
@@ -87,10 +83,10 @@ export const PreferencesBanner: FC<PreferencesBannerProps> = ({
       {/* Options */}
       <Box
         sx={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.125rem",
-          marginTop: "0.5rem",
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.125rem',
+          marginTop: '0.5rem',
         }}
       >
         {options.map((option, index) => {
@@ -109,25 +105,23 @@ export const PreferencesBanner: FC<PreferencesBannerProps> = ({
                     },
                   }}
                   sx={{
-                    color: "#4A0979",
-                    padding: "2px",
-                    "&.Mui-checked": {
-                      color: "#4A0979",
+                    color: '#4A0979',
+                    padding: '2px',
+                    '&.Mui-checked': {
+                      color: '#4A0979',
                     },
                   }}
                 />
               }
               label={
                 <Box>
-                  <div style={{ fontSize: "0.8125rem", fontWeight: 500 }}>
-                    {option.label}
-                  </div>
+                  <div style={{ fontSize: '0.8125rem', fontWeight: 500 }}>{option.label}</div>
                   {option.description && (
                     <div
                       style={{
-                        fontSize: "0.6875rem",
-                        color: "#666",
-                        marginTop: "1px",
+                        fontSize: '0.6875rem',
+                        color: '#666',
+                        marginTop: '1px',
                       }}
                     >
                       {option.description}
@@ -138,15 +132,15 @@ export const PreferencesBanner: FC<PreferencesBannerProps> = ({
               sx={{
                 marginLeft: 0,
                 marginRight: 0,
-                paddingY: "2px",
-                paddingX: "6px",
-                borderRadius: "4px",
-                transition: "background-color 0.2s",
-                "&:hover": {
-                  backgroundColor: alpha("#4A0979", 0.05),
+                paddingY: '2px',
+                paddingX: '6px',
+                borderRadius: '4px',
+                transition: 'background-color 0.2s',
+                '&:hover': {
+                  backgroundColor: alpha('#4A0979', 0.05),
                 },
-                "& .MuiFormControlLabel-label": {
-                  marginLeft: "6px",
+                '& .MuiFormControlLabel-label': {
+                  marginLeft: '6px',
                 },
               }}
             />
@@ -158,19 +152,19 @@ export const PreferencesBanner: FC<PreferencesBannerProps> = ({
       {error && (
         <Box
           sx={{
-            backgroundColor: "#FEE2E2",
-            border: "1px solid #DC2626",
-            borderRadius: "4px",
-            padding: "0.5rem",
-            marginTop: "0.5rem",
-            fontSize: "0.8125rem",
-            color: "#991B1B",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
+            backgroundColor: '#FEE2E2',
+            border: '1px solid #DC2626',
+            borderRadius: '4px',
+            padding: '0.5rem',
+            marginTop: '0.5rem',
+            fontSize: '0.8125rem',
+            color: '#991B1B',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
           }}
         >
-          <ErrorOutline sx={{ fontSize: "1rem" }} />
+          <ErrorOutline sx={{ fontSize: '1rem' }} />
           <span>{error}</span>
         </Box>
       )}
@@ -178,10 +172,10 @@ export const PreferencesBanner: FC<PreferencesBannerProps> = ({
       {/* Actions */}
       <Box
         sx={{
-          display: "flex",
-          gap: "0.5rem",
-          marginTop: "0.5rem",
-          justifyContent: "flex-end",
+          display: 'flex',
+          gap: '0.5rem',
+          marginTop: '0.5rem',
+          justifyContent: 'flex-end',
         }}
       >
         {onDismiss && (
@@ -190,10 +184,10 @@ export const PreferencesBanner: FC<PreferencesBannerProps> = ({
             size="small"
             onClick={onDismiss}
             sx={{
-              textTransform: "none",
-              fontSize: "0.875rem",
+              textTransform: 'none',
+              fontSize: '0.875rem',
               fontWeight: 500,
-              color: "#666",
+              color: '#666',
             }}
           >
             Skip for now
@@ -205,12 +199,12 @@ export const PreferencesBanner: FC<PreferencesBannerProps> = ({
           onClick={handleSubmit}
           disabled={selected.length === 0}
           sx={{
-            textTransform: "none",
-            fontSize: "0.875rem",
+            textTransform: 'none',
+            fontSize: '0.875rem',
             fontWeight: 500,
-            backgroundColor: "#4A0979",
-            "&:hover": {
-              backgroundColor: "#3A0759",
+            backgroundColor: '#4A0979',
+            '&:hover': {
+              backgroundColor: '#3A0759',
             },
           }}
         >

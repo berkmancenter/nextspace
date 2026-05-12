@@ -1,12 +1,12 @@
-import React, { FC, useEffect, useCallback, useRef } from "react";
-import { Close, Send, ArrowBack } from "@mui/icons-material";
-import { IconButton, useMediaQuery, useTheme } from "@mui/material";
-import { PseudonymousMessage, FeedbackConfig } from "../types.internal";
-import { InputEnhancer, ActiveEnhancerState } from "../types/inputEnhancer";
-import { normalizeAssistantPseudonym } from "../utils/Helpers";
-import { GenericEnhancerMenu } from "./GenericEnhancerMenu";
-import { MessageFeedback } from "./MessageFeedback";
-import { BotIcon } from "./BotIcon";
+import React, { FC, useEffect, useCallback, useRef } from 'react';
+import { Close, Send, ArrowBack } from '@mui/icons-material';
+import { IconButton, useMediaQuery, useTheme } from '@mui/material';
+import { PseudonymousMessage, FeedbackConfig } from '../types.internal';
+import { InputEnhancer, ActiveEnhancerState } from '../types/inputEnhancer';
+import { normalizeAssistantPseudonym } from '../utils/Helpers';
+import { GenericEnhancerMenu } from './GenericEnhancerMenu';
+import { MessageFeedback } from './MessageFeedback';
+import { BotIcon } from './BotIcon';
 
 interface ThreadPanelProps {
   parentMessage: PseudonymousMessage;
@@ -15,10 +15,7 @@ interface ThreadPanelProps {
   onClose: () => void;
   onSendReply: (text: string, parentId: string) => void;
   renderAvatar: (msg: PseudonymousMessage) => React.ReactNode;
-  renderMessageContent: (
-    msg: PseudonymousMessage,
-    isHovered?: boolean,
-  ) => React.ReactNode;
+  renderMessageContent: (msg: PseudonymousMessage, isHovered?: boolean) => React.ReactNode;
   enhancers: InputEnhancer<any>[];
   botName: string;
   feedbackConfig?: FeedbackConfig;
@@ -39,13 +36,12 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
   waitingForResponse = false,
 }) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [isReplying, setIsReplying] = React.useState(true); // Start with reply input open
-  const [replyText, setReplyText] = React.useState("");
+  const [replyText, setReplyText] = React.useState('');
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const threadContentRef = useRef<HTMLDivElement>(null);
-  const [activeEnhancer, setActiveEnhancer] =
-    React.useState<ActiveEnhancerState<any> | null>(null);
+  const [activeEnhancer, setActiveEnhancer] = React.useState<ActiveEnhancerState<any> | null>(null);
   const enterUsedForCommandRef = React.useRef(false);
 
   // Focus textarea when reply box is opened
@@ -93,7 +89,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
       // No triggers matched
       setActiveEnhancer(null);
     },
-    [enhancers]
+    [enhancers],
   );
 
   // Detect triggers whenever replyText changes
@@ -118,77 +114,66 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
     // Set cursor position
     setTimeout(() => {
       textareaRef.current?.focus();
-      textareaRef.current?.setSelectionRange(
-        result.cursorPos,
-        result.cursorPos
-      );
+      textareaRef.current?.setSelectionRange(result.cursorPos, result.cursorPos);
     }, 0);
   };
 
   const handleSendReply = (text: string) => {
     onSendReply(text, parentMessage.id!);
-    setReplyText("");
+    setReplyText('');
     // Keep reply box open after sending
   };
 
   const handleCancelReply = () => {
     setIsReplying(false);
-    setReplyText("");
+    setReplyText('');
   };
 
   /** Keyboard navigation for enhancer menus */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         setActiveEnhancer(null);
       }
 
       // Menu navigation
       if (activeEnhancer && activeEnhancer.items.length > 0) {
-        if (e.key === "ArrowDown") {
+        if (e.key === 'ArrowDown') {
           e.preventDefault();
           setActiveEnhancer((prev) =>
             prev
               ? {
                   ...prev,
-                  selectedIndex:
-                    prev.selectedIndex < prev.items.length - 1
-                      ? prev.selectedIndex + 1
-                      : 0,
+                  selectedIndex: prev.selectedIndex < prev.items.length - 1 ? prev.selectedIndex + 1 : 0,
                 }
-              : null
+              : null,
           );
-        } else if (e.key === "ArrowUp") {
+        } else if (e.key === 'ArrowUp') {
           e.preventDefault();
           setActiveEnhancer((prev) =>
             prev
               ? {
                   ...prev,
-                  selectedIndex:
-                    prev.selectedIndex > 0
-                      ? prev.selectedIndex - 1
-                      : prev.items.length - 1,
+                  selectedIndex: prev.selectedIndex > 0 ? prev.selectedIndex - 1 : prev.items.length - 1,
                 }
-              : null
+              : null,
           );
-        } else if (e.key === "Enter" || e.key === "Tab") {
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
           e.preventDefault();
           // Only suppress the subsequent Enter keyup when Enter itself was used
           // for selection. When Tab is used, no Enter keyup follows, so the flag
           // must stay false — otherwise the next Enter press to send the message
           // gets eaten.
-          if (e.key === "Enter") {
+          if (e.key === 'Enter') {
             enterUsedForCommandRef.current = true;
           }
-          handleEnhancerSelect(
-            activeEnhancer.items[activeEnhancer.selectedIndex]
-          );
+          handleEnhancerSelect(activeEnhancer.items[activeEnhancer.selectedIndex]);
         }
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown as any);
-    return () => window.removeEventListener("keydown", handleKeyDown as any);
+    window.addEventListener('keydown', handleKeyDown as any);
+    return () => window.removeEventListener('keydown', handleKeyDown as any);
   }, [activeEnhancer, handleEnhancerSelect]);
 
   return (
@@ -202,8 +187,8 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
               size="small"
               aria-label="Go back"
               sx={{
-                "&:hover": {
-                  backgroundColor: "#f3f4f6",
+                '&:hover': {
+                  backgroundColor: '#f3f4f6',
                 },
               }}
             >
@@ -218,8 +203,8 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
             size="small"
             aria-label="Close thread"
             sx={{
-              "&:hover": {
-                backgroundColor: "#f3f4f6",
+              '&:hover': {
+                backgroundColor: '#f3f4f6',
               },
             }}
           >
@@ -232,9 +217,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
       <div ref={threadContentRef} className="flex-1 overflow-y-auto px-4 py-4">
         {/* Parent message - always left-aligned in thread view */}
         <div className="mb-6">
-          <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
-            Original Message
-          </div>
+          <div className="text-xs font-semibold text-gray-500 uppercase mb-2">Original Message</div>
           <div className="flex gap-1.5 flex-row">
             {/* Avatar */}
             {renderAvatar(parentMessage)}
@@ -244,14 +227,12 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
               {/* Name and timestamp */}
               <div className="text-sm font-bold mb-1 text-left">
                 {normalizeAssistantPseudonym(parentMessage, botName)}
-                {parentMessage.pseudonym === pseudonym && (
-                  <span className="text-gray-600 font-normal"> (You)</span>
-                )}
+                {parentMessage.pseudonym === pseudonym && <span className="text-gray-600 font-normal"> (You)</span>}
                 {parentMessage.createdAt && (
                   <span className="text-xs font-normal text-gray-400 ml-2">
-                    {new Date(parentMessage.createdAt).toLocaleTimeString("en-US", {
-                      hour: "2-digit",
-                      minute: "2-digit",
+                    {new Date(parentMessage.createdAt).toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
                     })}
                   </span>
                 )}
@@ -265,12 +246,10 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                 parentMessage.id &&
                 feedbackConfig &&
                 feedbackConfig.eligibleMessageIds.has(parentMessage.id) && (
-                  <div className="mt-0" style={{ width: "85%" }}>
+                  <div className="mt-0" style={{ width: '85%' }}>
                     <MessageFeedback
                       messageId={parentMessage.id}
-                      initialRating={feedbackConfig.messageRatings.get(
-                        parentMessage.id,
-                      )}
+                      initialRating={feedbackConfig.messageRatings.get(parentMessage.id)}
                       onPopulateFeedbackText={feedbackConfig.onPopulateFeedbackText}
                       onSendFeedbackRating={feedbackConfig.onSendRating}
                     />
@@ -284,7 +263,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
         {replies.length > 0 && (
           <div className="border-t border-gray-300 mb-4">
             <div className="text-xs font-semibold text-gray-500 uppercase mt-4 mb-2">
-              {replies.length} {replies.length === 1 ? "Reply" : "Replies"}
+              {replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}
             </div>
           </div>
         )}
@@ -292,10 +271,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
         {/* Replies - all left-aligned */}
         <div className="space-y-4">
           {replies.map((reply, idx) => (
-            <div
-              key={`reply-${reply.id}-${idx}`}
-              className="flex gap-1.5 flex-row"
-            >
+            <div key={`reply-${reply.id}-${idx}`} className="flex gap-1.5 flex-row">
               {/* Avatar */}
               {renderAvatar(reply)}
 
@@ -304,14 +280,12 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                 {/* Name and timestamp */}
                 <div className="text-sm font-bold mb-1 text-left">
                   {normalizeAssistantPseudonym(reply, botName)}
-                  {reply.pseudonym === pseudonym && (
-                    <span className="text-gray-600 font-normal"> (You)</span>
-                  )}
+                  {reply.pseudonym === pseudonym && <span className="text-gray-600 font-normal"> (You)</span>}
                   {reply.createdAt && (
                     <span className="text-xs font-normal text-gray-400 ml-2">
-                      {new Date(reply.createdAt).toLocaleTimeString("en-US", {
-                        hour: "2-digit",
-                        minute: "2-digit",
+                      {new Date(reply.createdAt).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
                       })}
                     </span>
                   )}
@@ -321,19 +295,16 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                 {renderMessageContent(reply)}
 
                 {/* Feedback - rendered below the bubble for Event Assistant messages */}
-                {reply.fromAgent &&
-                  reply.id &&
-                  feedbackConfig &&
-                  feedbackConfig.eligibleMessageIds.has(reply.id) && (
-                    <div className="mt-0" style={{ width: "85%" }}>
-                      <MessageFeedback
-                        messageId={reply.id}
-                        initialRating={feedbackConfig.messageRatings.get(reply.id)}
-                        onPopulateFeedbackText={feedbackConfig.onPopulateFeedbackText}
-                        onSendFeedbackRating={feedbackConfig.onSendRating}
-                      />
-                    </div>
-                  )}
+                {reply.fromAgent && reply.id && feedbackConfig && feedbackConfig.eligibleMessageIds.has(reply.id) && (
+                  <div className="mt-0" style={{ width: '85%' }}>
+                    <MessageFeedback
+                      messageId={reply.id}
+                      initialRating={feedbackConfig.messageRatings.get(reply.id)}
+                      onPopulateFeedbackText={feedbackConfig.onPopulateFeedbackText}
+                      onSendFeedbackRating={feedbackConfig.onSendRating}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -349,117 +320,116 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
 
         {/* Reply action area - directly below messages */}
         <div className="pt-4">
-        {isReplying ? (
-          <div className="border-[1px] border-[#A5B4FC] rounded-lg bg-white transition-all focus-within:border-[#6366f1] focus-within:shadow-md">
-            <textarea
-              ref={textareaRef}
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              onKeyDown={(e) => {
-                // Don't handle Enter if menu is active (it's handled in the global listener)
-                if (activeEnhancer && (e.key === "Enter" || e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "Tab")) {
-                  return;
-                }
-
-                if (e.key === "Enter" && !e.shiftKey) {
-                  // Check if this Enter press was used for command selection
-                  if (enterUsedForCommandRef.current) {
-                    enterUsedForCommandRef.current = false;
-                    e.preventDefault();
+          {isReplying ? (
+            <div className="border-[1px] border-[#A5B4FC] rounded-lg bg-white transition-all focus-within:border-[#6366f1] focus-within:shadow-md">
+              <textarea
+                ref={textareaRef}
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                onKeyDown={(e) => {
+                  // Don't handle Enter if menu is active (it's handled in the global listener)
+                  if (
+                    activeEnhancer &&
+                    (e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Tab')
+                  ) {
                     return;
                   }
 
-                  e.preventDefault();
-                  if (replyText.trim()) {
-                    handleSendReply(replyText);
-                    setReplyText("");
-                  }
-                } else if (e.key === "Escape") {
-                  handleCancelReply();
-                }
-              }}
-              placeholder="Reply..."
-              className="w-full resize-none focus:outline-none text-base px-3 pt-2 pb-0"
-              rows={1}
-            />
-            <div className="flex items-center justify-between px-2 pb-1">
-              {/* Enhancer buttons at bottom left */}
-              <div className="flex gap-1">
-                {enhancers.map((enhancer) => {
-                  const isActive = activeEnhancer?.enhancer.id === enhancer.id;
-                  return (
-                    <IconButton
-                      key={enhancer.id}
-                      onClick={() => {
-                        const cursor =
-                          textareaRef.current?.selectionStart ?? replyText.length;
-                        const result = enhancer.button.onClick(replyText, cursor);
-                        setReplyText(result.value);
-                        setTimeout(() => {
-                          textareaRef.current?.focus();
-                          textareaRef.current?.setSelectionRange(
-                            result.cursorPos,
-                            result.cursorPos
-                          );
-                        }, 0);
-                      }}
-                      size="small"
-                      title={enhancer.button.getTitle(isActive)}
-                      sx={{
-                        padding: "6px",
-                        fontSize: "0.875rem",
-                        color: "#374151",
-                        backgroundColor: "#e5e7eb",
-                        borderRadius: "50%",
-                        width: "32px",
-                        height: "32px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        "&:hover": {
-                          backgroundColor: "#d1d5db",
-                        },
-                      }}
-                    >
-                      {enhancer.button.icon}
-                    </IconButton>
-                  );
-                })}
-              </div>
-              {/* Send button at bottom right */}
-              <IconButton
-                onClick={() => {
-                  if (replyText.trim()) {
-                    handleSendReply(replyText);
-                    setReplyText("");
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    // Check if this Enter press was used for command selection
+                    if (enterUsedForCommandRef.current) {
+                      enterUsedForCommandRef.current = false;
+                      e.preventDefault();
+                      return;
+                    }
+
+                    e.preventDefault();
+                    if (replyText.trim()) {
+                      handleSendReply(replyText);
+                      setReplyText('');
+                    }
+                  } else if (e.key === 'Escape') {
+                    handleCancelReply();
                   }
                 }}
-                disabled={!replyText.trim()}
-                aria-label="Send reply"
-                sx={{ padding: 0 }}
-              >
-                <Send
-                  sx={{
-                    opacity: replyText.trim() ? 1 : 0.5,
-                    color: "white",
-                    backgroundColor: "#2f69c4",
-                    borderRadius: "50%",
-                    padding: "4px",
-                    transform: "rotate(-45deg)",
-                    fontSize: 20,
+                placeholder="Reply..."
+                className="w-full resize-none focus:outline-none text-base px-3 pt-2 pb-0"
+                rows={1}
+              />
+              <div className="flex items-center justify-between px-2 pb-1">
+                {/* Enhancer buttons at bottom left */}
+                <div className="flex gap-1">
+                  {enhancers.map((enhancer) => {
+                    const isActive = activeEnhancer?.enhancer.id === enhancer.id;
+                    return (
+                      <IconButton
+                        key={enhancer.id}
+                        onClick={() => {
+                          const cursor = textareaRef.current?.selectionStart ?? replyText.length;
+                          const result = enhancer.button.onClick(replyText, cursor);
+                          setReplyText(result.value);
+                          setTimeout(() => {
+                            textareaRef.current?.focus();
+                            textareaRef.current?.setSelectionRange(result.cursorPos, result.cursorPos);
+                          }, 0);
+                        }}
+                        size="small"
+                        title={enhancer.button.getTitle(isActive)}
+                        sx={{
+                          padding: '6px',
+                          fontSize: '0.875rem',
+                          color: '#374151',
+                          backgroundColor: '#e5e7eb',
+                          borderRadius: '50%',
+                          width: '32px',
+                          height: '32px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          '&:hover': {
+                            backgroundColor: '#d1d5db',
+                          },
+                        }}
+                      >
+                        {enhancer.button.icon}
+                      </IconButton>
+                    );
+                  })}
+                </div>
+                {/* Send button at bottom right */}
+                <IconButton
+                  onClick={() => {
+                    if (replyText.trim()) {
+                      handleSendReply(replyText);
+                      setReplyText('');
+                    }
                   }}
-                />
-              </IconButton>
+                  disabled={!replyText.trim()}
+                  aria-label="Send reply"
+                  sx={{ padding: 0 }}
+                >
+                  <Send
+                    sx={{
+                      opacity: replyText.trim() ? 1 : 0.5,
+                      color: 'white',
+                      backgroundColor: '#2f69c4',
+                      borderRadius: '50%',
+                      padding: '4px',
+                      transform: 'rotate(-45deg)',
+                      fontSize: 20,
+                    }}
+                  />
+                </IconButton>
+              </div>
             </div>
-          </div>
-        ) : (
-          <button
-            onClick={() => setIsReplying(true)}
-            className="w-full border border-gray-300 rounded-lg hover:bg-gray-50 px-4 py-3 text-sm text-gray-700 text-left transition-colors"
-          >
-            Reply to thread...
-          </button>
-        )}
+          ) : (
+            <button
+              onClick={() => setIsReplying(true)}
+              className="w-full border border-gray-300 rounded-lg hover:bg-gray-50 px-4 py-3 text-sm text-gray-700 text-left transition-colors"
+            >
+              Reply to thread...
+            </button>
+          )}
         </div>
       </div>
 
@@ -470,9 +440,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
           selectedIndex={activeEnhancer.selectedIndex}
           onSelect={handleEnhancerSelect}
           renderItem={activeEnhancer.enhancer.renderItem}
-          getItemKey={(_item, index) =>
-            `${activeEnhancer.enhancer.id}-${index}`
-          }
+          getItemKey={(_item, index) => `${activeEnhancer.enhancer.id}-${index}`}
           anchorEl={textareaRef.current}
           open={true}
         />
