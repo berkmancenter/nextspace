@@ -1,73 +1,45 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ResourcesPanel } from '../../components/ResourcesPanel';
-import { PseudonymousMessage } from '../../types.internal';
+import { components } from '../../types';
 
-// Mock parseMessageBody from Helpers
-jest.mock('../../utils/Helpers', () => ({
-  parseMessageBody: jest.fn(),
-}));
+type Resource = components['schemas']['Resource'];
 
-import { parseMessageBody } from '../../utils/Helpers';
-const mockParseMessageBody = parseMessageBody as jest.Mock;
-
-function makeMessage(body: any): PseudonymousMessage {
-  return { id: 'msg-1', body } as unknown as PseudonymousMessage;
+function makeResource(overrides: Partial<Resource> = {}): Resource {
+  return {
+    id: 'res-1',
+    source: 'ai',
+    category: 'suggested',
+    title: 'The Internet and Democracy',
+    authors: ['Jane Doe', 'John Smith'],
+    year: '2021',
+    relevanceReason: "Directly relevant to today's discussion.",
+    participantVisible: true,
+    ...overrides,
+  };
 }
 
-const readingMessage = makeMessage({
-  type: 'reading',
-  content: [
-    {
-      title: 'The Internet and Democracy',
-      authors: ['Jane Doe', 'John Smith'],
-      year: 2021,
-      abstract: 'An abstract about internet and democracy.',
-      relevanceReason: "Directly relevant to today's discussion.",
-    },
-  ],
-});
-
-const readingMessageNoOptionals = makeMessage({
-  type: 'reading',
-  content: [
-    {
-      title: 'Digital Governance',
-      authors: ['Alice Wang'],
-      year: 2019,
-    },
-  ],
-});
-
 describe('ResourcesPanel', () => {
-  beforeEach(() => {
-    mockParseMessageBody.mockReturnValue({ text: '', type: undefined });
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
   describe('header / event info', () => {
     it('renders default title when eventName is not provided', () => {
-      render(<ResourcesPanel messages={[]} />);
+      render(<ResourcesPanel resources={[]} />);
       expect(screen.getByText('Event Resources')).toBeInTheDocument();
     });
 
     it('renders eventName when provided', () => {
-      render(<ResourcesPanel messages={[]} eventName="Tech & Society Forum" />);
+      render(<ResourcesPanel resources={[]} eventName="Tech & Society Forum" />);
       expect(screen.getByText('Tech & Society Forum')).toBeInTheDocument();
     });
 
     it('renders short eventDescription without truncation controls', () => {
-      render(<ResourcesPanel messages={[]} eventDescription="Short description." />);
+      render(<ResourcesPanel resources={[]} eventDescription="Short description." />);
       expect(screen.getByText('Short description.')).toBeInTheDocument();
       expect(screen.queryByText('more')).not.toBeInTheDocument();
     });
 
     it("truncates long eventDescription and shows 'more' button", () => {
       const longDescription = 'A'.repeat(600);
-      render(<ResourcesPanel messages={[]} eventDescription={longDescription} />);
+      render(<ResourcesPanel resources={[]} eventDescription={longDescription} />);
       expect(screen.getByText('more')).toBeInTheDocument();
       expect(screen.queryByText('less')).not.toBeInTheDocument();
     });
@@ -75,7 +47,7 @@ describe('ResourcesPanel', () => {
     it("expands truncated eventDescription on 'more' click and shows 'less'", async () => {
       const user = userEvent.setup();
       const longDescription = 'A'.repeat(600);
-      render(<ResourcesPanel messages={[]} eventDescription={longDescription} />);
+      render(<ResourcesPanel resources={[]} eventDescription={longDescription} />);
       await user.click(screen.getByText('more'));
       expect(screen.getByText('less')).toBeInTheDocument();
       expect(screen.queryByText('more')).not.toBeInTheDocument();
@@ -84,7 +56,7 @@ describe('ResourcesPanel', () => {
     it("collapses expanded description back on 'less' click", async () => {
       const user = userEvent.setup();
       const longDescription = 'B'.repeat(600);
-      render(<ResourcesPanel messages={[]} eventDescription={longDescription} />);
+      render(<ResourcesPanel resources={[]} eventDescription={longDescription} />);
       await user.click(screen.getByText('more'));
       await user.click(screen.getByText('less'));
       expect(screen.getByText('more')).toBeInTheDocument();
@@ -93,21 +65,20 @@ describe('ResourcesPanel', () => {
 
   describe('category headers', () => {
     it('renders Speakers and Readings & References category headers', () => {
-      render(<ResourcesPanel messages={[]} />);
+      render(<ResourcesPanel resources={[]} />);
       expect(screen.getByText('Speakers')).toBeInTheDocument();
       expect(screen.getByText('Readings & References')).toBeInTheDocument();
     });
 
     it('categories are collapsed by default (content not visible)', () => {
-      render(<ResourcesPanel messages={[]} speakers={[{ name: 'Alice', bio: 'Bio here' }]} />);
+      render(<ResourcesPanel resources={[]} speakers={[{ name: 'Alice', bio: 'Bio here' }]} />);
       expect(screen.queryByText('Speakers', { selector: 'h4' })).not.toBeInTheDocument();
       expect(screen.queryByText('Alice')).not.toBeInTheDocument();
     });
 
     it('shows ExpandMore icon when collapsed and ExpandLess when expanded', async () => {
       const user = userEvent.setup();
-      render(<ResourcesPanel messages={[]} />);
-      // MUI renders icons with data-testid like "ExpandMoreIcon"
+      render(<ResourcesPanel resources={[]} />);
       expect(screen.getAllByTestId('ExpandMoreIcon')).toHaveLength(2);
 
       await user.click(screen.getByText('Speakers'));
@@ -118,7 +89,7 @@ describe('ResourcesPanel', () => {
   describe('Speakers section', () => {
     it('shows speakers when the Speakers category is expanded', async () => {
       const user = userEvent.setup();
-      render(<ResourcesPanel messages={[]} speakers={[{ name: 'Dr. Ada Lovelace', bio: 'Pioneer of computing.' }]} />);
+      render(<ResourcesPanel resources={[]} speakers={[{ name: 'Dr. Ada Lovelace', bio: 'Pioneer of computing.' }]} />);
       await user.click(screen.getByText('Speakers'));
       expect(screen.getByText('Dr. Ada Lovelace')).toBeInTheDocument();
       expect(screen.getByText('Pioneer of computing.')).toBeInTheDocument();
@@ -126,7 +97,7 @@ describe('ResourcesPanel', () => {
 
     it('shows moderators when expanded', async () => {
       const user = userEvent.setup();
-      render(<ResourcesPanel messages={[]} moderators={[{ name: 'Mod One', bio: 'Moderator bio.' }]} />);
+      render(<ResourcesPanel resources={[]} moderators={[{ name: 'Mod One', bio: 'Moderator bio.' }]} />);
       await user.click(screen.getByText('Speakers'));
       expect(screen.getByText('Moderators')).toBeInTheDocument();
       expect(screen.getByText('Mod One')).toBeInTheDocument();
@@ -136,7 +107,7 @@ describe('ResourcesPanel', () => {
       const user = userEvent.setup();
       render(
         <ResourcesPanel
-          messages={[]}
+          resources={[]}
           speakers={[{ name: 'Speaker A', bio: 'Speaker bio.' }]}
           moderators={[{ name: 'Mod B', bio: 'Mod bio.' }]}
         />,
@@ -150,7 +121,7 @@ describe('ResourcesPanel', () => {
 
     it('does not render Moderators sub-heading when moderators array is empty', async () => {
       const user = userEvent.setup();
-      render(<ResourcesPanel messages={[]} speakers={[{ name: 'Speaker A', bio: 'Bio.' }]} moderators={[]} />);
+      render(<ResourcesPanel resources={[]} speakers={[{ name: 'Speaker A', bio: 'Bio.' }]} moderators={[]} />);
       await user.click(screen.getByText('Speakers'));
       expect(screen.queryByText('Moderators')).not.toBeInTheDocument();
     });
@@ -158,7 +129,7 @@ describe('ResourcesPanel', () => {
     it('truncates long speaker bios and allows expansion', async () => {
       const user = userEvent.setup();
       const longBio = 'X'.repeat(400);
-      render(<ResourcesPanel messages={[]} speakers={[{ name: 'Speaker A', bio: longBio }]} />);
+      render(<ResourcesPanel resources={[]} speakers={[{ name: 'Speaker A', bio: longBio }]} />);
       await user.click(screen.getByText('Speakers'));
       expect(screen.getByText('more')).toBeInTheDocument();
       await user.click(screen.getByText('more'));
@@ -167,114 +138,85 @@ describe('ResourcesPanel', () => {
 
     it('collapses the speakers section when header is clicked again', async () => {
       const user = userEvent.setup();
-      render(<ResourcesPanel messages={[]} speakers={[{ name: 'Speaker A', bio: 'Bio.' }]} />);
-      // Click the category header button to expand
+      render(<ResourcesPanel resources={[]} speakers={[{ name: 'Speaker A', bio: 'Bio.' }]} />);
       await user.click(screen.getByRole('button', { name: /speakers/i }));
       expect(screen.getByText('Speaker A')).toBeInTheDocument();
-      // Click again to collapse — re-query to get a fresh reference
       await user.click(screen.getByRole('button', { name: /speakers/i }));
       expect(screen.queryByText('Speaker A')).not.toBeInTheDocument();
     });
   });
 
   describe('Readings & References section', () => {
-    it('shows empty state when there are no readings', async () => {
+    it('shows empty state when there are no resources', async () => {
       const user = userEvent.setup();
-      render(<ResourcesPanel messages={[]} />);
+      render(<ResourcesPanel resources={[]} />);
       await user.click(screen.getByText('Readings & References'));
       expect(screen.getByText('No reading recommendations available yet.')).toBeInTheDocument();
     });
 
-    it('displays readings parsed from messages', async () => {
+    it('displays resources', async () => {
       const user = userEvent.setup();
-      mockParseMessageBody.mockReturnValueOnce({
-        text: '',
-        type: 'reading',
-        content: [
-          {
-            title: 'The Internet and Democracy',
-            authors: ['Jane Doe', 'John Smith'],
-            year: 2021,
-            abstract: 'An abstract about internet and democracy.',
-            relevanceReason: "Directly relevant to today's discussion.",
-          },
-        ],
-      });
+      const resource = makeResource({ source: 'ai' });
 
-      render(<ResourcesPanel messages={[readingMessage]} />);
+      render(<ResourcesPanel resources={[resource]} />);
       await user.click(screen.getByText('Readings & References'));
 
       expect(screen.getByText('The Internet and Democracy')).toBeInTheDocument();
       expect(screen.getByText('Jane Doe, John Smith (2021)')).toBeInTheDocument();
-      // relevanceReason takes priority over abstract when both are present
       expect(screen.getByText("Directly relevant to today's discussion.")).toBeInTheDocument();
-      expect(screen.queryByText('An abstract about internet and democracy.')).not.toBeInTheDocument();
       expect(screen.getByText('AI Pick')).toBeInTheDocument();
     });
 
-    it('renders reading without optional abstract and relevanceReason', async () => {
+    it('shows Speaker Pick label for speaker-sourced resources', async () => {
       const user = userEvent.setup();
-      mockParseMessageBody.mockReturnValueOnce({
-        text: '',
-        type: 'reading',
-        content: [
-          {
-            title: 'Digital Governance',
-            authors: ['Alice Wang'],
-            year: 2019,
-          },
-        ],
-      });
+      const resource = makeResource({ source: 'speaker' });
 
-      render(<ResourcesPanel messages={[readingMessageNoOptionals]} />);
+      render(<ResourcesPanel resources={[resource]} />);
       await user.click(screen.getByText('Readings & References'));
 
-      expect(screen.getByText('Digital Governance')).toBeInTheDocument();
-      expect(screen.getByText('Alice Wang (2019)')).toBeInTheDocument();
-      expect(screen.queryByText("Why it's relevant:")).not.toBeInTheDocument();
+      expect(screen.getByText('Speaker Pick')).toBeInTheDocument();
     });
 
-    it('aggregates readings from multiple messages', async () => {
-      const msg1 = makeMessage({ type: 'reading', content: [{ title: 'Book One', authors: ['Author A'], year: 2020 }] });
-      const msg2 = makeMessage({ type: 'reading', content: [{ title: 'Book Two', authors: ['Author B'], year: 2022 }] });
-
-      mockParseMessageBody
-        .mockReturnValueOnce({
-          text: '',
-          type: 'reading',
-          content: [{ title: 'Book One', authors: ['Author A'], year: 2020 }],
-        })
-        .mockReturnValueOnce({
-          text: '',
-          type: 'reading',
-          content: [{ title: 'Book Two', authors: ['Author B'], year: 2022 }],
-        });
-
+    it('renders resource without optional fields', async () => {
       const user = userEvent.setup();
-      render(<ResourcesPanel messages={[msg1, msg2]} />);
+      const resource = makeResource({ relevanceReason: undefined, description: undefined, summary: undefined, authors: [] });
+
+      render(<ResourcesPanel resources={[resource]} />);
+      await user.click(screen.getByText('Readings & References'));
+
+      expect(screen.getByText('The Internet and Democracy')).toBeInTheDocument();
+    });
+
+    it('displays multiple resources', async () => {
+      const user = userEvent.setup();
+      const res1 = makeResource({ id: 'res-1', title: 'Book One', authors: ['Author A'] });
+      const res2 = makeResource({ id: 'res-2', title: 'Book Two', authors: ['Author B'] });
+
+      render(<ResourcesPanel resources={[res1, res2]} />);
       await user.click(screen.getByText('Readings & References'));
 
       expect(screen.getByText('Book One')).toBeInTheDocument();
       expect(screen.getByText('Book Two')).toBeInTheDocument();
     });
 
-    it('ignores non-reading messages', async () => {
-      const nonReadingMsg = makeMessage({ type: 'assistant', text: 'Hello' });
-      mockParseMessageBody.mockReturnValueOnce({
-        text: 'Hello',
-        type: 'assistant',
+    it('prefers relevanceReason over description and summary', async () => {
+      const user = userEvent.setup();
+      const resource = makeResource({
+        relevanceReason: 'Relevance note',
+        description: 'Description text',
+        summary: 'Summary text',
       });
 
-      const user = userEvent.setup();
-      render(<ResourcesPanel messages={[nonReadingMsg]} />);
+      render(<ResourcesPanel resources={[resource]} />);
       await user.click(screen.getByText('Readings & References'));
 
-      expect(screen.getByText('No reading recommendations available yet.')).toBeInTheDocument();
+      expect(screen.getByText('Relevance note')).toBeInTheDocument();
+      expect(screen.queryByText('Description text')).not.toBeInTheDocument();
     });
 
     it('collapses the readings section when clicked again', async () => {
       const user = userEvent.setup();
-      render(<ResourcesPanel messages={[]} />);
+      render(<ResourcesPanel resources={[]} />);
       await user.click(screen.getByText('Readings & References'));
       expect(screen.getByText('No reading recommendations available yet.')).toBeInTheDocument();
       await user.click(screen.getByText('Readings & References'));
@@ -284,18 +226,17 @@ describe('ResourcesPanel', () => {
 
   describe('unseenReadingsCount badge', () => {
     it('does not show badge when unseenReadingsCount is 0', () => {
-      render(<ResourcesPanel messages={[]} unseenReadingsCount={0} />);
+      render(<ResourcesPanel resources={[]} unseenReadingsCount={0} />);
       expect(screen.queryByText('0')).not.toBeInTheDocument();
     });
 
     it('shows badge with count when unseenReadingsCount > 0', () => {
-      render(<ResourcesPanel messages={[]} unseenReadingsCount={3} />);
+      render(<ResourcesPanel resources={[]} unseenReadingsCount={3} />);
       expect(screen.getByText('3')).toBeInTheDocument();
     });
 
     it('does not show badge for the Speakers category regardless', () => {
-      render(<ResourcesPanel messages={[]} unseenReadingsCount={5} speakers={[{ name: 'S', bio: 'B' }]} />);
-      // Badge "5" should appear once (Readings), not duplicated for Speakers
+      render(<ResourcesPanel resources={[]} unseenReadingsCount={5} speakers={[{ name: 'S', bio: 'B' }]} />);
       expect(screen.getAllByText('5')).toHaveLength(1);
     });
   });
@@ -304,7 +245,7 @@ describe('ResourcesPanel', () => {
     it('does not call onMarkReadingsAsSeen when readings section is expanded', async () => {
       const user = userEvent.setup();
       const onMarkReadingsAsSeen = jest.fn();
-      render(<ResourcesPanel messages={[]} onMarkReadingsAsSeen={onMarkReadingsAsSeen} />);
+      render(<ResourcesPanel resources={[]} onMarkReadingsAsSeen={onMarkReadingsAsSeen} />);
       await user.click(screen.getByText('Readings & References'));
       expect(onMarkReadingsAsSeen).not.toHaveBeenCalled();
     });
@@ -312,7 +253,7 @@ describe('ResourcesPanel', () => {
     it('calls onMarkReadingsAsSeen when collapsing readings section', async () => {
       const user = userEvent.setup();
       const onMarkReadingsAsSeen = jest.fn();
-      render(<ResourcesPanel messages={[]} onMarkReadingsAsSeen={onMarkReadingsAsSeen} />);
+      render(<ResourcesPanel resources={[]} onMarkReadingsAsSeen={onMarkReadingsAsSeen} />);
       await user.click(screen.getByText('Readings & References')); // expand
       await user.click(screen.getByText('Readings & References')); // collapse
       expect(onMarkReadingsAsSeen).toHaveBeenCalledTimes(1);
@@ -322,7 +263,7 @@ describe('ResourcesPanel', () => {
       const user = userEvent.setup();
       const onMarkReadingsAsSeen = jest.fn();
       render(
-        <ResourcesPanel messages={[]} onMarkReadingsAsSeen={onMarkReadingsAsSeen} speakers={[{ name: 'S', bio: 'B' }]} />,
+        <ResourcesPanel resources={[]} onMarkReadingsAsSeen={onMarkReadingsAsSeen} speakers={[{ name: 'S', bio: 'B' }]} />,
       );
       await user.click(screen.getByText('Speakers'));
       expect(onMarkReadingsAsSeen).not.toHaveBeenCalled();
@@ -330,73 +271,48 @@ describe('ResourcesPanel', () => {
 
     it('does not throw when onMarkReadingsAsSeen is not provided', async () => {
       const user = userEvent.setup();
-      render(<ResourcesPanel messages={[]} />);
+      render(<ResourcesPanel resources={[]} />);
       await expect(user.click(screen.getByText('Readings & References'))).resolves.not.toThrow();
     });
   });
 
-  describe('newReadingMessageIds highlighting', () => {
-    it("shows 'New' badge on readings whose messageId is in newReadingMessageIds", async () => {
+  describe('newResourceIds highlighting', () => {
+    it("shows 'New' badge on resources whose id is in newResourceIds", async () => {
       const user = userEvent.setup();
-      mockParseMessageBody.mockReturnValueOnce({
-        text: '',
-        type: 'reading',
-        content: [{ title: 'New Paper', authors: ['Author X'], year: 2024 }],
-      });
+      const resource = makeResource({ id: 'res-1' });
 
-      render(<ResourcesPanel messages={[readingMessage]} newReadingMessageIds={new Set(['msg-1'])} />);
+      render(<ResourcesPanel resources={[resource]} newResourceIds={new Set(['res-1'])} />);
       await user.click(screen.getByText('Readings & References'));
       expect(screen.getByText('New')).toBeInTheDocument();
     });
 
-    it("does not show 'New' badge when messageId is not in newReadingMessageIds", async () => {
+    it("does not show 'New' badge when resource id is not in newResourceIds", async () => {
       const user = userEvent.setup();
-      mockParseMessageBody.mockReturnValueOnce({
-        text: '',
-        type: 'reading',
-        content: [{ title: 'Old Paper', authors: ['Author Y'], year: 2020 }],
-      });
+      const resource = makeResource({ id: 'res-1' });
 
-      render(<ResourcesPanel messages={[readingMessage]} newReadingMessageIds={new Set(['other-msg-id'])} />);
+      render(<ResourcesPanel resources={[resource]} newResourceIds={new Set(['other-res-id'])} />);
       await user.click(screen.getByText('Readings & References'));
       expect(screen.queryByText('New')).not.toBeInTheDocument();
     });
 
-    it("does not show 'New' badge when newReadingMessageIds is not provided", async () => {
+    it("does not show 'New' badge when newResourceIds is not provided", async () => {
       const user = userEvent.setup();
-      mockParseMessageBody.mockReturnValueOnce({
-        text: '',
-        type: 'reading',
-        content: [{ title: 'Some Paper', authors: ['Author Z'], year: 2022 }],
-      });
+      const resource = makeResource({ id: 'res-1' });
 
-      render(<ResourcesPanel messages={[readingMessage]} />);
+      render(<ResourcesPanel resources={[resource]} />);
       await user.click(screen.getByText('Readings & References'));
       expect(screen.queryByText('New')).not.toBeInTheDocument();
     });
 
-    it('applies amber styling only to new readings, not all readings', async () => {
+    it('applies amber styling only to new resources, not all resources', async () => {
       const user = userEvent.setup();
-      const msg1 = { id: 'msg-new', body: {} } as unknown as PseudonymousMessage;
-      const msg2 = { id: 'msg-old', body: {} } as unknown as PseudonymousMessage;
+      const res1 = makeResource({ id: 'res-new', title: 'New Reading' });
+      const res2 = makeResource({ id: 'res-old', title: 'Old Reading' });
 
-      mockParseMessageBody
-        .mockReturnValueOnce({
-          text: '',
-          type: 'reading',
-          content: [{ title: 'New Reading', authors: ['A'], year: 2024 }],
-        })
-        .mockReturnValueOnce({
-          text: '',
-          type: 'reading',
-          content: [{ title: 'Old Reading', authors: ['B'], year: 2020 }],
-        });
-
-      render(<ResourcesPanel messages={[msg1, msg2]} newReadingMessageIds={new Set(['msg-new'])} />);
+      render(<ResourcesPanel resources={[res1, res2]} newResourceIds={new Set(['res-new'])} />);
       await user.click(screen.getByText('Readings & References'));
 
       expect(screen.getByText('New')).toBeInTheDocument();
-      // Only one "New" badge even though there are two readings
       expect(screen.getAllByText('New')).toHaveLength(1);
     });
   });
@@ -406,7 +322,7 @@ describe('ResourcesPanel', () => {
       const user = userEvent.setup();
       render(
         <ResourcesPanel
-          messages={[]}
+          resources={[]}
           speakers={[
             { name: 'Speaker One', bio: 'Bio one.' },
             { name: 'Speaker Two', bio: 'Bio two.' },
@@ -424,7 +340,7 @@ describe('ResourcesPanel', () => {
       const user = userEvent.setup();
       render(
         <ResourcesPanel
-          messages={[]}
+          resources={[]}
           moderators={[
             { name: 'Mod Alpha', bio: 'Alpha bio.' },
             { name: 'Mod Beta', bio: 'Beta bio.' },

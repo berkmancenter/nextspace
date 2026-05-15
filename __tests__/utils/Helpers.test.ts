@@ -318,65 +318,18 @@ describe('generateEventUrls (via createConversationFromData)', () => {
     getConfigSpy.mockRestore();
   });
 
-  it('generates a participant URL without resources param when no resources channel exists', async () => {
-    const data = { ...baseConversation, channels: [] };
-    const result = await createConversationFromData(data as any);
-    const url = result.eventUrls.participant[0]?.url;
-    expect(url).not.toContain('channel=resources');
-  });
-
-  it('appends resources channel param when a resources channel is present (eventAssistant)', async () => {
-    const data = {
-      ...baseConversation,
-      channels: [{ name: 'resources', passcode: 'res-secret' }],
-    };
-    const result = await createConversationFromData(data as any);
-    const url = result.eventUrls.participant[0]?.url;
-    expect(url).toContain('channel=resources,res-secret');
-  });
-
-  it('appends resources channel param for eventAssistant', async () => {
-    const data = {
-      ...baseConversation,
-      conversationType: 'eventAssistant',
-      agents: [{ id: 'agent-1', agentType: 'eventAssistant' }],
-      channels: [{ name: 'resources', passcode: 'res-plus' }],
-    };
-    const result = await createConversationFromData(data as any);
-    const url = result.eventUrls.participant[0]?.url;
-    expect(url).toContain('channel=resources,res-plus');
-  });
-
-  it('includes resources param after chat param when both channels exist', async () => {
-    const data = {
-      ...baseConversation,
-      channels: [
-        { name: 'chat', passcode: 'chat-secret' },
-        { name: 'resources', passcode: 'res-secret' },
-      ],
-    };
-    const result = await createConversationFromData(data as any);
-    const url = result.eventUrls.participant[0]?.url;
-    expect(url).toContain('channel=chat,chat-secret');
-    expect(url).toContain('channel=resources,res-secret');
-    // resources appears after chat in the URL
-    expect(url.indexOf('channel=chat')).toBeLessThan(url.indexOf('channel=resources'));
-  });
-
-  it('includes transcript, chat, and resources params when all three channels exist', async () => {
+  it('includes transcript and chat params when both channels exist', async () => {
     const data = {
       ...baseConversation,
       channels: [
         { name: 'transcript', passcode: 'tx-pass' },
         { name: 'chat', passcode: 'chat-pass' },
-        { name: 'resources', passcode: 'res-pass' },
       ],
     };
     const result = await createConversationFromData(data as any);
     const url = result.eventUrls.participant[0]?.url;
     expect(url).toContain('channel=transcript,tx-pass');
     expect(url).toContain('channel=chat,chat-pass');
-    expect(url).toContain('channel=resources,res-pass');
   });
 
   it('includes a moderator URL when  moderator channel exists', async () => {

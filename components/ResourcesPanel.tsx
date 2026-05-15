@@ -1,19 +1,20 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { PseudonymousMessage } from '../types.internal';
-import { parseMessageBody } from '../utils/Helpers';
+import React, { useState, useEffect } from 'react';
+import { components } from '../types';
 import { ExpandMore, ExpandLess, MenuBook, Person, Info } from '@mui/icons-material';
 
+type Resource = components['schemas']['Resource'];
+
 interface ResourcesPanelProps {
-  messages: PseudonymousMessage[];
+  resources: Resource[];
   eventDescription?: string;
   speakers?: Array<{ name: string; bio: string }>;
   moderators?: Array<{ name: string; bio: string }>;
   eventName?: string;
   unseenReadingsCount?: number;
   onMarkReadingsAsSeen?: () => void;
-  newReadingMessageIds?: Set<string>;
+  newResourceIds?: Set<string>;
 }
 
 interface CategorySection {
@@ -52,52 +53,32 @@ const TruncatedText: React.FC<TruncatedTextProps> = ({ text, maxLength, classNam
 };
 
 export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
-  messages,
+  resources,
   eventDescription,
   speakers = [],
   moderators = [],
   eventName,
   unseenReadingsCount = 0,
   onMarkReadingsAsSeen,
-  newReadingMessageIds,
+  newResourceIds,
 }) => {
+  const suggestedResources = resources.filter((r) => r.category === 'suggested');
+
   // Track which categories are expanded
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  // Snapshot of new reading IDs captured at expand time, so highlights persist
-  // even after the parent clears newReadingMessageIds
-  const [newReadingIdsSnapshot, setNewReadingIdsSnapshot] = useState<Set<string>>(new Set());
+  // Snapshot of new resource IDs captured at expand time, so highlights persist
+  // even after the parent clears newResourceIds
+  const [newResourceIdsSnapshot, setNewResourceIdsSnapshot] = useState<Set<string>>(new Set());
 
-  // When new readings arrive while the section is already expanded, merge them into the snapshot
+  // When new resources arrive while the section is already expanded, merge them into the snapshot
   useEffect(() => {
-    if (!expandedCategories.has('readings') || !newReadingMessageIds) return;
-    setNewReadingIdsSnapshot((prev) => {
-      const hasNew = [...newReadingMessageIds].some((id) => !prev.has(id));
+    if (!expandedCategories.has('readings') || !newResourceIds) return;
+    setNewResourceIdsSnapshot((prev) => {
+      const hasNew = [...newResourceIds].some((id) => !prev.has(id));
       if (!hasNew) return prev;
-      return new Set([...prev, ...newReadingMessageIds]);
+      return new Set([...prev, ...newResourceIds]);
     });
-  }, [newReadingMessageIds, expandedCategories]);
-
-  // Extract reading recommendations from messages
-  const readings = useMemo(() => {
-    const allReadings: Array<{
-      title: string;
-      url?: string;
-      authors: string[];
-      year: number;
-      abstract?: string;
-      relevanceReason?: string;
-      messageId: string;
-    }> = [];
-
-    messages.forEach((msg) => {
-      const parsed = parseMessageBody(msg.body);
-      if (parsed.type === 'reading' && Array.isArray(parsed.content)) {
-        allReadings.push(...parsed.content.map((r) => ({ ...r, messageId: msg.id! })));
-      }
-    });
-
-    return allReadings;
-  }, [messages]);
+  }, [newResourceIds, expandedCategories]);
 
   const categories: CategorySection[] = [
     {
@@ -129,11 +110,11 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
     if (categoryId === 'readings') {
       if (expandedCategories.has(categoryId)) {
         // Mark as seen on collapse so re-expanding doesn't re-show highlights
-        setNewReadingIdsSnapshot(new Set());
+        setNewResourceIdsSnapshot(new Set());
         if (onMarkReadingsAsSeen) onMarkReadingsAsSeen();
       } else {
         // Snapshot current new IDs before clearing, so highlights render correctly
-        setNewReadingIdsSnapshot(new Set(newReadingMessageIds));
+        setNewResourceIdsSnapshot(new Set(newResourceIds));
       }
     }
   };
@@ -263,21 +244,21 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                 .
               </p>
               <ul className="space-y-4 list-none">
-                {readings.length === 0 ? (
+                {suggestedResources.length === 0 ? (
                   <li className="text-sm text-gray-500 italic">No reading recommendations available yet.</li>
                 ) : (
-                  readings.map((reading) => {
-                    const isNew = newReadingIdsSnapshot.has(reading.messageId);
+                  suggestedResources.map((resource) => {
+                    const isNew = resource.id ? newResourceIdsSnapshot.has(resource.id) : false;
                     return (
                       <li
-                        key={reading.messageId}
+                        key={resource.id}
                         className={`border-l-4 pl-4 py-3 rounded-r ${
                           isNew ? 'border-amber-400 bg-amber-50' : 'border-indigo-400 bg-indigo-50'
                         }`}
                       >
                         <div aria-hidden="true" className="flex items-center gap-2 mb-2">
                           <span className="inline-block text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
-                            AI Pick
+                            {resource.source === 'ai' ? 'AI Pick' : 'Speaker Pick'}
                           </span>
                           {isNew && (
                             <span className="inline-block text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
@@ -286,22 +267,25 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                           )}
                         </div>
                         <h3 className={`text-sm font-semibold mb-1 ${isNew ? 'text-amber-900' : 'text-indigo-900'}`}>
-                          {reading.url ? (
-                            <a href={reading.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                              {reading.title}
+                          {resource.url ? (
+                            <a href={resource.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                              {resource.title}
                             </a>
                           ) : (
-                            <span tabIndex={0}>{reading.title}</span>
+                            <span tabIndex={0}>{resource.title}</span>
                           )}
                         </h3>
-                        <p tabIndex={0} className="text-xs text-gray-600 mb-2">
-                          <span className="sr-only">Authors and year: </span>
-                          {reading.authors.join(', ')} ({reading.year})
-                        </p>
-                        {(reading.relevanceReason || reading.abstract) && (
+                        {resource.authors && resource.authors.length > 0 && (
+                          <p tabIndex={0} className="text-xs text-gray-600 mb-2">
+                            <span className="sr-only">Authors and year: </span>
+                            {resource.authors.join(', ')}
+                            {resource.year ? ` (${resource.year})` : ''}
+                          </p>
+                        )}
+                        {(resource.relevanceReason || resource.description || resource.summary) && (
                           <p tabIndex={0} className="text-xs text-gray-700 leading-relaxed mb-2">
                             <span className="sr-only">Relevance: </span>
-                            {reading.relevanceReason || reading.abstract}
+                            {resource.relevanceReason || resource.description || resource.summary}
                           </p>
                         )}
                       </li>
