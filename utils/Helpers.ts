@@ -303,9 +303,6 @@ function generateEventUrls(conversationData: Conversation, botName: string): Eve
   const chatPasscode = conversationData.channels.find((channel) => channel.name === 'chat')?.passcode;
   const hasChat = Boolean(chatPasscode);
 
-  const resourcesPasscode = conversationData.channels.find((channel) => channel.name === 'resources')?.passcode;
-  const hasResources = Boolean(resourcesPasscode);
-
   const modPasscode = conversationData.channels.find((channel) => channel.name === 'moderator')?.passcode;
 
   const modUrl = modPasscode
@@ -334,7 +331,7 @@ function generateEventUrls(conversationData: Conversation, botName: string): Eve
       label: botName,
       url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
         hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ''
-      }${hasChat ? `&channel=chat,${chatPasscode}` : ''}${hasResources ? `&channel=resources,${resourcesPasscode}` : ''}`,
+      }${hasChat ? `&channel=chat,${chatPasscode}` : ''}`,
     };
     participant.push(eventAssistantUrl);
     if (modPasscode) {
