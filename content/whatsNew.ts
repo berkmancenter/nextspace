@@ -29,6 +29,11 @@ export const whatsNewEntries: WhatsNewEntry[] = [
     body: 'Find reading recommendations and other resources surfaced during the event in the new Resources tab.',
     releasedAt: '2026-04-27',
   },
+  {
+    title: 'Required Reading',
+    body: 'Event organizers can now assign required readings that are highlighted in the Resources tab.',
+    releasedAt: '2026-05-15',
+  },
 ];
 
 /**
