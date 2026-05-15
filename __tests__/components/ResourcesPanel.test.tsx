@@ -67,7 +67,7 @@ describe('ResourcesPanel', () => {
     it('renders Speakers and Readings & References category headers', () => {
       render(<ResourcesPanel resources={[]} />);
       expect(screen.getByText('Speakers')).toBeInTheDocument();
-      expect(screen.getByText('Readings & References')).toBeInTheDocument();
+      expect(screen.getByText('Readings & References (optional)')).toBeInTheDocument();
     });
 
     it('categories are collapsed by default (content not visible)', () => {
@@ -79,7 +79,7 @@ describe('ResourcesPanel', () => {
     it('shows ExpandMore icon when collapsed and ExpandLess when expanded', async () => {
       const user = userEvent.setup();
       render(<ResourcesPanel resources={[]} />);
-      expect(screen.getAllByTestId('ExpandMoreIcon')).toHaveLength(2);
+      expect(screen.getAllByTestId('ExpandMoreIcon')).toHaveLength(3);
 
       await user.click(screen.getByText('Speakers'));
       expect(screen.getAllByTestId('ExpandLessIcon')).toHaveLength(1);
@@ -146,11 +146,118 @@ describe('ResourcesPanel', () => {
     });
   });
 
+  describe('Required Reading section', () => {
+    it('shows empty state when expanded with no required resources', async () => {
+      const user = userEvent.setup();
+      render(<ResourcesPanel resources={[]} />);
+      await user.click(screen.getByText('Required Reading'));
+      expect(screen.getByText('No required readings assigned yet.')).toBeInTheDocument();
+    });
+
+    it('renders Required Reading header', () => {
+      const resource = makeResource({ category: 'required', source: 'speaker' });
+      render(<ResourcesPanel resources={[resource]} />);
+      expect(screen.getByText('Required Reading')).toBeInTheDocument();
+    });
+
+    it('does not show content when collapsed', () => {
+      const resource = makeResource({ category: 'required', source: 'speaker' });
+      render(<ResourcesPanel resources={[resource]} />);
+      expect(screen.queryByText('The Internet and Democracy')).not.toBeInTheDocument();
+    });
+
+    it('shows resources when expanded', async () => {
+      const user = userEvent.setup();
+      const resource = makeResource({ category: 'required', source: 'speaker' });
+      render(<ResourcesPanel resources={[resource]} />);
+      await user.click(screen.getByText('Required Reading'));
+      expect(screen.getByText('The Internet and Democracy')).toBeInTheDocument();
+    });
+
+    it('shows singular intro text for one required reading', async () => {
+      const user = userEvent.setup();
+      const resource = makeResource({ category: 'required', source: 'speaker' });
+      render(<ResourcesPanel resources={[resource]} />);
+      await user.click(screen.getByText('Required Reading'));
+      expect(screen.getByText(/reading was/)).toBeInTheDocument();
+    });
+
+    it('shows plural intro text for multiple required readings', async () => {
+      const user = userEvent.setup();
+      const r1 = makeResource({ id: 'r1', category: 'required', source: 'speaker', title: 'Paper One' });
+      const r2 = makeResource({ id: 'r2', category: 'required', source: 'speaker', title: 'Paper Two' });
+      render(<ResourcesPanel resources={[r1, r2]} />);
+      await user.click(screen.getByText('Required Reading'));
+      expect(screen.getByText(/2 readings were/)).toBeInTheDocument();
+    });
+
+    it('shows Required badge on each required resource', async () => {
+      const user = userEvent.setup();
+      const r1 = makeResource({ id: 'r1', category: 'required', source: 'speaker', title: 'Paper One' });
+      const r2 = makeResource({ id: 'r2', category: 'required', source: 'speaker', title: 'Paper Two' });
+      render(<ResourcesPanel resources={[r1, r2]} />);
+      await user.click(screen.getByText('Required Reading'));
+      expect(screen.getAllByText('Required')).toHaveLength(2);
+    });
+
+    it('renders authors and year', async () => {
+      const user = userEvent.setup();
+      const resource = makeResource({ category: 'required', source: 'speaker' });
+      render(<ResourcesPanel resources={[resource]} />);
+      await user.click(screen.getByText('Required Reading'));
+      expect(screen.getByText('Jane Doe, John Smith (2021)')).toBeInTheDocument();
+    });
+
+    it('renders description when present', async () => {
+      const user = userEvent.setup();
+      const resource = makeResource({ category: 'required', source: 'speaker', description: 'A must-read paper.' });
+      render(<ResourcesPanel resources={[resource]} />);
+      await user.click(screen.getByText('Required Reading'));
+      expect(screen.getByText('A must-read paper.')).toBeInTheDocument();
+    });
+
+    it('renders summary with truncation when present', async () => {
+      const user = userEvent.setup();
+      const resource = makeResource({ category: 'required', source: 'speaker', summary: 'S'.repeat(500) });
+      render(<ResourcesPanel resources={[resource]} />);
+      await user.click(screen.getByText('Required Reading'));
+      expect(screen.getByText('Summary')).toBeInTheDocument();
+      expect(screen.getByText('more')).toBeInTheDocument();
+    });
+
+    it('renders title as a link when url is present', async () => {
+      const user = userEvent.setup();
+      const resource = makeResource({ category: 'required', source: 'speaker', url: 'https://example.com' });
+      render(<ResourcesPanel resources={[resource]} />);
+      await user.click(screen.getByText('Required Reading'));
+      const link = screen.getByRole('link', { name: 'The Internet and Democracy' });
+      expect(link).toHaveAttribute('href', 'https://example.com');
+    });
+
+    it('collapses when header is clicked again', async () => {
+      const user = userEvent.setup();
+      const resource = makeResource({ category: 'required', source: 'speaker' });
+      render(<ResourcesPanel resources={[resource]} />);
+      await user.click(screen.getByText('Required Reading'));
+      expect(screen.getByText('The Internet and Democracy')).toBeInTheDocument();
+      await user.click(screen.getByText('Required Reading'));
+      expect(screen.queryByText('The Internet and Democracy')).not.toBeInTheDocument();
+    });
+
+    it('does not show required resources in Readings & References section', async () => {
+      const user = userEvent.setup();
+      const resource = makeResource({ category: 'required', source: 'speaker' });
+      render(<ResourcesPanel resources={[resource]} />);
+      await user.click(screen.getByText('Readings & References (optional)'));
+      expect(screen.getByText('No reading recommendations available yet.')).toBeInTheDocument();
+    });
+  });
+
   describe('Readings & References section', () => {
     it('shows empty state when there are no resources', async () => {
       const user = userEvent.setup();
       render(<ResourcesPanel resources={[]} />);
-      await user.click(screen.getByText('Readings & References'));
+      await user.click(screen.getByText('Readings & References (optional)'));
       expect(screen.getByText('No reading recommendations available yet.')).toBeInTheDocument();
     });
 
@@ -159,7 +266,7 @@ describe('ResourcesPanel', () => {
       const resource = makeResource({ source: 'ai' });
 
       render(<ResourcesPanel resources={[resource]} />);
-      await user.click(screen.getByText('Readings & References'));
+      await user.click(screen.getByText('Readings & References (optional)'));
 
       expect(screen.getByText('The Internet and Democracy')).toBeInTheDocument();
       expect(screen.getByText('Jane Doe, John Smith (2021)')).toBeInTheDocument();
@@ -172,7 +279,7 @@ describe('ResourcesPanel', () => {
       const resource = makeResource({ source: 'speaker' });
 
       render(<ResourcesPanel resources={[resource]} />);
-      await user.click(screen.getByText('Readings & References'));
+      await user.click(screen.getByText('Readings & References (optional)'));
 
       expect(screen.getByText('Speaker Pick')).toBeInTheDocument();
     });
@@ -182,7 +289,7 @@ describe('ResourcesPanel', () => {
       const resource = makeResource({ relevanceReason: undefined, description: undefined, summary: undefined, authors: [] });
 
       render(<ResourcesPanel resources={[resource]} />);
-      await user.click(screen.getByText('Readings & References'));
+      await user.click(screen.getByText('Readings & References (optional)'));
 
       expect(screen.getByText('The Internet and Democracy')).toBeInTheDocument();
     });
@@ -193,7 +300,7 @@ describe('ResourcesPanel', () => {
       const res2 = makeResource({ id: 'res-2', title: 'Book Two', authors: ['Author B'] });
 
       render(<ResourcesPanel resources={[res1, res2]} />);
-      await user.click(screen.getByText('Readings & References'));
+      await user.click(screen.getByText('Readings & References (optional)'));
 
       expect(screen.getByText('Book One')).toBeInTheDocument();
       expect(screen.getByText('Book Two')).toBeInTheDocument();
@@ -208,7 +315,7 @@ describe('ResourcesPanel', () => {
       });
 
       render(<ResourcesPanel resources={[resource]} />);
-      await user.click(screen.getByText('Readings & References'));
+      await user.click(screen.getByText('Readings & References (optional)'));
 
       expect(screen.getByText('Relevance note')).toBeInTheDocument();
       expect(screen.queryByText('Description text')).not.toBeInTheDocument();
@@ -217,9 +324,9 @@ describe('ResourcesPanel', () => {
     it('collapses the readings section when clicked again', async () => {
       const user = userEvent.setup();
       render(<ResourcesPanel resources={[]} />);
-      await user.click(screen.getByText('Readings & References'));
+      await user.click(screen.getByText('Readings & References (optional)'));
       expect(screen.getByText('No reading recommendations available yet.')).toBeInTheDocument();
-      await user.click(screen.getByText('Readings & References'));
+      await user.click(screen.getByText('Readings & References (optional)'));
       expect(screen.queryByText('No reading recommendations available yet.')).not.toBeInTheDocument();
     });
   });
@@ -246,7 +353,7 @@ describe('ResourcesPanel', () => {
       const user = userEvent.setup();
       const onMarkReadingsAsSeen = jest.fn();
       render(<ResourcesPanel resources={[]} onMarkReadingsAsSeen={onMarkReadingsAsSeen} />);
-      await user.click(screen.getByText('Readings & References'));
+      await user.click(screen.getByText('Readings & References (optional)'));
       expect(onMarkReadingsAsSeen).not.toHaveBeenCalled();
     });
 
@@ -254,8 +361,8 @@ describe('ResourcesPanel', () => {
       const user = userEvent.setup();
       const onMarkReadingsAsSeen = jest.fn();
       render(<ResourcesPanel resources={[]} onMarkReadingsAsSeen={onMarkReadingsAsSeen} />);
-      await user.click(screen.getByText('Readings & References')); // expand
-      await user.click(screen.getByText('Readings & References')); // collapse
+      await user.click(screen.getByText('Readings & References (optional)')); // expand
+      await user.click(screen.getByText('Readings & References (optional)')); // collapse
       expect(onMarkReadingsAsSeen).toHaveBeenCalledTimes(1);
     });
 
@@ -272,7 +379,7 @@ describe('ResourcesPanel', () => {
     it('does not throw when onMarkReadingsAsSeen is not provided', async () => {
       const user = userEvent.setup();
       render(<ResourcesPanel resources={[]} />);
-      await expect(user.click(screen.getByText('Readings & References'))).resolves.not.toThrow();
+      await expect(user.click(screen.getByText('Readings & References (optional)'))).resolves.not.toThrow();
     });
   });
 
@@ -282,7 +389,7 @@ describe('ResourcesPanel', () => {
       const resource = makeResource({ id: 'res-1' });
 
       render(<ResourcesPanel resources={[resource]} newResourceIds={new Set(['res-1'])} />);
-      await user.click(screen.getByText('Readings & References'));
+      await user.click(screen.getByText('Readings & References (optional)'));
       expect(screen.getByText('New')).toBeInTheDocument();
     });
 
@@ -291,7 +398,7 @@ describe('ResourcesPanel', () => {
       const resource = makeResource({ id: 'res-1' });
 
       render(<ResourcesPanel resources={[resource]} newResourceIds={new Set(['other-res-id'])} />);
-      await user.click(screen.getByText('Readings & References'));
+      await user.click(screen.getByText('Readings & References (optional)'));
       expect(screen.queryByText('New')).not.toBeInTheDocument();
     });
 
@@ -300,7 +407,7 @@ describe('ResourcesPanel', () => {
       const resource = makeResource({ id: 'res-1' });
 
       render(<ResourcesPanel resources={[resource]} />);
-      await user.click(screen.getByText('Readings & References'));
+      await user.click(screen.getByText('Readings & References (optional)'));
       expect(screen.queryByText('New')).not.toBeInTheDocument();
     });
 
@@ -310,7 +417,7 @@ describe('ResourcesPanel', () => {
       const res2 = makeResource({ id: 'res-old', title: 'Old Reading' });
 
       render(<ResourcesPanel resources={[res1, res2]} newResourceIds={new Set(['res-new'])} />);
-      await user.click(screen.getByText('Readings & References'));
+      await user.click(screen.getByText('Readings & References (optional)'));
 
       expect(screen.getByText('New')).toBeInTheDocument();
       expect(screen.getAllByText('New')).toHaveLength(1);

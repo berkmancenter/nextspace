@@ -2732,7 +2732,7 @@ describe('EventAssistantRoom', () => {
 
       const user = userEvent.setup();
       await user.click(screen.getAllByLabelText('Resources')[0]);
-      await user.click(screen.getByText('Readings & References'));
+      await user.click(screen.getByText('Readings & References (optional)'));
 
       await waitFor(() => {
         expect(screen.getByText('Book A')).toBeInTheDocument();
@@ -2747,7 +2747,7 @@ describe('EventAssistantRoom', () => {
       await user.click(screen.getAllByLabelText('Resources')[0]);
 
       await waitFor(() => {
-        expect(screen.getByText('Readings & References')).toBeInTheDocument();
+        expect(screen.getByText('Readings & References (optional)')).toBeInTheDocument();
       });
     });
 
@@ -2870,15 +2870,12 @@ describe('EventAssistantRoom', () => {
       });
 
       await waitFor(() => {
-        expect(RetrieveData).toHaveBeenCalledWith(
-          `conversations/test-conversation-id`,
-          'mock-access-token',
-        );
+        expect(RetrieveData).toHaveBeenCalledWith(`conversations/test-conversation-id`, 'mock-access-token');
       });
 
       const user = userEvent.setup();
       await user.click(screen.getAllByLabelText('Resources')[0]);
-      await user.click(screen.getAllByText('Readings & References')[0]);
+      await user.click(screen.getAllByText('Readings & References (optional)')[0]);
 
       await waitFor(() => {
         expect(screen.getByText('Book C')).toBeInTheDocument();

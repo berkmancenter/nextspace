@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { components } from '../types';
-import { ExpandMore, ExpandLess, MenuBook, Person, Info } from '@mui/icons-material';
+import { ExpandMore, ExpandLess, MenuBook, Person, Info, Bookmark } from '@mui/icons-material';
 
 type Resource = components['schemas']['Resource'];
 
@@ -63,6 +63,7 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
   newResourceIds,
 }) => {
   const suggestedResources = resources.filter((r) => r.category === 'suggested');
+  const requiredResources = resources.filter((r) => r.category === 'required');
 
   // Track which categories are expanded
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -85,12 +86,19 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
       id: 'speakers',
       title: 'Speakers',
       icon: Person,
-      count: 0, // Don't show badge for speakers (static content)
+      count: 0,
+      defaultExpanded: false,
+    },
+    {
+      id: 'required',
+      title: 'Required Reading',
+      icon: Bookmark,
+      count: 0,
       defaultExpanded: false,
     },
     {
       id: 'readings',
-      title: 'Readings & References',
+      title: 'Readings & References (optional)',
       icon: MenuBook,
       count: unseenReadingsCount,
       defaultExpanded: false,
@@ -226,9 +234,73 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
           )}
         </div>
 
+        {/* Required Reading */}
+        <div className="mb-2">
+          <CategoryHeader category={categories[1]} isExpanded={expandedCategories.has('required')} />
+          {expandedCategories.has('required') && (
+            <div className="bg-white px-6 py-4 border-b border-gray-200">
+              {requiredResources.length === 0 ? (
+                <p className="text-sm text-gray-500 italic">No required readings assigned yet.</p>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-600 mb-4">
+                    The following{' '}
+                    {requiredResources.length === 1 ? 'reading was' : `${requiredResources.length} readings were`} assigned
+                    by the event organizer to prepare for this session.
+                  </p>
+                  <ul className="space-y-5 list-none">
+                    {requiredResources.map((resource, idx) => (
+                      <li key={resource.id || idx} className="border border-amber-200 rounded-lg bg-amber-50 p-4">
+                        <div aria-hidden="true" className="flex items-center gap-2 mb-2">
+                          <span className="inline-block text-xs font-semibold text-amber-800 bg-amber-200 px-2 py-0.5 rounded-full">
+                            Required
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-semibold text-amber-900 mb-1">
+                          {resource.url ? (
+                            <a href={resource.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                              {resource.title}
+                            </a>
+                          ) : (
+                            <span tabIndex={0}>{resource.title}</span>
+                          )}
+                        </h3>
+                        {resource.authors && resource.authors.length > 0 && (
+                          <p tabIndex={0} className="text-xs text-gray-600 mb-3">
+                            <span className="sr-only">Authors and year: </span>
+                            {resource.authors.join(', ')}
+                            {resource.year ? ` (${resource.year})` : ''}
+                          </p>
+                        )}
+                        {resource.description && (
+                          <p tabIndex={0} className="text-xs text-gray-600 italic mb-2">
+                            {resource.description}
+                          </p>
+                        )}
+                        {resource.summary && (
+                          <div className="border-t border-amber-200 pt-3 mt-2">
+                            <p className="text-xs font-semibold text-amber-900 mb-1">Summary</p>
+                            <p tabIndex={0} className="text-xs text-gray-700 leading-relaxed">
+                              <TruncatedText
+                                text={resource.summary}
+                                maxLength={400}
+                                className="text-xs text-gray-700 leading-relaxed"
+                              />
+                            </p>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Readings & References */}
         <div className="mb-2">
-          <CategoryHeader category={categories[1]} isExpanded={expandedCategories.has('readings')} />
+          <CategoryHeader category={categories[2]} isExpanded={expandedCategories.has('readings')} />
           {expandedCategories.has('readings') && (
             <div className="bg-white px-6 py-4 border-b border-gray-200">
               <p className="text-xs text-gray-600 mb-3">
