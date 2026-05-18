@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { EventCreationForm } from '../../components/EventCreationForm';
 import { RetrieveData, Request } from '../../utils';
-import { Api } from '../../utils/Helpers';
+import { Api, SendData } from '../../utils/Helpers';
 import '@testing-library/jest-dom';
 
 jest.setTimeout(60000);
@@ -38,6 +38,11 @@ jest.mock('next/router', () => ({
 jest.mock('../../utils', () => ({
   RetrieveData: jest.fn(),
   Request: jest.fn(),
+}));
+
+jest.mock('../../utils/Helpers', () => ({
+  ...jest.requireActual('../../utils/Helpers'),
+  SendData: jest.fn(),
 }));
 
 jest.mock('../../utils/SessionManager', () => ({
@@ -390,7 +395,7 @@ describe('EventCreationForm Component', () => {
     expect(screen.getAllByText('Event Details').length).toBeGreaterThan(0);
     expect(screen.getByText('Conversation Setup')).toBeInTheDocument();
     expect(screen.getByText('Configuration')).toBeInTheDocument();
-    expect(screen.getByText('Moderators & Speakers')).toBeInTheDocument();
+    expect(screen.getByText('Speakers')).toBeInTheDocument();
 
     // Should show Step 1 content
     expect(screen.getByLabelText(/Event Name/i)).toBeInTheDocument();
@@ -749,6 +754,8 @@ describe('EventCreationForm Component', () => {
     await user.click(screen.getByRole('button', { name: /next/i }));
 
     await waitFor(() => screen.getByText('About the Speakers'));
+    await user.click(screen.getByRole('button', { name: /next/i }));
+    await waitFor(() => screen.getByText('Reading & Resources'));
 
     // Submit form
     const submitButton = screen.getByRole('button', {
@@ -813,6 +820,8 @@ describe('EventCreationForm Component', () => {
     await user.click(screen.getByRole('button', { name: /next/i }));
 
     await waitFor(() => screen.getByText('About the Speakers'));
+    await user.click(screen.getByRole('button', { name: /next/i }));
+    await waitFor(() => screen.getByText('Reading & Resources'));
 
     const submitButton = screen.getByRole('button', {
       name: /create conversation/i,
@@ -868,6 +877,8 @@ describe('EventCreationForm Component', () => {
     await user.click(screen.getByRole('button', { name: /next/i }));
 
     await waitFor(() => screen.getByText('About the Speakers'));
+    await user.click(screen.getByRole('button', { name: /next/i }));
+    await waitFor(() => screen.getByText('Reading & Resources'));
 
     const submitButton = screen.getByRole('button', {
       name: /create conversation/i,
@@ -937,6 +948,9 @@ describe('EventCreationForm Component', () => {
     await user.type(moderatorNameInput, 'Jane Smith');
     const moderatorBioInput = screen.getAllByLabelText(/Bio/i)[1];
     await user.type(moderatorBioInput, 'Experienced moderator');
+
+    await user.click(screen.getByRole('button', { name: /next/i }));
+    await waitFor(() => screen.getByText('Reading & Resources'));
 
     const submitButton = screen.getByRole('button', {
       name: /create conversation/i,
@@ -1093,6 +1107,8 @@ describe('EventCreationForm Component', () => {
     await user.click(screen.getByRole('button', { name: /next/i }));
 
     await waitFor(() => screen.getByText('About the Speakers'));
+    await user.click(screen.getByRole('button', { name: /next/i }));
+    await waitFor(() => screen.getByText('Reading & Resources'));
 
     const submitButton = screen.getByRole('button', {
       name: /create conversation/i,
@@ -1148,6 +1164,8 @@ describe('EventCreationForm Component', () => {
     await user.click(screen.getByRole('button', { name: /next/i }));
 
     await waitFor(() => screen.getByText('About the Speakers'));
+    await user.click(screen.getByRole('button', { name: /next/i }));
+    await waitFor(() => screen.getByText('Reading & Resources'));
 
     const submitButton = screen.getByRole('button', {
       name: /create conversation/i,
@@ -1312,6 +1330,8 @@ describe('EventCreationForm Component', () => {
       await navigateToStep3WithBackChannel(user);
       await user.click(screen.getByRole('button', { name: /next/i }));
       await waitFor(() => screen.getByText('About the Speakers'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Reading & Resources'));
       await user.click(screen.getByRole('button', { name: /create conversation/i }));
 
       await waitFor(() => {
@@ -1347,6 +1367,8 @@ describe('EventCreationForm Component', () => {
 
       await user.click(screen.getByRole('button', { name: /next/i }));
       await waitFor(() => screen.getByText('About the Speakers'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Reading & Resources'));
       await user.click(screen.getByRole('button', { name: /create conversation/i }));
 
       await waitFor(() => {
@@ -1537,6 +1559,8 @@ describe('EventCreationForm Component', () => {
       await user.click(screen.getByRole('button', { name: /next/i }));
 
       await waitFor(() => screen.getByText('About the Speakers'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Reading & Resources'));
       await user.click(screen.getByRole('button', { name: /create conversation/i }));
 
       await waitFor(() => {
@@ -1763,6 +1787,8 @@ describe('EventCreationForm Component', () => {
       await user.click(screen.getByRole('button', { name: /next/i }));
 
       await waitFor(() => screen.getByText('About the Speakers'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Reading & Resources'));
       await user.click(screen.getByRole('button', { name: /create conversation/i }));
 
       await waitFor(() => {
@@ -1806,6 +1832,8 @@ describe('EventCreationForm Component', () => {
       await user.click(screen.getByRole('button', { name: /next/i }));
 
       await waitFor(() => screen.getByText('About the Speakers'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Reading & Resources'));
       await user.click(screen.getByRole('button', { name: /create conversation/i }));
 
       await waitFor(() => {
@@ -1813,6 +1841,427 @@ describe('EventCreationForm Component', () => {
         // Should NOT have called topics POST to create a new topic
         expect(Request).not.toHaveBeenCalledWith('topics', expect.anything());
       });
+    });
+  });
+
+  describe('Resources (Step 5)', () => {
+    const mockConversationData = {
+      id: 'conv-resources',
+      name: 'Test Event',
+      channels: [],
+      agents: [],
+      adapters: [],
+      conversationType: 'backChannel',
+      resources: [],
+    };
+
+    const navigateToStep5 = async (user: ReturnType<typeof userEvent.setup>) => {
+      await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Nextspace'));
+      await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
+      await user.click(screen.getByRole('radio', { name: /back channel/i }));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByLabelText(/Bot Name/i));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('About the Speakers'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Reading & Resources'));
+    };
+
+    beforeEach(() => {
+      (Request as jest.Mock).mockImplementation(makeRequestMock(mockConversationData));
+      (SendData as jest.Mock).mockResolvedValue({});
+    });
+
+    it('renders step 5 with one resource entry by default', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      expect(screen.getByText('Resource 1')).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Title/i)).toBeInTheDocument();
+    });
+
+    it('renders all resource fields', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      expect(screen.getByLabelText(/^Title/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^URL/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Authors/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Year/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Citation/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Description/i)).toBeInTheDocument();
+    });
+
+    it('renders the PDF drop zone', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      expect(screen.getByText(/Drop a PDF here or/i)).toBeInTheDocument();
+      expect(screen.getByText(/Max 20 MB/i)).toBeInTheDocument();
+    });
+
+    it('renders Show to attendees and Mark as required checkboxes', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      expect(screen.getByRole('checkbox', { name: /show to attendees/i })).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: /mark as required/i })).toBeInTheDocument();
+    });
+
+    it('Show to attendees is checked by default', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      expect(screen.getByRole('checkbox', { name: /show to attendees/i })).toBeChecked();
+    });
+
+    it('Mark as required is unchecked by default', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      expect(screen.getByRole('checkbox', { name: /mark as required/i })).not.toBeChecked();
+    });
+
+    it('Mark as required is disabled when Show to attendees is unchecked', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      await user.click(screen.getByRole('checkbox', { name: /show to attendees/i }));
+
+      expect(screen.getByRole('checkbox', { name: /mark as required/i })).toBeDisabled();
+    });
+
+    it('hides Remove button when there is only one resource', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      expect(screen.queryByRole('button', { name: /^remove$/i })).not.toBeInTheDocument();
+    });
+
+    it('adds a second resource entry when Add Resource is clicked', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      await user.click(screen.getByRole('button', { name: /\+ Add Resource/i }));
+
+      expect(screen.getByText('Resource 2')).toBeInTheDocument();
+    });
+
+    it('shows Remove button when there are multiple resources', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      await user.click(screen.getByRole('button', { name: /\+ Add Resource/i }));
+
+      expect(screen.getAllByRole('button', { name: /^remove$/i })).toHaveLength(2);
+    });
+
+    it('removes a resource entry when Remove is clicked', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      await user.click(screen.getByRole('button', { name: /\+ Add Resource/i }));
+      expect(screen.getByText('Resource 2')).toBeInTheDocument();
+
+      await user.click(screen.getAllByRole('button', { name: /^remove$/i })[0]);
+      expect(screen.queryByText('Resource 2')).not.toBeInTheDocument();
+    });
+
+    it('does not include resources in payload when title is empty', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      // Leave title blank, submit
+      await user.click(screen.getByRole('button', { name: /create conversation/i }));
+
+      await waitFor(() => {
+        const call = (Request as jest.Mock).mock.calls.find((c) => c[0] === 'conversations/from-type');
+        expect(call![1]).not.toHaveProperty('resources');
+      });
+    });
+
+    it('includes resource in payload when title is filled', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      await user.type(screen.getByLabelText(/^Title/i), 'Attention Is All You Need');
+      await user.click(screen.getByRole('button', { name: /create conversation/i }));
+
+      await waitFor(() => {
+        expect(Request).toHaveBeenCalledWith(
+          'conversations/from-type',
+          expect.objectContaining({
+            resources: expect.arrayContaining([
+              expect.objectContaining({
+                title: 'Attention Is All You Need',
+                source: 'speaker',
+                category: 'suggested',
+                participantVisible: true,
+              }),
+            ]),
+          }),
+        );
+      });
+    });
+
+    it('sends category "required" when Mark as required is checked', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      await user.type(screen.getByLabelText(/^Title/i), 'Required Paper');
+      await user.click(screen.getByRole('checkbox', { name: /mark as required/i }));
+      await user.click(screen.getByRole('button', { name: /create conversation/i }));
+
+      await waitFor(() => {
+        expect(Request).toHaveBeenCalledWith(
+          'conversations/from-type',
+          expect.objectContaining({
+            resources: expect.arrayContaining([expect.objectContaining({ category: 'required' })]),
+          }),
+        );
+      });
+    });
+
+    it('sends participantVisible: false when Show to attendees is unchecked', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      await user.type(screen.getByLabelText(/^Title/i), 'Private Paper');
+      await user.click(screen.getByRole('checkbox', { name: /show to attendees/i }));
+      await user.click(screen.getByRole('button', { name: /create conversation/i }));
+
+      await waitFor(() => {
+        expect(Request).toHaveBeenCalledWith(
+          'conversations/from-type',
+          expect.objectContaining({
+            resources: expect.arrayContaining([expect.objectContaining({ participantVisible: false })]),
+          }),
+        );
+      });
+    });
+
+    it('splits authors string into array in the payload', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      await user.type(screen.getByLabelText(/^Title/i), 'Paper');
+      await user.type(screen.getByLabelText(/Authors/i), 'Jane Smith, John Doe');
+      await user.click(screen.getByRole('button', { name: /create conversation/i }));
+
+      await waitFor(() => {
+        expect(Request).toHaveBeenCalledWith(
+          'conversations/from-type',
+          expect.objectContaining({
+            resources: expect.arrayContaining([expect.objectContaining({ authors: ['Jane Smith', 'John Doe'] })]),
+          }),
+        );
+      });
+    });
+
+    it('includes optional fields when provided', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      await user.type(screen.getByLabelText(/^Title/i), 'Full Paper');
+      await user.type(screen.getByLabelText(/^URL/i), 'https://example.com');
+      await user.type(screen.getByLabelText(/Year/i), '2024');
+      await user.type(screen.getByLabelText(/Citation/i), 'Smith et al. (2024).');
+      await user.type(screen.getByLabelText(/Description/i), 'Very relevant.');
+      await user.click(screen.getByRole('button', { name: /create conversation/i }));
+
+      await waitFor(() => {
+        expect(Request).toHaveBeenCalledWith(
+          'conversations/from-type',
+          expect.objectContaining({
+            resources: expect.arrayContaining([
+              expect.objectContaining({
+                url: 'https://example.com',
+                year: '2024',
+                citation: 'Smith et al. (2024).',
+                description: 'Very relevant.',
+              }),
+            ]),
+          }),
+        );
+      });
+    });
+
+    it('rejects a PDF over 20 MB and shows an error', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      const oversizedFile = new File(['x'.repeat(1)], 'big.pdf', { type: 'application/pdf' });
+      Object.defineProperty(oversizedFile, 'size', { value: 51 * 1024 * 1024 });
+
+      const input = document.getElementById('pdf-upload-0') as HTMLInputElement;
+      await user.upload(input, oversizedFile);
+
+      await waitFor(() => {
+        expect(screen.getByText(/exceeds the 20 MB limit/i)).toBeInTheDocument();
+      });
+    });
+
+    it('accepts a PDF under 20 MB and shows the filename', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      const validFile = new File(['content'], 'notes.pdf', { type: 'application/pdf' });
+
+      const input = document.getElementById('pdf-upload-0') as HTMLInputElement;
+      await user.upload(input, validFile);
+
+      await waitFor(() => {
+        expect(screen.getByText('notes.pdf')).toBeInTheDocument();
+        expect(screen.getByText(/Used as AI background context/i)).toBeInTheDocument();
+      });
+    });
+
+    it('calls SendData to upload PDF after conversation creation when resource has a PDF', async () => {
+      const user = userEvent.setup();
+      const convWithResources = {
+        ...mockConversationData,
+        resources: [
+          { id: 'res-abc', title: 'My Paper', source: 'speaker', category: 'suggested', participantVisible: true },
+        ],
+      };
+      (Request as jest.Mock).mockImplementation(makeRequestMock(convWithResources));
+
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      await user.type(screen.getByLabelText(/^Title/i), 'My Paper');
+
+      const validFile = new File(['content'], 'paper.pdf', { type: 'application/pdf' });
+      const input = document.getElementById('pdf-upload-0') as HTMLInputElement;
+      await user.upload(input, validFile);
+
+      await waitFor(() => screen.getByText('paper.pdf'));
+
+      await user.click(screen.getByRole('button', { name: /create conversation/i }));
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          'resources/conv-resources/res-abc/pdf',
+          null,
+          undefined,
+          expect.objectContaining({ method: 'POST', body: expect.any(FormData) }),
+        );
+      });
+    });
+
+    it('shows a warning when PDF upload fails but still shows EventStatus', async () => {
+      const user = userEvent.setup();
+      const convWithResources = {
+        ...mockConversationData,
+        resources: [
+          { id: 'res-fail', title: 'Fail Paper', source: 'speaker', category: 'suggested', participantVisible: true },
+        ],
+      };
+      (Request as jest.Mock).mockImplementation(makeRequestMock(convWithResources));
+      (SendData as jest.Mock).mockResolvedValue({ error: true });
+
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      await user.type(screen.getByLabelText(/^Title/i), 'Fail Paper');
+
+      const validFile = new File(['content'], 'fail.pdf', { type: 'application/pdf' });
+      const input = document.getElementById('pdf-upload-0') as HTMLInputElement;
+      await user.upload(input, validFile);
+
+      await waitFor(() => screen.getByText('fail.pdf'));
+
+      await user.click(screen.getByRole('button', { name: /create conversation/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/fail\.pdf/i)).toBeInTheDocument();
+        expect(screen.getByText('Event Status')).toBeInTheDocument();
+      });
+    });
+
+    it('does not call SendData when resource has no PDF attached', async () => {
+      const user = userEvent.setup();
+      const convWithResources = {
+        ...mockConversationData,
+        resources: [
+          { id: 'res-nopdf', title: 'No PDF Paper', source: 'speaker', category: 'suggested', participantVisible: true },
+        ],
+      };
+      (Request as jest.Mock).mockImplementation(makeRequestMock(convWithResources));
+
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+      await navigateToStep5(user);
+
+      await user.type(screen.getByLabelText(/^Title/i), 'No PDF Paper');
+      await user.click(screen.getByRole('button', { name: /create conversation/i }));
+
+      await waitFor(() => screen.getByText('Event Status'));
+      expect(SendData).not.toHaveBeenCalled();
     });
   });
 
@@ -1830,6 +2279,7 @@ describe('EventCreationForm Component', () => {
       await user.click(screen.getByRole('button', { name: /next/i }));
 
       await waitFor(() => screen.getByText('About the Speakers'));
+      // Step 4 — stay here for speaker/moderator interaction before optionally proceeding
     };
 
     beforeEach(() => {
@@ -1888,6 +2338,8 @@ describe('EventCreationForm Component', () => {
       const alternateNameInput = screen.getByLabelText(/Alternate Name/i);
       await user.type(alternateNameInput, 'Jon');
 
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Reading & Resources'));
       await user.click(screen.getByRole('button', { name: /create conversation/i }));
 
       await waitFor(() => {
