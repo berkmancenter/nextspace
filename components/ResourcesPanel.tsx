@@ -62,8 +62,9 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
   onMarkReadingsAsSeen,
   newResourceIds,
 }) => {
-  const suggestedResources = resources.filter((r) => r.category === 'suggested');
-  const requiredResources = resources.filter((r) => r.category === 'required');
+  const visibleResources = resources.filter((r) => r.participantVisible !== false);
+  const suggestedResources = visibleResources.filter((r) => r.category === 'suggested');
+  const requiredResources = visibleResources.filter((r) => r.category === 'required');
 
   // Track which categories are expanded
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
