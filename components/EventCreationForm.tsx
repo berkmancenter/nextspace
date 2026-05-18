@@ -38,7 +38,7 @@ import { createConversationFromData, Api, SendData } from '../utils/Helpers';
 import SessionManager from '../utils/SessionManager';
 import { NewTopicForm, NewTopicFormValues } from './NewTopicForm';
 
-const steps = ['Event Details', 'Conversation Setup', 'Configuration', 'Moderators & Speakers'];
+const steps = ['Event Details', 'Conversation Setup', 'Configuration', 'Speakers', 'Resources'];
 
 /**
  * EventCreationForm component
@@ -79,7 +79,9 @@ export const EventCreationForm: React.FC = ({}) => {
 
   const [dynamicPropertyValues, setDynamicPropertyValues] = useState<Record<string, any>>({});
   const [formSubmitted, setFormSubmitted] = useState(false);
+  const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [pdfUploadWarnings, setPdfUploadWarnings] = useState<string[]>([]);
   const [conversationData, setConversationData] = useState<Conversation | null>(null);
 
   const [formGroupsErrors, setFormGroupsErrors] = useState({
@@ -89,13 +91,56 @@ export const EventCreationForm: React.FC = ({}) => {
   const [platformsPreviouslyChecked, setPlatformsPreviouslyChecked] = useState(false);
 
   // Moderators and Speakers state
-  const [moderators, setModerators] = useState<Array<{ name: string; bio: string; alternateName?: string }>>([
-    { name: '', bio: '' },
-  ]);
-  const [speakers, setSpeakers] = useState<Array<{ name: string; bio: string; alternateName?: string }>>([
-    { name: '', bio: '' },
-  ]);
+  const emptySpeaker = () => ({ name: '', bio: '', alternateName: undefined as string | undefined });
+  const emptyModerator = () => ({ name: '', bio: '', alternateName: undefined as string | undefined });
+
+  const [moderators, setModerators] = useState([emptyModerator()]);
+  const [speakers, setSpeakers] = useState([emptySpeaker()]);
   const [showModerators, setShowModerators] = useState<boolean>(false);
+
+  // Reading & Resources state
+  const emptyResource = () => ({
+    title: '',
+    authors: '',
+    year: '',
+    url: '',
+    description: '',
+    citation: '',
+    pdf: undefined as File | undefined,
+    required: false,
+    participantVisible: true,
+  });
+
+  const [resources, setResources] = useState<ReturnType<typeof emptyResource>[]>([emptyResource()]);
+  const [pdfDragOver, setPdfDragOver] = useState<number | null>(null);
+
+  const addResource = () => setResources((prev) => [...prev, emptyResource()]);
+
+  const updateResource = (
+    index: number,
+    field: keyof ReturnType<typeof emptyResource>,
+    value: string | boolean | File | undefined,
+  ) => {
+    setResources((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const removeResource = (index: number) => {
+    setResources((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const PDF_MAX_BYTES = 20 * 1024 * 1024;
+
+  const attachPdf = (index: number, file: File) => {
+    if (file.size > PDF_MAX_BYTES) {
+      setFormError(`"${file.name}" exceeds the 20 MB limit and cannot be attached.`);
+      return;
+    }
+    updateResource(index, 'pdf', file);
+  };
 
   // Topic (Event Series) state
   const [topicMode, setTopicMode] = useState<'existing' | 'new'>('existing');
@@ -340,7 +385,7 @@ export const EventCreationForm: React.FC = ({}) => {
 
   // Moderator management functions
   const addModerator = () => {
-    setModerators([...moderators, { name: '', bio: '' }]);
+    setModerators([...moderators, emptyModerator()]);
   };
 
   const removeModerator = (index: number) => {
@@ -357,7 +402,7 @@ export const EventCreationForm: React.FC = ({}) => {
 
   // Speaker management functions
   const addSpeaker = () => {
-    setSpeakers([...speakers, { name: '', bio: '' }]);
+    setSpeakers([...speakers, emptySpeaker()]);
   };
 
   const removeSpeaker = (index: number) => {
@@ -729,15 +774,10 @@ export const EventCreationForm: React.FC = ({}) => {
   };
 
   const handleNext = () => {
-    if (activeStep === 0 && !validateStep1()) {
-      return;
-    }
-    if (activeStep === 1 && !validateStep2()) {
-      return;
-    }
-    if (activeStep === 2 && !validateStep3()) {
-      return;
-    }
+    if (activeStep === 0 && !validateStep1()) return;
+    if (activeStep === 1 && !validateStep2()) return;
+    if (activeStep === 2 && !validateStep3()) return;
+    // Steps 3 and 4 have no required fields — always advance
     setActiveStep((prevStep) => prevStep + 1);
   };
 
@@ -780,6 +820,26 @@ export const EventCreationForm: React.FC = ({}) => {
     const validModerators = showModerators ? moderators.filter((m) => m.name.trim() !== '' || m.bio.trim() !== '') : [];
     const validSpeakers = speakers.filter((s) => s.name.trim() !== '' || s.bio.trim() !== '');
 
+    // Build resources payload — exclude entries with no title
+    const validResources = resources
+      .filter((r) => r.title.trim() !== '')
+      .map((r) => ({
+        source: 'speaker' as const,
+        category: r.required ? ('required' as const) : ('suggested' as const),
+        title: r.title.trim(),
+        ...(r.authors.trim() && {
+          authors: r.authors
+            .split(',')
+            .map((a) => a.trim())
+            .filter(Boolean),
+        }),
+        ...(r.year.trim() && { year: r.year.trim() }),
+        ...(r.url.trim() && { url: r.url.trim() }),
+        ...(r.description.trim() && { description: r.description.trim() }),
+        ...(r.citation.trim() && { citation: r.citation.trim() }),
+        participantVisible: r.participantVisible,
+      }));
+
     let body: any = {
       name: eventName,
       ...(eventDescription && { description: eventDescription }),
@@ -790,6 +850,7 @@ export const EventCreationForm: React.FC = ({}) => {
       topicId,
       ...(validModerators.length > 0 && { moderators: validModerators }),
       ...(validSpeakers.length > 0 && { presenters: validSpeakers }),
+      ...(validResources.length > 0 && { resources: validResources }),
     };
 
     // Dynamically build properties based on conversationType schema
@@ -838,16 +899,52 @@ export const EventCreationForm: React.FC = ({}) => {
       ...(features.length > 0 && { features }),
     };
 
+    setFormSubmitting(true);
     Request('conversations/from-type', body)
-      .then((data) => {
+      .then(async (data) => {
         if (!data) {
           setFormError('Failed to send data. Please try again.');
+          setFormSubmitting(false);
           return;
         }
         if ('error' in data) {
           setFormError(data.message?.message || 'Failed to create conversation.');
+          setFormSubmitting(false);
           return;
         }
+
+        // Upload PDFs for any resources that have one attached
+        const conversationId = data.id as string;
+        const responseResources: components['schemas']['Resource'][] = data.resources ?? [];
+        const resourcesWithPdf = resources
+          .filter((r) => r.title.trim() !== '' && r.pdf)
+          .flatMap((r) => {
+            const match = responseResources.find((res) => res.title === r.title.trim());
+            return match?.id ? [{ pdf: r.pdf as File, resourceId: match.id }] : [];
+          });
+
+        if (resourcesWithPdf.length > 0) {
+          const uploadResults = await Promise.allSettled(
+            resourcesWithPdf.map(({ pdf, resourceId }) => {
+              const formData = new FormData();
+              formData.append('pdf', pdf);
+              return SendData(`resources/${conversationId}/${resourceId}/pdf`, null, undefined, {
+                method: 'POST',
+                body: formData,
+              });
+            }),
+          );
+
+          const failures = uploadResults
+            .map((result, i) => ({ result, name: resourcesWithPdf[i].pdf.name }))
+            .filter(({ result }) => result.status === 'rejected' || (result.status === 'fulfilled' && result.value?.error))
+            .map(({ name }) => name);
+
+          if (failures.length > 0) {
+            setPdfUploadWarnings(failures);
+          }
+        }
+
         createConversationFromData(data).then((conversation) => {
           setConversationData(conversation);
           setFormSubmitted(true);
@@ -856,11 +953,22 @@ export const EventCreationForm: React.FC = ({}) => {
       .catch((error) => {
         console.error('Error sending data:', error);
         setFormError(`Failed to send data. (${error.message})`);
+        setFormSubmitting(false);
       });
   };
 
   if (formSubmitted && conversationData) {
-    return <EventStatus conversationData={conversationData} />;
+    return (
+      <>
+        {pdfUploadWarnings.length > 0 && (
+          <Alert severity="warning" sx={{ maxWidth: 800, mx: 'auto', mt: 4 }}>
+            The following PDFs could not be uploaded and will not be available as AI context:{' '}
+            <strong>{pdfUploadWarnings.join(', ')}</strong>. You can retry by editing the event.
+          </Alert>
+        )}
+        <EventStatus conversationData={conversationData} />
+      </>
+    );
   }
 
   return (
@@ -1399,7 +1507,7 @@ export const EventCreationForm: React.FC = ({}) => {
                       size="small"
                       onClick={() => {
                         setShowModerators(false);
-                        setModerators([{ name: '', bio: '' }]);
+                        setModerators([emptyModerator()]);
                       }}
                     >
                       Remove All
@@ -1493,6 +1601,246 @@ export const EventCreationForm: React.FC = ({}) => {
             </Box>
           )}
 
+          {/* Step 5: Reading & Resources */}
+          {activeStep === 4 && (
+            <Box>
+              <Typography variant="h5" component="h2" gutterBottom>
+                Reading & Resources
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Add papers, articles, or links that attendees and the AI should know about (optional). Only the title is
+                required — fill in what you have. To make a resource available as background context for the AI, attach a PDF
+                — the AI will not have access to linked URLs alone.
+              </Typography>
+
+              {resources.length === 0 && (
+                <Box
+                  sx={{
+                    p: 2,
+                    border: '1px dashed rgba(0,0,0,0.2)',
+                    borderRadius: 1,
+                    textAlign: 'center',
+                    mb: 2,
+                  }}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    No resources added yet.
+                  </Typography>
+                </Box>
+              )}
+
+              {resources.map((resource, index) => (
+                <Box
+                  key={index}
+                  sx={{
+                    mb: 2,
+                    p: 2,
+                    border: '1px solid rgba(0,0,0,0.12)',
+                    borderRadius: 1,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Resource {index + 1}
+                    </Typography>
+                    {resources.length > 1 && (
+                      <Button size="small" color="error" onClick={() => removeResource(index)}>
+                        Remove
+                      </Button>
+                    )}
+                  </Box>
+
+                  <TextField
+                    label="Title"
+                    value={resource.title}
+                    onChange={(e) => updateResource(index, 'title', e.target.value)}
+                    fullWidth
+                    variant="outlined"
+                    margin="dense"
+                    required
+                    placeholder="e.g. Attention Is All You Need"
+                  />
+                  <TextField
+                    label="URL"
+                    value={resource.url}
+                    onChange={(e) => updateResource(index, 'url', e.target.value)}
+                    fullWidth
+                    variant="outlined"
+                    margin="dense"
+                    placeholder="https://..."
+                  />
+                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                    <TextField
+                      label="Authors"
+                      value={resource.authors}
+                      onChange={(e) => updateResource(index, 'authors', e.target.value)}
+                      variant="outlined"
+                      margin="dense"
+                      placeholder="Jane Smith, John Doe…"
+                      helperText="Comma-separated. Use First Last order."
+                      sx={{ flex: 1 }}
+                    />
+                    <TextField
+                      label="Year"
+                      value={resource.year}
+                      onChange={(e) => updateResource(index, 'year', e.target.value)}
+                      variant="outlined"
+                      margin="dense"
+                      placeholder="2024"
+                      sx={{ width: 100 }}
+                    />
+                  </Box>
+                  <TextField
+                    label="Citation (optional)"
+                    value={resource.citation}
+                    onChange={(e) => updateResource(index, 'citation', e.target.value)}
+                    fullWidth
+                    variant="outlined"
+                    margin="dense"
+                    placeholder="e.g. Vaswani et al. (2017). Attention is all you need. NeurIPS."
+                  />
+                  <TextField
+                    label="Description"
+                    value={resource.description}
+                    onChange={(e) => updateResource(index, 'description', e.target.value)}
+                    fullWidth
+                    variant="outlined"
+                    margin="dense"
+                    multiline
+                    rows={3}
+                    helperText="Express why this reading matters for this session. This is shown to attendees."
+                    placeholder="Why is this reading relevant to the session?"
+                  />
+
+                  {/* PDF attachment */}
+                  <Box sx={{ mt: 1.5, mb: 0.5 }}>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      style={{ display: 'none' }}
+                      id={`pdf-upload-${index}`}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) attachPdf(index, file);
+                        e.target.value = '';
+                      }}
+                    />
+                    {resource.pdf ? (
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          p: 1.5,
+                          border: '1px solid rgba(0,0,0,0.12)',
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="body2" fontWeight={500}>
+                            {resource.pdf.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {(resource.pdf.size / 1024 / 1024).toFixed(1)} MB · Used as AI background context
+                          </Typography>
+                        </Box>
+                        <Button size="small" onClick={() => document.getElementById(`pdf-upload-${index}`)?.click()}>
+                          Replace
+                        </Button>
+                        <Button size="small" color="error" onClick={() => updateResource(index, 'pdf', undefined)}>
+                          Remove
+                        </Button>
+                      </Box>
+                    ) : (
+                      <Box
+                        onClick={() => document.getElementById(`pdf-upload-${index}`)?.click()}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setPdfDragOver(index);
+                        }}
+                        onDragLeave={() => setPdfDragOver(null)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setPdfDragOver(null);
+                          const file = e.dataTransfer.files?.[0];
+                          if (file?.type === 'application/pdf') {
+                            attachPdf(index, file);
+                          }
+                        }}
+                        sx={{
+                          p: 2,
+                          border: '1px dashed',
+                          borderColor: pdfDragOver === index ? 'primary.main' : 'rgba(0,0,0,0.2)',
+                          borderRadius: 1,
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          bgcolor: pdfDragOver === index ? 'action.hover' : 'transparent',
+                          transition: 'border-color 0.15s, background-color 0.15s',
+                          '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          Drop a PDF here or <strong>click to browse</strong>
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Required for AI background context · Max 20 MB
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+
+                  <Box sx={{ display: 'flex', gap: 3, mt: 1.5, flexWrap: 'wrap' }}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={resource.participantVisible}
+                          onChange={(e) => updateResource(index, 'participantVisible', e.target.checked)}
+                        />
+                      }
+                      label={
+                        <Box>
+                          <Typography variant="body2" fontWeight={500}>
+                            Show to attendees
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Appears in the Resources tab
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={resource.required}
+                          disabled={!resource.participantVisible}
+                          onChange={(e) => updateResource(index, 'required', e.target.checked)}
+                        />
+                      }
+                      label={
+                        <Box>
+                          <Typography
+                            variant="body2"
+                            fontWeight={500}
+                            color={!resource.participantVisible ? 'text.disabled' : undefined}
+                          >
+                            Mark as required
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Shown in &quot;Required Reading&quot; section
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </Box>
+                </Box>
+              ))}
+
+              <Button variant="outlined" size="small" onClick={addResource}>
+                + Add Resource
+              </Button>
+            </Box>
+          )}
+
           {/* Navigation Buttons */}
           <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
             <Button
@@ -1509,6 +1857,7 @@ export const EventCreationForm: React.FC = ({}) => {
               <Button
                 type="button"
                 variant="contained"
+                disabled={formSubmitting}
                 onClick={(e) => {
                   e.preventDefault();
                   if (formRef.current) sendData(new FormData(formRef.current));
@@ -1518,7 +1867,14 @@ export const EventCreationForm: React.FC = ({}) => {
                   fontSize: { xs: '0.75rem', sm: '0.875rem' },
                 }}
               >
-                Create Conversation
+                {formSubmitting ? (
+                  <>
+                    <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
+                    Creating…
+                  </>
+                ) : (
+                  'Create Conversation'
+                )}
               </Button>
             ) : (
               <Button
