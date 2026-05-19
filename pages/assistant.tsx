@@ -533,6 +533,28 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     return { newReplyCounts, updatedUnreadSet };
   };
 
+  /**
+   * Fetch chat messages for the current conversation.
+   * This includes filtering out intro messages and inserting replies.
+   */
+  const fetchChatMessages = async () => {
+    try {
+      const chatMessages = await RetrieveData(
+        `messages/${router.query.conversationId}?channel=chat,${chatPasscode}`,
+        Api.get().getAccessToken(),
+      );
+
+      if (Array.isArray(chatMessages)) {
+        // Filter intro messages from older conversations where intros were persisted
+        const nonIntros = chatMessages.filter((m) => parseMessageBody(m.body)?.type !== 'intro');
+        const messagesWithReplies = await fetchAndInsertReplies(nonIntros);
+        setChatMessages([...chatIntroRef.current, ...messagesWithReplies]);
+      }
+    } catch (error) {
+      console.error('Error fetching chat messages:', error);
+    }
+  };
+
   // Track reply count changes for chat messages
   useEffect(() => {
     const { newReplyCounts, updatedUnreadSet } = trackReplyCountChanges(
@@ -566,25 +588,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   useEffect(() => {
     if (!chatPasscode || !router.query.conversationId || !initialJoinComplete) return;
 
-    const fetchInitialMessages = async () => {
-      try {
-        const chatMessages = await RetrieveData(
-          `messages/${router.query.conversationId}?channel=chat,${chatPasscode}`,
-          Api.get().getAccessToken(),
-        );
-
-        if (Array.isArray(chatMessages)) {
-          // Filter intro messages from older conversations where intros were persisted
-          const nonIntros = chatMessages.filter((m) => parseMessageBody(m.body)?.type !== 'intro');
-          const messagesWithReplies = await fetchAndInsertReplies(nonIntros);
-          setChatMessages([...chatIntroRef.current, ...messagesWithReplies]);
-        }
-      } catch (error) {
-        console.error('Error fetching initial chat messages:', error);
-      }
-    };
-
-    fetchInitialMessages();
+    fetchChatMessages();
   }, [chatPasscode, router.query.conversationId, initialJoinComplete]);
 
   // Check if user has existing preferences
@@ -652,7 +656,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       .catch((err) => console.error('Error re-fetching resources after reconnect:', err));
 
     fetchAllAssistantMessages();
-  }, [lastReconnectTime, router.query.conversationId, chatPasscode, fetchAllAssistantMessages]);
+    fetchChatMessages();
+  }, [lastReconnectTime, router.query.conversationId, chatPasscode]);
 
   async function sendMessage(
     message: string,
