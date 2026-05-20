@@ -2835,14 +2835,26 @@ describe('EventAssistantRoom', () => {
     });
 
     it('re-fetches resources from conversation API after gap-reconnect', async () => {
+      // Set up with lastReconnectTime to simulate a gap-reconnect
+      const { rerender } = await act(async () => render(<EventAssistantRoom authType={'guest'} />));
+
+      await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
+
+      // Simulate gap-reconnect by updating the mock to return lastReconnectTime
+      mockUseSessionJoin.mockReturnValue({
+        socket: mockSocket,
+        pseudonym: 'test-pseudonym',
+        userId: 'user-123',
+        isConnected: true,
+        errorMessage: null,
+        lastReconnectTime: Date.now(),
+      });
+
       const updatedResources = [
-        ...mockResources,
-        { id: 'res-3', source: 'ai', category: 'suggested', title: 'Book C', participantVisible: true },
+        { id: 'res-1', source: 'ai', category: 'suggested', title: 'Book A', participantVisible: true },
+        { id: 'res-3', source: 'ai', category: 'suggested', title: 'New Book After Reconnect', participantVisible: true },
       ];
 
-      await resourcesSetup(mockResources);
-
-      // Simulate a gap-reconnect by re-rendering with lastReconnectTime set
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
         if (path.startsWith('conversations/')) {
           return Promise.resolve({
@@ -2853,32 +2865,20 @@ describe('EventAssistantRoom', () => {
         return Promise.resolve([]);
       });
 
-      act(() => {
-        mockUseSessionJoin.mockReturnValue({
-          socket: mockSocket,
-          pseudonym: 'test-pseudonym',
-          userId: 'user-123',
-          isConnected: true,
-          errorMessage: null,
-          lastReconnectTime: new Date(),
-        });
-      });
-
-      // Re-render to trigger the lastReconnectTime effect
       await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
+        rerender(<EventAssistantRoom authType={'guest'} />);
       });
 
       await waitFor(() => {
-        expect(RetrieveData).toHaveBeenCalledWith(`conversations/test-conversation-id`, 'mock-access-token');
+        expect(RetrieveData).toHaveBeenCalledWith('conversations/test-conversation-id', 'mock-access-token');
       });
 
       const user = userEvent.setup();
       await user.click(screen.getAllByLabelText('Resources')[0]);
-      await user.click(screen.getAllByText('Readings & References (optional)')[0]);
+      await user.click(screen.getByText('Readings & References (optional)'));
 
       await waitFor(() => {
-        expect(screen.getByText('Book C')).toBeInTheDocument();
+        expect(screen.getByText('New Book After Reconnect')).toBeInTheDocument();
       });
     });
 
