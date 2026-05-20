@@ -127,7 +127,7 @@ export const Header = ({ className = '', variant = 'transparent', authType = 'gu
     <div className={`${className} ${variantStyles[variant]}`}>
       <Toolbar className="flex flex-row items-center justify-around w-full px-4 lg:px-8 h-14">
         <div className="flex flex-row items-center">
-          <Logo className="mr-4" />
+          <Logo className="mr-3" />
           <h1 className="text-2xl font-bold py-7">NextSpace</h1>
         </div>
         <div className="flex lg:hidden flex-col justify-end">
