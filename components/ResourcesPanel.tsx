@@ -185,6 +185,9 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
           {expandedCategories.has('speakers') && (
             <div className="bg-white px-6 py-4 border-b border-gray-200">
               <div className="space-y-4">
+                {moderators.length === 0 && speakers.length === 0 && (
+                  <p className="text-sm text-gray-500">No speakers available.</p>
+                )}
                 {moderators.length > 0 && (
                   <div>
                     <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Moderators</h4>

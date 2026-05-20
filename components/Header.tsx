@@ -1,37 +1,20 @@
 'use client';
-import { JSX, useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
+
+import { HeaderProps } from '../types.internal';
 
 import { Box, Button, Drawer, IconButton, List, Toolbar } from '@mui/material';
-import EventIcon from '@mui/icons-material/Event';
-import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import LoginIcon from '@mui/icons-material/Login';
-import LogoutIcon from '@mui/icons-material/Logout';
-import FeedbackOutlinedIcon from '@mui/icons-material/FeedbackOutlined';
+import { Close, Menu } from '@mui/icons-material';
 
-import { AuthType, HeaderProps, PageName } from '../types.internal';
 import Logo from './Logo';
 import { QuickGuideIconButton } from './QuickGuideIconButton';
-import { Close, Menu } from '@mui/icons-material';
-import { useRouter } from 'next/router';
-import { Api } from '../utils';
 
 // Admin pages navigation items (without Log In/Log Out - added dynamically)
-const adminPagesBase: Record<string, { icon: JSX.Element; url: string }> = {
-  'Event Schedule': { icon: <EventIcon />, url: '/admin/events' },
-  'Schedule an Event': {
-    icon: <AddCircleOutlineIcon />,
-    url: '/admin/events/new',
-  },
-};
-
-// Regular user pages navigation items
-const userPages: Record<string, { icon: JSX.Element; url: string }> = {
-  'Log In': { icon: <LoginIcon />, url: '/login' },
-  'Give Feedback': {
-    icon: <FeedbackOutlinedIcon />,
-    url: 'https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform',
-  },
+const adminPagesBase: Record<string, { url: string }> = {
+  'Event Schedule': { url: '/admin/events' },
+  'Schedule an Event': { url: '/admin/events/new' },
 };
 
 /**
@@ -56,7 +39,7 @@ export const Header = ({ className = '', variant = 'transparent', authType = 'gu
   const isAdminRoute = router.pathname.startsWith('/admin');
 
   // Build pages based on authType
-  let currentPages: Record<string, { icon: JSX.Element; url: string }>;
+  let currentPages: Record<string, { url: string }>;
 
   if (authType === 'admin') {
     // Admin users see admin pages; Give Feedback + Log Out rendered after Quick Guide
@@ -68,7 +51,7 @@ export const Header = ({ className = '', variant = 'transparent', authType = 'gu
     // Guest users: show login button only on admin routes
     currentPages = {
       ...(isAdminRoute && {
-        'Log In': { icon: <LoginIcon />, url: '/login' },
+        'Log In': { url: '/login' },
       }),
     };
   }
@@ -80,7 +63,7 @@ export const Header = ({ className = '', variant = 'transparent', authType = 'gu
     textTransform: 'capitalize' as const,
     '&:hover': { color: '#4845d2' },
     fontSize: '1rem',
-    color: 'grey',
+    color: 'black',
     backgroundColor: 'transparent',
   };
 
@@ -90,15 +73,11 @@ export const Header = ({ className = '', variant = 'transparent', authType = 'gu
   const TrailingNavItems = () => (
     <>
       <Link href={giveFeedbackUrl} target="_blank" rel="noopener noreferrer">
-        <Button sx={navButtonSx} startIcon={<FeedbackOutlinedIcon />}>
-          Give Feedback
-        </Button>
+        <Button sx={navButtonSx}>Give Feedback</Button>
       </Link>
       {isLoggedIn && (
         <Link href="/logout">
-          <Button sx={navButtonSx} startIcon={<LogoutIcon />}>
-            Log Out
-          </Button>
+          <Button sx={navButtonSx}>Log Out</Button>
         </Link>
       )}
     </>
@@ -114,7 +93,7 @@ export const Header = ({ className = '', variant = 'transparent', authType = 'gu
         const pageData = currentPages[pageName];
 
         // Guard against undefined/invalid page data
-        if (!pageData?.url) {
+        if (!pageData.url) {
           console.warn(`Navigation item "${pageName}" has no URL`);
           return null;
         }
@@ -132,10 +111,9 @@ export const Header = ({ className = '', variant = 'transparent', authType = 'gu
                 textTransform: 'capitalize',
                 '&:hover': { color: '#4845d2' },
                 fontSize: '1rem',
-                color: router.asPath === pageData.url ? '#4845d2' : 'grey',
+                color: 'black',
                 backgroundColor: 'transparent',
               }}
-              startIcon={pageData.icon}
             >
               {pageName}
             </Button>
@@ -146,11 +124,11 @@ export const Header = ({ className = '', variant = 'transparent', authType = 'gu
   };
 
   return (
-    <div className={`${className} ${variantStyles[variant]} bg-header shadow-sm`}>
-      <Toolbar className="flex flex-row items-center justify-around w-full px-4 lg:px-8">
+    <div className={`${className} ${variantStyles[variant]}`}>
+      <Toolbar className="flex flex-row items-center justify-around w-full px-4 lg:px-8 h-14">
         <div className="flex flex-row items-center">
-          <Logo className="mr-4" />
-          <h1 className="text-3xl font-bold py-7 text-medium-slate-blue">NextSpace</h1>
+          <Logo className="mr-3" />
+          <h1 className="text-2xl font-bold py-7">NextSpace</h1>
         </div>
         <div className="flex lg:hidden flex-col justify-end">
           <IconButton onClick={toggleDrawer(true)}>

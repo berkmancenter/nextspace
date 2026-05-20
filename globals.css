@@ -1,14 +1,4 @@
-@import "tailwindcss";
-
-:root {
-  --bg-image: url("/top-bg.svg");
-}
-
-.bg-header {
-  background-image: var(--bg-image);
-  background-size: cover;
-  background-repeat: no-repeat;
-}
+@import 'tailwindcss';
 
 /* Markdown content styling */
 .markdown-content {
@@ -41,7 +31,6 @@
 .markdown-content li {
   margin-bottom: 0.25rem;
 }
-
 
 @theme {
   --color-medium-slate-blue: #4845d2;

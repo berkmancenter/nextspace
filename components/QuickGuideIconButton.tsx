@@ -28,13 +28,12 @@ export const QuickGuideIconButton = ({ showLabel = false }: QuickGuideIconButton
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        startIcon={<TipsAndUpdatesOutlinedIcon />}
         sx={{
           textTransform: 'capitalize',
           justifyContent: 'flex-start',
           '&:hover': { color: '#4845d2' },
           fontSize: '1rem',
-          color: 'grey',
+          color: 'black',
           backgroundColor: 'transparent',
         }}
       >
