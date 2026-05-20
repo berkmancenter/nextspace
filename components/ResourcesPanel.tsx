@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { components } from '../types';
 import { ExpandMore, ExpandLess, MenuBook, Person, Info, Bookmark } from '@mui/icons-material';
 
@@ -34,20 +36,21 @@ interface TruncatedTextProps {
 const TruncatedText: React.FC<TruncatedTextProps> = ({ text, maxLength, className = '' }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const needsTruncation = text.length > maxLength;
-
-  if (!needsTruncation) {
-    return <span className={className}>{text}</span>;
-  }
+  const displayText = needsTruncation && !isExpanded ? `${text.slice(0, maxLength)}...` : text;
 
   return (
     <span className={className}>
-      {isExpanded ? text : `${text.slice(0, maxLength)}...`}{' '}
+      <span className="markdown-content">
+        <Markdown remarkPlugins={[remarkGfm]}>{displayText}</Markdown>
+      </span>
+      {needsTruncation && (
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="text-medium-slate-blue hover:opacity-80 font-medium underline cursor-pointer"
       >
         {isExpanded ? 'less' : 'more'}
       </button>
+      )}
     </span>
   );
 };
@@ -274,9 +277,9 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                           </p>
                         )}
                         {resource.description && (
-                          <p tabIndex={0} className="text-xs text-gray-600 italic mb-2">
-                            {resource.description}
-                          </p>
+                            <div tabIndex={0} className="markdown-content text-xs text-gray-600 italic mb-2">
+                              <Markdown remarkPlugins={[remarkGfm]}>{resource.description}</Markdown>
+                            </div>
                         )}
                         {resource.summary && (
                           <div className="border-t border-amber-200 pt-3 mt-2">
@@ -356,11 +359,14 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                           </p>
                         )}
                         {(resource.relevanceReason || resource.description || resource.summary) && (
-                          <p tabIndex={0} className="text-xs text-gray-700 leading-relaxed mb-2">
+                            <div tabIndex={0} className="markdown-content text-sm text-gray-700 leading-relaxed mb-2">
                             <span className="sr-only">Relevance: </span>
+                              <Markdown remarkPlugins={[remarkGfm]}>
                             {resource.relevanceReason || resource.description || resource.summary}
-                          </p>
+                              </Markdown>
+                            </div>
                         )}
+                        </div>
                       </li>
                     );
                   })
