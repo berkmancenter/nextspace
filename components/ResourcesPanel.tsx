@@ -44,12 +44,12 @@ const TruncatedText: React.FC<TruncatedTextProps> = ({ text, maxLength, classNam
         <Markdown remarkPlugins={[remarkGfm]}>{displayText}</Markdown>
       </span>
       {needsTruncation && (
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="text-medium-slate-blue hover:opacity-80 font-medium underline cursor-pointer"
-      >
-        {isExpanded ? 'less' : 'more'}
-      </button>
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="text-medium-slate-blue hover:opacity-80 font-medium underline cursor-pointer"
+        >
+          {isExpanded ? 'less' : 'more'}
+        </button>
       )}
     </span>
   );
@@ -196,11 +196,11 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                           </div>
                           <div>
                             <h5 className="text-sm font-semibold text-gray-900">{mod.name}</h5>
-                            <p className="text-xs text-gray-600 leading-relaxed mt-1">
+                            <p className="text-sm text-gray-600 leading-relaxed mt-1">
                               <TruncatedText
                                 text={mod.bio}
                                 maxLength={300}
-                                className="text-xs text-gray-600 leading-relaxed"
+                                className="text-sm text-gray-600 leading-relaxed"
                               />
                             </p>
                           </div>
@@ -220,11 +220,11 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                           </div>
                           <div>
                             <h5 className="text-sm font-semibold text-gray-900">{speaker.name}</h5>
-                            <p className="text-xs text-gray-600 leading-relaxed mt-1">
+                            <p className="text-sm text-gray-600 leading-relaxed mt-1">
                               <TruncatedText
                                 text={speaker.bio}
                                 maxLength={300}
-                                className="text-xs text-gray-600 leading-relaxed"
+                                className="text-sm text-gray-600 leading-relaxed"
                               />
                             </p>
                           </div>
@@ -247,7 +247,7 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                 <p className="text-sm text-gray-500 italic">No required readings assigned yet.</p>
               ) : (
                 <>
-                  <p className="text-xs text-gray-600 mb-4">
+                  <p className="text-sm text-gray-600 mb-4">
                     The following{' '}
                     {requiredResources.length === 1 ? 'reading was' : `${requiredResources.length} readings were`} assigned
                     by the event organizer to prepare for this session.
@@ -255,44 +255,45 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                   <ul className="space-y-5 list-none">
                     {requiredResources.map((resource, idx) => (
                       <li key={resource.id || idx} className="border border-amber-200 rounded-lg bg-amber-50 p-4">
-                        <div aria-hidden="true" className="flex items-center gap-2 mb-2">
-                          <span className="inline-block text-xs font-semibold text-amber-800 bg-amber-200 px-2 py-0.5 rounded-full">
-                            Required
-                          </span>
-                        </div>
-                        <h3 className="text-sm font-semibold text-amber-900 mb-1">
-                          {resource.url ? (
-                            <a href={resource.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                              {resource.title}
-                            </a>
-                          ) : (
-                            <span tabIndex={0}>{resource.title}</span>
+                        <div className="max-w-[600px]">
+                          <div aria-hidden="true" className="flex items-center gap-2 mb-2">
+                            <span className="inline-block text-xs font-semibold text-amber-800 bg-amber-200 px-2 py-0.5 rounded-full">
+                              Required
+                            </span>
+                          </div>
+                          <h3 className="text-base font-semibold text-amber-900 mb-1">
+                            {resource.url ? (
+                              <a href={resource.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                {resource.title}
+                              </a>
+                            ) : (
+                              <span tabIndex={0}>{resource.title}</span>
+                            )}
+                          </h3>
+                          {resource.authors && resource.authors.length > 0 && (
+                            <p tabIndex={0} className="text-xs text-gray-600 mb-3">
+                              <span className="sr-only">Authors and year: </span>
+                              {resource.authors.join(', ')}
+                              {resource.year ? ` (${resource.year})` : ''}
+                            </p>
                           )}
-                        </h3>
-                        {resource.authors && resource.authors.length > 0 && (
-                          <p tabIndex={0} className="text-xs text-gray-600 mb-3">
-                            <span className="sr-only">Authors and year: </span>
-                            {resource.authors.join(', ')}
-                            {resource.year ? ` (${resource.year})` : ''}
-                          </p>
-                        )}
-                        {resource.description && (
-                            <div tabIndex={0} className="markdown-content text-xs text-gray-600 italic mb-2">
+                          {resource.description && (
+                            <div tabIndex={0} className="markdown-content text-sm text-gray-600 italic mb-2">
                               <Markdown remarkPlugins={[remarkGfm]}>{resource.description}</Markdown>
                             </div>
-                        )}
-                        {resource.summary && (
-                          <div className="border-t border-amber-200 pt-3 mt-2">
-                            <p className="text-xs font-semibold text-amber-900 mb-1">Summary</p>
-                            <p tabIndex={0} className="text-xs text-gray-700 leading-relaxed">
-                              <TruncatedText
-                                text={resource.summary}
-                                maxLength={400}
-                                className="text-xs text-gray-700 leading-relaxed"
-                              />
-                            </p>
-                          </div>
-                        )}
+                          )}
+                          {resource.summary && (
+                            <div className="border-t border-amber-200 pt-3 mt-2">
+                              <p tabIndex={0} className="text-sm text-gray-700 leading-relaxed">
+                                <TruncatedText
+                                  text={resource.summary}
+                                  maxLength={400}
+                                  className="text-sm text-gray-700 leading-relaxed"
+                                />
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -307,7 +308,7 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
           <CategoryHeader category={categories[2]} isExpanded={expandedCategories.has('readings')} />
           {expandedCategories.has('readings') && (
             <div className="bg-white px-6 py-4 border-b border-gray-200">
-              <p className="text-xs text-gray-600 mb-3">
+              <p className="text-sm text-gray-600 mb-3">
                 References sourced from{' '}
                 <a
                   href="https://www.semanticscholar.org"
@@ -332,40 +333,41 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                           isNew ? 'border-amber-400 bg-amber-50' : 'border-indigo-400 bg-indigo-50'
                         }`}
                       >
-                        <div aria-hidden="true" className="flex items-center gap-2 mb-2">
-                          <span className="inline-block text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
-                            {resource.source === 'ai' ? 'AI Pick' : 'Speaker Pick'}
-                          </span>
-                          {isNew && (
-                            <span className="inline-block text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
-                              New
+                        <div className="max-w-[600px]">
+                          <div aria-hidden="true" className="flex items-center gap-2 mb-2">
+                            <span className="inline-block text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
+                              {resource.source === 'ai' ? 'AI Pick' : 'Speaker Pick'}
                             </span>
+                            {isNew && (
+                              <span className="inline-block text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                                New
+                              </span>
+                            )}
+                          </div>
+                          <h3 className={`text-base font-semibold mb-1 ${isNew ? 'text-amber-900' : 'text-indigo-900'}`}>
+                            {resource.url ? (
+                              <a href={resource.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                {resource.title}
+                              </a>
+                            ) : (
+                              <span tabIndex={0}>{resource.title}</span>
+                            )}
+                          </h3>
+                          {resource.authors && resource.authors.length > 0 && (
+                            <p tabIndex={0} className="text-xs text-gray-600 mb-2">
+                              <span className="sr-only">Authors and year: </span>
+                              {resource.authors.join(', ')}
+                              {resource.year ? ` (${resource.year})` : ''}
+                            </p>
                           )}
-                        </div>
-                        <h3 className={`text-sm font-semibold mb-1 ${isNew ? 'text-amber-900' : 'text-indigo-900'}`}>
-                          {resource.url ? (
-                            <a href={resource.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                              {resource.title}
-                            </a>
-                          ) : (
-                            <span tabIndex={0}>{resource.title}</span>
-                          )}
-                        </h3>
-                        {resource.authors && resource.authors.length > 0 && (
-                          <p tabIndex={0} className="text-xs text-gray-600 mb-2">
-                            <span className="sr-only">Authors and year: </span>
-                            {resource.authors.join(', ')}
-                            {resource.year ? ` (${resource.year})` : ''}
-                          </p>
-                        )}
-                        {(resource.relevanceReason || resource.description || resource.summary) && (
+                          {(resource.relevanceReason || resource.description || resource.summary) && (
                             <div tabIndex={0} className="markdown-content text-sm text-gray-700 leading-relaxed mb-2">
-                            <span className="sr-only">Relevance: </span>
+                              <span className="sr-only">Relevance: </span>
                               <Markdown remarkPlugins={[remarkGfm]}>
-                            {resource.relevanceReason || resource.description || resource.summary}
+                                {resource.relevanceReason || resource.description || resource.summary}
                               </Markdown>
                             </div>
-                        )}
+                          )}
                         </div>
                       </li>
                     );

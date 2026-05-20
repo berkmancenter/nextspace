@@ -221,7 +221,6 @@ describe('ResourcesPanel', () => {
       const resource = makeResource({ category: 'required', source: 'speaker', summary: 'S'.repeat(500) });
       render(<ResourcesPanel resources={[resource]} />);
       await user.click(screen.getByText('Required Reading'));
-      expect(screen.getByText('Summary')).toBeInTheDocument();
       expect(screen.getByText('more')).toBeInTheDocument();
     });
 
