@@ -1,20 +1,20 @@
 'use client';
-import { JSX, useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
+
+import { HeaderProps } from '../types.internal';
 
 import { Box, Button, Drawer, IconButton, List, Toolbar } from '@mui/material';
+import { Close, Menu } from '@mui/icons-material';
 
-import { AuthType, HeaderProps, PageName } from '../types.internal';
 import Logo from './Logo';
 import { QuickGuideIconButton } from './QuickGuideIconButton';
-import { Close, Menu } from '@mui/icons-material';
-import { useRouter } from 'next/router';
-import { Api } from '../utils';
 
 // Admin pages navigation items (without Log In/Log Out - added dynamically)
-const adminPagesBase: Record<string, string> = {
-  'Event Schedule': '/admin/events',
-  'Schedule an Event': '/admin/events/new',
+const adminPagesBase: Record<string, { url: string }> = {
+  'Event Schedule': { url: '/admin/events' },
+  'Schedule an Event': { url: '/admin/events/new' },
 };
 
 /**
@@ -39,7 +39,7 @@ export const Header = ({ className = '', variant = 'transparent', authType = 'gu
   const isAdminRoute = router.pathname.startsWith('/admin');
 
   // Build pages based on authType
-  let currentPages: Record<string, string>;
+  let currentPages: Record<string, { url: string }>;
 
   if (authType === 'admin') {
     // Admin users see admin pages; Give Feedback + Log Out rendered after Quick Guide
@@ -51,7 +51,7 @@ export const Header = ({ className = '', variant = 'transparent', authType = 'gu
     // Guest users: show login button only on admin routes
     currentPages = {
       ...(isAdminRoute && {
-        'Log In': '/login',
+        'Log In': { url: '/login' },
       }),
     };
   }
@@ -93,15 +93,15 @@ export const Header = ({ className = '', variant = 'transparent', authType = 'gu
         const pageData = currentPages[pageName];
 
         // Guard against undefined/invalid page data
-        if (!pageData[1]) {
+        if (!pageData.url) {
           console.warn(`Navigation item "${pageName}" has no URL`);
           return null;
         }
 
-        const isExternalLink = pageData[1].startsWith('http');
+        const isExternalLink = pageData.url.startsWith('http');
         return (
           <Link
-            href={pageData[1]}
+            href={pageData.url}
             key={pageName}
             target={isExternalLink ? '_blank' : undefined}
             rel={isExternalLink ? 'noopener noreferrer' : undefined}
