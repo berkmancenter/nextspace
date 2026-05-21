@@ -155,13 +155,13 @@ export class Api {
  * @param setErrorMessage - Function to set an error message if needed.
  * @returns The passcode for the specified channel, or null if not found or error.
  */
-export const GetChannelPasscode = (channel: string, query: ParsedUrlQuery, setErrorMessage: (err: string) => void) => {
+export const GetChannelPasscode = (channel: string, query: ParsedUrlQuery, setErrorMessage?: (err: string) => void) => {
   let hasChannel = false;
   let passcodeParam = null;
   let channelIndex = 0;
 
   if (!query.channel) {
-    setErrorMessage('Please provide channels.');
+    setErrorMessage?.('Please provide channels.');
     return null;
   }
 
@@ -185,7 +185,7 @@ export const GetChannelPasscode = (channel: string, query: ParsedUrlQuery, setEr
       passcodeParam = query.channel[channelIndex].split(',')[1];
     }
     if (!passcodeParam) {
-      setErrorMessage(`Please provide a ${channel} passcode.`);
+      setErrorMessage?.(`Please provide a ${channel} passcode.`);
       return null;
     }
   }
@@ -234,7 +234,17 @@ export const SendData = async (
       !accessToken, // Use stored tokens if no explicit accessToken provided
     );
 
-    // TODO: Handle other status codes as needed
+    // Handle 400
+    if (response.status === 400) {
+      const errorData = await response.json();
+      return {
+        error: true,
+        status: 400,
+        message: errorData.message || 'Bad Request',
+      };
+    }
+
+    // Fallback
     if (!response.ok) {
       console.error('Error:', response);
       return {
