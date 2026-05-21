@@ -11,6 +11,8 @@ import { AuthType } from '../types.internal';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useSetConversationType } from '../context/ConversationTypeContext';
 import { trackConversationEvent } from '../utils/analytics';
+import { Alert, Paper, Snackbar } from '@mui/material';
+import { ErrorOutline } from '@mui/icons-material';
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -34,7 +36,8 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
     return () => setConversationType(null);
   }, [router.query.conversationId]);
 
-  const [localError, setLocalError] = useState<string | null>(null);
+  const [generalError, setGeneralError] = useState<string | null>(null);
+  const [paramsError, setParamsError] = useState<{ header: string; params: string[] } | null>(null);
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
   const [conversationName, setConversationName] = useState<string>('');
 
@@ -53,11 +56,16 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
   // Use custom hook for session joining
   const { socket, isConnected, errorMessage: sessionError, lastReconnectTime } = useSessionJoin();
 
-  // Combine session and local errors
-  const errorMessage = sessionError || localError;
+  const sessionErrorMessage = sessionError;
+  const paramsErrorMessage = paramsError;
 
   useEffect(() => {
     if (!router.isReady || !socket || !Api.get().getAccessToken()) return;
+    const queryError = QueryParamsError(router, 'moderator');
+    if (queryError) {
+      setParamsError(queryError);
+      return;
+    }
 
     const messageHandler = (data: PseudonymousMessage) => {
       console.log('New message:', data);
@@ -75,14 +83,9 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
 
     async function fetchConversationData() {
       if (!router.isReady || !Api.get().getAccessToken()) return;
-      if (!router.query.conversationId || !router.query.channel || router.query.channel.length === 0) {
-        setLocalError(QueryParamsError(router));
-        return;
-      }
 
-      const transcriptPasscodeParam = GetChannelPasscode('transcript', router.query, setLocalError);
-
-      const modPasscodeParam = GetChannelPasscode('moderator', router.query, setLocalError);
+      const transcriptPasscodeParam = GetChannelPasscode('transcript', router.query, setGeneralError);
+      const modPasscodeParam = GetChannelPasscode('moderator', router.query, setGeneralError);
 
       // Store transcript passcode for Transcript component
       if (transcriptPasscodeParam) {
@@ -122,7 +125,13 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
       );
 
       if (conversationMessagesResponse && 'error' in conversationMessagesResponse) {
-        setLocalError(conversationMessagesResponse.message?.message || 'Failed to fetch conversation messages.');
+        // catch conversation not found
+        if (conversationMessagesResponse.message?.message.includes('not found'))
+          setParamsError({ header: 'Conversation Not Found', params: [] });
+        // Catch incorrect passcode
+        else if (conversationMessagesResponse.message?.message.toLocaleLowerCase().includes('incorrect passcode'))
+          setParamsError({ header: 'Incorrect Passcode', params: ['moderator'] });
+        else setGeneralError(conversationMessagesResponse.message?.message || 'Failed to fetch conversation messages.');
         return;
       } else if (Array.isArray(conversationMessagesResponse)) {
         setMessages(
@@ -244,8 +253,35 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-96px)] overflow-hidden">
-      {errorMessage ? (
-        <div className="text-medium-slate-blue text-lg font-bold mx-9">{errorMessage}</div>
+      {/* Display general error if present */}
+      {generalError && (
+        <Snackbar
+          open={!!generalError}
+          autoHideDuration={6000}
+          onClose={() => setGeneralError(null)}
+          // message={generalError}
+        >
+          <Alert severity="error" color="warning">
+            {generalError}
+          </Alert>
+        </Snackbar>
+      )}
+      {/* Display parameter error if present */}
+      {paramsError ? (
+        <div className="flex items-center justify-center w-full h-full">
+          <div className="min-w-3xs border-2 border-red-400">
+            <h3 className="text-xl font-bold px-2 py-2 bg-red-400 text-white w-full">
+              <ErrorOutline />
+              &nbsp; Error
+            </h3>
+            <p className="text-xl font-bold mx-9 my-3">{paramsError.header}</p>
+            <ul className="text-xl mx-9 my-3 list-disc list-inside">
+              {paramsError.params.map((param, index) => (
+                <li key={index}>{<code>{param}</code>}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
       ) : (
         <>
           {/* Transcript view on top for mobile, right side for desktop - only render if enabled */}
@@ -259,6 +295,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
                 transcriptPasscode={transcriptPasscode}
                 showControls={true}
                 lastReconnectTime={lastReconnectTime}
+                setErrorMessage={setGeneralError}
               />
             </div>
           )}

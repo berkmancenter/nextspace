@@ -5,7 +5,15 @@ import { AssistantChatPanel } from '../components/AssistantChatPanel';
 import { GroupChatPanel } from '../components/GroupChatPanel';
 import { ResourcesPanel } from '../components/ResourcesPanel';
 import { SlashCommand } from '../components/enhancers/slashCommandEnhancer';
-import { Api, RetrieveData, SendData, GetChannelPasscode, emitWithTokenRefresh, buildDirectChannels } from '../utils';
+import {
+  Api,
+  RetrieveData,
+  SendData,
+  GetChannelPasscode,
+  emitWithTokenRefresh,
+  buildDirectChannels,
+  QueryParamsError,
+} from '../utils';
 import { components } from '../types';
 import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
 import { CheckAuthHeader, createConversationFromData, resolveConversationBotName, parseMessageBody } from '../utils/Helpers';
@@ -19,6 +27,7 @@ import { Transcript } from '../components/';
 import { useSessionJoin } from '../utils/useSessionJoin';
 import { NavigationBar, NavTab } from '../components/NavigationBar';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
+import { Snackbar, Alert } from '@mui/material';
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -70,7 +79,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   // Initialize page-level analytics
   useAnalytics({ pageType: 'assistant' });
 
-  const [localError, setLocalError] = useState<string | null>(null);
+  const [generalError, setGeneralError] = useState<string | null>(null);
+  const [paramsError, setParamsError] = useState<{ header: string; params: string[] } | null>(null);
+
   const [waitingForResponse, setWaitingForResponse] = useState(false);
   const [waitingForChatResponse, setWaitingForChatResponse] = useState(false);
 
@@ -152,7 +163,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const { socket, pseudonym, userId, isConnected, errorMessage: sessionError, lastReconnectTime } = useSessionJoin();
 
   // Combine session and local errors
-  const errorMessage = sessionError || localError;
+  const errorMessage = sessionError || generalError;
 
   // Derive slash commands from the loaded conversation type's features.
   // Empty until the type loads, so the autocomplete stays hidden during that window.
@@ -239,8 +250,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   useEffect(() => {
     if (!Api.get().getAccessToken() || !router.isReady) return;
-    if (!router.query.conversationId) {
-      setLocalError('Please provide a Conversation ID.');
+    const queryError = QueryParamsError(router, 'assistant');
+    if (queryError) {
+      setParamsError(queryError);
       return;
     }
 
@@ -256,11 +268,15 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         );
 
         if (!conversationData) {
-          setLocalError('Conversation not found.');
+          setParamsError({ header: 'Conversation Not Found', params: [] });
           return;
         }
         if ('error' in conversationData) {
-          setLocalError(conversationData.message?.message || 'Error retrieving conversation.');
+          // catch conversation not found
+          if (conversationData.message?.message.includes('not found'))
+            setParamsError({ header: 'Conversation Not Found', params: [] });
+
+          setGeneralError(conversationData.message?.message || 'Error retrieving conversation.');
           return;
         }
 
@@ -295,13 +311,13 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
         // Get transcript and chat passcodes if channel query param exists
         if (router.query.channel) {
-          const transcriptPasscodeParam = GetChannelPasscode('transcript', router.query, setLocalError);
+          const transcriptPasscodeParam = GetChannelPasscode('transcript', router.query, setGeneralError);
 
           if (transcriptPasscodeParam) {
             setTranscriptPasscode(transcriptPasscodeParam);
           }
 
-          const chatPasscodeParam = GetChannelPasscode('chat', router.query, setLocalError);
+          const chatPasscodeParam = GetChannelPasscode('chat', router.query, setGeneralError);
 
           if (chatPasscodeParam) {
             setChatPasscode(chatPasscodeParam);
@@ -326,7 +342,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         }
       } catch (error) {
         console.error('Error fetching conversation data:', error);
-        setLocalError('Failed to fetch conversation data.');
+        setGeneralError('Failed to fetch conversation data.');
       }
     }
     fetchConversationData();
@@ -713,7 +729,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       }
     }
 
-    await SendData('messages', {
+    const response = await SendData('messages', {
       body: finalMessage,
       bodyType: 'text',
       conversation: router.query.conversationId,
@@ -721,6 +737,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       ...(parentMessageId !== undefined && { parentMessage: parentMessageId }),
       ...(messageSource === 'promptResponse' && promptQuestionId && { answersPrompt: promptQuestionId }),
     });
+
+    // Catch incorrect passcode
+    if (response.error && response.message.toLocaleLowerCase().includes('incorrect passcode'))
+      setGeneralError('Incorrect chat passcode. Message could not be sent.');
 
     // Auto-exit controlled mode after sending
     if (controlledMode) {
@@ -762,7 +782,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     // Find the prompt message to get its parentMessage (if it's in a thread)
     const promptMessage = assistantMessages.find((msg) => msg.id === promptMessageId);
     const threadParentId = promptMessage?.parentMessage;
-
     await sendMessage(
       value,
       true,
@@ -860,8 +879,27 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     <>
       {/* On mobile we add bottom padding so the fixed nav bar doesn't cover content */}
       <div className="flex flex-row h-[calc(100vh-96px)] overflow-hidden pb-[60px] lg:pb-0">
-        {errorMessage ? (
-          <div className="text-medium-slate-blue text-lg font-bold mx-9 mt-6">{errorMessage}</div>
+        {/* Display general error if present */}
+        {generalError && (
+          <Snackbar open={!!generalError} autoHideDuration={6000} onClose={() => setGeneralError(null)}>
+            <Alert severity="error" color="warning">
+              {generalError}
+            </Alert>
+          </Snackbar>
+        )}
+        {/* Display parameter error if present */}
+        {paramsError ? (
+          <div className="flex items-center justify-center w-full h-full">
+            <div className="min-h-36 min-w-2xs border-2 border-red-400">
+              <h3 className="text-lg font-bold px-4 py-2 bg-red-400 text-white w-full">Error</h3>
+              <p className="text-lg font-bold mx-9 my-3">{paramsError.header}</p>
+              <ul className="text-lg mx-9 my-3 list-disc list-inside">
+                {paramsError.params.map((param, index) => (
+                  <li key={index}>{<code>{param}</code>}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
         ) : (
           <>
             {/* ── Navigation Bar (left sidebar on desktop, bottom bar on mobile) ── */}
