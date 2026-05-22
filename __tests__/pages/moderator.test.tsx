@@ -3,7 +3,8 @@ import { act } from 'react';
 import { useRouter } from 'next/router';
 import { io } from 'socket.io-client';
 import ModeratorScreen from '../../pages/moderator';
-import { RetrieveData } from '../../utils';
+import { GetChannelPasscode, RetrieveData } from '../../utils';
+import { channel } from 'diagnostics_channel';
 
 // Mock dependencies
 jest.mock('next/router', () => ({
@@ -28,7 +29,25 @@ jest.mock('../../utils', () => ({
   },
   GetChannelPasscode: jest.fn().mockReturnValue('mock-passcode'),
   RetrieveData: jest.fn(),
-  QueryParamsError: jest.fn().mockReturnValue('Query params error'),
+  QueryParamsError: jest.fn((router, page) => {
+    const { conversationId, channel }: { conversationId?: string; channel?: string[] | string } = router.query;
+    const missing: string[] = [];
+
+    if (!conversationId) missing.push('conversation ID');
+    if (!channel) missing.push('channel');
+
+    if (typeof channel === 'string' && !channel.startsWith('moderator')) missing.push('moderator channel');
+    else if (Array.isArray(channel) && !channel.find((ch) => ch.startsWith('moderator'))) missing.push('moderator channel');
+    if (!GetChannelPasscode('moderator', router.query)) missing.push('moderator passcode');
+    if (typeof channel === 'string' && !channel.startsWith('transcript')) missing.push('transcript channel');
+    else if (Array.isArray(channel) && !channel.find((ch) => ch.startsWith('transcript')))
+      missing.push('transcript channel');
+    if (!GetChannelPasscode('transcript', router.query)) missing.push('transcript passcode');
+
+    if (missing.length > 0) return { header: `Missing required parameter${missing.length > 1 ? 's' : ''}`, params: missing };
+
+    return null;
+  }),
   emitWithTokenRefresh: jest.fn((socket, event, data, onSuccess) => {
     // Simulate successful emit
     if (onSuccess) onSuccess();
@@ -80,7 +99,7 @@ describe('ModeratorScreen', () => {
     isReady: true,
     query: {
       conversationId: 'test-conversation',
-      channel: 'moderator',
+      channel: ['moderator,nDWq1-bh', 'transcript,MJqaT2ii'],
     },
   };
 
@@ -184,10 +203,27 @@ describe('ModeratorScreen', () => {
     expect(screen.getByTestId('transcript-component')).toBeInTheDocument();
   });
 
-  it('shows error message when query params are invalid', async () => {
+  it('displays error when conversation is not found', async () => {
+    (RetrieveData as jest.Mock).mockResolvedValue(null);
+
+    await act(async () => {
+      render(<ModeratorScreen authType={'user'} />);
+    });
+
+    await waitFor(() => {
+      expect(document.getElementById('params-error')).toBeInTheDocument();
+      expect(screen.getByText('Error')).toBeInTheDocument();
+      expect(screen.getByText('Conversation Not Found')).toBeInTheDocument();
+    });
+  });
+
+  it('shows error message when channel query param is missing', async () => {
     (useRouter as jest.Mock).mockReturnValue({
       ...mockRouter,
-      query: {},
+      query: {
+        conversationId: 'test-conversation-id',
+        channel: null,
+      },
     });
 
     await act(async () => {
@@ -195,7 +231,33 @@ describe('ModeratorScreen', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Query params error')).toBeInTheDocument();
+      expect(document.getElementById('params-error')).toBeInTheDocument();
+      expect(screen.getByText('Error')).toBeInTheDocument();
+      expect(screen.getByText(/Missing required parameter/)).toBeInTheDocument();
+      expect(screen.getByText(/channel/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows error message when channel query params are invalid', async () => {
+    (useRouter as jest.Mock).mockReturnValue({
+      ...mockRouter,
+      query: {
+        conversationId: 'test-conversation-id',
+        channel: 'moderator',
+        passcode: null,
+      },
+    });
+
+    await act(async () => {
+      render(<ModeratorScreen authType={'user'} />);
+    });
+
+    await waitFor(() => {
+      expect(document.getElementById('params-error')).toBeInTheDocument();
+      expect(screen.getByText('Error')).toBeInTheDocument();
+      expect(screen.getByText(/Missing required parameter/)).toBeInTheDocument();
+      expect(screen.getByRole('list')).toBeInTheDocument();
+      expect(screen.getByText(/transcript channel/i)).toBeInTheDocument();
     });
   });
 
