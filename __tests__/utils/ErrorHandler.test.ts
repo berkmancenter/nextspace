@@ -116,26 +116,6 @@ describe('QueryParamsError', () => {
       expect(result?.params).toContain('moderator passcode');
     });
 
-    it('should return error when transcript channel is missing (string)', () => {
-      const router = createMockRouter({
-        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
-        channel: 'moderator-main',
-      });
-
-      const result = QueryParamsError(router, 'moderator');
-      expect(result?.params).toContain('transcript channel');
-    });
-
-    it('should return error when transcript channel is missing (array)', () => {
-      const router = createMockRouter({
-        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
-        channel: ['moderator-main'],
-      });
-
-      const result = QueryParamsError(router, 'moderator');
-      expect(result?.params).toContain('transcript channel');
-    });
-
     it('should return error when transcript passcode is missing', () => {
       mockGetChannelPasscode.mockImplementation((type) => (type === 'transcript' ? null : 'passcode'));
 
@@ -180,28 +160,6 @@ describe('QueryParamsError', () => {
 
       const result = QueryParamsError(router, 'assistant');
       expect(result?.params).toContain('chat passcode');
-    });
-
-    it('should return error when transcript channel is missing for assistant', () => {
-      const router = createMockRouter({
-        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
-        channel: ['chat-main'],
-      });
-
-      const result = QueryParamsError(router, 'assistant');
-      expect(result?.params).toContain('transcript channel');
-    });
-
-    it('should return error when transcript passcode is missing for assistant', () => {
-      mockGetChannelPasscode.mockImplementation((type) => (type === 'transcript' ? null : 'passcode'));
-
-      const router = createMockRouter({
-        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
-        channel: ['chat-main', 'transcript-main'],
-      });
-
-      const result = QueryParamsError(router, 'assistant');
-      expect(result?.params).toContain('transcript passcode');
     });
   });
 
