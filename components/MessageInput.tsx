@@ -7,27 +7,36 @@ import { GenericEnhancerMenu } from './GenericEnhancerMenu';
 import { getAvatarStyle } from '../utils/avatarUtils';
 
 interface MessageInputProps {
+  /** The pseudonym of the user */
   pseudonym: string | null;
+  /** List of input enhancers */
   enhancers: InputEnhancer<any>[];
-  onSendMessage: (message: string) => void;
+  /** Whether the input is waiting for a response */
   waitingForResponse: boolean;
+  /** Configuration for controlled input mode */
   controlledMode: ControlledInputConfig | null;
-  onExitControlledMode: () => void;
+  /** The current value of the input in controlled mode */
   inputValue?: string;
-  onInputChange?: (value: string) => void;
+  /** Whether to disable the input while waiting for a response */
   disableWhileWaiting?: boolean;
+  /** Callback when a message is sent */
+  onSendMessage: (message: string) => void;
+  /** Callback when exiting controlled input mode */
+  onExitControlledMode: () => void;
+  /** Callback when the input value changes in controlled mode */
+  onInputChange?: (value: string) => void;
 }
 
 export const MessageInput: FC<MessageInputProps> = ({
   pseudonym,
   enhancers,
-  onSendMessage,
   waitingForResponse,
   controlledMode,
-  onExitControlledMode,
   inputValue,
-  onInputChange,
   disableWhileWaiting = true,
+  onExitControlledMode,
+  onInputChange,
+  onSendMessage,
 }) => {
   const [internalValue, setInternalValue] = useState('');
   const isControlled = inputValue !== undefined && onInputChange !== undefined;
