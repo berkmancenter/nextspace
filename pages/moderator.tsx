@@ -11,7 +11,7 @@ import { AuthType } from '../types.internal';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useSetConversationType } from '../context/ConversationTypeContext';
 import { trackConversationEvent } from '../utils/analytics';
-import { Alert, Paper, Snackbar } from '@mui/material';
+import { Alert, Snackbar } from '@mui/material';
 import { ErrorOutline } from '@mui/icons-material';
 
 export const getServerSideProps = async (context: { req: any }) => {
@@ -55,9 +55,6 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
 
   // Use custom hook for session joining
   const { socket, isConnected, errorMessage: sessionError, lastReconnectTime } = useSessionJoin();
-
-  const sessionErrorMessage = sessionError;
-  const paramsErrorMessage = paramsError;
 
   useEffect(() => {
     if (!router.isReady || !socket || !Api.get().getAccessToken()) return;
@@ -105,6 +102,17 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
         Api.get().getAccessToken(),
       );
 
+      // Catch conversation not found
+      if (
+        !conversationResponse ||
+        (conversationResponse &&
+          'error' in conversationResponse &&
+          conversationResponse.message?.message.includes('not found'))
+      ) {
+        setParamsError({ header: 'Conversation Not Found', params: [] });
+        return;
+      }
+
       if (conversationResponse && !('error' in conversationResponse)) {
         setConversationName(conversationResponse.name || '');
         setConversationActive(conversationResponse.active ?? true);
@@ -125,7 +133,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
       );
 
       if (conversationMessagesResponse && 'error' in conversationMessagesResponse) {
-        // catch conversation not found
+        // Catch conversation not found
         if (conversationMessagesResponse.message?.message.includes('not found'))
           setParamsError({ header: 'Conversation Not Found', params: [] });
         // Catch incorrect passcode
@@ -253,22 +261,22 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-96px)] overflow-hidden">
-      {/* Display general error if present */}
-      {generalError && (
+      {/* Display general or session error if present */}
+      {(generalError || sessionError) && (
         <Snackbar
-          open={!!generalError}
+          open={!!(generalError || sessionError)}
           autoHideDuration={6000}
           onClose={() => setGeneralError(null)}
           // message={generalError}
         >
           <Alert severity="error" color="warning">
-            {generalError}
+            {generalError || sessionError}
           </Alert>
         </Snackbar>
       )}
       {/* Display parameter error if present */}
       {paramsError ? (
-        <div className="flex items-center justify-center w-full h-full">
+        <div id="params-error" className="flex items-center justify-center w-full h-full">
           <div className="min-w-3xs border-2 border-red-400">
             <h3 className="text-xl font-bold px-2 py-2 bg-red-400 text-white w-full">
               <ErrorOutline />

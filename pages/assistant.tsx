@@ -162,9 +162,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   // Use custom hook for session joining
   const { socket, pseudonym, userId, isConnected, errorMessage: sessionError, lastReconnectTime } = useSessionJoin();
 
-  // Combine session and local errors
-  const errorMessage = sessionError || generalError;
-
   // Derive slash commands from the loaded conversation type's features.
   // Empty until the type loads, so the autocomplete stays hidden during that window.
   const slashCommands: SlashCommand[] = (conversationType?.features ?? [])
@@ -739,7 +736,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     });
 
     // Catch incorrect passcode
-    if (response.error && response.message.toLocaleLowerCase().includes('incorrect passcode'))
+    if (response && response.error && response.message.toLocaleLowerCase().includes('incorrect passcode'))
       setGeneralError('Incorrect chat passcode. Message could not be sent.');
 
     // Auto-exit controlled mode after sending
@@ -879,17 +876,17 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     <>
       {/* On mobile we add bottom padding so the fixed nav bar doesn't cover content */}
       <div className="flex flex-row h-[calc(100vh-96px)] overflow-hidden pb-[60px] lg:pb-0">
-        {/* Display general error if present */}
-        {generalError && (
-          <Snackbar open={!!generalError} autoHideDuration={6000} onClose={() => setGeneralError(null)}>
+        {/* Display general or socket error if present */}
+        {(generalError || sessionError) && (
+          <Snackbar open={!!(generalError || sessionError)} autoHideDuration={6000} onClose={() => setGeneralError(null)}>
             <Alert severity="error" color="warning">
-              {generalError}
+              {generalError || sessionError}
             </Alert>
           </Snackbar>
         )}
         {/* Display parameter error if present */}
         {paramsError ? (
-          <div className="flex items-center justify-center w-full h-full">
+          <div id="params-error" className="flex items-center justify-center w-full h-full">
             <div className="min-h-36 min-w-2xs border-2 border-red-400">
               <h3 className="text-lg font-bold px-4 py-2 bg-red-400 text-white w-full">Error</h3>
               <p className="text-lg font-bold mx-9 my-3">{paramsError.header}</p>
