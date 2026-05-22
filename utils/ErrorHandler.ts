@@ -13,11 +13,13 @@ export const QueryParamsError = (router: NextRouter, page: Page): { header: stri
   const missing: string[] = [];
 
   const checkTranscriptPasscode = () => {
-    // Also check for transcript channel and passcode
-    if (typeof channel === 'string' && !channel.startsWith('transcript')) missing.push('transcript channel');
-    else if (Array.isArray(channel) && !channel.find((ch) => ch.startsWith('transcript')))
-      missing.push('transcript channel');
-    if (!GetChannelPasscode('transcript', router.query)) missing.push('transcript passcode');
+    // Also check for transcript passcode, if specified as a channel
+    if (
+      (typeof channel === 'string' && channel.startsWith('transcript')) ||
+      (Array.isArray(channel) && channel.find((ch) => ch.startsWith('transcript')))
+    ) {
+      if (!GetChannelPasscode('transcript', router.query)) missing.push('transcript passcode');
+    }
   };
 
   if (!conversationId) missing.push('conversation ID');
