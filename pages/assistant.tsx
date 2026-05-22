@@ -23,11 +23,10 @@ import { useAnalytics } from '../hooks/useAnalytics';
 import { useConversationType, useSetBotName, useSetConversationType } from '../context/ConversationTypeContext';
 import { AuthType } from '../types.internal';
 import { trackConversationEvent, setUserId } from '../utils/analytics';
-import { Transcript } from '../components/';
+import { Errors, ParamErrors, Transcript } from '../components/';
 import { useSessionJoin } from '../utils/useSessionJoin';
 import { NavigationBar, NavTab } from '../components/NavigationBar';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
-import { Snackbar, Alert } from '@mui/material';
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -876,27 +875,15 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     <>
       {/* On mobile we add bottom padding so the fixed nav bar doesn't cover content */}
       <div className="flex flex-row h-[calc(100vh-96px)] overflow-hidden pb-[60px] lg:pb-0">
-        {/* Display general or socket error if present */}
-        {(generalError || sessionError) && (
-          <Snackbar open={!!(generalError || sessionError)} autoHideDuration={6000} onClose={() => setGeneralError(null)}>
-            <Alert severity="error" color="warning">
-              {generalError || sessionError}
-            </Alert>
-          </Snackbar>
-        )}
-        {/* Display parameter error if present */}
+        {/* Error messages */}
+        {generalError ||
+          (sessionError && (
+            <Errors generalError={generalError} sessionError={sessionError} setGeneralError={setGeneralError} />
+          ))}
+
+        {/* Display parameter errors if present */}
         {paramsError ? (
-          <div id="params-error" className="flex items-center justify-center w-full h-full">
-            <div className="min-h-36 min-w-2xs border-2 border-red-400">
-              <h3 className="text-lg font-bold px-4 py-2 bg-red-400 text-white w-full">Error</h3>
-              <p className="text-lg font-bold mx-9 my-3">{paramsError.header}</p>
-              <ul className="text-lg mx-9 my-3 list-disc list-inside">
-                {paramsError.params.map((param, index) => (
-                  <li key={index}>{<code>{param}</code>}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          <ParamErrors paramsError={paramsError} />
         ) : (
           <>
             {/* ── Navigation Bar (left sidebar on desktop, bottom bar on mobile) ── */}

@@ -4,15 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import { PseudonymousMessage, ModeratorInsightsMessage, ModeratorMetricsMessage, ErrorMessage } from '../types.internal';
 import { Api, GetChannelPasscode, RetrieveData, QueryParamsError, emitWithTokenRefresh } from '../utils';
 
-import { Transcript } from '../components/';
+import { Errors, ParamErrors, Transcript } from '../components/';
 import { CheckAuthHeader, createConversationFromData } from '../utils/Helpers';
 import { useSessionJoin } from '../utils/useSessionJoin';
 import { AuthType } from '../types.internal';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useSetConversationType } from '../context/ConversationTypeContext';
 import { trackConversationEvent } from '../utils/analytics';
-import { Alert, Snackbar } from '@mui/material';
-import { ErrorOutline } from '@mui/icons-material';
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -262,34 +260,14 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-96px)] overflow-hidden">
       {/* Display general or session error if present */}
-      {(generalError || sessionError) && (
-        <Snackbar
-          open={!!(generalError || sessionError)}
-          autoHideDuration={6000}
-          onClose={() => setGeneralError(null)}
-          // message={generalError}
-        >
-          <Alert severity="error" color="warning">
-            {generalError || sessionError}
-          </Alert>
-        </Snackbar>
-      )}
-      {/* Display parameter error if present */}
+      {generalError ||
+        (sessionError && (
+          <Errors generalError={generalError} sessionError={sessionError} setGeneralError={setGeneralError} />
+        ))}
+
+      {/* Display parameter errors if present */}
       {paramsError ? (
-        <div id="params-error" className="flex items-center justify-center w-full h-full">
-          <div className="min-w-3xs border-2 border-red-400">
-            <h3 className="text-xl font-bold px-2 py-2 bg-red-400 text-white w-full">
-              <ErrorOutline />
-              &nbsp; Error
-            </h3>
-            <p className="text-xl font-bold mx-9 my-3">{paramsError.header}</p>
-            <ul className="text-xl mx-9 my-3 list-disc list-inside">
-              {paramsError.params.map((param, index) => (
-                <li key={index}>{<code>{param}</code>}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
+        <ParamErrors paramsError={paramsError} />
       ) : (
         <>
           {/* Transcript view on top for mobile, right side for desktop - only render if enabled */}
