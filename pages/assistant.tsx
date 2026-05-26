@@ -18,6 +18,7 @@ import { trackConversationEvent, setUserId } from '../utils/analytics';
 import { Transcript } from '../components/';
 import { useSessionJoin } from '../utils/useSessionJoin';
 import { NavigationBar, NavTab } from '../components/NavigationBar';
+import { PreferencesPanel } from '../components/PreferencesPanel';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
 
 export const getServerSideProps = async (context: { req: any }) => {
@@ -817,6 +818,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   const handleTabChange = (tab: NavTab) => {
     setActiveTab(tab);
+    if (router.query.view) {
+      const { view: _, ...rest } = router.query;
+      router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+    }
     // Clear unseen count for the tab we're switching to
     if (tab === 'assistant') {
       setUnseenAssistantCount(0);
@@ -866,7 +871,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           <>
             {/* ── Navigation Bar (left sidebar on desktop, bottom bar on mobile) ── */}
             <NavigationBar
-              activeTab={activeTab}
+              activeTab={router.query.view === 'preferences' ? null : activeTab}
               onTabChange={handleTabChange}
               unseenAssistantCount={unseenAssistantCount}
               unseenChatCount={unseenChatCount}
@@ -882,7 +887,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
             {/* ── Main content area ── */}
             <div className="flex-1 flex flex-row overflow-hidden">
               {/* Transcript full-screen view when transcript tab is active */}
-              {activeTab === 'transcript' && transcriptPasscode ? (
+              {router.query.view !== 'preferences' && activeTab === 'transcript' && transcriptPasscode ? (
                 <div className="flex-1 overflow-hidden">
                   <Transcript
                     category="assistant"
@@ -895,9 +900,11 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                 </div>
               ) : (
                 <>
-                  {/* Chat / Assistant / Resources panel */}
+                  {/* Chat / Assistant / Resources / Preferences panel */}
                   <div className="flex-1 flex flex-col relative overflow-hidden">
-                    {isConnected ? (
+                    {router.query.view === 'preferences' ? (
+                      <PreferencesPanel botName={botName} />
+                    ) : isConnected ? (
                       activeTab === 'chat' ? (
                         <GroupChatPanel
                           messages={chatMessages}
