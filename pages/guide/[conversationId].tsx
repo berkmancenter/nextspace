@@ -306,10 +306,9 @@ function TabSection({ tab, features, botName }: { tab: string; features: Feature
   const actionTip = tabActionTip(tab, botName);
 
   const slashCommands = features.filter((f) => f.slashCommand);
-  const userControlled = features.filter((f) => !f.slashCommand && f.userControlled);
   const automatic = features.filter((f) => !f.slashCommand && !f.userControlled);
   const hasDisabled = features.some((f) => f.enabled === false);
-  const hasNonSlash = userControlled.length + automatic.length > 0;
+  const hasNonSlash = automatic.length > 0;
 
   return (
     <Box
@@ -382,22 +381,6 @@ function TabSection({ tab, features, botName }: { tab: string; features: Feature
           </Box>
         )}
 
-        {/* User-controlled features — Settings subheader + pill per row */}
-        {userControlled.length > 0 && (
-          <Box sx={{ pt: 1.5, pb: automatic.length > 0 ? 0 : actionTip ? 0 : 1.5 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ ...TIER_LABEL_SX, mb: 0.5 }}>
-              Settings
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, fontStyle: 'italic' }}>
-              You can change these settings in the {botName} tab. Once you&apos;ve set them, they won&apos;t appear again.
-              We&apos;re working on making these easier to find.
-            </Typography>
-            {userControlled.map((f) => (
-              <FeatureRowWithPill key={f.name} f={f} />
-            ))}
-          </Box>
-        )}
-
         {/* Automatic features — pill per row, no tier header */}
         {automatic.length > 0 && (
           <Box sx={{ pt: 1.5, pb: actionTip ? 0 : 1.5 }}>
@@ -433,6 +416,58 @@ function TabSection({ tab, features, botName }: { tab: string; features: Feature
             </Typography>
           </Box>
         )}
+      </Box>
+    </Box>
+  );
+}
+
+function PreferencesSection({ features, botName }: { features: FeatureConfig[]; botName: string }) {
+  const userControlled = features.filter((f) => f.userControlled && !f.slashCommand && f.enabled !== false);
+  if (userControlled.length === 0) return null;
+
+  return (
+    <Box component="section" aria-labelledby="guide-preferences" sx={{ mb: 4 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1.5 }}>
+        <SettingsOutlinedIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+        <Typography id="guide-preferences" variant="h6" component="h2" fontWeight="bold">
+          Preferences
+        </Typography>
+      </Box>
+      <Divider sx={{ mb: 1.5 }} />
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Personalise how {botName} works for you. Toggle these on or off anytime via{' '}
+        <Box component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>
+          Preferences
+        </Box>{' '}
+        in the top menu.
+      </Typography>
+      <Box
+        sx={{
+          borderRadius: 2,
+          border: '1px solid',
+          borderColor: 'divider',
+          overflow: 'hidden',
+          px: 2,
+        }}
+      >
+        {userControlled.map((f) => (
+          <Box
+            key={f.name}
+            sx={{
+              py: 1.5,
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+              '&:last-child': { borderBottom: 'none' },
+            }}
+          >
+            <Typography variant="body2" fontWeight="medium" sx={{ mb: 0.25 }}>
+              {f.label}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {f.description}
+            </Typography>
+          </Box>
+        ))}
       </Box>
     </Box>
   );
@@ -528,6 +563,8 @@ export default function GuidePage() {
         </Box>
 
         <WhatsNew />
+
+        <PreferencesSection features={features} botName={botName} />
 
         {tabs.length > 0 && (
           <Box component="section" aria-labelledby="guide-features">

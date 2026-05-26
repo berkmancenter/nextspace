@@ -34,6 +34,11 @@ export const whatsNewEntries: WhatsNewEntry[] = [
     body: 'Event organizers can now assign required readings that are highlighted in the Resources tab.',
     releasedAt: '2026-05-15',
   },
+  {
+    title: 'Preferences',
+    body: 'Customize your experience with the new Preferences panel.',
+    releasedAt: '2026-05-26',
+  },
 ];
 
 /**
