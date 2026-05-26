@@ -126,25 +126,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [botName, setBotName] = useState<string>('Berkie');
   const [assistantInputValue, setAssistantInputValue] = useState<string>('');
   const [chatInputValue, setChatInputValue] = useState<string>('');
-  const [showPreferences, setShowPreferences] = useState<boolean>(true);
-  const [preferencesError, setPreferencesError] = useState<string | null>(null);
   // Track messages with unread replies (persists across tab switches)
   const [messagesWithUnreadReplies, setMessagesWithUnreadReplies] = useState<Set<string>>(new Set());
   // Track assistant messages with unread replies separately
   const [assistantMessagesWithUnreadReplies, setAssistantMessagesWithUnreadReplies] = useState<Set<string>>(new Set());
-
-  const preferenceOptions = [
-    {
-      value: 'visualResponse',
-      label: 'Visual Response',
-      description: 'Answer my questions with images when appropriate',
-    },
-    {
-      value: 'jargonClarification',
-      label: 'Jargon Clarification',
-      description: 'Send me clarification when speakers use jargon',
-    },
-  ];
 
   // Ref to track active tab for socket handler
   const activeTabRef = useRef<NavTab>('assistant');
@@ -592,31 +577,23 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     fetchChatMessages();
   }, [chatPasscode, router.query.conversationId, initialJoinComplete]);
 
-  // Check if user has existing preferences
+  // Load user preferences for agent channel routing (jargon filter etc.)
   useEffect(() => {
     if (!userId) return;
 
     const fetchUserPreferences = async () => {
       try {
         const preferences = await RetrieveData(`users/user/${userId}/preferences`, Api.get().getAccessToken());
-
-        if ('error' in preferences) {
-          console.error(`Error retrieving preferences: ${preferences.message?.message}`);
-          setShowPreferences(true);
-          return;
-        }
-
-        // If preferences exist (non-empty object), don't show the banner
-        if (preferences && typeof preferences === 'object' && Object.keys(preferences).length > 0) {
-          setShowPreferences(false);
+        if (
+          !('error' in preferences) &&
+          preferences &&
+          typeof preferences === 'object' &&
+          Object.keys(preferences).length > 0
+        ) {
           setUserPreferences(preferences as Record<string, boolean>);
-        } else {
-          // Empty object means no preferences set yet
-          setShowPreferences(true);
         }
       } catch (error: any) {
         console.error(`Error retrieving preferences: ${error.message}`);
-        setShowPreferences(true);
       }
     };
 
@@ -774,48 +751,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     );
   };
 
-  const handlePreferencesSubmit = async (selectedValues: string[]) => {
-    if (!userId) return;
-
-    try {
-      setPreferencesError(null); // Clear any previous errors
-
-      // Create object with all preference keys and true/false based on selection
-      const preferencesObject = preferenceOptions.reduce(
-        (acc, option) => {
-          acc[option.value] = selectedValues.includes(option.value);
-          return acc;
-        },
-        {} as Record<string, boolean>,
-      );
-
-      // Save preferences to API
-      const response = await SendData(`users/user/${userId}/preferences`, preferencesObject, undefined, undefined, 'PUT');
-
-      if ('error' in response) {
-        const errorMsg = response.message?.message || 'Failed to save preferences. Please try again.';
-        setPreferencesError(errorMsg);
-        console.error(`Error setting preferences: ${errorMsg}`);
-        return;
-      }
-
-      // Track preferences submission
-      trackConversationEvent(
-        router.query.conversationId as string,
-        'assistant',
-        'preferences_submitted',
-        selectedValues.join(','),
-      );
-
-      setShowPreferences(false);
-      setPreferencesError(null);
-      setUserPreferences(preferencesObject);
-    } catch (error) {
-      console.error('Error saving preferences:', error);
-      setPreferencesError('Failed to save preferences. Please try again.');
-    }
-  };
-
   const handleTabChange = (tab: NavTab) => {
     setActiveTab(tab);
     if (router.query.view) {
@@ -958,10 +893,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                           onExitControlledMode={exitControlledMode}
                           onPromptSelect={handlePromptSelect}
                           userId={userId}
-                          showPreferences={showPreferences}
-                          preferenceOptions={preferenceOptions}
-                          onPreferencesSubmit={handlePreferencesSubmit}
-                          preferencesError={preferencesError}
                           feedbackConfig={assistantFeedbackConfig}
                           inactive={!agentActive}
                           messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
