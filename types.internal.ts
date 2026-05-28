@@ -168,7 +168,6 @@ export interface MediaItem {
  */
 export interface AgentChannelConfig {
   agentId: string;
-  preferenceKey?: string;
 }
 
 /**

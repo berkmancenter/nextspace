@@ -102,7 +102,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [agentId, setAgentId] = useState<string | null>(null);
   const [agentActive, setAgentActive] = useState<boolean>(true);
   const [jargonFilterAgentId, setJargonFilterAgentId] = useState<string | null>(null);
-  const [userPreferences, setUserPreferences] = useState<Record<string, boolean>>({});
   const [conversationFeatures, setConversationFeatures] = useState<{ name: string; enabled?: boolean }[]>([]);
   const conversationType = useConversationType();
   const setConversationType = useSetConversationType();
@@ -331,23 +330,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       return;
     }
 
-    // Build direct channels based on available agents and user preferences
     const agentChannels = agentId
-      ? buildDirectChannels(
-          userId,
-          [
-            { agentId },
-            ...(jargonFilterAgentId
-              ? [
-                  {
-                    agentId: jargonFilterAgentId,
-                    preferenceKey: 'jargonClarification',
-                  },
-                ]
-              : []),
-          ],
-          userPreferences,
-        )
+      ? buildDirectChannels(userId, [{ agentId }, ...(jargonFilterAgentId ? [{ agentId: jargonFilterAgentId }] : [])])
       : [];
 
     const channels: components['schemas']['Channel'][] = [...agentChannels];
@@ -386,9 +370,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           assistantIntroRef.current = intros.filter((m) => !Array.isArray(m.channels) || !m.channels.includes('chat'));
 
           // Only push intros into state on the very first join. Re-joins
-          // (e.g. when userPreferences loads and the effect re-runs) must not
-          // add them again — the initial fetch effects will prepend from the
-          // refs once initialJoinComplete flips to true.
+          // must not add them again — the initial fetch effects will prepend
+          // from the refs once initialJoinComplete flips to true.
           setInitialJoinComplete((already) => {
             if (!already) {
               if (chatIntroRef.current.length > 0) setChatMessages(chatIntroRef.current);
@@ -414,16 +397,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     return () => {
       socket.off('connect', joinConversation);
     };
-  }, [
-    socket,
-    agentId,
-    agentActive,
-    jargonFilterAgentId,
-    userId,
-    userPreferences,
-    chatPasscode,
-    router.query.conversationId,
-  ]);
+  }, [socket, agentId, agentActive, jargonFilterAgentId, userId, chatPasscode, router.query.conversationId]);
 
   /**
    * Helper function to fetch all assistant messages (direct + jargon filter)
@@ -576,29 +550,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
     fetchChatMessages();
   }, [chatPasscode, router.query.conversationId, initialJoinComplete]);
-
-  // Load user preferences for agent channel routing (jargon filter etc.)
-  useEffect(() => {
-    if (!userId) return;
-
-    const fetchUserPreferences = async () => {
-      try {
-        const preferences = await RetrieveData(`users/user/${userId}/preferences`, Api.get().getAccessToken());
-        if (
-          !('error' in preferences) &&
-          preferences &&
-          typeof preferences === 'object' &&
-          Object.keys(preferences).length > 0
-        ) {
-          setUserPreferences(preferences as Record<string, boolean>);
-        }
-      } catch (error: any) {
-        console.error(`Error retrieving preferences: ${error.message}`);
-      }
-    };
-
-    fetchUserPreferences();
-  }, [userId]);
 
   // Load initial assistant messages after the conversation:join completes (so
   // intros are already in state before DB messages are prepended).

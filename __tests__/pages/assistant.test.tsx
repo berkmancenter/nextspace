@@ -82,14 +82,12 @@ jest.mock('../../utils', () => ({
     // Also call socket.emit so existing tests can verify it
     socket.emit(event, data);
   }),
-  buildDirectChannels: jest.fn((userId, agents, preferences) =>
-    agents
-      .filter((a: any) => !a.preferenceKey || preferences[a.preferenceKey])
-      .map((a: any) => ({
-        name: `direct-${userId}-${a.agentId}`,
-        passcode: null,
-        direct: true,
-      })),
+  buildDirectChannels: jest.fn((userId, agents) =>
+    agents.map((a: any) => ({
+      name: `direct-${userId}-${a.agentId}`,
+      passcode: null,
+      direct: true,
+    })),
   ),
 }));
 
@@ -875,8 +873,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({ visualResponse: true });
         } else if (path.includes('?channel=direct-')) {
           return Promise.resolve(mockMessages);
         } else if (path === 'messages/msg-1/replies') {
@@ -939,8 +935,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({ visualResponse: true });
         } else if (path.includes('?channel=chat')) {
           return Promise.resolve(mockChatMessages);
         } else if (path === 'messages/chat-msg-1/replies') {
@@ -1008,8 +1002,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({ visualResponse: true });
         } else if (path.includes('?channel=direct-')) {
           return Promise.resolve(mockMessages);
         } else if (path === 'messages/msg-1/replies') {
@@ -1094,8 +1086,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({ visualResponse: true });
         } else if (path.includes('?channel=direct-')) {
           return Promise.resolve(mockMessages);
         } else if (path === 'messages/msg-1/replies') {
@@ -1141,8 +1131,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({ visualResponse: true });
         } else if (path.includes('?channel=direct-')) {
           return Promise.resolve(mockMessages);
         } else if (path === 'messages/msg-1/replies') {
@@ -1191,12 +1179,14 @@ describe('EventAssistantRoom', () => {
         },
       ];
 
-      (RetrieveData as jest.Mock)
-        .mockResolvedValueOnce({
-          agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        })
-        .mockResolvedValueOnce({ visualResponse: true }) // User preferences
-        .mockResolvedValueOnce(mockMessages);
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+        } else if (path.includes('?channel=direct-')) {
+          return Promise.resolve(mockMessages);
+        }
+        return Promise.resolve([]);
+      });
 
       (createConversationFromData as jest.Mock).mockResolvedValue({
         agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
@@ -1230,12 +1220,14 @@ describe('EventAssistantRoom', () => {
         },
       ];
 
-      (RetrieveData as jest.Mock)
-        .mockResolvedValueOnce({
-          agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        })
-        .mockResolvedValueOnce({ visualResponse: true }) // User preferences
-        .mockResolvedValueOnce(mockMessages);
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+        } else if (path.includes('?channel=direct-')) {
+          return Promise.resolve(mockMessages);
+        }
+        return Promise.resolve([]);
+      });
 
       (createConversationFromData as jest.Mock).mockResolvedValue({
         agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
@@ -1255,29 +1247,6 @@ describe('EventAssistantRoom', () => {
 
       // Should NOT call the replies endpoint
       expect(RetrieveData).not.toHaveBeenCalledWith('messages/msg-1/replies', 'mock-access-token');
-    });
-  });
-
-  describe('User Preferences', () => {
-    it('fetches user preferences on page load when userId is available', async () => {
-      (RetrieveData as jest.Mock)
-        .mockResolvedValueOnce({
-          agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        })
-        .mockResolvedValueOnce([]); // Empty preferences
-
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        type: { name: 'eventAssistant' },
-      });
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => {
-        expect(RetrieveData).toHaveBeenCalledWith('users/user/user-123/preferences', 'mock-access-token');
-      });
     });
   });
 
@@ -1369,8 +1338,6 @@ describe('EventAssistantRoom', () => {
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
             properties: { feedbackFrequency: 2 }, // Every 2nd message
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({});
         } else if (path.includes('?channel=direct-')) {
           return Promise.resolve([]);
         }
@@ -1401,8 +1368,6 @@ describe('EventAssistantRoom', () => {
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
             // No properties or feedbackFrequency
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({});
         } else if (path.includes('?channel=direct-')) {
           return Promise.resolve([]);
         }
@@ -1440,8 +1405,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({});
         } else if (path.startsWith('messages/')) {
           return Promise.resolve([]);
         }
@@ -1474,8 +1437,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({});
         } else if (path.startsWith('messages/')) {
           // Return a message with prompt options
           return Promise.resolve([
@@ -1539,8 +1500,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({});
         } else if (path.startsWith('messages/')) {
           return Promise.resolve([
             {
@@ -1637,8 +1596,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({});
         } else if (path.startsWith('messages/')) {
           return Promise.resolve([
             {
