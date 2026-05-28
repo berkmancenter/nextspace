@@ -133,42 +133,17 @@ describe('normalizeAssistantPseudonym', () => {
 describe('buildDirectChannels', () => {
   const userId = 'user-123';
 
-  it('includes a direct channel for each agent with no preferenceKey', () => {
+  it('includes a direct channel for each agent', () => {
     const agents = [{ agentId: 'agent-abc' }, { agentId: 'agent-def' }];
-    const channels = buildDirectChannels(userId, agents, {});
+    const channels = buildDirectChannels(userId, agents);
     expect(channels).toHaveLength(2);
     expect(channels.map((c) => c.name)).toContain('direct-user-123-agent-abc');
     expect(channels.map((c) => c.name)).toContain('direct-user-123-agent-def');
   });
 
-  it('includes a preference-gated agent channel when the preference is true', () => {
-    const agents = [{ agentId: 'agent-abc' }, { agentId: 'agent-jargon', preferenceKey: 'jargonClarification' }];
-    const channels = buildDirectChannels(userId, agents, {
-      jargonClarification: true,
-    });
-    expect(channels).toHaveLength(2);
-    expect(channels.map((c) => c.name)).toContain('direct-user-123-agent-jargon');
-  });
-
-  it('excludes a preference-gated agent channel when the preference is false', () => {
-    const agents = [{ agentId: 'agent-abc' }, { agentId: 'agent-jargon', preferenceKey: 'jargonClarification' }];
-    const channels = buildDirectChannels(userId, agents, {
-      jargonClarification: false,
-    });
-    expect(channels).toHaveLength(1);
-    expect(channels.map((c) => c.name)).not.toContain('direct-user-123-agent-jargon');
-  });
-
-  it('excludes a preference-gated agent channel when the preference is absent', () => {
-    const agents = [{ agentId: 'agent-abc' }, { agentId: 'agent-jargon', preferenceKey: 'jargonClarification' }];
-    const channels = buildDirectChannels(userId, agents, {});
-    expect(channels).toHaveLength(1);
-    expect(channels.map((c) => c.name)).not.toContain('direct-user-123-agent-jargon');
-  });
-
   it('marks all channels as direct with null passcode — access is controlled by channel name, not passcode', () => {
     const agents = [{ agentId: 'agent-abc' }];
-    const [channel] = buildDirectChannels(userId, agents, {});
+    const [channel] = buildDirectChannels(userId, agents);
     expect(channel.direct).toBe(true);
     expect(channel.passcode).toBeNull();
   });

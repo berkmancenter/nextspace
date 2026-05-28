@@ -70,8 +70,20 @@ export const Header = ({ className = '', variant = 'transparent', authType = 'gu
   const giveFeedbackUrl =
     'https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform';
 
+  const isOnAssistantPage = router.asPath.includes('conversationId');
+
   const TrailingNavItems = () => (
     <>
+      {isOnAssistantPage && (
+        <div>
+          <Button
+            onClick={() => router.push({ pathname: router.pathname, query: { ...router.query, view: 'preferences' } })}
+            sx={navButtonSx}
+          >
+            Preferences
+          </Button>
+        </div>
+      )}
       <Link href={giveFeedbackUrl} target="_blank" rel="noopener noreferrer">
         <Button sx={navButtonSx}>Give Feedback</Button>
       </Link>

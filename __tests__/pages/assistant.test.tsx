@@ -82,14 +82,12 @@ jest.mock('../../utils', () => ({
     // Also call socket.emit so existing tests can verify it
     socket.emit(event, data);
   }),
-  buildDirectChannels: jest.fn((userId, agents, preferences) =>
-    agents
-      .filter((a: any) => !a.preferenceKey || preferences[a.preferenceKey])
-      .map((a: any) => ({
-        name: `direct-${userId}-${a.agentId}`,
-        passcode: null,
-        direct: true,
-      })),
+  buildDirectChannels: jest.fn((userId, agents) =>
+    agents.map((a: any) => ({
+      name: `direct-${userId}-${a.agentId}`,
+      passcode: null,
+      direct: true,
+    })),
   ),
 }));
 
@@ -875,8 +873,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({ visualResponse: true });
         } else if (path.includes('?channel=direct-')) {
           return Promise.resolve(mockMessages);
         } else if (path === 'messages/msg-1/replies') {
@@ -939,8 +935,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({ visualResponse: true });
         } else if (path.includes('?channel=chat')) {
           return Promise.resolve(mockChatMessages);
         } else if (path === 'messages/chat-msg-1/replies') {
@@ -1008,8 +1002,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({ visualResponse: true });
         } else if (path.includes('?channel=direct-')) {
           return Promise.resolve(mockMessages);
         } else if (path === 'messages/msg-1/replies') {
@@ -1094,8 +1086,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({ visualResponse: true });
         } else if (path.includes('?channel=direct-')) {
           return Promise.resolve(mockMessages);
         } else if (path === 'messages/msg-1/replies') {
@@ -1141,8 +1131,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({ visualResponse: true });
         } else if (path.includes('?channel=direct-')) {
           return Promise.resolve(mockMessages);
         } else if (path === 'messages/msg-1/replies') {
@@ -1191,12 +1179,14 @@ describe('EventAssistantRoom', () => {
         },
       ];
 
-      (RetrieveData as jest.Mock)
-        .mockResolvedValueOnce({
-          agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        })
-        .mockResolvedValueOnce({ visualResponse: true }) // User preferences
-        .mockResolvedValueOnce(mockMessages);
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+        } else if (path.includes('?channel=direct-')) {
+          return Promise.resolve(mockMessages);
+        }
+        return Promise.resolve([]);
+      });
 
       (createConversationFromData as jest.Mock).mockResolvedValue({
         agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
@@ -1230,12 +1220,14 @@ describe('EventAssistantRoom', () => {
         },
       ];
 
-      (RetrieveData as jest.Mock)
-        .mockResolvedValueOnce({
-          agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        })
-        .mockResolvedValueOnce({ visualResponse: true }) // User preferences
-        .mockResolvedValueOnce(mockMessages);
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+        } else if (path.includes('?channel=direct-')) {
+          return Promise.resolve(mockMessages);
+        }
+        return Promise.resolve([]);
+      });
 
       (createConversationFromData as jest.Mock).mockResolvedValue({
         agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
@@ -1255,602 +1247,6 @@ describe('EventAssistantRoom', () => {
 
       // Should NOT call the replies endpoint
       expect(RetrieveData).not.toHaveBeenCalledWith('messages/msg-1/replies', 'mock-access-token');
-    });
-  });
-
-  describe('User Preferences', () => {
-    it('fetches user preferences on page load when userId is available', async () => {
-      (RetrieveData as jest.Mock)
-        .mockResolvedValueOnce({
-          agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        })
-        .mockResolvedValueOnce([]); // Empty preferences
-
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        type: { name: 'eventAssistant' },
-      });
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => {
-        expect(RetrieveData).toHaveBeenCalledWith('users/user/user-123/preferences', 'mock-access-token');
-      });
-    });
-
-    it('shows preferences banner when user has no preferences', async () => {
-      const user = userEvent.setup();
-
-      // Set up router with chat passcode so tabs are shown
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,test-chat-pass',
-      };
-
-      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
-        if (path.startsWith('conversations/')) {
-          return Promise.resolve({
-            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-          });
-        } else if (path.includes('users/user/') && path.includes('/preferences')) {
-          return Promise.resolve({}); // Empty preferences object
-        } else if (path.startsWith('messages/')) {
-          return Promise.resolve([]); // Empty messages
-        }
-        return Promise.resolve(null);
-      });
-
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        type: { name: 'eventAssistant' },
-      });
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
-      });
-
-      // Click on the Event Bot (assistant) tab to show preferences
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
-      await user.click(assistantTab);
-
-      await waitFor(() => {
-        expect(screen.getByText('Set Your Preferences')).toBeInTheDocument();
-      });
-    });
-
-    it('hides preferences banner when user has existing preferences', async () => {
-      const user = userEvent.setup();
-
-      // Set up router with chat passcode so tabs are shown
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,test-chat-pass',
-      };
-
-      // Use mockImplementation to return different values based on the path
-      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
-        if (path.startsWith('conversations/')) {
-          return Promise.resolve({
-            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-          });
-        } else if (path.includes('users/user/') && path.includes('/preferences')) {
-          return Promise.resolve({ visualResponse: true }); // Existing preferences
-        } else if (path.startsWith('messages/')) {
-          return Promise.resolve([]); // Empty messages
-        }
-        return Promise.resolve(null);
-      });
-
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        type: { name: 'eventAssistant' },
-      });
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
-      });
-
-      // Click on the Event Bot (assistant) tab
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
-      await user.click(assistantTab);
-
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText('Enter your message here')).toBeInTheDocument();
-      });
-
-      // Wait for preferences to be loaded and the banner to be hidden
-      await waitFor(
-        () => {
-          expect(screen.queryByText('Set Your Preferences')).not.toBeInTheDocument();
-        },
-        { timeout: 2000 },
-      );
-    });
-
-    it('shows preferences banner when preferences fetch returns error', async () => {
-      const user = userEvent.setup();
-
-      // Set up router with chat passcode so tabs are shown
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,test-chat-pass',
-      };
-
-      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
-        if (path.startsWith('conversations/')) {
-          return Promise.resolve({
-            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-          });
-        } else if (path.includes('users/user/') && path.includes('/preferences')) {
-          return Promise.resolve({
-            error: true,
-            message: { message: 'Failed to fetch preferences' },
-          });
-        } else if (path.startsWith('messages/')) {
-          return Promise.resolve([]); // Empty messages
-        }
-        return Promise.resolve(null);
-      });
-
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        type: { name: 'eventAssistant' },
-      });
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
-      });
-
-      // Click on the Event Bot (assistant) tab
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
-      await user.click(assistantTab);
-
-      await waitFor(() => {
-        expect(screen.getByText('Set Your Preferences')).toBeInTheDocument();
-      });
-    });
-
-    it('successfully saves preferences and hides banner', async () => {
-      const user = userEvent.setup();
-
-      // Set up router with chat passcode so tabs are shown
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,test-chat-pass',
-      };
-
-      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
-        if (path.startsWith('conversations/')) {
-          return Promise.resolve({
-            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-          });
-        } else if (path.includes('users/user/') && path.includes('/preferences')) {
-          return Promise.resolve({}); // Empty preferences
-        } else if (path.startsWith('messages/')) {
-          return Promise.resolve([]); // Empty messages
-        }
-        return Promise.resolve(null);
-      });
-
-      (SendData as jest.Mock).mockResolvedValue({ success: true });
-
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        type: { name: 'eventAssistant' },
-      });
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
-      });
-
-      // Click on the Event Bot (assistant) tab
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
-      await user.click(assistantTab);
-
-      await waitFor(() => {
-        expect(screen.getByText('Set Your Preferences')).toBeInTheDocument();
-      });
-
-      // Select a preference option
-      const checkbox = screen.getByRole('checkbox', {
-        name: /Visual Response/i,
-      });
-      await user.click(checkbox);
-
-      // Click save
-      const saveButton = screen.getByRole('button', {
-        name: /Save Preferences/i,
-      });
-      await user.click(saveButton);
-
-      await waitFor(() => {
-        expect(SendData).toHaveBeenCalledWith(
-          'users/user/user-123/preferences',
-          { visualResponse: true, jargonClarification: false },
-          undefined,
-          undefined,
-          'PUT',
-        );
-      });
-
-      await waitFor(() => {
-        expect(screen.queryByText('Set Your Preferences')).not.toBeInTheDocument();
-      });
-    });
-
-    it('handles preference save errors gracefully', async () => {
-      const user = userEvent.setup();
-
-      // Set up router with chat passcode so tabs are shown
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,test-chat-pass',
-      };
-
-      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
-        if (path.startsWith('conversations/')) {
-          return Promise.resolve({
-            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-          });
-        } else if (path.includes('users/user/') && path.includes('/preferences')) {
-          return Promise.resolve({}); // Empty preferences
-        } else if (path.startsWith('messages/')) {
-          return Promise.resolve([]); // Empty messages
-        }
-        return Promise.resolve(null);
-      });
-
-      (SendData as jest.Mock).mockResolvedValue({
-        error: true,
-        message: { message: 'Failed to save preferences' },
-      });
-
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        type: { name: 'eventAssistant' },
-      });
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
-      });
-
-      // Click on the Event Bot (assistant) tab
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
-      await user.click(assistantTab);
-
-      await waitFor(() => {
-        expect(screen.getByText('Set Your Preferences')).toBeInTheDocument();
-      });
-
-      // Select a preference option
-      const checkbox = screen.getByRole('checkbox', {
-        name: /Visual Response/i,
-      });
-      await user.click(checkbox);
-
-      // Click save
-      const saveButton = screen.getByRole('button', {
-        name: /Save Preferences/i,
-      });
-      await user.click(saveButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Failed to save preferences')).toBeInTheDocument();
-      });
-
-      // Banner should still be visible
-      expect(screen.getByText('Set Your Preferences')).toBeInTheDocument();
-    });
-
-    it('saves preferences with correct boolean values for selected and unselected options', async () => {
-      const user = userEvent.setup();
-
-      // Set up router with chat passcode so tabs are shown
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,test-chat-pass',
-      };
-
-      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
-        if (path.startsWith('conversations/')) {
-          return Promise.resolve({
-            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-          });
-        } else if (path.includes('users/user/') && path.includes('/preferences')) {
-          return Promise.resolve({}); // Empty preferences
-        } else if (path.startsWith('messages/')) {
-          return Promise.resolve([]); // Empty messages
-        }
-        return Promise.resolve(null);
-      });
-
-      (SendData as jest.Mock).mockResolvedValue({ success: true });
-
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        type: { name: 'eventAssistant' },
-      });
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
-      });
-
-      // Click on the Event Bot (assistant) tab
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
-      await user.click(assistantTab);
-
-      await waitFor(() => {
-        expect(screen.getByText('Set Your Preferences')).toBeInTheDocument();
-      });
-
-      // Select only visualResponse (not selecting other options if they exist)
-      const checkbox = screen.getByRole('checkbox', {
-        name: /Visual Response/i,
-      });
-      await user.click(checkbox);
-
-      // Click save
-      const saveButton = screen.getByRole('button', {
-        name: /Save Preferences/i,
-      });
-      await user.click(saveButton);
-
-      await waitFor(() => {
-        expect(SendData).toHaveBeenCalledWith(
-          'users/user/user-123/preferences',
-          { visualResponse: true, jargonClarification: false },
-          undefined,
-          undefined,
-          'PUT',
-        );
-      });
-    });
-
-    it('handles preference save network error', async () => {
-      const user = userEvent.setup();
-
-      // Set up router with chat passcode so tabs are shown
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,test-chat-pass',
-      };
-
-      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
-        if (path.startsWith('conversations/')) {
-          return Promise.resolve({
-            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-          });
-        } else if (path.includes('users/user/') && path.includes('/preferences')) {
-          return Promise.resolve({}); // Empty preferences
-        } else if (path.startsWith('messages/')) {
-          return Promise.resolve([]); // Empty messages
-        }
-        return Promise.resolve(null);
-      });
-
-      (SendData as jest.Mock).mockRejectedValue(new Error('Network error'));
-
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        type: { name: 'eventAssistant' },
-      });
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
-      });
-
-      // Click on the Event Bot (assistant) tab
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
-      await user.click(assistantTab);
-
-      await waitFor(() => {
-        expect(screen.getByText('Set Your Preferences')).toBeInTheDocument();
-      });
-
-      // Select a preference option
-      const checkbox = screen.getByRole('checkbox', {
-        name: /Visual Response/i,
-      });
-      await user.click(checkbox);
-
-      // Click save
-      const saveButton = screen.getByRole('button', {
-        name: /Save Preferences/i,
-      });
-      await user.click(saveButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Failed to save preferences. Please try again.')).toBeInTheDocument();
-      });
-    });
-
-    it('renders Jargon Clarification option in the preferences banner', async () => {
-      const user = userEvent.setup();
-
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,test-chat-pass',
-      };
-
-      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
-        if (path.startsWith('conversations/')) {
-          return Promise.resolve({
-            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-          });
-        } else if (path.includes('users/user/') && path.includes('/preferences')) {
-          return Promise.resolve({});
-        } else if (path.startsWith('messages/')) {
-          return Promise.resolve([]);
-        }
-        return Promise.resolve(null);
-      });
-
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        type: { name: 'eventAssistant' },
-      });
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
-      });
-
-      await user.click(screen.getAllByLabelText('Berkie')[0]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Set Your Preferences')).toBeInTheDocument();
-      });
-
-      expect(screen.getByRole('checkbox', { name: /Jargon Clarification/i })).toBeInTheDocument();
-      expect(screen.getByText('Send me clarification when speakers use jargon')).toBeInTheDocument();
-    });
-
-    it('saves jargonClarification: true when only that option is selected', async () => {
-      const user = userEvent.setup();
-
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,test-chat-pass',
-      };
-
-      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
-        if (path.startsWith('conversations/')) {
-          return Promise.resolve({
-            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-          });
-        } else if (path.includes('users/user/') && path.includes('/preferences')) {
-          return Promise.resolve({});
-        } else if (path.startsWith('messages/')) {
-          return Promise.resolve([]);
-        }
-        return Promise.resolve(null);
-      });
-
-      (SendData as jest.Mock).mockResolvedValue({ success: true });
-
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        type: { name: 'eventAssistant' },
-      });
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
-      });
-
-      await user.click(screen.getAllByLabelText('Berkie')[0]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Set Your Preferences')).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole('checkbox', { name: /Jargon Clarification/i }));
-
-      await user.click(screen.getByRole('button', { name: /Save Preferences/i }));
-
-      await waitFor(() => {
-        expect(SendData).toHaveBeenCalledWith(
-          'users/user/user-123/preferences',
-          { visualResponse: false, jargonClarification: true },
-          undefined,
-          undefined,
-          'PUT',
-        );
-      });
-    });
-
-    it('saves both options as true when both are selected', async () => {
-      const user = userEvent.setup();
-
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,test-chat-pass',
-      };
-
-      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
-        if (path.startsWith('conversations/')) {
-          return Promise.resolve({
-            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-          });
-        } else if (path.includes('users/user/') && path.includes('/preferences')) {
-          return Promise.resolve({});
-        } else if (path.startsWith('messages/')) {
-          return Promise.resolve([]);
-        }
-        return Promise.resolve(null);
-      });
-
-      (SendData as jest.Mock).mockResolvedValue({ success: true });
-
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        type: { name: 'eventAssistant' },
-      });
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
-      });
-
-      await user.click(screen.getAllByLabelText('Berkie')[0]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Set Your Preferences')).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole('checkbox', { name: /Visual Response/i }));
-      await user.click(screen.getByRole('checkbox', { name: /Jargon Clarification/i }));
-
-      await user.click(screen.getByRole('button', { name: /Save Preferences/i }));
-
-      await waitFor(() => {
-        expect(SendData).toHaveBeenCalledWith(
-          'users/user/user-123/preferences',
-          { visualResponse: true, jargonClarification: true },
-          undefined,
-          undefined,
-          'PUT',
-        );
-      });
     });
   });
 
@@ -1942,8 +1338,6 @@ describe('EventAssistantRoom', () => {
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
             properties: { feedbackFrequency: 2 }, // Every 2nd message
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({});
         } else if (path.includes('?channel=direct-')) {
           return Promise.resolve([]);
         }
@@ -1974,8 +1368,6 @@ describe('EventAssistantRoom', () => {
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
             // No properties or feedbackFrequency
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({});
         } else if (path.includes('?channel=direct-')) {
           return Promise.resolve([]);
         }
@@ -2013,8 +1405,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({});
         } else if (path.startsWith('messages/')) {
           return Promise.resolve([]);
         }
@@ -2047,8 +1437,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({});
         } else if (path.startsWith('messages/')) {
           // Return a message with prompt options
           return Promise.resolve([
@@ -2112,8 +1500,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({});
         } else if (path.startsWith('messages/')) {
           return Promise.resolve([
             {
@@ -2210,8 +1596,6 @@ describe('EventAssistantRoom', () => {
           return Promise.resolve({
             agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
           });
-        } else if (path.includes('/preferences')) {
-          return Promise.resolve({});
         } else if (path.startsWith('messages/')) {
           return Promise.resolve([
             {
