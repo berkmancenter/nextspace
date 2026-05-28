@@ -432,6 +432,62 @@ describe('MessageInput Component', () => {
     });
   });
 
+  describe('Pseudonym Info Popover', () => {
+    it('renders the info button next to the pseudonym', () => {
+      render(<MessageInput {...defaultProps} />);
+
+      expect(screen.getByRole('button', { name: 'Pseudonym info' })).toBeInTheDocument();
+    });
+
+    it('opens popover when info button is clicked', async () => {
+      const user = userEvent.setup();
+      render(<MessageInput {...defaultProps} />);
+
+      await user.click(screen.getByRole('button', { name: 'Pseudonym info' }));
+
+      expect(screen.getByText(/who are you today/i)).toBeInTheDocument();
+      expect(screen.getByText(/not even the ai knows your real name/i)).toBeInTheDocument();
+    });
+
+    it('does not show fun fact section when pseudonymFunFact is not provided', async () => {
+      const user = userEvent.setup();
+      render(<MessageInput {...defaultProps} />);
+
+      await user.click(screen.getByRole('button', { name: 'Pseudonym info' }));
+
+      expect(screen.queryByText(/fun fact/i)).not.toBeInTheDocument();
+    });
+
+    it('shows fun fact when pseudonymFunFact is provided', async () => {
+      const user = userEvent.setup();
+      render(
+        <MessageInput
+          {...defaultProps}
+          pseudonymFunFact="The name 'Velvet Fox' is inspired by a real subspecies native to the Pacific Northwest."
+        />,
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Pseudonym info' }));
+
+      expect(screen.getByText(/fun fact/i)).toBeInTheDocument();
+      expect(screen.getByText(/Velvet Fox/i)).toBeInTheDocument();
+    });
+
+    it('closes popover when clicking away', async () => {
+      const user = userEvent.setup();
+      render(<MessageInput {...defaultProps} pseudonymFunFact="Some fun fact." />);
+
+      await user.click(screen.getByRole('button', { name: 'Pseudonym info' }));
+      expect(screen.getByText(/who are you today/i)).toBeInTheDocument();
+
+      await user.keyboard('{Escape}');
+
+      await waitFor(() => {
+        expect(screen.queryByText(/who are you today/i)).not.toBeInTheDocument();
+      });
+    });
+  });
+
   describe('Multiple Messages', () => {
     it('allows typing and sending multiple messages', async () => {
       const user = userEvent.setup();
