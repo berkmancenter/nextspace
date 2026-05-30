@@ -234,6 +234,79 @@ describe('EventAssistantRoom', () => {
     });
   });
 
+  describe('pseudonym fun fact', () => {
+    it('fetches user data using userId on mount', async () => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url === 'users/user/user-123') {
+          return Promise.resolve({
+            pseudonyms: [
+              { active: true, pseudonym: 'test-pseudonym', funFact: "Foxes use the Earth's magnetic field to hunt." },
+            ],
+          });
+        }
+        return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith('users/user/user-123', 'mock-access-token');
+      });
+    });
+
+    it('does not fetch user data when userId is null', async () => {
+      mockUseSessionJoin.mockReturnValue({
+        socket: mockSocket,
+        pseudonym: 'test-pseudonym',
+        userId: null,
+        isConnected: true,
+        errorMessage: null,
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).not.toHaveBeenCalledWith(expect.stringContaining('users/user/'), expect.anything());
+      });
+    });
+
+    it('passes fun fact to chat panel when active pseudonym has funFact', async () => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url === 'users/user/user-123') {
+          return Promise.resolve({
+            pseudonyms: [
+              { active: true, pseudonym: 'test-pseudonym', funFact: "Foxes use the Earth's magnetic field to hunt." },
+            ],
+          });
+        }
+        return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+      });
+
+      await act(async () => {
+        render(
+          <ConversationTypeProvider>
+            <EventAssistantRoom authType={'guest'} />
+          </ConversationTypeProvider>,
+        );
+      });
+
+      // Open the info popover
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Pseudonym info' })).toBeInTheDocument();
+      });
+
+      await userEvent.click(screen.getByRole('button', { name: 'Pseudonym info' }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Foxes use the Earth/i)).toBeInTheDocument();
+      });
+    });
+  });
+
   it('fetches conversation data when router is ready', async () => {
     await act(async () => {
       render(<EventAssistantRoom authType={'guest'} />);

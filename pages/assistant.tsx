@@ -136,6 +136,18 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   // Use custom hook for session joining
   const { socket, pseudonym, userId, isConnected, errorMessage: sessionError, lastReconnectTime } = useSessionJoin();
 
+  const [pseudonymFunFact, setPseudonymFunFact] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!userId) return;
+    RetrieveData(`users/user/${userId}`, Api.get().getAccessToken()).then((user) => {
+      if (user && !('error' in user)) {
+        const activePseudonym = user.pseudonyms?.find((p: any) => p.active);
+        if (activePseudonym?.funFact) setPseudonymFunFact(activePseudonym.funFact);
+      }
+    });
+  }, [userId]);
+
   // Combine session and local errors
   const errorMessage = sessionError || localError;
 
@@ -795,6 +807,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                         <GroupChatPanel
                           messages={chatMessages}
                           pseudonym={pseudonym}
+                          pseudonymFunFact={pseudonymFunFact}
                           eventName={eventName}
                           botName={botName}
                           inputValue={chatInputValue}
@@ -833,6 +846,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                         <AssistantChatPanel
                           messages={assistantMessages}
                           pseudonym={pseudonym}
+                          pseudonymFunFact={pseudonymFunFact}
                           waitingForResponse={waitingForResponse}
                           controlledMode={controlledMode}
                           slashCommands={slashCommands}

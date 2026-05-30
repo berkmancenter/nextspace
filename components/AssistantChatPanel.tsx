@@ -21,6 +21,7 @@ import { ThreadPanel } from './ThreadPanel';
 interface AssistantChatPanelProps {
   messages: PseudonymousMessage[];
   pseudonym: string | null;
+  pseudonymFunFact?: string;
   waitingForResponse: boolean;
   controlledMode: ControlledInputConfig | null;
   slashCommands: SlashCommand[];
@@ -41,6 +42,7 @@ interface AssistantChatPanelProps {
 export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   messages,
   pseudonym,
+  pseudonymFunFact,
   waitingForResponse,
   controlledMode,
   slashCommands,
@@ -379,6 +381,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
           ) : (
             <MessageInput
               pseudonym={pseudonym}
+              pseudonymFunFact={pseudonymFunFact}
               enhancers={enhancers}
               onSendMessage={onSendMessage}
               waitingForResponse={waitingForResponse}
