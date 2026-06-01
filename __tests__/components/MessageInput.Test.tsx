@@ -8,7 +8,7 @@ import { SlashCommand, createSlashCommandEnhancer } from '../../components/enhan
 Element.prototype.scrollIntoView = jest.fn();
 
 describe('MessageInput Component', () => {
-  const mockOnSendMessage = jest.fn();
+  const mockOnSendMessage = jest.fn(() => Promise.resolve(true));
   const mockOnExitControlledMode = jest.fn();
 
   const mockSlashCommands: SlashCommand[] = [
@@ -114,7 +114,7 @@ describe('MessageInput Component', () => {
       expect(mockOnSendMessage).toHaveBeenCalledWith('Test message');
     });
 
-    it('clears input after sending message', async () => {
+    it('clears input after sending message successfully', async () => {
       const user = userEvent.setup();
       render(<MessageInput {...defaultProps} />);
 
@@ -127,6 +127,25 @@ describe('MessageInput Component', () => {
       await waitFor(() => {
         expect(input.value).toBe('');
       });
+    });
+
+    it('does not clear input after sending message unsuccessfully', async () => {
+      const user = userEvent.setup();
+      defaultProps.onSendMessage = jest.fn(() => Promise.resolve(false));
+      render(<MessageInput {...defaultProps} />);
+
+      const input = screen.getByPlaceholderText('Enter your message here') as HTMLInputElement;
+      const sendButton = screen.getByLabelText('send message');
+
+      await user.type(input, 'Test message');
+      await user.click(sendButton);
+
+      await waitFor(() => {
+        expect(input.value).toBe('Test message');
+      });
+
+      // Reset props
+      defaultProps.onSendMessage = mockOnSendMessage;
     });
 
     it('does not send empty message', async () => {
