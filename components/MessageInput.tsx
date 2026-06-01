@@ -7,16 +7,24 @@ import { GenericEnhancerMenu } from './GenericEnhancerMenu';
 import { getAvatarStyle } from '../utils/avatarUtils';
 
 interface MessageInputProps {
+  /** The pseudonym of the user */
   pseudonym: string | null;
   pseudonymFunFact?: string;
+  /** List of input enhancers */
   enhancers: InputEnhancer<any>[];
-  onSendMessage: (message: string) => void;
+  /** Whether the input is waiting for a response */
   waitingForResponse: boolean;
   controlledMode: ControlledInputConfig | null;
-  onExitControlledMode: () => void;
+  /** The current value of the input in controlled mode */
   inputValue?: string;
-  onInputChange?: (value: string) => void;
+  /** Whether to disable the input while waiting for a response */
   disableWhileWaiting?: boolean;
+  /** Callback when a message is sent; should return true if the message was successfully sent */
+  onSendMessage: (message: string) => Promise<boolean>;
+  /** Callback when exiting controlled input mode */
+  onExitControlledMode: () => void;
+  /** Callback when the input value changes in controlled mode */
+  onInputChange?: (value: string) => void;
 }
 
 export const MessageInput: FC<MessageInputProps> = ({
@@ -109,11 +117,11 @@ export const MessageInput: FC<MessageInputProps> = ({
   };
 
   /** Send message */
-  const handleSend = () => {
+  const handleSend = async () => {
     const canSend = disableWhileWaiting ? !waitingForResponse : true;
     if (currentMessage && currentMessage.length > 0 && canSend) {
-      onSendMessage(currentMessage);
-      setCurrentMessage('');
+      const success = await onSendMessage(currentMessage);
+      if (success) setCurrentMessage('');
     }
   };
 

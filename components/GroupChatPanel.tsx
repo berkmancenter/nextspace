@@ -36,20 +36,33 @@ const renderAssistantMessage = (text: string): React.ReactNode => {
 };
 
 interface GroupChatPanelProps {
+  /** The list of messages to display in the chat panel */
   messages: PseudonymousMessage[];
+  /** The pseudonym of the current user */
   pseudonym: string | null;
   pseudonymFunFact?: string;
+  /** The name of the event, if applicable */
   eventName?: string;
+  /** The name of the bot, if applicable */
   botName?: string;
+  /** The current value of the input in controlled mode */
   inputValue?: string;
-  onInputChange?: (value: string) => void;
-  onSendMessage: (message: string, parentMessageId?: string) => void;
+  /** Configuration for controlled input mode */
   controlledMode?: ControlledInputConfig | null;
-  onExitControlledMode?: () => void;
+  /** Configuration for feedback */
   feedbackConfig?: FeedbackConfig;
+  /** Set of message IDs with unread replies */
   messagesWithUnreadReplies?: Set<string>;
-  onMarkAsRead?: (messageId: string) => void;
+  /** Whether the chat is waiting for a response */
   waitingForResponse?: boolean;
+  /** Callback when exiting controlled input mode */
+  onExitControlledMode?: () => void;
+  /** Callback when marking a message as read */
+  onMarkAsRead?: (messageId: string) => void;
+  /** Callback when the input value changes in controlled mode */
+  onInputChange?: (value: string) => void;
+  /** Callback when a message is sent; should return true if the message was successfully sent */
+  onSendMessage: (message: string, parentMessageId?: string) => Promise<boolean>;
 }
 
 export const GroupChatPanel: FC<GroupChatPanelProps> = ({
@@ -59,14 +72,14 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   eventName,
   botName = 'Berkie',
   inputValue,
-  onInputChange,
-  onSendMessage,
   controlledMode,
-  onExitControlledMode,
   feedbackConfig,
   messagesWithUnreadReplies = new Set(),
-  onMarkAsRead,
   waitingForResponse = false,
+  onExitControlledMode,
+  onInputChange,
+  onMarkAsRead,
+  onSendMessage,
 }) => {
   // State for tracking which thread is open in split view
   const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(null);
