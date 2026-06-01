@@ -54,6 +54,4 @@ export function ParamErrors(props: ParamErrorsProps) {
       </div>
     </div>
   );
-
-  return null;
 }
