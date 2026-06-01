@@ -146,8 +146,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   // Use custom hook for session joining
   const { socket, pseudonym, userId, isConnected, errorMessage: sessionError, lastReconnectTime } = useSessionJoin();
 
-<<<<<<< HEAD
-=======
   const [pseudonymFunFact, setPseudonymFunFact] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -160,10 +158,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     });
   }, [userId]);
 
-  // Combine session and local errors
-  const errorMessage = sessionError || localError;
-
->>>>>>> main
   // Derive slash commands from the loaded conversation type's features.
   // Empty until the type loads, so the autocomplete stays hidden during that window.
   const slashCommands: SlashCommand[] = (conversationType?.features ?? [])
