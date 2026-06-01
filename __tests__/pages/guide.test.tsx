@@ -210,7 +210,7 @@ describe('GuidePage', () => {
     render(<GuidePage />);
     await waitFor(() => {
       expect(screen.getByText('Jargon Filter')).toBeInTheDocument();
-      expect(screen.getByText(/you can change these settings/i)).toBeInTheDocument();
+      expect(screen.getByText(/toggle these on or off anytime via/i)).toBeInTheDocument();
     });
   });
 
@@ -237,28 +237,25 @@ describe('GuidePage', () => {
     await waitFor(() => expect(screen.getByRole('region', { name: 'Berkie' })).toBeInTheDocument());
   });
 
-  it('still renders a disabled feature (enabled:false) in the guide', async () => {
-    resolveWith(GUIDE_RESPONSE_WITH_DISABLED);
+  it('still renders a disabled automatic feature (enabled:false) in the guide', async () => {
+    resolveWith(GUIDE_RESPONSE_WITH_UNAVAILABLE);
     render(<GuidePage />);
-    await waitFor(() => expect(screen.getByText('Jargon Filter')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Collective Voice')).toBeInTheDocument());
   });
 
-  it("shows 'Configurable' pill for an enabled user-controlled feature", async () => {
+  it('renders an enabled user-controlled feature in the Preferences section', async () => {
     resolveWith(GUIDE_RESPONSE);
     render(<GuidePage />);
     await waitFor(() => {
       expect(screen.getByText('Jargon Filter')).toBeInTheDocument();
-      expect(screen.getByText('Configurable')).toBeInTheDocument();
+      expect(screen.getByRole('region', { name: 'Preferences' })).toBeInTheDocument();
     });
   });
 
-  it("shows 'Not available' pill for a disabled user-controlled feature", async () => {
+  it('omits a disabled user-controlled feature from the Preferences section', async () => {
     resolveWith(GUIDE_RESPONSE_WITH_DISABLED);
     render(<GuidePage />);
-    await waitFor(() => {
-      expect(screen.getByText('Jargon Filter')).toBeInTheDocument();
-      expect(screen.getByText('Not available')).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.queryByText('Jargon Filter')).not.toBeInTheDocument());
   });
 
   it("shows 'Not available' pill for a disabled automatic feature", async () => {
@@ -270,11 +267,11 @@ describe('GuidePage', () => {
     });
   });
 
-  it('marks any disabled feature with aria-disabled', async () => {
-    resolveWith(GUIDE_RESPONSE_WITH_DISABLED);
+  it('marks any disabled automatic feature with aria-disabled', async () => {
+    resolveWith(GUIDE_RESPONSE_WITH_UNAVAILABLE);
     render(<GuidePage />);
     await waitFor(() => {
-      const row = screen.getByText('Jargon Filter').closest('[aria-disabled]');
+      const row = screen.getByText('Collective Voice').closest('[aria-disabled]');
       expect(row).toHaveAttribute('aria-disabled', 'true');
     });
   });

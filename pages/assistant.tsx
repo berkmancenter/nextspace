@@ -26,6 +26,7 @@ import { trackConversationEvent, setUserId } from '../utils/analytics';
 import { Errors, ParamErrors, Transcript } from '../components/';
 import { useSessionJoin } from '../utils/useSessionJoin';
 import { NavigationBar, NavTab } from '../components/NavigationBar';
+import { PreferencesPanel } from '../components/PreferencesPanel';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
 
 export const getServerSideProps = async (context: { req: any }) => {
@@ -111,7 +112,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [agentId, setAgentId] = useState<string | null>(null);
   const [agentActive, setAgentActive] = useState<boolean>(true);
   const [jargonFilterAgentId, setJargonFilterAgentId] = useState<string | null>(null);
-  const [userPreferences, setUserPreferences] = useState<Record<string, boolean>>({});
   const [conversationFeatures, setConversationFeatures] = useState<{ name: string; enabled?: boolean }[]>([]);
   const conversationType = useConversationType();
   const setConversationType = useSetConversationType();
@@ -135,25 +135,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [botName, setBotName] = useState<string>('Berkie');
   const [assistantInputValue, setAssistantInputValue] = useState<string>('');
   const [chatInputValue, setChatInputValue] = useState<string>('');
-  const [showPreferences, setShowPreferences] = useState<boolean>(true);
-  const [preferencesError, setPreferencesError] = useState<string | null>(null);
   // Track messages with unread replies (persists across tab switches)
   const [messagesWithUnreadReplies, setMessagesWithUnreadReplies] = useState<Set<string>>(new Set());
   // Track assistant messages with unread replies separately
   const [assistantMessagesWithUnreadReplies, setAssistantMessagesWithUnreadReplies] = useState<Set<string>>(new Set());
-
-  const preferenceOptions = [
-    {
-      value: 'visualResponse',
-      label: 'Visual Response',
-      description: 'Answer my questions with images when appropriate',
-    },
-    {
-      value: 'jargonClarification',
-      label: 'Jargon Clarification',
-      description: 'Send me clarification when speakers use jargon',
-    },
-  ];
 
   // Ref to track active tab for socket handler
   const activeTabRef = useRef<NavTab>('assistant');
@@ -161,6 +146,24 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   // Use custom hook for session joining
   const { socket, pseudonym, userId, isConnected, errorMessage: sessionError, lastReconnectTime } = useSessionJoin();
 
+<<<<<<< HEAD
+=======
+  const [pseudonymFunFact, setPseudonymFunFact] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!userId) return;
+    RetrieveData(`users/user/${userId}`, Api.get().getAccessToken()).then((user) => {
+      if (user && !('error' in user)) {
+        const activePseudonym = user.pseudonyms?.find((p: any) => p.active);
+        if (activePseudonym?.funFact) setPseudonymFunFact(activePseudonym.funFact);
+      }
+    });
+  }, [userId]);
+
+  // Combine session and local errors
+  const errorMessage = sessionError || localError;
+
+>>>>>>> main
   // Derive slash commands from the loaded conversation type's features.
   // Empty until the type loads, so the autocomplete stays hidden during that window.
   const slashCommands: SlashCommand[] = (conversationType?.features ?? [])
@@ -357,23 +360,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       return;
     }
 
-    // Build direct channels based on available agents and user preferences
     const agentChannels = agentId
-      ? buildDirectChannels(
-          userId,
-          [
-            { agentId },
-            ...(jargonFilterAgentId
-              ? [
-                  {
-                    agentId: jargonFilterAgentId,
-                    preferenceKey: 'jargonClarification',
-                  },
-                ]
-              : []),
-          ],
-          userPreferences,
-        )
+      ? buildDirectChannels(userId, [{ agentId }, ...(jargonFilterAgentId ? [{ agentId: jargonFilterAgentId }] : [])])
       : [];
 
     const channels: components['schemas']['Channel'][] = [...agentChannels];
@@ -412,9 +400,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           assistantIntroRef.current = intros.filter((m) => !Array.isArray(m.channels) || !m.channels.includes('chat'));
 
           // Only push intros into state on the very first join. Re-joins
-          // (e.g. when userPreferences loads and the effect re-runs) must not
-          // add them again — the initial fetch effects will prepend from the
-          // refs once initialJoinComplete flips to true.
+          // must not add them again — the initial fetch effects will prepend
+          // from the refs once initialJoinComplete flips to true.
           setInitialJoinComplete((already) => {
             if (!already) {
               if (chatIntroRef.current.length > 0) setChatMessages(chatIntroRef.current);
@@ -440,16 +427,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     return () => {
       socket.off('connect', joinConversation);
     };
-  }, [
-    socket,
-    agentId,
-    agentActive,
-    jargonFilterAgentId,
-    userId,
-    userPreferences,
-    chatPasscode,
-    router.query.conversationId,
-  ]);
+  }, [socket, agentId, agentActive, jargonFilterAgentId, userId, chatPasscode, router.query.conversationId]);
 
   /**
    * Helper function to fetch all assistant messages (direct + jargon filter)
@@ -602,37 +580,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
     fetchChatMessages();
   }, [chatPasscode, router.query.conversationId, initialJoinComplete]);
-
-  // Check if user has existing preferences
-  useEffect(() => {
-    if (!userId) return;
-
-    const fetchUserPreferences = async () => {
-      try {
-        const preferences = await RetrieveData(`users/user/${userId}/preferences`, Api.get().getAccessToken());
-
-        if ('error' in preferences) {
-          console.error(`Error retrieving preferences: ${preferences.message?.message}`);
-          setShowPreferences(true);
-          return;
-        }
-
-        // If preferences exist (non-empty object), don't show the banner
-        if (preferences && typeof preferences === 'object' && Object.keys(preferences).length > 0) {
-          setShowPreferences(false);
-          setUserPreferences(preferences as Record<string, boolean>);
-        } else {
-          // Empty object means no preferences set yet
-          setShowPreferences(true);
-        }
-      } catch (error: any) {
-        console.error(`Error retrieving preferences: ${error.message}`);
-        setShowPreferences(true);
-      }
-    };
-
-    fetchUserPreferences();
-  }, [userId]);
 
   // Load initial assistant messages after the conversation:join completes (so
   // intros are already in state before DB messages are prepended).
@@ -788,50 +735,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     );
   };
 
-  const handlePreferencesSubmit = async (selectedValues: string[]) => {
-    if (!userId) return;
-
-    try {
-      setPreferencesError(null); // Clear any previous errors
-
-      // Create object with all preference keys and true/false based on selection
-      const preferencesObject = preferenceOptions.reduce(
-        (acc, option) => {
-          acc[option.value] = selectedValues.includes(option.value);
-          return acc;
-        },
-        {} as Record<string, boolean>,
-      );
-
-      // Save preferences to API
-      const response = await SendData(`users/user/${userId}/preferences`, preferencesObject, undefined, undefined, 'PUT');
-
-      if ('error' in response) {
-        const errorMsg = response.message?.message || 'Failed to save preferences. Please try again.';
-        setPreferencesError(errorMsg);
-        console.error(`Error setting preferences: ${errorMsg}`);
-        return;
-      }
-
-      // Track preferences submission
-      trackConversationEvent(
-        router.query.conversationId as string,
-        'assistant',
-        'preferences_submitted',
-        selectedValues.join(','),
-      );
-
-      setShowPreferences(false);
-      setPreferencesError(null);
-      setUserPreferences(preferencesObject);
-    } catch (error) {
-      console.error('Error saving preferences:', error);
-      setPreferencesError('Failed to save preferences. Please try again.');
-    }
-  };
-
   const handleTabChange = (tab: NavTab) => {
     setActiveTab(tab);
+    if (router.query.view) {
+      const { view: _, ...rest } = router.query;
+      router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+    }
     // Clear unseen count for the tab we're switching to
     if (tab === 'assistant') {
       setUnseenAssistantCount(0);
@@ -888,7 +797,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           <>
             {/* ── Navigation Bar (left sidebar on desktop, bottom bar on mobile) ── */}
             <NavigationBar
-              activeTab={activeTab}
+              activeTab={router.query.view === 'preferences' ? null : activeTab}
               onTabChange={handleTabChange}
               unseenAssistantCount={unseenAssistantCount}
               unseenChatCount={unseenChatCount}
@@ -904,7 +813,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
             {/* ── Main content area ── */}
             <div className="flex-1 flex flex-row overflow-hidden">
               {/* Transcript full-screen view when transcript tab is active */}
-              {activeTab === 'transcript' && transcriptPasscode ? (
+              {router.query.view !== 'preferences' && activeTab === 'transcript' && transcriptPasscode ? (
                 <div className="flex-1 overflow-hidden">
                   <Transcript
                     category="assistant"
@@ -917,13 +826,16 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                 </div>
               ) : (
                 <>
-                  {/* Chat / Assistant / Resources panel */}
+                  {/* Chat / Assistant / Resources / Preferences panel */}
                   <div className="flex-1 flex flex-col relative overflow-hidden">
-                    {isConnected ? (
+                    {router.query.view === 'preferences' ? (
+                      <PreferencesPanel botName={botName} />
+                    ) : isConnected ? (
                       activeTab === 'chat' ? (
                         <GroupChatPanel
                           messages={chatMessages}
                           pseudonym={pseudonym}
+                          pseudonymFunFact={pseudonymFunFact}
                           eventName={eventName}
                           botName={botName}
                           inputValue={chatInputValue}
@@ -962,6 +874,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                         <AssistantChatPanel
                           messages={assistantMessages}
                           pseudonym={pseudonym}
+                          pseudonymFunFact={pseudonymFunFact}
                           waitingForResponse={waitingForResponse}
                           controlledMode={controlledMode}
                           slashCommands={slashCommands}
@@ -973,10 +886,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                           onExitControlledMode={exitControlledMode}
                           onPromptSelect={handlePromptSelect}
                           userId={userId}
-                          showPreferences={showPreferences}
-                          preferenceOptions={preferenceOptions}
-                          onPreferencesSubmit={handlePreferencesSubmit}
-                          preferencesError={preferencesError}
                           feedbackConfig={assistantFeedbackConfig}
                           inactive={!agentActive}
                           messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}

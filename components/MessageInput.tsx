@@ -1,6 +1,6 @@
 import { FC, useState, useRef, KeyboardEvent, ChangeEvent, useEffect, useCallback } from 'react';
-import { Box, IconButton, InputAdornment, TextField } from '@mui/material';
-import { Send, Close } from '@mui/icons-material';
+import { Box, IconButton, InputAdornment, TextField, Popover, Typography } from '@mui/material';
+import { Send, Close, InfoOutlined } from '@mui/icons-material';
 import { ControlledInputConfig } from '../types.internal';
 import { ActiveEnhancerState, InputEnhancer } from '../types/inputEnhancer';
 import { GenericEnhancerMenu } from './GenericEnhancerMenu';
@@ -9,6 +9,7 @@ import { getAvatarStyle } from '../utils/avatarUtils';
 interface MessageInputProps {
   /** The pseudonym of the user */
   pseudonym: string | null;
+  pseudonymFunFact?: string;
   /** List of input enhancers */
   enhancers: InputEnhancer<any>[];
   /** Whether the input is waiting for a response */
@@ -29,6 +30,7 @@ interface MessageInputProps {
 
 export const MessageInput: FC<MessageInputProps> = ({
   pseudonym,
+  pseudonymFunFact,
   enhancers,
   waitingForResponse,
   controlledMode,
@@ -44,6 +46,7 @@ export const MessageInput: FC<MessageInputProps> = ({
   const setCurrentMessage = isControlled ? onInputChange : setInternalValue;
 
   const [activeEnhancer, setActiveEnhancer] = useState<ActiveEnhancerState<any> | null>(null);
+  const [pseudonymInfoAnchor, setPseudonymInfoAnchor] = useState<HTMLButtonElement | null>(null);
 
   const messageInputRef = useRef<HTMLInputElement>(null);
   const enterUsedForCommandRef = useRef(false);
@@ -212,8 +215,16 @@ export const MessageInput: FC<MessageInputProps> = ({
                 backgroundColor: getAvatarStyle(pseudonym, true).avatarBg,
               }}
             >
-              <span className="uppercase">
+              <span className="uppercase flex items-center gap-1">
                 Writing as {pseudonym}
+                <IconButton
+                  size="small"
+                  onClick={(e) => setPseudonymInfoAnchor(e.currentTarget)}
+                  sx={{ padding: '2px', verticalAlign: 'middle' }}
+                  aria-label="Pseudonym info"
+                >
+                  <InfoOutlined sx={{ fontSize: 16 }} />
+                </IconButton>
                 {controlledMode && (
                   <span className="normal-case">
                     {' • '}
@@ -221,6 +232,31 @@ export const MessageInput: FC<MessageInputProps> = ({
                   </span>
                 )}
               </span>
+              <Popover
+                open={Boolean(pseudonymInfoAnchor)}
+                anchorEl={pseudonymInfoAnchor}
+                onClose={() => setPseudonymInfoAnchor(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                slotProps={{ paper: { sx: { maxWidth: 300, p: 2 } } }}
+              >
+                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                  Who are you today?
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  To protect your privacy, your identity is hidden behind this pseudonym. Not even the AI knows your real
+                  name.
+                </Typography>
+                {pseudonymFunFact && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: 'block', mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}
+                  >
+                    <strong>Fun fact:</strong> {pseudonymFunFact}
+                  </Typography>
+                )}
+              </Popover>
               {controlledMode && (
                 <IconButton size="small" onClick={onExitControlledMode} sx={{ padding: '4px' }}>
                   <Close fontSize="small" />

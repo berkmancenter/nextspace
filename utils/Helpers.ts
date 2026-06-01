@@ -440,16 +440,10 @@ export const normalizeAssistantPseudonym = (message: PseudonymousMessage, botNam
   return message.fromAgent ? botName : message.pseudonym;
 };
 
-export const buildDirectChannels = (
-  userId: string,
-  agents: AgentChannelConfig[],
-  preferences: Record<string, boolean>,
-): components['schemas']['Channel'][] => {
-  return agents
-    .filter((agent) => (agent.preferenceKey ? preferences[agent.preferenceKey] === true : true))
-    .map((agent) => ({
-      name: `direct-${userId}-${agent.agentId}`,
-      passcode: null,
-      direct: true,
-    }));
+export const buildDirectChannels = (userId: string, agents: AgentChannelConfig[]): components['schemas']['Channel'][] => {
+  return agents.map((agent) => ({
+    name: `direct-${userId}-${agent.agentId}`,
+    passcode: null,
+    direct: true,
+  }));
 };

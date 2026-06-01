@@ -14,7 +14,6 @@ import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { parseMessageBody } from '../utils/Helpers';
 import { BotIcon } from './BotIcon';
-import { PreferencesBanner, PreferenceOption } from './PreferencesBanner';
 import { MediaLightbox } from './MediaLightbox';
 import { ThreadedMessage } from './ThreadedMessage';
 import { ThreadPanel } from './ThreadPanel';
@@ -22,6 +21,7 @@ import { ThreadPanel } from './ThreadPanel';
 interface AssistantChatPanelProps {
   messages: PseudonymousMessage[];
   pseudonym: string | null;
+  pseudonymFunFact?: string;
   waitingForResponse: boolean;
   controlledMode: ControlledInputConfig | null;
   slashCommands: SlashCommand[];
@@ -33,10 +33,6 @@ interface AssistantChatPanelProps {
   onExitControlledMode: () => void;
   onPromptSelect: (prompt: string, promptMessageId?: string) => void;
   userId: string | null;
-  showPreferences?: boolean;
-  preferenceOptions?: PreferenceOption[];
-  onPreferencesSubmit?: (selectedValues: string[]) => void;
-  preferencesError?: string | null;
   feedbackConfig?: FeedbackConfig;
   messagesWithUnreadReplies?: Set<string>;
   onMarkAsRead?: (messageId: string) => void;
@@ -46,6 +42,7 @@ interface AssistantChatPanelProps {
 export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   messages,
   pseudonym,
+  pseudonymFunFact,
   waitingForResponse,
   controlledMode,
   slashCommands,
@@ -57,16 +54,11 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   onExitControlledMode,
   onPromptSelect,
   userId,
-  showPreferences = false,
-  preferenceOptions = [],
-  onPreferencesSubmit,
-  preferencesError = null,
   feedbackConfig,
   messagesWithUnreadReplies = new Set(),
   onMarkAsRead,
   inactive = false,
 }) => {
-  const [preferencesVisible, setPreferencesVisible] = useState(showPreferences);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -83,11 +75,6 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     mediaSrc: '',
     mimeType: undefined,
   });
-
-  // Sync local state with prop changes
-  useEffect(() => {
-    setPreferencesVisible(showPreferences);
-  }, [showPreferences]);
 
   // Lightbox handlers
   const handleImageClick = useCallback((src: string, mimeType: string) => {
@@ -131,15 +118,6 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
       return false;
     })
     .map((msg) => (msg.body as any).message);
-
-  // Handle preferences submission - don't hide optimistically, let parent control visibility
-  const handlePreferencesSubmit = (selectedValues: string[]) => {
-    onPreferencesSubmit?.(selectedValues);
-  };
-
-  const handlePreferencesDismiss = () => {
-    setPreferencesVisible(false);
-  };
 
   // Helper to check if a message is a prompt response
   const isPromptResponse = (msg: PseudonymousMessage): boolean => {
@@ -351,18 +329,6 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
               </p>
             </div>
 
-            {/* Preferences Banner */}
-            {preferencesVisible && preferenceOptions.length > 0 && (
-              <div className="w-full">
-                <PreferencesBanner
-                  options={preferenceOptions}
-                  onSubmit={handlePreferencesSubmit}
-                  onDismiss={handlePreferencesDismiss}
-                  error={preferencesError}
-                />
-              </div>
-            )}
-
             {parentMessages.map((message, i) => {
               const replies = threadMap.get(message.id!) || [];
               // Calculate if we should show timestamp
@@ -415,6 +381,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
           ) : (
             <MessageInput
               pseudonym={pseudonym}
+              pseudonymFunFact={pseudonymFunFact}
               enhancers={enhancers}
               onSendMessage={onSendMessage}
               waitingForResponse={waitingForResponse}

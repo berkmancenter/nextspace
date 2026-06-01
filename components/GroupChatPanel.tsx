@@ -38,6 +38,7 @@ const renderAssistantMessage = (text: string): React.ReactNode => {
 interface GroupChatPanelProps {
   messages: PseudonymousMessage[];
   pseudonym: string | null;
+  pseudonymFunFact?: string;
   eventName?: string;
   botName?: string;
   inputValue?: string;
@@ -54,6 +55,7 @@ interface GroupChatPanelProps {
 export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   messages,
   pseudonym,
+  pseudonymFunFact,
   eventName,
   botName = 'Berkie',
   inputValue,
@@ -338,6 +340,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
         <div ref={messageInputRef} className="flex-shrink-0">
           <MessageInput
             pseudonym={pseudonym}
+            pseudonymFunFact={pseudonymFunFact}
             enhancers={enhancers}
             onSendMessage={onSendMessage}
             waitingForResponse={waitingForResponse && !waitingForThreadedReply}

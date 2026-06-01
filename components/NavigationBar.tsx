@@ -19,7 +19,7 @@ interface NavItem {
 }
 
 interface NavigationBarProps {
-  activeTab: NavTab;
+  activeTab: NavTab | null;
   onTabChange: (tab: NavTab) => void;
   unseenAssistantCount: number;
   unseenChatCount: number;
