@@ -663,7 +663,11 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         ...(messageSource === 'promptResponse' && promptQuestionId && { answersPrompt: promptQuestionId }),
       });
 
-      if (response.error) return false;
+      if (response.error) {
+        setWaitingForResponse(false);
+
+        return false;
+      }
 
       // Auto-exit controlled mode after sending
       if (controlledMode) {
