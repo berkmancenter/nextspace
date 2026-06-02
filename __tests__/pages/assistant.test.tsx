@@ -28,6 +28,7 @@ const mockSocket = {
   emit: jest.fn(),
   auth: { token: 'mock-token' },
   hasListeners: jest.fn(() => false),
+  connected: true,
 };
 
 jest.mock('socket.io-client', () => ({
@@ -1413,7 +1414,7 @@ describe('EventAssistantRoom', () => {
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
         if (path.startsWith('conversations/')) return Promise.resolve({ agents: [] });
         if (path.includes('jargon-agent-456')) return Promise.resolve([secondaryAgentMessage]);
-          return Promise.resolve([]);
+        return Promise.resolve([]);
       });
 
       const user = userEvent.setup();
@@ -1461,16 +1462,16 @@ describe('EventAssistantRoom', () => {
 
       act(() => {
         messageHandler({
-        id: 'msg-jargon-1',
+          id: 'msg-jargon-1',
           body: { type: 'jargon_clarification', text: 'An SLO is a reliability target.', sourceText: 'Our SLOs...' },
-        bodyType: 'json',
-        fromAgent: true,
-        channels: ['direct-user-123-jargon-agent-456'],
-        pseudonym: 'Jargon Filter Agent',
-        pause: false,
-        visible: true,
-        upVotes: [],
-        downVotes: [],
+          bodyType: 'json',
+          fromAgent: true,
+          channels: ['direct-user-123-jargon-agent-456'],
+          pseudonym: 'Jargon Filter Agent',
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
         });
       });
 

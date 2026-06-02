@@ -344,7 +344,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
             userId,
             agentIds.map((id) => ({ agentId: id })),
           )
-      : [];
+        : [];
 
     const channels: components['schemas']['Channel'][] = [...agentChannels];
     if (chatPasscode) {
@@ -401,12 +401,15 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         },
       );
     };
-
-    // Initial join
-    joinConversation();
-
     // Re-join on every subsequent reconnection (e.g. after token refresh)
     socket.on('connect', joinConversation);
+
+    // Only join immediately if the socket is already connected — otherwise
+    // let the connect event fire the first join to avoid a duplicate join
+    // when the socket is mid-handshake or reconnecting after a token refresh.
+    if (socket.connected) {
+      joinConversation();
+    }
 
     return () => {
       socket.off('connect', joinConversation);

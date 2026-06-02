@@ -174,6 +174,13 @@ export function useSessionJoin(
     socket.on('disconnect', handleDisconnect);
     socket.on('connect_error', handleConnectError);
 
+    // If the socket is already connected when this effect runs (e.g. StrictMode
+    // remount or token-refresh reconnect already completed), sync state immediately
+    // since the connect event won't fire again for the current connection.
+    if (socket.connected) {
+      handleConnect();
+    }
+
     return () => {
       socket.off('error', handleError);
       socket.off('connect', handleConnect);
