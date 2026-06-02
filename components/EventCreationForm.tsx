@@ -34,11 +34,20 @@ import { Request } from '../utils';
 import { EventStatus } from './';
 import { components } from '../types';
 import { Conversation } from '../types.internal';
-import { createConversationFromData, Api, SendData } from '../utils/Helpers';
+import { createConversationFromData, Api, SendData, updateConversation } from '../utils/Helpers';
 import SessionManager from '../utils/SessionManager';
 import { NewTopicForm, NewTopicFormValues } from './NewTopicForm';
 
 const steps = ['Event Details', 'Conversation Setup', 'Configuration', 'Speakers', 'Resources'];
+
+/**
+ * Produces a stable JSON string from an object by sorting its keys alphabetically.
+ * Used for enum radio-button comparisons so that key ordering differences (e.g. from
+ * MongoDB Mixed field serialization) don't cause a mismatch between the stored value
+ * and the radio option value built from validationKeys.
+ */
+const sortedStringify = (obj: Record<string, unknown>): string =>
+  JSON.stringify(Object.fromEntries(Object.entries(obj).sort(([a], [b]) => a.localeCompare(b))));
 
 /**
  * EventCreationForm component
@@ -50,7 +59,10 @@ const steps = ['Event Details', 'Conversation Setup', 'Configuration', 'Speakers
  * Step 4: Moderators & Speakers (moderator and speaker information)
  * @returns A React component displaying the Event Creation form.
  */
-export const EventCreationForm: React.FC = ({}) => {
+export const EventCreationForm: React.FC<{
+  mode?: 'create' | 'edit';
+  initialEvent?: Conversation;
+}> = ({ mode = 'create', initialEvent }) => {
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -63,6 +75,7 @@ export const EventCreationForm: React.FC = ({}) => {
 
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [selectedConvType, setSelectedConvType] = useState<string | null>(null);
+  const [showAgentTypeHint, setShowAgentTypeHint] = useState(false);
   const [supportedModels, setSupportedModels] = useState<components['schemas']['LlmModelDetails'][] | null>(null);
   const [availablePlatforms, setAvailablePlatforms] = useState<components['schemas']['PlatformConfig'][] | null>(null);
   const [conversationTypes, setConversationTypes] = useState<components['schemas']['ConversationType'][] | null>(null);
@@ -155,6 +168,9 @@ export const EventCreationForm: React.FC = ({}) => {
   });
 
   const formRef = useRef<HTMLFormElement>(null);
+  // Stores event's existing dynamic property values so Effect 1 can merge them
+  // with type defaults after setSelectedConvType triggers it to re-run.
+  const preFillPending = useRef<Record<string, any> | null>(null);
 
   const setFieldFocus = (fieldName: string) => {
     (formRef.current?.elements.namedItem(fieldName) as HTMLElement)?.focus();
@@ -222,6 +238,13 @@ export const EventCreationForm: React.FC = ({}) => {
           });
         });
 
+        // In edit mode, the pre-fill effect stores the event's existing values here
+        // before calling setSelectedConvType, so we merge them over the type defaults.
+        if (preFillPending.current) {
+          Object.assign(initialValues, preFillPending.current);
+          preFillPending.current = null;
+        }
+
         setDynamicPropertyValues(initialValues);
       }
     }
@@ -288,6 +311,92 @@ export const EventCreationForm: React.FC = ({}) => {
     if (availableTopics === null) fetchTopics();
   }, [availableTopics]);
 
+  // In edit mode, pre-fill form state from the existing conversation once config has loaded.
+  // Config must be loaded first because setSelectedConvType triggers Effect 1, which needs
+  // conversationTypes and availablePlatforms to already be populated.
+  useEffect(() => {
+    if (mode !== 'edit' || !initialEvent || !conversationTypes || !availablePlatforms) return;
+
+    // Build the dynamic values from the saved event. These get stored in preFillPending
+    // so that Effect 1 (which runs after setSelectedConvType) can merge them with the
+    // type's defaults rather than replacing them.
+    const dynamicPrefill: Record<string, any> = {};
+    if (initialEvent.properties) {
+      Object.entries(initialEvent.properties).forEach(([key, value]) => {
+        if (key !== 'zoomMeetingUrl') dynamicPrefill[key] = value;
+      });
+    }
+    // Explicitly disable all features defined on the type first. This ensures that features
+    // absent from the saved event (i.e. the user disabled them) correctly override any
+    // default: true values that Effect 1 would otherwise apply.
+    const savedTypeName = initialEvent.type?.name ?? (initialEvent as any).conversationType;
+    const typeDefinition = conversationTypes?.find((t) => t.name === savedTypeName);
+    typeDefinition?.features?.forEach((featureDef) => {
+      dynamicPrefill[featureDef.name] = false;
+    });
+
+    initialEvent.features?.forEach((f) => {
+      dynamicPrefill[f.name] = f.enabled !== false;
+      Object.entries(f.config || {}).forEach(([key, value]) => {
+        dynamicPrefill[`${f.name}.${key}`] = value;
+      });
+    });
+    preFillPending.current = dynamicPrefill;
+
+    setEventName(initialEvent.name);
+    setEventDescription(initialEvent.description ?? '');
+    setZoomMeetingUrl((initialEvent.properties?.zoomMeetingUrl as string) ?? '');
+    setZoomMeetingTime(initialEvent.scheduledTime ?? '');
+    setScheduledEndTime((initialEvent as any).scheduledEndTime ?? '');
+    setSelectedPlatforms(initialEvent.platforms ?? []);
+
+    const rawTopic = initialEvent.topic;
+    const topicId =
+      typeof rawTopic === 'string' ? rawTopic : ((rawTopic as any)?.id ?? (rawTopic as any)?._id?.toString() ?? null);
+    if (topicId) setSelectedTopicId(topicId);
+
+    if (initialEvent.moderators?.length) {
+      setShowModerators(true);
+      setModerators(
+        initialEvent.moderators.map((m) => ({
+          name: m.name ?? '',
+          bio: m.bio ?? '',
+          alternateName: (m as any).alternateName,
+        })),
+      );
+    }
+
+    if (initialEvent.presenters?.length) {
+      setSpeakers(
+        initialEvent.presenters.map((p) => ({
+          name: p.name ?? '',
+          bio: p.bio ?? '',
+          alternateName: (p as any).alternateName,
+        })),
+      );
+    }
+
+    const apiResources = (initialEvent as any).resources ?? [];
+    if (apiResources.length) {
+      setResources(
+        apiResources.map((r: any) => ({
+          title: r.title ?? '',
+          authors: Array.isArray(r.authors) ? r.authors.join(', ') : (r.authors ?? ''),
+          year: r.year ?? '',
+          url: r.url ?? '',
+          description: r.description ?? '',
+          citation: r.citation ?? '',
+          pdf: undefined,
+          required: r.category === 'required',
+          participantVisible: r.participantVisible ?? true,
+        })),
+      );
+    }
+
+    // Triggers Effect 1, which will merge preFillPending into the initialized defaults.
+    setSelectedConvType(initialEvent.type?.name ?? null);
+  }, [mode, initialEvent, conversationTypes, availablePlatforms]);
+
   const validateStep1 = () => {
     // Check that required fields are present
     if (!eventName || eventName.trim() === '') {
@@ -317,7 +426,7 @@ export const EventCreationForm: React.FC = ({}) => {
       return false;
     }
 
-    if (zoomMeetingTime && new Date(zoomMeetingTime) < new Date(Date.now() + 10 * 60 * 1000)) {
+    if (mode !== 'edit' && zoomMeetingTime && new Date(zoomMeetingTime) < new Date(Date.now() + 10 * 60 * 1000)) {
       setFormError('Meeting Start Time must be at least 10 minutes from now');
       setZoomMeetingTimeErrorMessage('Meeting Start Time must be at least 10 minutes from now.');
       setZoomMeetingTimeHasError(true);
@@ -534,7 +643,7 @@ export const EventCreationForm: React.FC = ({}) => {
                 </Typography>
               )}
               <RadioGroup
-                value={JSON.stringify(value || {})}
+                value={sortedStringify(value || {})}
                 name={stateKey}
                 onChange={(e) => {
                   try {
@@ -578,7 +687,7 @@ export const EventCreationForm: React.FC = ({}) => {
                   return (
                     <div key={idx}>
                       <FormControlLabel
-                        value={JSON.stringify(optionValue)}
+                        value={sortedStringify(optionValue)}
                         control={<Radio />}
                         label={option.label || option.name || `Option ${idx + 1}`}
                       />
@@ -896,10 +1005,28 @@ export const EventCreationForm: React.FC = ({}) => {
     body = {
       ...body,
       properties,
-      ...(features.length > 0 && { features }),
+      features,
     };
 
     setFormSubmitting(true);
+
+    if (mode === 'edit' && initialEvent) {
+      updateConversation(initialEvent.id!, body)
+        .then((data) => {
+          setFormSubmitting(false);
+          if (!data || 'error' in data) {
+            setFormError((data as any)?.message?.message || 'Failed to save changes.');
+            return;
+          }
+          router.push(`/admin/${initialEvent.type.name}/view/${initialEvent.id}`);
+        })
+        .catch((error: Error) => {
+          setFormError(`Failed to save changes. (${error.message})`);
+          setFormSubmitting(false);
+        });
+      return;
+    }
+
     Request('conversations/from-type', body)
       .then(async (data) => {
         if (!data) {
@@ -974,7 +1101,7 @@ export const EventCreationForm: React.FC = ({}) => {
   return (
     <>
       <Typography variant="h4" className="text-center" gutterBottom>
-        Create Event
+        {mode === 'edit' ? 'Edit Event' : 'Create Event'}
       </Typography>
       <Paper elevation={3} sx={{ p: 4, maxWidth: 800, mx: 'auto', mt: 4, mb: 4 }}>
         {isMobile ? (
@@ -1118,8 +1245,8 @@ export const EventCreationForm: React.FC = ({}) => {
                       setSelectedTopicId(value?.id ?? null);
                       setTopicHasError(false);
                     }}
-                    renderOption={(props, option) => (
-                      <Box component="li" {...props} key={option.id}>
+                    renderOption={({ key, ...props }, option) => (
+                      <Box component="li" key={key} {...props}>
                         <Box sx={{ flexGrow: 1 }}>{option.name}</Box>
                         {option.private && (
                           <Typography variant="caption" sx={{ color: 'text.secondary', ml: 1 }}>
@@ -1306,6 +1433,14 @@ export const EventCreationForm: React.FC = ({}) => {
                   value={selectedConvType}
                   name="selectedConvType"
                   onChange={(e) => {
+                    if (selectedConvType && e.target.value !== selectedConvType) {
+                      setShowAgentTypeHint(true);
+                      // Preserve the current model selection so Effect 1 doesn't reset
+                      // it to the new type's default when it re-runs.
+                      if (dynamicPropertyValues.llmModel !== undefined) {
+                        preFillPending.current = { llmModel: dynamicPropertyValues.llmModel };
+                      }
+                    }
                     setSelectedConvType(e.target.value);
                     setFormGroupsErrors((prev) => ({
                       ...prev,
@@ -1334,6 +1469,11 @@ export const EventCreationForm: React.FC = ({}) => {
                     </div>
                   ))}
                 </RadioGroup>
+                {showAgentTypeHint && (
+                  <Alert severity="info" sx={{ mt: 1 }}>
+                    Changing the agent type will also update the bot name — you can customize it on the next step.
+                  </Alert>
+                )}
               </FormControl>
             </Box>
           )}
@@ -1469,6 +1609,7 @@ export const EventCreationForm: React.FC = ({}) => {
                     onChange={(e) => updateSpeaker(index, 'alternateName', e.target.value)}
                     fullWidth
                     variant="outlined"
+                    margin="dense"
                     placeholder="Separate multiple names with commas, e.g. Jon, Dr. Smith"
                   />
                   <TextField
@@ -1567,6 +1708,7 @@ export const EventCreationForm: React.FC = ({}) => {
                           onChange={(e) => updateModerator(index, 'alternateName', e.target.value)}
                           fullWidth
                           variant="outlined"
+                          margin="dense"
                           placeholder="Separate multiple names with commas, e.g. Jon, Dr. Smith"
                         />
                         <TextField
@@ -1870,8 +2012,10 @@ export const EventCreationForm: React.FC = ({}) => {
                 {formSubmitting ? (
                   <>
                     <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
-                    Creating…
+                    {mode === 'edit' ? 'Saving…' : 'Creating…'}
                   </>
+                ) : mode === 'edit' ? (
+                  'Save Changes'
                 ) : (
                   'Create Conversation'
                 )}
