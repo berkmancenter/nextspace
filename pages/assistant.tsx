@@ -111,7 +111,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const assistantIntroRef = useRef<PseudonymousMessage[]>([]);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [agentActive, setAgentActive] = useState<boolean>(true);
-  const [jargonFilterAgentId, setJargonFilterAgentId] = useState<string | null>(null);
+  const [agentIds, setAgentIds] = useState<string[]>([]);
   const [conversationFeatures, setConversationFeatures] = useState<{ name: string; enabled?: boolean }[]>([]);
   const conversationType = useConversationType();
   const setConversationType = useSetConversationType();
@@ -227,7 +227,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       socket.off('message:new', messageHandler);
       socket.off('resources:updated', resourcesUpdatedHandler);
     };
-  }, [socket, jargonFilterAgentId]);
+  }, [socket]);
 
   // Keep activeTabRef in sync with activeTab state
   useEffect(() => {
@@ -327,12 +327,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           setAgentActive(false);
         }
 
-        const jargonAgent = conversation.agents.find(
-          (agent: components['schemas']['Agent']) => agent.agentType === 'jargonFilterAgent',
-        );
-        if (jargonAgent) {
-          setJargonFilterAgentId(jargonAgent.id!);
-        }
+        const ids = conversation.agents.map((agent: components['schemas']['Agent']) => agent.id!);
+        setAgentIds(ids);
       } catch (error) {
         console.error('Error fetching conversation data:', error);
         setGeneralError('Failed to fetch conversation data.');
@@ -354,8 +350,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       return;
     }
 
-    const agentChannels = agentId
-      ? buildDirectChannels(userId, [{ agentId }, ...(jargonFilterAgentId ? [{ agentId: jargonFilterAgentId }] : [])])
+    const agentChannels =
+      agentIds.length > 0
+        ? buildDirectChannels(
+            userId,
+            agentIds.map((id) => ({ agentId: id })),
+          )
       : [];
 
     const channels: components['schemas']['Channel'][] = [...agentChannels];
@@ -390,8 +390,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           const intros: PseudonymousMessage[] = response?.intros ?? [];
 
           chatIntroRef.current = intros.filter((m) => Array.isArray(m.channels) && m.channels.includes('chat'));
-          // Any intro not in chat belongs to the direct (assistant) channel.
-          assistantIntroRef.current = intros.filter((m) => !Array.isArray(m.channels) || !m.channels.includes('chat'));
+          // Only intros on the eventAssistant's direct channel.
+          assistantIntroRef.current = intros.filter(
+            (m) => Array.isArray(m.channels) && m.channels.some((c) => c.includes(`-${agentId}`)),
+          );
 
           // Only push intros into state on the very first join. Re-joins
           // must not add them again — the initial fetch effects will prepend
@@ -421,38 +423,26 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     return () => {
       socket.off('connect', joinConversation);
     };
-  }, [socket, agentId, agentActive, jargonFilterAgentId, userId, chatPasscode, router.query.conversationId]);
+  }, [socket, agentId, agentActive, agentIds, userId, chatPasscode, router.query.conversationId]);
 
   /**
-   * Helper function to fetch all assistant messages (direct + jargon filter)
+   * Helper function to fetch all assistant messages across all agent direct channels
    * and their threaded replies
    */
   const fetchAllAssistantMessages = useCallback(async (): Promise<void> => {
     if (!userId || !agentId || !router.query.conversationId) return;
 
     try {
-      const directChannelName = `direct-${userId}-${agentId}`;
-      const assistantMessages = await RetrieveData(
-        `messages/${router.query.conversationId}?channel=${directChannelName}`,
-        Api.get().getAccessToken(),
+      const allFetched = await Promise.all(
+        agentIds.map((id) =>
+          RetrieveData(`messages/${router.query.conversationId}?channel=direct-${userId}-${id}`, Api.get().getAccessToken()),
+        ),
       );
 
       // Filter intro messages from older conversations where intros were persisted
-      let allMessages = (Array.isArray(assistantMessages) ? assistantMessages : []).filter(
-        (m) => parseMessageBody(m.body)?.type !== 'intro',
-      );
-
-      // Fetch jargon filter agent's messages, if enabled
-      if (jargonFilterAgentId) {
-        const jargonChannelName = `direct-${userId}-${jargonFilterAgentId}`;
-        const jargonMessages = await RetrieveData(
-          `messages/${router.query.conversationId}?channel=${jargonChannelName}`,
-          Api.get().getAccessToken(),
-        );
-        if (Array.isArray(jargonMessages)) {
-          allMessages = [...allMessages, ...jargonMessages];
-        }
-      }
+      let allMessages = allFetched
+        .flatMap((result) => (Array.isArray(result) ? result : []))
+        .filter((m) => parseMessageBody(m.body)?.type !== 'intro');
 
       // Sort all messages by creation time
       allMessages.sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
@@ -464,7 +454,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     } catch (error) {
       console.error('Error fetching assistant messages:', error);
     }
-  }, [userId, agentId, jargonFilterAgentId, router.query.conversationId]);
+  }, [userId, agentId, agentIds, router.query.conversationId]);
 
   /**
    * Helper function to track reply count changes and identify unread messages
@@ -629,12 +619,13 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     let channels =
       effectiveTab === 'chat' ? [{ name: 'chat', passcode: chatPasscode }] : [{ name: `direct-${userId}-${agentId}` }];
 
-    // If replying to a message in assistant tab, check if parent came from jargon filter agent
-    // and use that channel instead
-    if (effectiveTab !== 'chat' && parentMessageId && jargonFilterAgentId) {
+    // If replying to a message in assistant tab, route to whichever direct channel
+    // the parent message was on (supports any agent, not just the primary one)
+    if (effectiveTab !== 'chat' && parentMessageId) {
       const parentMessage = assistantMessages.find((m) => m.id === parentMessageId);
-      if (parentMessage?.channels?.some((c) => c.includes(jargonFilterAgentId))) {
-        channels = [{ name: `direct-${userId}-${jargonFilterAgentId}` }];
+      const parentDirectChannel = parentMessage?.channels?.find((c) => c.startsWith('direct-') && !c.includes(agentId!));
+      if (parentDirectChannel) {
+        channels = [{ name: parentDirectChannel }];
       }
     }
 

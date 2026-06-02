@@ -1314,82 +1314,201 @@ describe('EventAssistantRoom', () => {
     });
   });
 
-  describe('Jargon message routing', () => {
-    it('displays jargon clarification messages inline in the assistant panel when jargonFilterAgentId is set', async () => {
-      const conversationWithJargon = {
+  describe('Multi-agent channel subscription and message fetching', () => {
+    it('subscribes to direct channels for all agents in the conversation', async () => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
         agents: [
           { id: 'agent-123', agentType: 'eventAssistant' },
           { id: 'jargon-agent-456', agentType: 'jargonFilterAgent' },
+          { id: 'future-agent-789', agentType: 'someNewAgent' },
         ],
         type: { name: 'eventAssistant' },
-      };
-      (createConversationFromData as jest.Mock).mockResolvedValue(conversationWithJargon);
+      });
 
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
-        if (path.startsWith('conversations/')) {
-          return Promise.resolve(conversationWithJargon);
-        } else if (path.includes('users/user/') && path.includes('/preferences')) {
-          return Promise.resolve({ jargonClarification: true });
-        } else if (path.startsWith('messages/')) {
-          return Promise.resolve([]);
-        }
-        return Promise.resolve({});
+        if (path.startsWith('conversations/')) return Promise.resolve({ agents: [] });
+        return Promise.resolve([]);
       });
 
       await act(async () => {
         render(<EventAssistantRoom authType={'guest'} />);
       });
 
-      // Wait for jargonFilterAgentId to be set from conversation data
       await waitFor(() => {
-        expect(mockSocket.on).toHaveBeenCalledWith('message:new', expect.any(Function));
+        expect(mockSocket.emit).toHaveBeenCalledWith(
+          'conversation:join',
+          expect.objectContaining({
+            channels: expect.arrayContaining([
+              { name: 'direct-user-123-agent-123', passcode: null, direct: true },
+              { name: 'direct-user-123-jargon-agent-456', passcode: null, direct: true },
+              { name: 'direct-user-123-future-agent-789', passcode: null, direct: true },
+            ]),
+          }),
+        );
+      });
+    });
+
+    it('fetches messages from all agent direct channels', async () => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [
+          { id: 'agent-123', agentType: 'eventAssistant' },
+          { id: 'jargon-agent-456', agentType: 'jargonFilterAgent' },
+        ],
+        type: { name: 'eventAssistant' },
       });
 
-      // Retrieve the most recently registered message:new handler — it has jargonFilterAgentId in its closure
-      const messageHandler: Function = mockSocket.on.mock.calls
-        .filter(([event]: [string]) => event === 'message:new')
-        .map(([, handler]: [string, Function]) => handler)
-        .at(-1)!;
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) return Promise.resolve({ agents: [] });
+        return Promise.resolve([]);
+      });
 
-      expect(messageHandler).toBeDefined();
-      expect(typeof messageHandler).toBe('function');
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
 
-      // Simulate a jargon clarification message arriving on the jargon filter's direct channel
-      const jargonMessage = {
-        id: 'msg-jargon-1',
-        body: {
-          type: 'jargon_clarification',
-          text: 'An SLO is a reliability target.',
-          sourceText: 'Our SLOs...',
-        },
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          'messages/test-conversation-id?channel=direct-user-123-agent-123',
+          'mock-access-token',
+        );
+        expect(RetrieveData).toHaveBeenCalledWith(
+          'messages/test-conversation-id?channel=direct-user-123-jargon-agent-456',
+          'mock-access-token',
+        );
+      });
+    });
+
+    it('displays messages from any agent direct channel in the assistant panel', async () => {
+      const secondaryAgentMessage = {
+        id: 'secondary-msg-1',
+        body: { type: 'jargon_clarification', text: 'An SLO is a reliability target.', sourceText: 'Our SLOs...' },
         bodyType: 'json',
         fromAgent: true,
         channels: ['direct-user-123-jargon-agent-456'],
-        pseudonym: 'Jargon Filter Agent',
-        pseudonymId: 'jargon-agent-456',
-        conversation: 'test-conversation-id',
+        pseudonym: 'Jargon Filter',
+        createdAt: '2024-01-01T10:00:00Z',
         pause: false,
         visible: true,
         upVotes: [],
         downVotes: [],
       };
 
-      // Switch to assistant tab before receiving the message
-      await waitFor(() => {
-        const assistantTabs = screen.queryAllByLabelText(/Berkie|Assistant/i);
-        expect(assistantTabs.length).toBeGreaterThan(0);
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [
+          { id: 'agent-123', agentType: 'eventAssistant' },
+          { id: 'jargon-agent-456', agentType: 'jargonFilterAgent' },
+        ],
+        type: { name: 'eventAssistant' },
       });
 
-      const assistantTab = screen.getAllByLabelText(/Berkie|Assistant/i)[0];
-      await userEvent.click(assistantTab);
-
-      act(() => {
-        messageHandler(jargonMessage);
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) return Promise.resolve({ agents: [] });
+        if (path.includes('jargon-agent-456')) return Promise.resolve([secondaryAgentMessage]);
+          return Promise.resolve([]);
       });
 
-      // Verify the jargon clarification content appears inline in the assistant panel
+      const user = userEvent.setup();
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0));
+      await user.click(screen.getAllByLabelText('Berkie')[0]);
+
       await waitFor(() => {
         expect(screen.getByText('An SLO is a reliability target.')).toBeInTheDocument();
+      });
+    });
+
+    it('displays real-time messages from any agent direct channel in the assistant panel', async () => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [
+          { id: 'agent-123', agentType: 'eventAssistant' },
+          { id: 'jargon-agent-456', agentType: 'jargonFilterAgent' },
+        ],
+        type: { name: 'eventAssistant' },
+      });
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) return Promise.resolve({ agents: [] });
+        return Promise.resolve([]);
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => expect(mockSocket.on).toHaveBeenCalledWith('message:new', expect.any(Function)));
+
+      const messageHandler: Function = mockSocket.on.mock.calls
+        .filter(([event]: [string]) => event === 'message:new')
+        .map(([, handler]: [string, Function]) => handler)
+        .at(-1)!;
+
+      const user = userEvent.setup();
+      await waitFor(() => expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0));
+      await user.click(screen.getAllByLabelText('Berkie')[0]);
+
+      act(() => {
+        messageHandler({
+        id: 'msg-jargon-1',
+          body: { type: 'jargon_clarification', text: 'An SLO is a reliability target.', sourceText: 'Our SLOs...' },
+        bodyType: 'json',
+        fromAgent: true,
+        channels: ['direct-user-123-jargon-agent-456'],
+        pseudonym: 'Jargon Filter Agent',
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('An SLO is a reliability target.')).toBeInTheDocument();
+      });
+    });
+
+    it('routes replies to the channel of the parent message, not the primary agent channel', async () => {
+      const secondaryAgentMessage = {
+        id: 'jargon-msg-1',
+        body: 'A clarification from jargon agent',
+        fromAgent: true,
+        channels: ['direct-user-123-jargon-agent-456'],
+        pseudonym: 'Jargon Filter',
+        createdAt: '2024-01-01T10:00:00Z',
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [
+          { id: 'agent-123', agentType: 'eventAssistant' },
+          { id: 'jargon-agent-456', agentType: 'jargonFilterAgent' },
+        ],
+        type: { name: 'eventAssistant' },
+      });
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) return Promise.resolve({ agents: [] });
+        if (path.includes('jargon-agent-456')) return Promise.resolve([secondaryAgentMessage]);
+        return Promise.resolve([]);
+      });
+
+      const user = userEvent.setup();
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0));
+      await user.click(screen.getAllByLabelText('Berkie')[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('A clarification from jargon agent')).toBeInTheDocument();
       });
     });
   });
@@ -1749,7 +1868,7 @@ describe('EventAssistantRoom', () => {
         body: 'Welcome to the event!',
         pseudonym: 'Berkie',
         fromAgent: true,
-        channels: [],
+        channels: ['direct-user-123-agent-123'],
         createdAt: '2024-01-01T09:59:00Z',
         conversation: 'test-conversation-id',
         pause: false,
@@ -1959,7 +2078,7 @@ describe('EventAssistantRoom', () => {
         body: 'Intro message',
         pseudonym: 'Berkie',
         fromAgent: true,
-        channels: [],
+        channels: ['direct-user-123-agent-123'],
         createdAt: '2024-01-01T09:59:00Z',
       };
 
@@ -2067,7 +2186,7 @@ describe('EventAssistantRoom', () => {
         body: 'Intro message',
         pseudonym: 'Berkie',
         fromAgent: true,
-        channels: [],
+        channels: ['direct-user-123-agent-123'],
         createdAt: '2024-01-01T09:59:00Z',
       };
 
