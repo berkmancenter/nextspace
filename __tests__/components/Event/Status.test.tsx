@@ -13,6 +13,20 @@ jest.mock('../../../utils', () => ({
   SendData: jest.fn(),
 }));
 
+const mockPush = jest.fn();
+jest.mock('next/router', () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
+
+jest.mock('../../../utils/SessionManager', () => ({
+  __esModule: true,
+  default: {
+    get: () => ({
+      getSessionInfo: () => ({ userId: 'current-user-id' }),
+    }),
+  },
+}));
+
 // Mock window.location
 const mockLocation = {
   protocol: 'http:',
@@ -106,6 +120,7 @@ describe('EventStatus', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPush.mockReset();
     (SendData as jest.Mock).mockResolvedValue({ success: true });
     (RetrieveData as jest.Mock).mockResolvedValue(mockConfig);
   });
@@ -194,6 +209,32 @@ describe('EventStatus', () => {
   it('displays active status if conversationData.active is true initially', () => {
     render(<EventStatus conversationData={{ ...mockConversationData, active: true }} />);
     expect(screen.getByText('The event is currently active.')).toBeInTheDocument();
+  });
+
+  describe('Edit Event button', () => {
+    it('shows Edit Event button for an inactive event owned by the current user', () => {
+      render(<EventStatus conversationData={{ ...mockConversationData, owner: 'current-user-id' }} />);
+      expect(screen.getByRole('button', { name: /edit event/i })).toBeInTheDocument();
+    });
+
+    it('does not show Edit Event button when the current user is not the owner', () => {
+      render(<EventStatus conversationData={{ ...mockConversationData, owner: 'other-user-id' }} />);
+      expect(screen.queryByRole('button', { name: /edit event/i })).not.toBeInTheDocument();
+    });
+
+    it('does not show Edit Event button when the event is active', () => {
+      render(<EventStatus conversationData={{ ...mockConversationData, owner: 'current-user-id', active: true }} />);
+      expect(screen.queryByRole('button', { name: /edit event/i })).not.toBeInTheDocument();
+    });
+
+    it('navigates to the edit page when Edit Event button is clicked', async () => {
+      const user = userEvent.setup();
+      render(<EventStatus conversationData={{ ...mockConversationData, owner: 'current-user-id' }} />);
+
+      await user.click(screen.getByRole('button', { name: /edit event/i }));
+
+      expect(mockPush).toHaveBeenCalledWith('/admin/eventAssistant/edit/conv-123');
+    });
   });
 
   it('renders zoom link when provided in eventUrls', () => {
