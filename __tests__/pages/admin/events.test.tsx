@@ -915,6 +915,13 @@ describe('Events Page - Edit button', () => {
     expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
   });
 
+  it('does not show an edit button for an event with no type set', async () => {
+    /* Legacy events may have no type object, which would produce /admin/undefined/edit/<id>
+       if the edit button were shown. The canEdit guard prevents this. */
+    await renderWithEvent(makeConversation({ type: undefined }));
+    expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
+  });
+
   it('navigates to the edit page when the edit button is clicked', async () => {
     const user = userEvent.setup();
     await renderWithEvent(makeConversation({}));

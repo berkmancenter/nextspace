@@ -54,7 +54,7 @@ const EventCard = ({
 
   // Edit is available for future, not-yet-started, owned events
   const eventStarted = event.scheduledTime ? new Date(event.scheduledTime) <= new Date() : false;
-  const canEdit = isOwner && !event.active && !eventStarted;
+  const canEdit = isOwner && !event.active && !eventStarted && !!event.type?.name;
 
   const handleCopyLink = async (url: string) => {
     try {
