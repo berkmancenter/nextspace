@@ -2392,6 +2392,36 @@ describe('EventCreationForm Component', () => {
       });
     });
 
+    it('navigates to the view page after saving a legacy event with no type object set', async () => {
+      /* Legacy events may have conversationType (a string) but no type object. The
+         post-save redirect must not crash by reading type.name directly — it should
+         fall back to conversationType the same way the Cancel button does. */
+      const legacyEvent = {
+        ...mockInitialEvent,
+        type: undefined,
+        conversationType: 'backChannel',
+      };
+      (updateConversation as jest.Mock).mockResolvedValue({ id: 'conv-edit-123' });
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm mode="edit" initialEvent={legacyEvent} />);
+      });
+      await waitFor(() => screen.getByLabelText(/Event Name/i));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Nextspace'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Customize your conversation settings'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('About the Speakers'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Reading & Resources'));
+      await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-edit-123');
+      });
+    });
+
     describe('Agent type change hint', () => {
       const navigateToStep2 = async (user: ReturnType<typeof userEvent.setup>) => {
         await waitFor(() => screen.getByLabelText(/Event Name/i));
@@ -2670,7 +2700,7 @@ describe('EventCreationForm Component', () => {
             properties: [],
             platforms: [],
           },
-          features: [], // collectiveVoice was explicitly disabled — not present in array
+          features: [], // collectiveVoice was explicitly disabled, so it's absent from the array
         };
 
         const user = userEvent.setup();
@@ -2776,10 +2806,10 @@ describe('EventCreationForm Component', () => {
       });
 
       it('navigates immediately when the API returned a non-UTC ISO date and nothing was edited', async () => {
-        // The backend may return scheduledTime in a timezone-offset ISO format (e.g. "+00:00"),
-        // while DateTimePicker's onChange canonicalizes via dayjs().toISOString() ("Z"). Without
-        // normalization in the snapshot, an untouched form would compare unequal and trigger the
-        // unsaved-changes dialog on Cancel. This guards that normalization stays in place.
+        /* The API may return dates with a timezone offset rather than UTC "Z".
+           Without normalizing both sides to the same format, an untouched form
+           compares unequal and shows the unsaved-changes warning on Cancel. This
+           test guards that the normalization stays in place. */
         const eventWithOffsetDate = {
           ...mockInitialEvent,
           scheduledTime: '2030-01-15T15:00:00+00:00',
@@ -2846,6 +2876,27 @@ describe('EventCreationForm Component', () => {
         expect(screen.getByLabelText(/Event Name/i)).toBeInTheDocument();
       });
 
+    });
+
+    it('allows proceeding from Step 1 when the pre-filled scheduled time is in the past', async () => {
+      /* In edit mode the start-time picker must not enforce a future-only constraint.
+         An existing event's scheduled time may be in the past, and blocking navigation
+         would prevent the organizer from editing any other field. */
+      const pastEvent = {
+        ...mockInitialEvent,
+        scheduledTime: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      };
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm mode="edit" initialEvent={pastEvent} />);
+      });
+      await waitFor(() => screen.getByLabelText(/Event Name/i));
+
+      await user.click(screen.getByRole('button', { name: /next/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Nextspace')).toBeInTheDocument();
+      });
     });
 
     describe('Step payload verification', () => {

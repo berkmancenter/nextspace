@@ -174,10 +174,12 @@ export const EventCreationForm: React.FC<{
   });
 
   const formRef = useRef<HTMLFormElement>(null);
-  // Stores event's existing dynamic property values so Effect 1 can merge them
-  // with type defaults after setSelectedConvType triggers it to re-run.
+  /* Holds the saved event's field values while the form initializes. In edit
+     mode, we stash these here before setting the conversation type. The
+     type-change effect picks them up and merges them with the type's defaults
+     instead of overwriting them. */
   const preFillPending = useRef<Record<string, any> | null>(null);
-  /** Snapshot of all editable state at the moment pre-fill settled. Used to detect real changes vs. reverts. */
+  /** Snapshot of the form state once the saved event has been loaded in. Used to detect real changes vs. a user editing then reverting a field. */
   const cleanSnapshot = useRef<string | null>(null);
 
   const setFieldFocus = (fieldName: string) => {
@@ -189,20 +191,19 @@ export const EventCreationForm: React.FC<{
     router.push(`/admin/${typeName}/view/${initialEvent?.id}`);
   };
 
-  /*
-   * Normalizes a date string to the same canonical form DateTimePicker.onChange produces
-   * (UTC ISO via dayjs().toISOString()). Without this, the API's local-tz ISO and a
-   * user-edited-then-reverted value would serialize differently and trigger a false dirty.
-   */
+  /* Converts a date string to UTC ISO so both sides of a dirty-check compare
+     in the same format. The API may return dates with a timezone offset (e.g.
+     "+00:00") rather than "Z". Without this, a date the user didn't touch
+     still looks different from what DateTimePicker writes, and Cancel would
+     incorrectly show the unsaved-changes warning. */
   const normalizeDate = (s: string) => (s && dayjs(s).isValid() ? dayjs(s).toISOString() : (s ?? ''));
 
-  /*
-   * Serializes all user-editable form state into a stable JSON string for dirty-checking.
-   * Platforms are sorted so selection order doesn't cause false positives.
-   * PDF File objects are excluded (non-serializable); hasNewPdf handles them separately.
-   * `overrides` lets the initial capture pass values the corresponding state setter
-   * hasn't committed yet (e.g. dynamicPropertyValues during the pre-fill effect).
-   */
+  /* Captures all editable form fields as a JSON string for dirty-checking.
+     Platforms are sorted so adding then removing one in the same session
+     doesn't look like a change. PDF files are skipped since they can't be
+     serialized; hasNewPdf covers those separately. The overrides param lets
+     the initial snapshot pass dynamicPropertyValues directly, because the
+     state setter hasn't committed yet when we first call this. */
   const serializeFormState = (overrides?: { dynamicPropertyValues?: Record<string, any> }) =>
     JSON.stringify({
       eventName,
@@ -290,14 +291,15 @@ export const EventCreationForm: React.FC<{
           });
         });
 
-        // In edit mode, the pre-fill effect stores the event's existing values here
-        // before calling setSelectedConvType, so we merge them over the type defaults.
+        /* In edit mode, the pre-fill effect stores the saved event's values
+           here before setting the conversation type. We merge them on top of
+           the type's defaults rather than overwriting. */
         if (preFillPending.current) {
           Object.assign(initialValues, preFillPending.current);
           preFillPending.current = null;
-          // Capture the clean snapshot here, using `initialValues` directly as the
-          // dynamicPropertyValues — the state setter below hasn't committed yet, so
-          // the closure's `dynamicPropertyValues` would be stale if we read it instead.
+          /* Record the baseline form state here, passing initialValues directly
+             instead of reading dynamicPropertyValues from the closure. The state
+             setter hasn't committed yet at this point, so the closure value is stale. */
           if (mode === 'edit' && cleanSnapshot.current === null) {
             cleanSnapshot.current = serializeFormState({ dynamicPropertyValues: initialValues });
           }
@@ -306,10 +308,11 @@ export const EventCreationForm: React.FC<{
         setDynamicPropertyValues(initialValues);
       }
     }
-    // The snapshot capture above reads several state variables (eventName, moderators, etc.)
-    // from the closure. Those intentionally are NOT in the dep array — this effect must only
-    // re-run when the conv type changes, not on every field edit. The snapshot is only written
-    // once (cleanSnapshot.current guards it), so stale-closure risk doesn't apply.
+    /* This effect reads eventName, moderators, and other state from the closure,
+       but those are left out of the dependency array on purpose. The effect only
+       needs to re-run when the conversation type changes, not on every field edit.
+       The snapshot is written exactly once (cleanSnapshot guards it), so reading a
+       stale closure value at that moment is safe. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationTypes, selectedConvType]);
 
@@ -374,24 +377,28 @@ export const EventCreationForm: React.FC<{
     if (availableTopics === null) fetchTopics();
   }, [availableTopics]);
 
-  // In edit mode, pre-fill form state from the existing conversation once config has loaded.
-  // Config must be loaded first because setSelectedConvType triggers Effect 1, which needs
-  // conversationTypes and availablePlatforms to already be populated.
+  /* Populates the form with the saved event's data when the user opens an
+     existing event to edit. We wait until conversation types and platforms
+     have loaded before running this, because setting the conversation type
+     triggers a separate effect that needs those lists to be ready. */
   useEffect(() => {
     if (mode !== 'edit' || !initialEvent || !conversationTypes || !availablePlatforms) return;
 
-    // Build the dynamic values from the saved event. These get stored in preFillPending
-    // so that Effect 1 (which runs after setSelectedConvType) can merge them with the
-    // type's defaults rather than replacing them.
+    /* Build the saved event's dynamic field values (bot name, model, feature
+       toggles, etc.) and store them in preFillPending. Setting the conversation
+       type below triggers another effect that initializes all dynamic fields from
+       the type definition. That effect merges these saved values on top of the
+       defaults rather than replacing them. */
     const dynamicPrefill: Record<string, any> = {};
     if (initialEvent.properties) {
       Object.entries(initialEvent.properties).forEach(([key, value]) => {
         if (key !== 'zoomMeetingUrl') dynamicPrefill[key] = value;
       });
     }
-    // Explicitly disable all features defined on the type first. This ensures that features
-    // absent from the saved event (i.e. the user disabled them) correctly override any
-    // default: true values that Effect 1 would otherwise apply.
+    /* Mark all of the type's features as disabled before merging in the saved
+       event's feature list. Without this, any feature the organizer previously
+       turned off would be absent from the saved array, and the type-change effect
+       would re-enable it because the type definition has default: true. */
     const savedTypeName = initialEvent.type?.name ?? (initialEvent as any).conversationType;
     const typeDefinition = conversationTypes?.find((t) => t.name === savedTypeName);
     typeDefinition?.features?.forEach((featureDef) => {
@@ -456,8 +463,8 @@ export const EventCreationForm: React.FC<{
       );
     }
 
-    // Triggers Effect 1, which will merge preFillPending into the initialized defaults.
-    setSelectedConvType(initialEvent.type?.name ?? null);
+    // Setting the conversation type triggers the type-change effect, which merges preFillPending into the defaults.
+    setSelectedConvType(initialEvent.type?.name ?? (initialEvent as any).conversationType ?? null);
   }, [mode, initialEvent, conversationTypes, availablePlatforms]);
 
   const validateStep1 = () => {
@@ -1081,7 +1088,7 @@ export const EventCreationForm: React.FC<{
             setFormError((data as any)?.message?.message || 'Failed to save changes.');
             return;
           }
-          router.push(`/admin/${initialEvent.type.name}/view/${initialEvent.id}`);
+          navigateToView();
         })
         .catch((error: Error) => {
           setFormError(`Failed to save changes. (${error.message})`);
@@ -1366,7 +1373,7 @@ export const EventCreationForm: React.FC<{
                 <DateTimePicker
                   label="Meeting Day/Time"
                   value={zoomMeetingTime ? dayjs(zoomMeetingTime) : null}
-                  minDateTime={dayjs().add(10, 'minute')}
+                  minDateTime={mode === 'edit' ? undefined : dayjs().add(10, 'minute')}
                   onChange={(newValue) => {
                     const value = newValue?.isValid() ? newValue.toISOString() : '';
                     setZoomMeetingTime(value);
@@ -1498,8 +1505,10 @@ export const EventCreationForm: React.FC<{
                   onChange={(e) => {
                     if (selectedConvType && e.target.value !== selectedConvType) {
                       setShowAgentTypeHint(true);
-                      // Preserve the current model selection so Effect 1 doesn't reset
-                      // it to the new type's default when it re-runs.
+                      /* Save the current model before switching conversation types. The
+                         type-change effect re-initializes all dynamic fields from the new
+                         type's defaults, which would overwrite whatever model the user had
+                         already selected. */
                       if (dynamicPropertyValues.llmModel !== undefined) {
                         preFillPending.current = { llmModel: dynamicPropertyValues.llmModel };
                       }
