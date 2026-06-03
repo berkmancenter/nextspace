@@ -24,6 +24,11 @@ import {
   useTheme,
   useMediaQuery,
   MobileStepper,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
 } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -76,6 +81,7 @@ export const EventCreationForm: React.FC<{
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [selectedConvType, setSelectedConvType] = useState<string | null>(null);
   const [showAgentTypeHint, setShowAgentTypeHint] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [supportedModels, setSupportedModels] = useState<components['schemas']['LlmModelDetails'][] | null>(null);
   const [availablePlatforms, setAvailablePlatforms] = useState<components['schemas']['PlatformConfig'][] | null>(null);
   const [conversationTypes, setConversationTypes] = useState<components['schemas']['ConversationType'][] | null>(null);
@@ -171,9 +177,55 @@ export const EventCreationForm: React.FC<{
   // Stores event's existing dynamic property values so Effect 1 can merge them
   // with type defaults after setSelectedConvType triggers it to re-run.
   const preFillPending = useRef<Record<string, any> | null>(null);
+  /** Snapshot of all editable state at the moment pre-fill settled. Used to detect real changes vs. reverts. */
+  const cleanSnapshot = useRef<string | null>(null);
 
   const setFieldFocus = (fieldName: string) => {
     (formRef.current?.elements.namedItem(fieldName) as HTMLElement)?.focus();
+  };
+
+  const navigateToView = () => {
+    const typeName = initialEvent?.type?.name ?? (initialEvent as any)?.conversationType;
+    router.push(`/admin/${typeName}/view/${initialEvent?.id}`);
+  };
+
+  /*
+   * Normalizes a date string to the same canonical form DateTimePicker.onChange produces
+   * (UTC ISO via dayjs().toISOString()). Without this, the API's local-tz ISO and a
+   * user-edited-then-reverted value would serialize differently and trigger a false dirty.
+   */
+  const normalizeDate = (s: string) => (s && dayjs(s).isValid() ? dayjs(s).toISOString() : (s ?? ''));
+
+  /*
+   * Serializes all user-editable form state into a stable JSON string for dirty-checking.
+   * Platforms are sorted so selection order doesn't cause false positives.
+   * PDF File objects are excluded (non-serializable); hasNewPdf handles them separately.
+   * `overrides` lets the initial capture pass values the corresponding state setter
+   * hasn't committed yet (e.g. dynamicPropertyValues during the pre-fill effect).
+   */
+  const serializeFormState = (overrides?: { dynamicPropertyValues?: Record<string, any> }) =>
+    JSON.stringify({
+      eventName,
+      eventDescription,
+      zoomMeetingUrl,
+      zoomMeetingTime: normalizeDate(zoomMeetingTime),
+      scheduledEndTime: normalizeDate(scheduledEndTime),
+      selectedConvType,
+      selectedPlatforms: [...selectedPlatforms].sort(),
+      selectedTopicId,
+      moderators,
+      speakers,
+      resources: resources.map(({ pdf: _pdf, ...r }) => r),
+      dynamicPropertyValues: overrides?.dynamicPropertyValues ?? dynamicPropertyValues,
+    });
+
+  const handleCancelEdit = () => {
+    const hasNewPdf = resources.some((r) => r.pdf);
+    if (hasNewPdf || serializeFormState() !== cleanSnapshot.current) {
+      setCancelDialogOpen(true);
+    } else {
+      navigateToView();
+    }
   };
 
   useEffect(() => {
@@ -243,11 +295,22 @@ export const EventCreationForm: React.FC<{
         if (preFillPending.current) {
           Object.assign(initialValues, preFillPending.current);
           preFillPending.current = null;
+          // Capture the clean snapshot here, using `initialValues` directly as the
+          // dynamicPropertyValues — the state setter below hasn't committed yet, so
+          // the closure's `dynamicPropertyValues` would be stale if we read it instead.
+          if (mode === 'edit' && cleanSnapshot.current === null) {
+            cleanSnapshot.current = serializeFormState({ dynamicPropertyValues: initialValues });
+          }
         }
 
         setDynamicPropertyValues(initialValues);
       }
     }
+    // The snapshot capture above reads several state variables (eventName, moderators, etc.)
+    // from the closure. Those intentionally are NOT in the dep array — this effect must only
+    // re-run when the conv type changes, not on every field edit. The snapshot is only written
+    // once (cleanSnapshot.current guards it), so stale-closure risk doesn't apply.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationTypes, selectedConvType]);
 
   useEffect(() => {
@@ -1995,47 +2058,68 @@ export const EventCreationForm: React.FC<{
               Back
             </Button>
 
-            {activeStep === steps.length - 1 ? (
-              <Button
-                type="button"
-                variant="contained"
-                disabled={formSubmitting}
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (formRef.current) sendData(new FormData(formRef.current));
-                }}
-                sx={{
-                  ml: { xs: 1, sm: 0 },
-                  fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                }}
-              >
-                {formSubmitting ? (
-                  <>
-                    <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
-                    {mode === 'edit' ? 'Saving…' : 'Creating…'}
-                  </>
-                ) : mode === 'edit' ? (
-                  'Save Changes'
-                ) : (
-                  'Create Conversation'
-                )}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="contained"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleNext();
-                }}
-                sx={{ ml: { xs: 1, sm: 0 } }}
-              >
-                Next
-              </Button>
-            )}
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {mode === 'edit' && (
+                <Button variant="outlined" color="inherit" onClick={handleCancelEdit} type="button">
+                  Cancel
+                </Button>
+              )}
+
+              {activeStep === steps.length - 1 ? (
+                <Button
+                  type="button"
+                  variant="contained"
+                  disabled={formSubmitting}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (formRef.current) sendData(new FormData(formRef.current));
+                  }}
+                  sx={{
+                    ml: { xs: 1, sm: 0 },
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                  }}
+                >
+                  {formSubmitting ? (
+                    <>
+                      <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
+                      {mode === 'edit' ? 'Saving…' : 'Creating…'}
+                    </>
+                  ) : mode === 'edit' ? (
+                    'Save Changes'
+                  ) : (
+                    'Create Conversation'
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="contained"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleNext();
+                  }}
+                  sx={{ ml: { xs: 1, sm: 0 } }}
+                >
+                  Next
+                </Button>
+              )}
+            </Box>
           </Box>
         </Box>
       </Paper>
+
+      <Dialog open={cancelDialogOpen} onClose={() => setCancelDialogOpen(false)}>
+        <DialogTitle>Discard changes?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>Your changes will be lost if you leave this page.</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCancelDialogOpen(false)}>Keep editing</Button>
+          <Button onClick={navigateToView} color="error">
+            Discard
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };

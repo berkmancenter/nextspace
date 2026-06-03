@@ -2726,6 +2726,128 @@ describe('EventCreationForm Component', () => {
       });
     });
 
+    describe('Cancel button', () => {
+      const renderEditForm = async (event: any = mockInitialEvent) => {
+        await act(async () => {
+          render(<EventCreationForm mode="edit" initialEvent={event} />);
+        });
+        await waitFor(() => screen.getByLabelText(/Event Name/i));
+      };
+
+      it('shows a Cancel button in edit mode', async () => {
+        await renderEditForm();
+        expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+      });
+
+      it('does not show a Cancel button in create mode', async () => {
+        await act(async () => {
+          render(<EventCreationForm />);
+        });
+        await waitFor(() => screen.getByLabelText(/Event Name/i));
+        expect(screen.queryByRole('button', { name: /cancel/i })).not.toBeInTheDocument();
+      });
+
+      it('navigates to the view page immediately when cancelled with no changes', async () => {
+        const user = userEvent.setup();
+        await renderEditForm();
+
+        await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+        await waitFor(() => {
+          expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-edit-123');
+        });
+      });
+
+      it('navigates immediately when a change is reverted back to the original value', async () => {
+        const user = userEvent.setup();
+        await renderEditForm();
+
+        const nameInput = screen.getByLabelText(/Event Name/i);
+        await user.clear(nameInput);
+        await user.type(nameInput, 'Temporary Edit');
+        await user.clear(nameInput);
+        await user.type(nameInput, 'My Existing Event');
+
+        await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+        await waitFor(() => {
+          expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-edit-123');
+        });
+      });
+
+      it('navigates immediately when the API returned a non-UTC ISO date and nothing was edited', async () => {
+        // The backend may return scheduledTime in a timezone-offset ISO format (e.g. "+00:00"),
+        // while DateTimePicker's onChange canonicalizes via dayjs().toISOString() ("Z"). Without
+        // normalization in the snapshot, an untouched form would compare unequal and trigger the
+        // unsaved-changes dialog on Cancel. This guards that normalization stays in place.
+        const eventWithOffsetDate = {
+          ...mockInitialEvent,
+          scheduledTime: '2030-01-15T15:00:00+00:00',
+          scheduledEndTime: '2030-01-15T16:00:00+00:00',
+        };
+        const user = userEvent.setup();
+        await act(async () => {
+          render(<EventCreationForm mode="edit" initialEvent={eventWithOffsetDate} />);
+        });
+        await waitFor(() => screen.getByLabelText(/Event Name/i));
+
+        await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+        await waitFor(() => {
+          expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-edit-123');
+        });
+      });
+
+      it('shows a confirmation dialog when cancelled after making a change', async () => {
+        const user = userEvent.setup();
+        await renderEditForm();
+
+        const nameInput = screen.getByLabelText(/Event Name/i);
+        await user.clear(nameInput);
+        await user.type(nameInput, 'Changed Name');
+
+        await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByText(/discard changes/i)).toBeInTheDocument();
+      });
+
+      it('navigates away when the user confirms discarding changes', async () => {
+        const user = userEvent.setup();
+        await renderEditForm();
+
+        const nameInput = screen.getByLabelText(/Event Name/i);
+        await user.clear(nameInput);
+        await user.type(nameInput, 'Changed Name');
+
+        await user.click(screen.getByRole('button', { name: /cancel/i }));
+        await screen.findByRole('dialog');
+        await user.click(screen.getByRole('button', { name: /discard/i }));
+
+        await waitFor(() => {
+          expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-edit-123');
+        });
+      });
+
+      it('keeps the user on the form when they dismiss the confirmation dialog', async () => {
+        const user = userEvent.setup();
+        await renderEditForm();
+
+        const nameInput = screen.getByLabelText(/Event Name/i);
+        await user.clear(nameInput);
+        await user.type(nameInput, 'Changed Name');
+
+        await user.click(screen.getByRole('button', { name: /cancel/i }));
+        await screen.findByRole('dialog');
+        await user.click(screen.getByRole('button', { name: /keep editing/i }));
+
+        // The user stays on the form — no navigation occurred and the form is still interactive
+        expect(mockPush).not.toHaveBeenCalled();
+        expect(screen.getByLabelText(/Event Name/i)).toBeInTheDocument();
+      });
+
+    });
+
     describe('Step payload verification', () => {
       // Navigate to a specific step starting from the rendered edit form.
       const renderAndGoToStep = async (
