@@ -13,3 +13,4 @@ export { NavigationBar } from './NavigationBar';
 export type { NavTab } from './NavigationBar';
 export { BotIcon } from './BotIcon';
 export { TranscriptIcon } from './TranscriptIcon';
+export { Errors, ParamErrors } from './Errors';

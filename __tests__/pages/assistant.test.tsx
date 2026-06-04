@@ -3,7 +3,7 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EventAssistantRoom from '../../pages/assistant';
 import { RetrieveData, SendData } from '../../utils';
-import { createConversationFromData } from '../../utils/Helpers';
+import { createConversationFromData, GetChannelPasscode } from '../../utils/Helpers';
 import { ConversationTypeProvider } from '../../context/ConversationTypeContext';
 
 // Mock next/router
@@ -61,6 +61,27 @@ jest.mock('../../utils', () => ({
       getAccessToken: jest.fn(() => 'mock-access-token'),
     })),
   },
+  QueryParamsError: jest.fn((router, page) => {
+    const { conversationId, channel }: { conversationId?: string; channel?: string[] | string } = router.query;
+    const missing: string[] = [];
+
+    if (!conversationId) missing.push('conversation ID');
+    if (!channel) missing.push('channel');
+
+    if (typeof channel === 'string' && !channel.startsWith('chat')) missing.push('chat channel');
+    else if (Array.isArray(channel) && !channel.find((ch) => ch.startsWith('chat'))) missing.push('chat channel');
+    if (!GetChannelPasscode('chat', router.query)) missing.push('chat passcode');
+    if (
+      (typeof channel === 'string' && channel.startsWith('transcript')) ||
+      (Array.isArray(channel) && channel.find((ch) => ch.startsWith('transcript')))
+    ) {
+      if (!GetChannelPasscode('transcript', router.query)) missing.push('transcript passcode');
+    }
+    if (missing.length > 0) return { header: `Missing required parameter${missing.length > 1 ? 's' : ''}`, params: missing };
+
+    return null;
+  }),
+
   RetrieveData: jest.fn(),
   SendData: jest.fn(),
   GetChannelPasscode: jest.fn((channel: string, query: any) => {
@@ -172,7 +193,7 @@ describe('EventAssistantRoom', () => {
     });
 
     mockSocket.hasListeners.mockReturnValue(false);
-    mockRouter.query = { conversationId: 'test-conversation-id' };
+    mockRouter.query = { conversationId: 'test-conversation-id', channel: ['transcript,MJqaT2ii', 'chat,chat-pass'] };
     mockRouter.isReady = true;
 
     // Default mock implementation
@@ -325,7 +346,7 @@ describe('EventAssistantRoom', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Conversation not found.')).toBeInTheDocument();
+      expect(screen.getByText('Conversation Not Found')).toBeInTheDocument();
     });
   });
 
@@ -445,16 +466,17 @@ describe('EventAssistantRoom', () => {
             passcode: null,
             direct: true,
           },
+          {
+            direct: false,
+            name: 'chat',
+            passcode: 'chat-pass',
+          },
         ],
       });
     });
   });
 
   it('includes chat channel in conversation:join when chatPasscode is available', async () => {
-    mockRouter.query = {
-      conversationId: 'test-conversation-id',
-      channel: ['transcript,transcript-pass', 'chat,chat-pass'],
-    };
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
     });
@@ -489,12 +511,6 @@ describe('EventAssistantRoom', () => {
 
   describe('Conversation-Type-Specific Commands', () => {
     it('shows /mod command for Event Assistant', async () => {
-      // Set up router query with channel and chat passcode
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,test-chat-passcode',
-      };
-
       mockUseSessionJoin.mockReturnValue({
         socket: mockSocket,
         pseudonym: 'test-pseudonym',
@@ -571,12 +587,6 @@ describe('EventAssistantRoom', () => {
     });
 
     it('does not show /mod command for Event Assistant without moderator feature', async () => {
-      // Set up router query with channel and chat passcode
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,test-chat-passcode',
-      };
-
       mockUseSessionJoin.mockReturnValue({
         socket: mockSocket,
         pseudonym: 'test-pseudonym',
@@ -636,11 +646,6 @@ describe('EventAssistantRoom', () => {
     });
 
     it('does not show /mod command when the feature is disabled (enabled: false)', async () => {
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,test-chat-passcode',
-      };
-
       mockUseSessionJoin.mockReturnValue({
         socket: mockSocket,
         pseudonym: 'test-pseudonym',
@@ -716,10 +721,6 @@ describe('EventAssistantRoom', () => {
 
   describe('Bot @mention routing in chat tab', () => {
     const chatSetup = async () => {
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,chat-pass',
-      };
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
         if (path.startsWith('conversations/')) {
           return Promise.resolve({
@@ -869,11 +870,6 @@ describe('EventAssistantRoom', () => {
   });
 
   it('loads initial chat messages when chatPasscode becomes available', async () => {
-    mockRouter.query = {
-      conversationId: 'test-conversation-id',
-      channel: 'chat,chat-pass',
-    };
-
     const mockChatMessages = [
       {
         id: '1',
@@ -976,11 +972,6 @@ describe('EventAssistantRoom', () => {
     });
 
     it('fetches and inserts replies for chat messages with replyCount', async () => {
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,chat-pass',
-      };
-
       const mockChatMessages = [
         {
           id: 'chat-msg-1',
@@ -1467,7 +1458,10 @@ describe('EventAssistantRoom', () => {
   describe('Prompt Response Handling', () => {
     beforeEach(() => {
       // Reset router query to avoid chat tab being selected by default
-      mockRouter.query = { conversationId: 'test-conversation-id' };
+      mockRouter.query = {
+        conversationId: 'test-conversation-id',
+        channel: ['chat,test-chat-pass', 'transcript,test-transcript-pass'],
+      };
     });
 
     it('includes answersPrompt field when sending a prompt response', async () => {
@@ -1557,7 +1551,7 @@ describe('EventAssistantRoom', () => {
       await user.click(assistantTab);
 
       await waitFor(() => {
-        expect(screen.getByText('Do you need assistance?')).toBeInTheDocument();
+        expect(screen.getAllByText('Do you need assistance?').length).toBeGreaterThan(0);
       });
 
       // The component would render prompt buttons, but our mock doesn't render them
@@ -1566,6 +1560,8 @@ describe('EventAssistantRoom', () => {
     });
 
     it('filters out messages with answersPrompt from display', async () => {
+      mockRouter.query = { conversationId: 'test-conversation-id', channel: 'chat,chat-pass' };
+
       const user = userEvent.setup();
 
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
@@ -1652,8 +1648,7 @@ describe('EventAssistantRoom', () => {
       });
 
       // The prompt question should be visible
-      expect(screen.getByText('Would you like help?')).toBeInTheDocument();
-
+      expect(screen.getAllByText('Would you like help?').length).toBeGreaterThan(0);
       // The response with answersPrompt should NOT be visible
       expect(screen.queryByText(/^Yes$/)).not.toBeInTheDocument();
 
@@ -1662,6 +1657,8 @@ describe('EventAssistantRoom', () => {
     });
 
     it('restores selected prompt option on page load when response exists', async () => {
+      mockRouter.query = { conversationId: 'test-conversation-id', channel: 'chat,chat-pass' };
+
       const user = userEvent.setup();
 
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
@@ -1800,11 +1797,6 @@ describe('EventAssistantRoom', () => {
     });
 
     it('routes chat intros from join callback to the chat panel', async () => {
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,chat-pass',
-      };
-
       const chatIntro = {
         id: 'chat-intro-1',
         body: 'Welcome to the chat!',
@@ -1908,11 +1900,6 @@ describe('EventAssistantRoom', () => {
     });
 
     it('filters out intro-typed messages from the DB chat fetch', async () => {
-      mockRouter.query = {
-        conversationId: 'test-conversation-id',
-        channel: 'chat,chat-pass',
-      };
-
       const chatDbMessages = [
         {
           id: 'chat-intro-db-1',
@@ -2144,8 +2131,6 @@ describe('EventAssistantRoom', () => {
     ];
 
     const resourcesSetup = async (resources = mockResources) => {
-      mockRouter.query = { conversationId: 'test-conversation-id' };
-
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
         if (path.startsWith('conversations/')) {
           return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });

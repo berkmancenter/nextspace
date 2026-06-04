@@ -14,6 +14,7 @@ interface MessageInputProps {
   enhancers: InputEnhancer<any>[];
   /** Whether the input is waiting for a response */
   waitingForResponse: boolean;
+  /** Configuration for controlled input mode */
   controlledMode: ControlledInputConfig | null;
   /** The current value of the input in controlled mode */
   inputValue?: string;
@@ -31,13 +32,13 @@ export const MessageInput: FC<MessageInputProps> = ({
   pseudonym,
   pseudonymFunFact,
   enhancers,
-  onSendMessage,
   waitingForResponse,
   controlledMode,
-  onExitControlledMode,
   inputValue,
-  onInputChange,
   disableWhileWaiting = true,
+  onExitControlledMode,
+  onInputChange,
+  onSendMessage,
 }) => {
   const [internalValue, setInternalValue] = useState('');
   const isControlled = inputValue !== undefined && onInputChange !== undefined;

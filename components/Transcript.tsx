@@ -7,18 +7,18 @@ import { Api, RetrieveData, SendData } from '../utils';
 import { trackFeatureUsage, trackConversationEvent } from '../utils/analytics';
 import { useVisibilityAwareDuration } from '../hooks/useVisibilityAwareDuration';
 
-/**
- * Transcript component - Sidebar style
- *
- * This component renders a live transcript of messages as a sidebar that spans full height.
- * Opens/closes with a toggle button at the top, displays as a thin sliver when closed.
- */
-export function Transcript(props: {
+interface TranscriptProps {
+  /** The time range to focus on in the transcript */
   focusTimeRange?: { start: Date; end: Date } | null;
+  /** The socket instance for real-time updates */
   socket: Socket | null;
+  /** The ID of the conversation */
   conversationId: string;
+  /** The passcode for accessing the transcript */
   transcriptPasscode?: string;
+  /** The category of messages to display */
   category?: string;
+  /** Whether to show the transcript controls */
   showControls?: boolean;
   /** When true, hides the open/close toggle and fills the available container width */
   hideToggle?: boolean;
@@ -29,7 +29,19 @@ export function Transcript(props: {
    * was disconnected.
    */
   lastReconnectTime?: number | null;
-}) {
+  /** Function to set an error message */
+  setErrorMessage?: (message: string | null) => void;
+}
+
+/**
+ * Transcript component - Sidebar style
+ *
+ * This component renders a live transcript of messages as a sidebar that spans full height.
+ * Opens/closes with a toggle button at the top, displays as a thin sliver when closed.
+ *
+ * @param props - Props for the Transcript component
+ */
+export function Transcript(props: TranscriptProps) {
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
   const [isOpen, setIsOpen] = useState<boolean>(true);
   const [focusedMessageIds, setFocusedMessageIds] = useState<string[]>([]);
@@ -299,6 +311,14 @@ export function Transcript(props: {
         Api.get().getAccessToken(),
       );
 
+      // Catch incorrect passcode
+      if (transcriptMessages && 'error' in transcriptMessages) {
+        setError(transcriptMessages.message?.message || 'Failed to fetch transcript messages.');
+        if (props.setErrorMessage)
+          props.setErrorMessage(transcriptMessages.message?.message || 'Failed to fetch transcript messages.');
+        return;
+      }
+
       if (Array.isArray(transcriptMessages)) {
         const reversedMessages = transcriptMessages.reverse();
         setMessages(reversedMessages);
@@ -313,6 +333,8 @@ export function Transcript(props: {
       }
     } catch (error) {
       console.error('Error fetching transcript data:', error);
+
+      if (props.setErrorMessage) props.setErrorMessage(error as string);
     }
   };
 

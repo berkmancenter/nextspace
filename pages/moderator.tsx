@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PseudonymousMessage, ModeratorInsightsMessage, ModeratorMetricsMessage, ErrorMessage } from '../types.internal';
 import { Api, GetChannelPasscode, RetrieveData, QueryParamsError, emitWithTokenRefresh } from '../utils';
 
-import { Transcript } from '../components/';
+import { Errors, ParamErrors, Transcript } from '../components/';
 import { CheckAuthHeader, createConversationFromData } from '../utils/Helpers';
 import { useSessionJoin } from '../utils/useSessionJoin';
 import { AuthType } from '../types.internal';
@@ -34,7 +34,8 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
     return () => setConversationType(null);
   }, [router.query.conversationId]);
 
-  const [localError, setLocalError] = useState<string | null>(null);
+  const [generalError, setGeneralError] = useState<string | null>(null);
+  const [paramsError, setParamsError] = useState<{ header: string; params: string[] } | null>(null);
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
   const [conversationName, setConversationName] = useState<string>('');
 
@@ -53,11 +54,13 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
   // Use custom hook for session joining
   const { socket, isConnected, errorMessage: sessionError, lastReconnectTime } = useSessionJoin();
 
-  // Combine session and local errors
-  const errorMessage = sessionError || localError;
-
   useEffect(() => {
     if (!router.isReady || !socket || !Api.get().getAccessToken()) return;
+    const queryError = QueryParamsError(router, 'moderator');
+    if (queryError) {
+      setParamsError(queryError);
+      return;
+    }
 
     const messageHandler = (data: PseudonymousMessage) => {
       console.log('New message:', data);
@@ -75,14 +78,9 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
 
     async function fetchConversationData() {
       if (!router.isReady || !Api.get().getAccessToken()) return;
-      if (!router.query.conversationId || !router.query.channel || router.query.channel.length === 0) {
-        setLocalError(QueryParamsError(router));
-        return;
-      }
 
-      const transcriptPasscodeParam = GetChannelPasscode('transcript', router.query, setLocalError);
-
-      const modPasscodeParam = GetChannelPasscode('moderator', router.query, setLocalError);
+      const transcriptPasscodeParam = GetChannelPasscode('transcript', router.query, setGeneralError);
+      const modPasscodeParam = GetChannelPasscode('moderator', router.query, setGeneralError);
 
       // Store transcript passcode for Transcript component
       if (transcriptPasscodeParam) {
@@ -101,6 +99,17 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
         `conversations/${router.query.conversationId}`,
         Api.get().getAccessToken(),
       );
+
+      // Catch conversation not found
+      if (
+        !conversationResponse ||
+        (conversationResponse &&
+          'error' in conversationResponse &&
+          conversationResponse.message?.message.includes('not found'))
+      ) {
+        setParamsError({ header: 'Conversation Not Found', params: [] });
+        return;
+      }
 
       if (conversationResponse && !('error' in conversationResponse)) {
         setConversationName(conversationResponse.name || '');
@@ -122,7 +131,13 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
       );
 
       if (conversationMessagesResponse && 'error' in conversationMessagesResponse) {
-        setLocalError(conversationMessagesResponse.message?.message || 'Failed to fetch conversation messages.');
+        // Catch conversation not found
+        if (conversationMessagesResponse.message?.message.includes('not found'))
+          setParamsError({ header: 'Conversation Not Found', params: [] });
+        // Catch incorrect passcode
+        else if (conversationMessagesResponse.message?.message.toLocaleLowerCase().includes('incorrect passcode'))
+          setParamsError({ header: 'Incorrect Passcode', params: ['moderator'] });
+        else setGeneralError(conversationMessagesResponse.message?.message || 'Failed to fetch conversation messages.');
         return;
       } else if (Array.isArray(conversationMessagesResponse)) {
         setMessages(
@@ -244,8 +259,14 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-96px)] overflow-hidden">
-      {errorMessage ? (
-        <div className="text-medium-slate-blue text-lg font-bold mx-9">{errorMessage}</div>
+      {/* Display general or session error if present, if no parameter errors are present */}
+      {(generalError || sessionError) && !paramsError && (
+        <Errors generalError={generalError} sessionError={sessionError} setGeneralError={setGeneralError} />
+      )}
+
+      {/* Display parameter errors if present */}
+      {paramsError ? (
+        <ParamErrors paramsError={paramsError} />
       ) : (
         <>
           {/* Transcript view on top for mobile, right side for desktop - only render if enabled */}
@@ -259,6 +280,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
                 transcriptPasscode={transcriptPasscode}
                 showControls={true}
                 lastReconnectTime={lastReconnectTime}
+                setErrorMessage={setGeneralError}
               />
             </div>
           )}

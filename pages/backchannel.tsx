@@ -43,7 +43,7 @@ function BackchannelRoom({ authType }: { authType: AuthType }) {
   useEffect(() => {
     if (participantPasscode || !router.isReady) return;
     if (!router.query.conversationId || !router.query.channel || router.query.channel.length === 0) {
-      setLocalError(QueryParamsError(router));
+      setLocalError(QueryParamsError(router, 'moderator')?.header || 'Unknown error');
       return;
     }
 
