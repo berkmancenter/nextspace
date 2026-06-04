@@ -608,7 +608,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     messageSource: 'message' | 'promptResponse' = 'message',
     promptQuestionId?: string,
   ) {
-    if (!Api.get().GetTokens() || !message) return;
+    if (!Api.get().GetTokens() || !message) return false;
 
     // Use different channel based on active tab
     // When in transcript view, default to assistant channel for sending
@@ -653,19 +653,31 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         setWaitingForChatResponse(true);
       }
     }
+    try {
+      const response = await SendData('messages', {
+        body: finalMessage,
+        bodyType: 'text',
+        conversation: router.query.conversationId,
+        channels,
+        ...(parentMessageId !== undefined && { parentMessage: parentMessageId }),
+        ...(messageSource === 'promptResponse' && promptQuestionId && { answersPrompt: promptQuestionId }),
+      });
 
-    await SendData('messages', {
-      body: finalMessage,
-      bodyType: 'text',
-      conversation: router.query.conversationId,
-      channels,
-      ...(parentMessageId !== undefined && { parentMessage: parentMessageId }),
-      ...(messageSource === 'promptResponse' && promptQuestionId && { answersPrompt: promptQuestionId }),
-    });
+      if (response.error) {
+        setWaitingForResponse(false);
 
-    // Auto-exit controlled mode after sending
-    if (controlledMode) {
-      setControlledMode(null);
+        return false;
+      }
+
+      // Auto-exit controlled mode after sending
+      if (controlledMode) {
+        setControlledMode(null);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error sending message:', error);
+      return false;
     }
   }
 
@@ -812,10 +824,11 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                           botName={botName}
                           inputValue={chatInputValue}
                           onInputChange={setChatInputValue}
-                          onSendMessage={(msg, parentMessageId) => {
+                          onSendMessage={async (msg, parentMessageId) => {
                             // Wait for response if message mentions the bot
                             const mentionsBot = msg.includes(`@${botName}`);
-                            sendMessage(msg, mentionsBot, parentMessageId);
+                            const success = await sendMessage(msg, mentionsBot, parentMessageId);
+                            return success;
                           }}
                           controlledMode={controlledMode}
                           onExitControlledMode={exitControlledMode}
@@ -854,7 +867,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                           botName={botName}
                           inputValue={assistantInputValue}
                           onInputChange={setAssistantInputValue}
-                          onSendMessage={(msg, parentMessageId) => sendMessage(msg, true, parentMessageId)}
+                          onSendMessage={async (msg, parentMessageId) => {
+                            const success = await sendMessage(msg, true, parentMessageId);
+                            return success;
+                          }}
                           onExitControlledMode={exitControlledMode}
                           onPromptSelect={handlePromptSelect}
                           userId={userId}
