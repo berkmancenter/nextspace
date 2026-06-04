@@ -272,7 +272,15 @@ const mockConfig = {
           description: 'Contributes to the group chat by surfacing what participants are privately thinking.',
           userControlled: false,
           default: true,
-          properties: [],
+          properties: [
+            {
+              name: 'minContributionInterval',
+              label: 'Minimum Minutes Between Contributions',
+              type: 'number',
+              default: 10,
+              required: false,
+            },
+          ],
         },
         {
           name: 'catalyst',
@@ -280,7 +288,15 @@ const mockConfig = {
           description: 'Participates in the group chat as an active voice, jumping into silences.',
           userControlled: false,
           default: true,
-          properties: [],
+          properties: [
+            {
+              name: 'minContributionInterval',
+              label: 'Minimum Minutes Between Contributions',
+              type: 'number',
+              default: 10,
+              required: false,
+            },
+          ],
         },
         {
           name: 'librarian',
@@ -288,7 +304,15 @@ const mockConfig = {
           description: 'Periodically recommends relevant reading during the event.',
           userControlled: false,
           default: true,
-          properties: [],
+          properties: [
+            {
+              name: 'recommendationsPerInterval',
+              label: 'Number of Reading Recommendations per Interval',
+              type: 'number',
+              default: 2,
+              required: false,
+            },
+          ],
         },
         {
           name: 'mod',
@@ -2686,11 +2710,12 @@ describe('EventCreationForm Component', () => {
         });
       });
 
-      it('shows a default:true feature as unchecked when it was disabled in the saved event', async () => {
-        // eventAssistantExtraTest has collectiveVoice with default: true.
-        // If the user previously disabled it, the saved features array won't contain it.
-        // The form must not re-enable it just because the type definition defaults to true.
-        const eventWithFeatureDisabled: any = {
+      it('falls back to the type default for features absent from the saved features array', async () => {
+        /* Matches the backend's getFeatures() contract: a feature missing from the
+           stored array uses the type's default. This is the legacy event case (features
+           were dropped by the pre-markModified persistence bug), and also covers events
+           created before a feature existed on the type. */
+        const legacyEvent: any = {
           ...mockInitialEvent,
           platforms: ['zoom'],
           conversationType: 'eventAssistantExtraTest',
@@ -2700,14 +2725,37 @@ describe('EventCreationForm Component', () => {
             properties: [],
             platforms: [],
           },
-          features: [], // collectiveVoice was explicitly disabled, so it's absent from the array
+          features: [], // no features persisted, so the form falls back to type defaults
         };
 
         const user = userEvent.setup();
-        await renderAndGoToStep3(user, eventWithFeatureDisabled);
+        await renderAndGoToStep3(user, legacyEvent);
 
-        const collectiveVoiceCheckbox = screen.getByRole('checkbox', { name: /collective voice/i });
-        expect(collectiveVoiceCheckbox).not.toBeChecked();
+        // collectiveVoice and librarian both have default: true on the type
+        expect(screen.getByRole('checkbox', { name: /collective voice/i })).toBeChecked();
+        expect(screen.getByRole('checkbox', { name: /reading recommendations/i })).toBeChecked();
+      });
+
+      it('respects an explicit disabled record in the saved features array', async () => {
+        /* The default fallback only applies when a feature is absent from the array.
+           An explicit enabled: false record should still win over the type's default. */
+        const eventWithExplicitDisable: any = {
+          ...mockInitialEvent,
+          platforms: ['zoom'],
+          conversationType: 'eventAssistantExtraTest',
+          type: {
+            name: 'eventAssistantExtraTest',
+            label: 'Event Assistant With Additional Features',
+            properties: [],
+            platforms: [],
+          },
+          features: [{ name: 'collectiveVoice', enabled: false, config: {} }],
+        };
+
+        const user = userEvent.setup();
+        await renderAndGoToStep3(user, eventWithExplicitDisable);
+
+        expect(screen.getByRole('checkbox', { name: /collective voice/i })).not.toBeChecked();
       });
 
       it('includes a newly enabled feature in the payload alongside pre-existing ones', async () => {
@@ -2727,6 +2775,105 @@ describe('EventCreationForm Component', () => {
                 { name: 'liveTranscript', config: { transcriptDelay: 10 } },
                 { name: 'autoSummary', config: {} },
               ]),
+            }),
+          );
+        });
+      });
+    });
+
+    describe('Catalyst timing in edit mode', () => {
+      /* Catalyst's minContributionInterval is fixed once the event is created. In edit
+         mode the organizer can only toggle the feature on or off. The input is hidden,
+         and the saved value goes back in the update payload unchanged. */
+      const mockCatalystEvent: any = {
+        ...mockInitialEvent,
+        platforms: ['zoom'],
+        conversationType: 'eventAssistantExtraTest',
+        type: {
+          name: 'eventAssistantExtraTest',
+          label: 'Event Assistant With Additional Features',
+          properties: [],
+          platforms: [],
+        },
+        /* Explicitly disable Collective Voice and Librarian. They share the same
+           "Minimum Minutes Between Contributions" label as catalyst, so leaving them
+           at their default of true would cause the hide-input assertion below to find
+           the wrong field. */
+        features: [
+          { name: 'catalyst', enabled: true, config: { minContributionInterval: 7 } },
+          { name: 'collectiveVoice', enabled: false, config: {} },
+          { name: 'librarian', enabled: false, config: {} },
+        ],
+      };
+
+      const goToStep3 = async (user: ReturnType<typeof userEvent.setup>, event: any) => {
+        await act(async () => {
+          render(<EventCreationForm mode="edit" initialEvent={event} />);
+        });
+        await waitFor(() => screen.getByLabelText(/Event Name/i));
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Nextspace'));
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Customize your conversation settings'));
+      };
+
+      it('still shows Collective Voice and Reading Recommendations sub-fields in edit mode', async () => {
+        // Regression: the catalyst-only hide rule should not affect peer features that
+        // share the same minContributionInterval shape. Collective Voice and Librarian's
+        // sub-properties stay editable in edit mode.
+        const eventWithAllThree: any = {
+          ...mockInitialEvent,
+          platforms: ['zoom'],
+          conversationType: 'eventAssistantExtraTest',
+          type: {
+            name: 'eventAssistantExtraTest',
+            label: 'Event Assistant With Additional Features',
+            properties: [],
+            platforms: [],
+          },
+          features: [
+            { name: 'collectiveVoice', enabled: true, config: { minContributionInterval: 5 } },
+            { name: 'librarian', enabled: true, config: { recommendationsPerInterval: 3 } },
+          ],
+        };
+
+        const user = userEvent.setup();
+        await goToStep3(user, eventWithAllThree);
+
+        // Collective Voice's sub-property must render with the saved value
+        const cvInputs = screen.getAllByLabelText(/Minimum Minutes Between Contributions/i) as HTMLInputElement[];
+        expect(cvInputs.length).toBeGreaterThanOrEqual(1);
+        expect(cvInputs.some((i) => i.value === '5')).toBe(true);
+
+        // Librarian's sub-property must render with the saved value
+        const libInput = screen.getByLabelText(/Number of Reading Recommendations per Interval/i) as HTMLInputElement;
+        expect(libInput.value).toBe('3');
+      });
+
+      it('hides the catalyst timing input in edit mode even when the feature is enabled', async () => {
+        const user = userEvent.setup();
+        await goToStep3(user, mockCatalystEvent);
+
+        // Catalyst is checked, but its sub-property input must not render in edit mode
+        expect(screen.getByRole('checkbox', { name: /catalyst/i })).toBeChecked();
+        expect(screen.queryByLabelText(/Minimum Minutes Between Contributions/i)).not.toBeInTheDocument();
+      });
+
+      it('preserves the saved catalyst timing in the payload when re-saved unchanged', async () => {
+        const user = userEvent.setup();
+        await goToStep3(user, mockCatalystEvent);
+
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('About the Speakers'));
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Reading & Resources'));
+        await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+        await waitFor(() => {
+          expect(updateConversation).toHaveBeenCalledWith(
+            'conv-edit-123',
+            expect.objectContaining({
+              features: expect.arrayContaining([{ name: 'catalyst', config: { minContributionInterval: 7 } }]),
             }),
           );
         });
@@ -3033,6 +3180,30 @@ describe('EventCreationForm Component', () => {
               }),
             );
           });
+        });
+
+        it('allows advancing past Step 1 when a saved event has a start time but no end time', async () => {
+          /* Regression: in create mode, an end time is required once a start time is set.
+             That rule blocked editing legacy events with no persisted end time. The
+             backend treats scheduledEndTime as optional, so the frontend shouldn't gate
+             edits on it. */
+          const legacyEventNoEndTime: any = {
+            ...mockInitialEvent,
+            scheduledTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+            scheduledEndTime: undefined,
+          };
+
+          const user = userEvent.setup();
+          await act(async () => {
+            render(<EventCreationForm mode="edit" initialEvent={legacyEventNoEndTime} />);
+          });
+          await waitFor(() => screen.getByLabelText(/Event Name/i));
+
+          await user.click(screen.getByRole('button', { name: /next/i }));
+
+          // Reached Step 2 (Conversation Setup) without the end-time-required error
+          await waitFor(() => screen.getByText('Nextspace'));
+          expect(screen.queryByText(/Meeting End Time is required when a start time is provided/i)).not.toBeInTheDocument();
         });
 
         it('includes the updated topic ID in the payload', async () => {

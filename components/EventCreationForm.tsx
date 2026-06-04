@@ -395,14 +395,15 @@ export const EventCreationForm: React.FC<{
         if (key !== 'zoomMeetingUrl') dynamicPrefill[key] = value;
       });
     }
-    /* Mark all of the type's features as disabled before merging in the saved
-       event's feature list. Without this, any feature the organizer previously
-       turned off would be absent from the saved array, and the type-change effect
-       would re-enable it because the type definition has default: true. */
+    /* Start each feature at its type default. The saved event's features array
+       overrides this below, but features that aren't in the array stay at the
+       default. This matches what getFeatures() in the backend does for legacy events
+       whose features were never persisted, and for events created before a feature
+       was added to the type. */
     const savedTypeName = initialEvent.type?.name ?? (initialEvent as any).conversationType;
     const typeDefinition = conversationTypes?.find((t) => t.name === savedTypeName);
     typeDefinition?.features?.forEach((featureDef) => {
-      dynamicPrefill[featureDef.name] = false;
+      dynamicPrefill[featureDef.name] = Boolean(featureDef.default);
     });
 
     initialEvent.features?.forEach((f) => {
@@ -510,7 +511,10 @@ export const EventCreationForm: React.FC<{
       return false;
     }
 
-    if (zoomMeetingTime && !scheduledEndTime) {
+    /* In create mode, end time is required once start time is set. In edit mode
+       it's optional: the backend stores scheduledEndTime as an optional Date, so
+       events without one should still be editable. */
+    if (mode !== 'edit' && zoomMeetingTime && !scheduledEndTime) {
       setFormError('Meeting End Time is required when a start time is provided');
       return false;
     }
@@ -1615,6 +1619,11 @@ export const EventCreationForm: React.FC<{
                           }
                         />
                         {dynamicPropertyValues[feature.name] &&
+                          /* Catalyst timing is fixed once an event is created. In edit mode
+                             the organizer can only toggle the feature on or off. The saved
+                             value stays in dynamicPropertyValues and goes back in the
+                             update payload unchanged. */
+                          !(mode === 'edit' && feature.name === 'catalyst') &&
                           feature.properties?.map((prop) => renderDynamicPropertyField(prop, feature.name))}
                       </Box>
                     ))}
