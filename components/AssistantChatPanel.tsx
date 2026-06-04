@@ -29,7 +29,7 @@ interface AssistantChatPanelProps {
   botName: string;
   inputValue?: string;
   onInputChange?: (value: string) => void;
-  onSendMessage: (message: string, parentMessageId?: string) => void;
+  onSendMessage: (message: string, parentMessageId?: string) => Promise<boolean>;
   onExitControlledMode: () => void;
   onPromptSelect: (prompt: string, promptMessageId?: string) => void;
   userId: string | null;
@@ -381,7 +381,6 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
           ) : (
             <MessageInput
               pseudonym={pseudonym}
-              pseudonymFunFact={pseudonymFunFact}
               enhancers={enhancers}
               onSendMessage={onSendMessage}
               waitingForResponse={waitingForResponse}

@@ -620,7 +620,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     messageSource: 'message' | 'promptResponse' = 'message',
     promptQuestionId?: string,
   ) {
-    if (!Api.get().GetTokens() || !message) return;
+    if (!Api.get().GetTokens() || !message) return false;
 
     // Use different channel based on active tab
     // When in transcript view, default to assistant channel for sending
@@ -666,22 +666,30 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       }
     }
 
-    const response = await SendData('messages', {
-      body: finalMessage,
-      bodyType: 'text',
-      conversation: router.query.conversationId,
-      channels,
-      ...(parentMessageId !== undefined && { parentMessage: parentMessageId }),
-      ...(messageSource === 'promptResponse' && promptQuestionId && { answersPrompt: promptQuestionId }),
-    });
+    try {
+      const response = await SendData('messages', {
+        body: finalMessage,
+        bodyType: 'text',
+        conversation: router.query.conversationId,
+        channels,
+        ...(parentMessageId !== undefined && { parentMessage: parentMessageId }),
+        ...(messageSource === 'promptResponse' && promptQuestionId && { answersPrompt: promptQuestionId }),
+      });
 
-    // Catch incorrect passcode
-    if (response && response.error && response.message.toLocaleLowerCase().includes('incorrect passcode'))
-      setGeneralError('Incorrect chat passcode. Message could not be sent.');
+      // Catch incorrect passcode
+      if (response && response.error && response.message.toLocaleLowerCase().includes('incorrect passcode')) {
+        setGeneralError('Incorrect chat passcode. Message could not be sent.');
+        setWaitingForResponse(false);
+        return false;
+      }
 
-    // Auto-exit controlled mode after sending
-    if (controlledMode) {
-      setControlledMode(null);
+      // Auto-exit controlled mode after sending
+      if (controlledMode) setControlledMode(null);
+
+      return true;
+    } catch (error) {
+      console.error('Error sending message:', error);
+      return false;
     }
   }
 
@@ -779,10 +787,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       {/* On mobile we add bottom padding so the fixed nav bar doesn't cover content */}
       <div className="flex flex-row h-[calc(100vh-96px)] overflow-hidden pb-[60px] lg:pb-0">
         {/* Error messages */}
-        {generalError ||
-          (sessionError && (
-            <Errors generalError={generalError} sessionError={sessionError} setGeneralError={setGeneralError} />
-          ))}
+        {(generalError || sessionError) && !paramsError && (
+          <Errors generalError={generalError} sessionError={sessionError} setGeneralError={setGeneralError} />
+        )}
 
         {/* Display parameter errors if present */}
         {paramsError ? (
@@ -834,10 +841,11 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                           botName={botName}
                           inputValue={chatInputValue}
                           onInputChange={setChatInputValue}
-                          onSendMessage={(msg, parentMessageId) => {
+                          onSendMessage={async (msg, parentMessageId) => {
                             // Wait for response if message mentions the bot
                             const mentionsBot = msg.includes(`@${botName}`);
-                            sendMessage(msg, mentionsBot, parentMessageId);
+                            const success = await sendMessage(msg, mentionsBot, parentMessageId);
+                            return success;
                           }}
                           controlledMode={controlledMode}
                           onExitControlledMode={exitControlledMode}
@@ -876,7 +884,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                           botName={botName}
                           inputValue={assistantInputValue}
                           onInputChange={setAssistantInputValue}
-                          onSendMessage={(msg, parentMessageId) => sendMessage(msg, true, parentMessageId)}
+                          onSendMessage={async (msg, parentMessageId) => {
+                            const success = await sendMessage(msg, true, parentMessageId);
+                            return success;
+                          }}
                           onExitControlledMode={exitControlledMode}
                           onPromptSelect={handlePromptSelect}
                           userId={userId}

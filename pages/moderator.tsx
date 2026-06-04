@@ -259,11 +259,10 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-96px)] overflow-hidden">
-      {/* Display general or session error if present */}
-      {generalError ||
-        (sessionError && (
-          <Errors generalError={generalError} sessionError={sessionError} setGeneralError={setGeneralError} />
-        ))}
+      {/* Display general or session error if present, if no parameter errors are present */}
+      {(generalError || sessionError) && !paramsError && (
+        <Errors generalError={generalError} sessionError={sessionError} setGeneralError={setGeneralError} />
+      )}
 
       {/* Display parameter errors if present */}
       {paramsError ? (

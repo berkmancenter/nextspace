@@ -20,8 +20,8 @@ interface MessageInputProps {
   inputValue?: string;
   /** Whether to disable the input while waiting for a response */
   disableWhileWaiting?: boolean;
-  /** Callback when a message is sent */
-  onSendMessage: (message: string) => void;
+  /** Callback when a message is sent; should return true if the message was successfully sent */
+  onSendMessage: (message: string) => Promise<boolean>;
   /** Callback when exiting controlled input mode */
   onExitControlledMode: () => void;
   /** Callback when the input value changes in controlled mode */
@@ -118,11 +118,11 @@ export const MessageInput: FC<MessageInputProps> = ({
   };
 
   /** Send message */
-  const handleSend = () => {
+  const handleSend = async () => {
     const canSend = disableWhileWaiting ? !waitingForResponse : true;
     if (currentMessage && currentMessage.length > 0 && canSend) {
-      onSendMessage(currentMessage);
-      setCurrentMessage('');
+      const success = await onSendMessage(currentMessage);
+      if (success) setCurrentMessage('');
     }
   };
 
