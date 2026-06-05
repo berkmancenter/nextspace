@@ -85,9 +85,13 @@ export class Api {
    * @param refresh       Raw refresh token string.
    * @param accessExpires Optional ISO-8601 expiry for the access token.
    * @param refreshExpires Optional ISO-8601 expiry for the refresh token.
+   * @param userId        Optional id of the user the tokens belong to.  Pass it
+   *                      from authoritative writes (guest creation, login,
+   *                      cookie restore) so TokenManager can reject tokens that
+   *                      arrive cross-tab / via cookie for a different user.
    */
-  SetTokens(access: string, refresh: string, accessExpires?: string, refreshExpires?: string) {
-    TokenManagerDefault.setTokensFromStrings(access, refresh, accessExpires, refreshExpires);
+  SetTokens(access: string, refresh: string, accessExpires?: string, refreshExpires?: string, userId?: string) {
+    TokenManagerDefault.setTokensFromStrings(access, refresh, accessExpires, refreshExpires, userId);
   }
 
   /**
