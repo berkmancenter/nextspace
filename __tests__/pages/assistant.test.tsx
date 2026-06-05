@@ -1442,28 +1442,34 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => expect(mockSocket.on).toHaveBeenCalledWith('message:new', expect.any(Function)));
 
-      const messageHandler: Function = mockSocket.on.mock.calls
-        .filter(([event]: [string]) => event === 'message:new')
-        .map(([, handler]: [string, Function]) => handler)
-        .at(-1)!;
-
       const user = userEvent.setup();
       await waitFor(() => expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0));
       await user.click(screen.getAllByLabelText('Berkie')[0]);
 
+      // A real socket broadcasts 'message:new' to every registered listener. The
+      // assistant page AND the Transcript sidebar (mounted because the route has
+      // a transcript passcode) each register one, so we must invoke all of them
+      // rather than guessing which registration is the assistant page's. Capture
+      // after the click so any re-registrations have settled.
+      const messageHandlers: Function[] = mockSocket.on.mock.calls
+        .filter(([event]: [string]) => event === 'message:new')
+        .map(([, handler]: [string, Function]) => handler);
+
       act(() => {
-        messageHandler({
-          id: 'msg-jargon-1',
-          body: { type: 'jargon_clarification', text: 'An SLO is a reliability target.', sourceText: 'Our SLOs...' },
-          bodyType: 'json',
-          fromAgent: true,
-          channels: ['direct-user-123-jargon-agent-456'],
-          pseudonym: 'Jargon Filter Agent',
-          pause: false,
-          visible: true,
-          upVotes: [],
-          downVotes: [],
-        });
+        messageHandlers.forEach((handler) =>
+          handler({
+            id: 'msg-jargon-1',
+            body: { type: 'jargon_clarification', text: 'An SLO is a reliability target.', sourceText: 'Our SLOs...' },
+            bodyType: 'json',
+            fromAgent: true,
+            channels: ['direct-user-123-jargon-agent-456'],
+            pseudonym: 'Jargon Filter Agent',
+            pause: false,
+            visible: true,
+            upVotes: [],
+            downVotes: [],
+          }),
+        );
       });
 
       await waitFor(() => {
