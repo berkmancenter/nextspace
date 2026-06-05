@@ -109,6 +109,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   // reconnect re-fetches can always prepend them without stale-closure issues.
   const chatIntroRef = useRef<PseudonymousMessage[]>([]);
   const assistantIntroRef = useRef<PseudonymousMessage[]>([]);
+  const hasJoinedConvRef = useRef(false);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [agentActive, setAgentActive] = useState<boolean>(true);
   const [agentIds, setAgentIds] = useState<string[]>([]);
@@ -373,6 +374,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     }
 
     const joinConversation = () => {
+      if (hasJoinedConvRef.current) return;
+      hasJoinedConvRef.current = true;
       console.log('Joining conversation');
       // Always read the current token so re-joins after a refresh use the
       // new token rather than the one captured at socket-creation time.
@@ -414,7 +417,11 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       );
     };
     // Re-join on every subsequent reconnection (e.g. after token refresh)
-    socket.on('connect', joinConversation);
+    const onConnect = () => {
+      hasJoinedConvRef.current = false;
+      joinConversation();
+    };
+    socket.on('connect', onConnect);
 
     // Only join immediately if the socket is already connected — otherwise
     // let the connect event fire the first join to avoid a duplicate join
@@ -424,7 +431,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     }
 
     return () => {
-      socket.off('connect', joinConversation);
+      socket.off('connect', onConnect);
     };
   }, [socket, agentId, agentActive, agentIds, userId, chatPasscode, router.query.conversationId]);
 
