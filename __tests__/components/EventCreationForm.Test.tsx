@@ -2889,10 +2889,9 @@ describe('EventCreationForm Component', () => {
       });
     });
 
-    describe('Catalyst timing in edit mode', () => {
-      /* Catalyst's minContributionInterval is fixed once the event is created. In edit
-         mode the organizer can only toggle the feature on or off. The input is hidden,
-         and the saved value goes back in the update payload unchanged. */
+    describe('Feature sub-property inputs in edit mode', () => {
+      /* All feature sub-properties (timing intervals, etc.) are editable in edit mode,
+         the same as in create mode. */
       const mockCatalystEvent: any = {
         ...mockInitialEvent,
         platforms: ['zoom'],
@@ -2903,10 +2902,6 @@ describe('EventCreationForm Component', () => {
           properties: [],
           platforms: [],
         },
-        /* Explicitly disable Collective Voice and Librarian. They share the same
-           "Minimum Minutes Between Contributions" label as catalyst, so leaving them
-           at their default of true would cause the hide-input assertion below to find
-           the wrong field. */
         features: [
           { name: 'catalyst', enabled: true, config: { minContributionInterval: 7 } },
           { name: 'collectiveVoice', enabled: false, config: {} },
@@ -2925,10 +2920,7 @@ describe('EventCreationForm Component', () => {
         await waitFor(() => screen.getByText('Customize your conversation settings'));
       };
 
-      it('still shows Collective Voice and Reading Recommendations sub-fields in edit mode', async () => {
-        // Regression: the catalyst-only hide rule should not affect peer features that
-        // share the same minContributionInterval shape. Collective Voice and Librarian's
-        // sub-properties stay editable in edit mode.
+      it('shows sub-property inputs for all enabled features in edit mode', async () => {
         const eventWithAllThree: any = {
           ...mockInitialEvent,
           platforms: ['zoom'],
@@ -2940,6 +2932,7 @@ describe('EventCreationForm Component', () => {
             platforms: [],
           },
           features: [
+            { name: 'catalyst', enabled: true, config: { minContributionInterval: 7 } },
             { name: 'collectiveVoice', enabled: true, config: { minContributionInterval: 5 } },
             { name: 'librarian', enabled: true, config: { recommendationsPerInterval: 3 } },
           ],
@@ -2948,23 +2941,16 @@ describe('EventCreationForm Component', () => {
         const user = userEvent.setup();
         await goToStep3(user, eventWithAllThree);
 
-        // Collective Voice's sub-property must render with the saved value
-        const cvInputs = screen.getAllByLabelText(/Minimum Minutes Between Contributions/i) as HTMLInputElement[];
-        expect(cvInputs.length).toBeGreaterThanOrEqual(1);
-        expect(cvInputs.some((i) => i.value === '5')).toBe(true);
+        // Catalyst's sub-property must render with the saved value
+        const intervalInputs = screen.getAllByLabelText(/Minimum Minutes Between Contributions/i) as HTMLInputElement[];
+        expect(intervalInputs.some((i) => i.value === '7')).toBe(true);
+
+        // Collective Voice's sub-property must also render
+        expect(intervalInputs.some((i) => i.value === '5')).toBe(true);
 
         // Librarian's sub-property must render with the saved value
         const libInput = screen.getByLabelText(/Number of Reading Recommendations per Interval/i) as HTMLInputElement;
         expect(libInput.value).toBe('3');
-      });
-
-      it('hides the catalyst timing input in edit mode even when the feature is enabled', async () => {
-        const user = userEvent.setup();
-        await goToStep3(user, mockCatalystEvent);
-
-        // Catalyst is checked, but its sub-property input must not render in edit mode
-        expect(screen.getByRole('checkbox', { name: /catalyst/i })).toBeChecked();
-        expect(screen.queryByLabelText(/Minimum Minutes Between Contributions/i)).not.toBeInTheDocument();
       });
 
       it('preserves the saved catalyst timing in the payload when re-saved unchanged', async () => {

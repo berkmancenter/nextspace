@@ -1666,11 +1666,6 @@ export const EventCreationForm: React.FC<{
                           }
                         />
                         {dynamicPropertyValues[feature.name] &&
-                          /* Catalyst timing is fixed once an event is created. In edit mode
-                             the organizer can only toggle the feature on or off. The saved
-                             value stays in dynamicPropertyValues and goes back in the
-                             update payload unchanged. */
-                          !(mode === 'edit' && feature.name === 'catalyst') &&
                           feature.properties?.map((prop) => renderDynamicPropertyField(prop, feature.name))}
                       </Box>
                     ))}
