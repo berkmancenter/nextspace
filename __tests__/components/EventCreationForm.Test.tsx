@@ -427,6 +427,25 @@ describe('EventCreationForm Component', () => {
     expect(screen.getByLabelText(/Zoom Meeting URL/i)).toBeInTheDocument();
   });
 
+  it('prevents native form submission to avoid full page reloads on Enter keypress', async () => {
+    await act(async () => {
+      render(<EventCreationForm />);
+    });
+
+    const form = document.querySelector('form');
+    expect(form).toBeInTheDocument();
+
+    /* Pressing Enter inside a text field fires a native submit event. Without
+       onSubmit={e => e.preventDefault()}, the form submits to action="#", which
+       triggers a full browser reload in Next.js — bypassing the router entirely. */
+    const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+    act(() => {
+      form!.dispatchEvent(submitEvent);
+    });
+
+    expect(submitEvent.defaultPrevented).toBe(true);
+  });
+
   it('validates Step 1 before allowing navigation to Step 2', async () => {
     const user = userEvent.setup();
     await act(async () => {
@@ -1335,7 +1354,7 @@ describe('EventCreationForm Component', () => {
       expect(screen.queryByLabelText(/Transcript Delay/i)).not.toBeInTheDocument();
     });
 
-    it('includes features as an empty array in the payload when none are enabled', async () => {
+    it('includes all features with enabled: false in the payload when none are enabled', async () => {
       const user = userEvent.setup();
       (Request as jest.Mock).mockImplementation(
         makeRequestMock({
@@ -1361,7 +1380,10 @@ describe('EventCreationForm Component', () => {
 
       await waitFor(() => {
         const conversationCall = (Request as jest.Mock).mock.calls.find((call) => call[0] === 'conversations/from-type');
-        expect(conversationCall![1]).toHaveProperty('features', []);
+        expect(conversationCall![1]).toHaveProperty('features', [
+          { name: 'liveTranscript', enabled: false, config: {} },
+          { name: 'autoSummary', enabled: false, config: {} },
+        ]);
       });
     });
 
@@ -1401,8 +1423,8 @@ describe('EventCreationForm Component', () => {
           'conversations/from-type',
           expect.objectContaining({
             features: expect.arrayContaining([
-              { name: 'liveTranscript', config: { transcriptDelay: 5 } },
-              { name: 'autoSummary', config: {} },
+              { name: 'liveTranscript', enabled: true, config: { transcriptDelay: 5 } },
+              { name: 'autoSummary', enabled: true, config: {} },
             ]),
           }),
         );
@@ -1458,6 +1480,34 @@ describe('EventCreationForm Component', () => {
       await waitFor(() => screen.getByLabelText(/Bot Name/i));
 
       expect(screen.queryByText('Features')).not.toBeInTheDocument();
+    });
+
+    it('blurs number inputs on scroll wheel to prevent accidental value changes', async () => {
+      /* MUI type="number" TextFields fire onChange when the scroll wheel moves while
+         the input has focus. If the input is not blurred on wheel events, scrolling the
+         page (or scrolling to find a value) silently mutates the field. The fix adds an
+         onWheel handler that calls blur(), which removes focus and stops the browser from
+         intercepting the scroll. This test confirms that behavior. */
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithBackChannel(user);
+
+      // Enable the liveTranscript feature so its number sub-property (transcriptDelay) is visible
+      await user.click(screen.getByRole('checkbox', { name: /live transcript/i }));
+      const numberInput = await screen.findByLabelText(/Transcript Delay/i);
+
+      // Focus the input, confirm it has focus, then fire a scroll-wheel event
+      numberInput.focus();
+      expect(numberInput).toHaveFocus();
+
+      fireEvent.wheel(numberInput, { deltaY: -100 });
+
+      // After the onWheel handler calls blur(), the input should no longer have focus.
+      // Before the fix, there is no handler and the input stays focused.
+      expect(numberInput).not.toHaveFocus();
     });
   });
 
@@ -2583,7 +2633,7 @@ describe('EventCreationForm Component', () => {
       });
     });
 
-    it('always includes features in the payload even when none are enabled', async () => {
+    it('includes all features with enabled: false in the payload when none are enabled', async () => {
       const user = userEvent.setup();
       await act(async () => {
         render(<EventCreationForm mode="edit" initialEvent={mockInitialEvent} />);
@@ -2603,7 +2653,15 @@ describe('EventCreationForm Component', () => {
       await user.click(screen.getByRole('button', { name: /save changes/i }));
 
       await waitFor(() => {
-        expect(updateConversation).toHaveBeenCalledWith('conv-edit-123', expect.objectContaining({ features: [] }));
+        expect(updateConversation).toHaveBeenCalledWith(
+          'conv-edit-123',
+          expect.objectContaining({
+            features: [
+              { name: 'liveTranscript', enabled: false, config: {} },
+              { name: 'autoSummary', enabled: false, config: {} },
+            ],
+          }),
+        );
       });
     });
 
@@ -2652,17 +2710,17 @@ describe('EventCreationForm Component', () => {
           expect(updateConversation).toHaveBeenCalledWith(
             'conv-edit-123',
             expect.objectContaining({
-              features: expect.arrayContaining([{ name: 'liveTranscript', config: { transcriptDelay: 10 } }]),
+              features: expect.arrayContaining([{ name: 'liveTranscript', enabled: true, config: { transcriptDelay: 10 } }]),
             }),
           );
         });
       });
 
-      it('removes only the disabled feature from the payload, preserving others', async () => {
+      it('sets enabled: false on unchecked feature while preserving enabled: true on others', async () => {
         const user = userEvent.setup();
         await renderAndGoToStep3(user, mockEventWithBothFeatures);
 
-        // Uncheck liveTranscript — autoSummary should remain
+        // Uncheck liveTranscript — it should appear in payload with enabled: false
         await user.click(screen.getByRole('checkbox', { name: /live transcript/i }));
 
         await submitFromStep3(user);
@@ -2670,13 +2728,14 @@ describe('EventCreationForm Component', () => {
         await waitFor(() => {
           const call = (updateConversation as jest.Mock).mock.calls[0];
           const payload = call[1];
-          const featureNames = payload.features.map((f: any) => f.name);
-          expect(featureNames).not.toContain('liveTranscript');
-          expect(featureNames).toContain('autoSummary');
+          const liveTranscript = payload.features.find((f: any) => f.name === 'liveTranscript');
+          const autoSummary = payload.features.find((f: any) => f.name === 'autoSummary');
+          expect(liveTranscript).toMatchObject({ name: 'liveTranscript', enabled: false });
+          expect(autoSummary).toMatchObject({ name: 'autoSummary', enabled: true });
         });
       });
 
-      it('sends features: [] when all pre-enabled features are disabled', async () => {
+      it('sets enabled: false on all features when all are unchecked', async () => {
         const user = userEvent.setup();
         await renderAndGoToStep3(user, mockEventWithBothFeatures);
 
@@ -2686,7 +2745,15 @@ describe('EventCreationForm Component', () => {
         await submitFromStep3(user);
 
         await waitFor(() => {
-          expect(updateConversation).toHaveBeenCalledWith('conv-edit-123', expect.objectContaining({ features: [] }));
+          expect(updateConversation).toHaveBeenCalledWith(
+            'conv-edit-123',
+            expect.objectContaining({
+              features: [
+                { name: 'liveTranscript', enabled: false, config: {} },
+                { name: 'autoSummary', enabled: false, config: {} },
+              ],
+            }),
+          );
         });
       });
 
@@ -2704,7 +2771,7 @@ describe('EventCreationForm Component', () => {
           expect(updateConversation).toHaveBeenCalledWith(
             'conv-edit-123',
             expect.objectContaining({
-              features: expect.arrayContaining([{ name: 'liveTranscript', config: { transcriptDelay: 20 } }]),
+              features: expect.arrayContaining([{ name: 'liveTranscript', enabled: true, config: { transcriptDelay: 20 } }]),
             }),
           );
         });
@@ -2758,6 +2825,47 @@ describe('EventCreationForm Component', () => {
         expect(screen.getByRole('checkbox', { name: /collective voice/i })).not.toBeChecked();
       });
 
+      it('includes a disabled user-controlled feature (mindmap) in the payload with enabled: false', async () => {
+        /* mindmap is userControlled: true — it is not shown in the admin form,
+           so the admin cannot toggle it. But if the server has it saved as
+           enabled: false, that state must still reach updateConversation so the
+           server can persist the explicit disable rather than falling back to the
+           type default (true). */
+        const eventWithDisabledMindmap: any = {
+          ...mockInitialEvent,
+          platforms: ['zoom'],
+          conversationType: 'eventAssistantExtraTest',
+          type: {
+            name: 'eventAssistantExtraTest',
+            label: 'Event Assistant With Additional Features',
+            properties: [],
+            platforms: [],
+          },
+          features: [{ name: 'mindmap', enabled: false, config: {} }],
+        };
+
+        const user = userEvent.setup();
+        await renderAndGoToStep3(user, eventWithDisabledMindmap);
+        await submitFromStep3(user);
+
+        await waitFor(() => {
+          expect(updateConversation).toHaveBeenCalledWith(
+            'conv-edit-123',
+            expect.objectContaining({
+              features: [
+                { name: 'collectiveVoice', enabled: true, config: { minContributionInterval: 10 } },
+                { name: 'catalyst', enabled: true, config: { minContributionInterval: 10 } },
+                { name: 'librarian', enabled: true, config: { recommendationsPerInterval: 2 } },
+                { name: 'mod', enabled: true, config: {} },
+                { name: 'mindmap', enabled: false, config: {} },
+                { name: 'visual', enabled: true, config: {} },
+                { name: 'jargonFilter', enabled: true, config: {} },
+              ],
+            }),
+          );
+        });
+      });
+
       it('includes a newly enabled feature in the payload alongside pre-existing ones', async () => {
         const user = userEvent.setup();
         // Start with only liveTranscript; enable autoSummary during edit
@@ -2772,8 +2880,8 @@ describe('EventCreationForm Component', () => {
             'conv-edit-123',
             expect.objectContaining({
               features: expect.arrayContaining([
-                { name: 'liveTranscript', config: { transcriptDelay: 10 } },
-                { name: 'autoSummary', config: {} },
+                { name: 'liveTranscript', enabled: true, config: { transcriptDelay: 10 } },
+                { name: 'autoSummary', enabled: true, config: {} },
               ]),
             }),
           );
@@ -2873,7 +2981,7 @@ describe('EventCreationForm Component', () => {
           expect(updateConversation).toHaveBeenCalledWith(
             'conv-edit-123',
             expect.objectContaining({
-              features: expect.arrayContaining([{ name: 'catalyst', config: { minContributionInterval: 7 } }]),
+              features: expect.arrayContaining([{ name: 'catalyst', enabled: true, config: { minContributionInterval: 7 } }]),
             }),
           );
         });
@@ -3022,7 +3130,6 @@ describe('EventCreationForm Component', () => {
         expect(mockPush).not.toHaveBeenCalled();
         expect(screen.getByLabelText(/Event Name/i)).toBeInTheDocument();
       });
-
     });
 
     it('allows proceeding from Step 1 when the pre-filled scheduled time is in the past', async () => {
@@ -3043,6 +3150,95 @@ describe('EventCreationForm Component', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Nextspace')).toBeInTheDocument();
+      });
+    });
+
+    describe('Save overlay', () => {
+      /* Renders the form in edit mode and clicks through to the given step.
+         Defined here so overlay tests can reuse it without depending on the
+         Step payload verification describe block's inner scope. */
+      const goToStep = async (user: ReturnType<typeof userEvent.setup>, step: number, event: any = mockInitialEvent) => {
+        await act(async () => {
+          render(<EventCreationForm mode="edit" initialEvent={event} />);
+        });
+        await waitFor(() => screen.getByLabelText(/Event Name/i));
+        for (let i = 1; i < step; i++) {
+          await user.click(screen.getByRole('button', { name: /next/i }));
+        }
+        if (step >= 5) await waitFor(() => screen.getByText('Reading & Resources'));
+      };
+
+      it('shows a "Saving changes..." overlay while the update request is in flight', async () => {
+        const user = userEvent.setup();
+
+        let resolveUpdate: (value: any) => void;
+        (updateConversation as jest.Mock).mockImplementation(
+          () =>
+            new Promise((resolve) => {
+              resolveUpdate = resolve;
+            }),
+        );
+
+        await goToStep(user, 5);
+        await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+        expect(screen.getByText('Saving changes...')).toBeInTheDocument();
+
+        // Resolve to avoid a dangling promise after the test exits
+        await act(async () => {
+          resolveUpdate({ id: 'conv-edit-123', resources: [] });
+        });
+      });
+
+      it('updates the overlay to "Uploading PDF..." after saving when a PDF is attached', async () => {
+        const user = userEvent.setup();
+
+        (updateConversation as jest.Mock).mockResolvedValue({
+          id: 'conv-edit-123',
+          resources: [{ id: 'res-1', title: 'Test Paper' }],
+        });
+
+        let resolveUpload: (value: any) => void;
+        (SendData as jest.Mock).mockImplementation(
+          () =>
+            new Promise((resolve) => {
+              resolveUpload = resolve;
+            }),
+        );
+
+        await goToStep(user, 5);
+
+        await user.type(screen.getByLabelText(/^Title/i), 'Test Paper');
+        const input = document.getElementById('pdf-upload-0') as HTMLInputElement;
+        await user.upload(input, new File(['content'], 'test.pdf', { type: 'application/pdf' }));
+        await waitFor(() => screen.getByText('test.pdf'));
+
+        await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+        await waitFor(() => {
+          expect(screen.getByText('Uploading PDF...')).toBeInTheDocument();
+        });
+
+        await act(async () => {
+          resolveUpload({});
+        });
+      });
+
+      it('hides the overlay and shows an error if the update request fails', async () => {
+        const user = userEvent.setup();
+
+        (updateConversation as jest.Mock).mockResolvedValue({
+          error: true,
+          message: { message: 'Server error' },
+        });
+
+        await goToStep(user, 5);
+        await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+        await waitFor(() => {
+          expect(screen.queryByText('Saving changes...')).not.toBeInTheDocument();
+          expect(screen.getByText(/Server error/i)).toBeInTheDocument();
+        });
       });
     });
 
@@ -3473,6 +3669,82 @@ describe('EventCreationForm Component', () => {
           await waitFor(() => {
             const call = (updateConversation as jest.Mock).mock.calls[0];
             expect(call[1].resources ?? []).toHaveLength(0);
+          });
+        });
+
+        it('uploads the PDF after saving changes in edit mode when a resource has one attached', async () => {
+          /* In create mode, the PDF upload runs after Request('conversations/from-type') returns.
+             In edit mode, the form calls updateConversation and returns early, so the upload
+             block is skipped. This test confirms the upload happens in edit mode too. */
+          const user = userEvent.setup();
+
+          // Return a resource with an ID so the upload endpoint can be built
+          (updateConversation as jest.Mock).mockResolvedValue({
+            id: 'conv-edit-123',
+            resources: [{ id: 'res-edit-abc', title: 'Edit Paper' }],
+          });
+          (SendData as jest.Mock).mockResolvedValue({});
+
+          await renderAndGoToStep(user, 5);
+
+          await user.type(screen.getByLabelText(/^Title/i), 'Edit Paper');
+
+          const validFile = new File(['content'], 'edit-paper.pdf', { type: 'application/pdf' });
+          const input = document.getElementById('pdf-upload-0') as HTMLInputElement;
+          await user.upload(input, validFile);
+          await waitFor(() => screen.getByText('edit-paper.pdf'));
+
+          await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+          await waitFor(() => {
+            expect(SendData).toHaveBeenCalledWith(
+              'resources/conv-edit-123/res-edit-abc/pdf',
+              null,
+              undefined,
+              expect.objectContaining({ method: 'POST', body: expect.any(FormData) }),
+            );
+          });
+        });
+
+        it('shows "PDF already uploaded" when a resource already has one saved on the server', async () => {
+          /*
+           * The API returns hasPdf: true (derived from fileName, which is private).
+           * The form should display an indicator rather than the empty drop zone so
+           * users know a PDF is attached, and re-saving without changes preserves it.
+           */
+          const user = userEvent.setup();
+          const eventWithPdf: any = {
+            ...mockInitialEvent,
+            resources: [{ id: 'res-abc', title: 'Existing Paper', hasPdf: true }],
+          };
+          await renderAndGoToStep(user, 5, eventWithPdf);
+
+          expect(screen.getByText('PDF already uploaded')).toBeInTheDocument();
+          expect(screen.queryByText(/drop a pdf/i)).not.toBeInTheDocument();
+        });
+
+        it('includes the resource id in the save payload so the server can preserve the existing PDF', async () => {
+          /*
+           * updateResources() on the server matches incoming resources to existing ones by id
+           * to carry over fileName. Without id in the payload, the server can't match, and
+           * fileName is lost on re-save even when the user made no changes.
+           */
+          const user = userEvent.setup();
+          const eventWithPdf: any = {
+            ...mockInitialEvent,
+            resources: [{ id: 'res-abc', title: 'Existing Paper', hasPdf: true }],
+          };
+          await renderAndGoToStep(user, 5, eventWithPdf);
+
+          await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+          await waitFor(() => {
+            expect(updateConversation).toHaveBeenCalledWith(
+              'conv-edit-123',
+              expect.objectContaining({
+                resources: expect.arrayContaining([expect.objectContaining({ id: 'res-abc', title: 'Existing Paper' })]),
+              }),
+            );
           });
         });
       });

@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Alert,
   Autocomplete,
+  Backdrop,
   Box,
   Button,
   Checkbox,
@@ -99,6 +100,7 @@ export const EventCreationForm: React.FC<{
   const [dynamicPropertyValues, setDynamicPropertyValues] = useState<Record<string, any>>({});
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [formSubmitting, setFormSubmitting] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [pdfUploadWarnings, setPdfUploadWarnings] = useState<string[]>([]);
   const [conversationData, setConversationData] = useState<Conversation | null>(null);
@@ -126,6 +128,11 @@ export const EventCreationForm: React.FC<{
     description: '',
     citation: '',
     pdf: undefined as File | undefined,
+    /* id and hasPdf are only populated in edit mode, carried over from the server.
+       id lets updateResources match this entry to its DB record and preserve fileName.
+       hasPdf is the server's derived signal that a PDF is already attached. */
+    id: undefined as string | undefined,
+    hasPdf: false as boolean,
     required: false,
     participantVisible: true,
   });
@@ -458,6 +465,10 @@ export const EventCreationForm: React.FC<{
           description: r.description ?? '',
           citation: r.citation ?? '',
           pdf: undefined,
+          /* Carry over id (for server-side fileName matching on re-save) and hasPdf
+             (so the UI can show that a PDF is already attached). */
+          id: r.id as string | undefined,
+          hasPdf: !!(r as any).hasPdf,
           required: r.category === 'required',
           participantVisible: r.participantVisible ?? true,
         })),
@@ -658,6 +669,10 @@ export const EventCreationForm: React.FC<{
                 }));
               }
             }}
+            /* Blurring on scroll prevents the browser from treating the wheel event as
+               an increment/decrement on a focused number input. The mutation is silent,
+               so users often don't notice until the form submits the wrong value. */
+            onWheel={(e) => (e.target as HTMLInputElement).blur()}
           />
         );
 
@@ -1007,6 +1022,9 @@ export const EventCreationForm: React.FC<{
     const validResources = resources
       .filter((r) => r.title.trim() !== '')
       .map((r) => ({
+        /* Include the server-side id so updateResources can match this resource
+           to its existing DB entry and carry over fileName. Omitted for new resources. */
+        ...(r.id && { id: r.id }),
         source: 'speaker' as const,
         category: r.required ? ('required' as const) : ('suggested' as const),
         title: r.title.trim(),
@@ -1061,10 +1079,16 @@ export const EventCreationForm: React.FC<{
       });
     }
 
-    const features = (selectedType?.features ?? [])
-      .filter((feature) => Boolean(dynamicPropertyValues[feature.name]))
-      .map((feature) => {
-        const config: Record<string, any> = {};
+    /* Include every feature in the type definition, not just enabled ones.
+       Disabled features must be sent explicitly so the server can persist the
+       intent to disable (silence is ambiguous — it could mean "not set yet"
+       rather than "turned off"). User-controlled features (userControlled: true)
+       are not rendered in the admin form but their saved state still belongs
+       in the payload. */
+    const features = (selectedType?.features ?? []).map((feature) => {
+      const enabled = Boolean(dynamicPropertyValues[feature.name]);
+      const config: Record<string, any> = {};
+      if (enabled) {
         feature.properties?.forEach((prop) => {
           const value = dynamicPropertyValues[`${feature.name}.${prop.name}`];
           if (value !== undefined && value !== null && value !== '') {
@@ -1073,8 +1097,9 @@ export const EventCreationForm: React.FC<{
             config[prop.name] = prop.default;
           }
         });
-        return { name: feature.name, config };
-      });
+      }
+      return { name: feature.name, enabled, config };
+    });
 
     body = {
       ...body,
@@ -1083,20 +1108,62 @@ export const EventCreationForm: React.FC<{
     };
 
     setFormSubmitting(true);
+    setSaveStatus(mode === 'edit' ? 'Saving changes...' : 'Creating event...');
+
+    /* Upload PDFs for resources that have a file attached.
+       Matches local resources to response resources by title to get the resource ID,
+       then POSTs each PDF to the resource endpoint. Collects any upload failures so
+       they can be shown to the user without blocking navigation. */
+    const uploadPdfs = async (conversationId: string, responseResources: components['schemas']['Resource'][]) => {
+      const resourcesWithPdf = resources
+        .filter((r) => r.title.trim() !== '' && r.pdf)
+        .flatMap((r) => {
+          const match = responseResources.find((res) => res.title === r.title.trim());
+          return match?.id ? [{ pdf: r.pdf as File, resourceId: match.id }] : [];
+        });
+
+      if (resourcesWithPdf.length === 0) return;
+
+      const uploadResults = await Promise.allSettled(
+        resourcesWithPdf.map(({ pdf, resourceId }) => {
+          const formData = new FormData();
+          formData.append('pdf', pdf);
+          return SendData(`resources/${conversationId}/${resourceId}/pdf`, null, undefined, {
+            method: 'POST',
+            body: formData,
+          });
+        }),
+      );
+
+      const failures = uploadResults
+        .map((result, i) => ({ result, name: resourcesWithPdf[i].pdf.name }))
+        .filter(({ result }) => result.status === 'rejected' || (result.status === 'fulfilled' && result.value?.error))
+        .map(({ name }) => name);
+
+      if (failures.length > 0) {
+        setPdfUploadWarnings(failures);
+      }
+    };
 
     if (mode === 'edit' && initialEvent) {
       updateConversation(initialEvent.id!, body)
-        .then((data) => {
-          setFormSubmitting(false);
+        .then(async (data) => {
           if (!data || 'error' in data) {
+            setSaveStatus(null);
+            setFormSubmitting(false);
             setFormError((data as any)?.message?.message || 'Failed to save changes.');
             return;
           }
+          const hasPdfs = resources.some((r) => r.title.trim() !== '' && r.pdf);
+          if (hasPdfs) setSaveStatus('Uploading PDF...');
+          // Upload PDFs for any resources with a file attached, same as create mode.
+          await uploadPdfs(data.id as string, (data as any).resources ?? []);
           navigateToView();
         })
         .catch((error: Error) => {
-          setFormError(`Failed to save changes. (${error.message})`);
+          setSaveStatus(null);
           setFormSubmitting(false);
+          setFormError(`Failed to save changes. (${error.message})`);
         });
       return;
     }
@@ -1104,48 +1171,27 @@ export const EventCreationForm: React.FC<{
     Request('conversations/from-type', body)
       .then(async (data) => {
         if (!data) {
-          setFormError('Failed to send data. Please try again.');
+          setSaveStatus(null);
           setFormSubmitting(false);
+          setFormError('Failed to send data. Please try again.');
           return;
         }
         if ('error' in data) {
-          setFormError(data.message?.message || 'Failed to create conversation.');
+          setSaveStatus(null);
           setFormSubmitting(false);
+          setFormError(data.message?.message || 'Failed to create conversation.');
           return;
         }
 
-        // Upload PDFs for any resources that have one attached
         const conversationId = data.id as string;
         const responseResources: components['schemas']['Resource'][] = data.resources ?? [];
-        const resourcesWithPdf = resources
-          .filter((r) => r.title.trim() !== '' && r.pdf)
-          .flatMap((r) => {
-            const match = responseResources.find((res) => res.title === r.title.trim());
-            return match?.id ? [{ pdf: r.pdf as File, resourceId: match.id }] : [];
-          });
 
-        if (resourcesWithPdf.length > 0) {
-          const uploadResults = await Promise.allSettled(
-            resourcesWithPdf.map(({ pdf, resourceId }) => {
-              const formData = new FormData();
-              formData.append('pdf', pdf);
-              return SendData(`resources/${conversationId}/${resourceId}/pdf`, null, undefined, {
-                method: 'POST',
-                body: formData,
-              });
-            }),
-          );
+        const hasPdfs = resources.some((r) => r.title.trim() !== '' && r.pdf);
+        if (hasPdfs) setSaveStatus('Uploading PDF...');
+        // Upload PDFs for any resources with a file attached.
+        await uploadPdfs(conversationId, responseResources);
 
-          const failures = uploadResults
-            .map((result, i) => ({ result, name: resourcesWithPdf[i].pdf.name }))
-            .filter(({ result }) => result.status === 'rejected' || (result.status === 'fulfilled' && result.value?.error))
-            .map(({ name }) => name);
-
-          if (failures.length > 0) {
-            setPdfUploadWarnings(failures);
-          }
-        }
-
+        setSaveStatus(null);
         createConversationFromData(data).then((conversation) => {
           setConversationData(conversation);
           setFormSubmitted(true);
@@ -1153,8 +1199,9 @@ export const EventCreationForm: React.FC<{
       })
       .catch((error) => {
         console.error('Error sending data:', error);
-        setFormError(`Failed to send data. (${error.message})`);
+        setSaveStatus(null);
         setFormSubmitting(false);
+        setFormError(`Failed to send data. (${error.message})`);
       });
   };
 
@@ -1224,7 +1271,7 @@ export const EventCreationForm: React.FC<{
           </Snackbar>
         )}
 
-        <Box component="form" noValidate action="#" ref={formRef}>
+        <Box component="form" noValidate onSubmit={(e) => e.preventDefault()} ref={formRef}>
           {/* Step 1: Event Details */}
           {activeStep === 0 && (
             <Box>
@@ -1974,6 +2021,32 @@ export const EventCreationForm: React.FC<{
                           Remove
                         </Button>
                       </Box>
+                    ) : resource.hasPdf ? (
+                      /* hasPdf came back true from the server, so a PDF is attached.
+                         The API doesn't expose the filename, just the flag. Uploading a
+                         new file replaces it; re-saving without one keeps it. */
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          p: 1.5,
+                          border: '1px solid rgba(0,0,0,0.12)',
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="body2" fontWeight={500}>
+                            PDF already uploaded
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Used as AI background context · Upload a new file to replace it
+                          </Typography>
+                        </Box>
+                        <Button size="small" onClick={() => document.getElementById(`pdf-upload-${index}`)?.click()}>
+                          Replace
+                        </Button>
+                      </Box>
                     ) : (
                       <Box
                         onClick={() => document.getElementById(`pdf-upload-${index}`)?.click()}
@@ -2125,6 +2198,16 @@ export const EventCreationForm: React.FC<{
           </Box>
         </Box>
       </Paper>
+
+      {/* Full-page overlay shown while saving or uploading — keeps the user informed
+          during async operations that block navigation */}
+      <Backdrop
+        open={saveStatus !== null}
+        sx={{ zIndex: (theme) => theme.zIndex.modal + 1, color: '#fff', flexDirection: 'column', gap: 2 }}
+      >
+        <CircularProgress color="inherit" />
+        <Typography variant="h6">{saveStatus}</Typography>
+      </Backdrop>
 
       <Dialog open={cancelDialogOpen} onClose={() => setCancelDialogOpen(false)}>
         <DialogTitle>Discard changes?</DialogTitle>
