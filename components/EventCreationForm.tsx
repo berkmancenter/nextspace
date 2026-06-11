@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Alert,
   Autocomplete,
+  Backdrop,
   Box,
   Button,
   Checkbox,
@@ -24,6 +25,11 @@ import {
   useTheme,
   useMediaQuery,
   MobileStepper,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
 } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -34,11 +40,20 @@ import { Request } from '../utils';
 import { EventStatus } from './';
 import { components } from '../types';
 import { Conversation } from '../types.internal';
-import { createConversationFromData, Api, SendData } from '../utils/Helpers';
+import { createConversationFromData, Api, SendData, updateConversation } from '../utils/Helpers';
 import SessionManager from '../utils/SessionManager';
 import { NewTopicForm, NewTopicFormValues } from './NewTopicForm';
 
 const steps = ['Event Details', 'Conversation Setup', 'Configuration', 'Speakers', 'Resources'];
+
+/**
+ * Produces a stable JSON string from an object by sorting its keys alphabetically.
+ * Used for enum radio-button comparisons so that key ordering differences (e.g. from
+ * MongoDB Mixed field serialization) don't cause a mismatch between the stored value
+ * and the radio option value built from validationKeys.
+ */
+const sortedStringify = (obj: Record<string, unknown>): string =>
+  JSON.stringify(Object.fromEntries(Object.entries(obj).sort(([a], [b]) => a.localeCompare(b))));
 
 /**
  * EventCreationForm component
@@ -50,7 +65,10 @@ const steps = ['Event Details', 'Conversation Setup', 'Configuration', 'Speakers
  * Step 4: Moderators & Speakers (moderator and speaker information)
  * @returns A React component displaying the Event Creation form.
  */
-export const EventCreationForm: React.FC = ({}) => {
+export const EventCreationForm: React.FC<{
+  mode?: 'create' | 'edit';
+  initialEvent?: Conversation;
+}> = ({ mode = 'create', initialEvent }) => {
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -63,6 +81,8 @@ export const EventCreationForm: React.FC = ({}) => {
 
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [selectedConvType, setSelectedConvType] = useState<string | null>(null);
+  const [showAgentTypeHint, setShowAgentTypeHint] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [supportedModels, setSupportedModels] = useState<components['schemas']['LlmModelDetails'][] | null>(null);
   const [availablePlatforms, setAvailablePlatforms] = useState<components['schemas']['PlatformConfig'][] | null>(null);
   const [conversationTypes, setConversationTypes] = useState<components['schemas']['ConversationType'][] | null>(null);
@@ -80,6 +100,7 @@ export const EventCreationForm: React.FC = ({}) => {
   const [dynamicPropertyValues, setDynamicPropertyValues] = useState<Record<string, any>>({});
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [formSubmitting, setFormSubmitting] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [pdfUploadWarnings, setPdfUploadWarnings] = useState<string[]>([]);
   const [conversationData, setConversationData] = useState<Conversation | null>(null);
@@ -107,6 +128,11 @@ export const EventCreationForm: React.FC = ({}) => {
     description: '',
     citation: '',
     pdf: undefined as File | undefined,
+    /* id and hasPdf are only populated in edit mode, carried over from the server.
+       id lets updateResources match this entry to its DB record and preserve fileName.
+       hasPdf is the server's derived signal that a PDF is already attached. */
+    id: undefined as string | undefined,
+    hasPdf: false as boolean,
     required: false,
     participantVisible: true,
   });
@@ -155,9 +181,59 @@ export const EventCreationForm: React.FC = ({}) => {
   });
 
   const formRef = useRef<HTMLFormElement>(null);
+  /* Holds the saved event's field values while the form initializes. In edit
+     mode, we stash these here before setting the conversation type. The
+     type-change effect picks them up and merges them with the type's defaults
+     instead of overwriting them. */
+  const preFillPending = useRef<Record<string, any> | null>(null);
+  /** Snapshot of the form state once the saved event has been loaded in. Used to detect real changes vs. a user editing then reverting a field. */
+  const cleanSnapshot = useRef<string | null>(null);
 
   const setFieldFocus = (fieldName: string) => {
     (formRef.current?.elements.namedItem(fieldName) as HTMLElement)?.focus();
+  };
+
+  const navigateToView = () => {
+    const typeName = initialEvent?.type?.name ?? (initialEvent as any)?.conversationType;
+    router.push(`/admin/${typeName}/view/${initialEvent?.id}`);
+  };
+
+  /* Converts a date string to UTC ISO so both sides of a dirty-check compare
+     in the same format. The API may return dates with a timezone offset (e.g.
+     "+00:00") rather than "Z". Without this, a date the user didn't touch
+     still looks different from what DateTimePicker writes, and Cancel would
+     incorrectly show the unsaved-changes warning. */
+  const normalizeDate = (s: string) => (s && dayjs(s).isValid() ? dayjs(s).toISOString() : (s ?? ''));
+
+  /* Captures all editable form fields as a JSON string for dirty-checking.
+     Platforms are sorted so adding then removing one in the same session
+     doesn't look like a change. PDF files are skipped since they can't be
+     serialized; hasNewPdf covers those separately. The overrides param lets
+     the initial snapshot pass dynamicPropertyValues directly, because the
+     state setter hasn't committed yet when we first call this. */
+  const serializeFormState = (overrides?: { dynamicPropertyValues?: Record<string, any> }) =>
+    JSON.stringify({
+      eventName,
+      eventDescription,
+      zoomMeetingUrl,
+      zoomMeetingTime: normalizeDate(zoomMeetingTime),
+      scheduledEndTime: normalizeDate(scheduledEndTime),
+      selectedConvType,
+      selectedPlatforms: [...selectedPlatforms].sort(),
+      selectedTopicId,
+      moderators,
+      speakers,
+      resources: resources.map(({ pdf: _pdf, ...r }) => r),
+      dynamicPropertyValues: overrides?.dynamicPropertyValues ?? dynamicPropertyValues,
+    });
+
+  const handleCancelEdit = () => {
+    const hasNewPdf = resources.some((r) => r.pdf);
+    if (hasNewPdf || serializeFormState() !== cleanSnapshot.current) {
+      setCancelDialogOpen(true);
+    } else {
+      navigateToView();
+    }
   };
 
   useEffect(() => {
@@ -222,9 +298,29 @@ export const EventCreationForm: React.FC = ({}) => {
           });
         });
 
+        /* In edit mode, the pre-fill effect stores the saved event's values
+           here before setting the conversation type. We merge them on top of
+           the type's defaults rather than overwriting. */
+        if (preFillPending.current) {
+          Object.assign(initialValues, preFillPending.current);
+          preFillPending.current = null;
+          /* Record the baseline form state here, passing initialValues directly
+             instead of reading dynamicPropertyValues from the closure. The state
+             setter hasn't committed yet at this point, so the closure value is stale. */
+          if (mode === 'edit' && cleanSnapshot.current === null) {
+            cleanSnapshot.current = serializeFormState({ dynamicPropertyValues: initialValues });
+          }
+        }
+
         setDynamicPropertyValues(initialValues);
       }
     }
+    /* This effect reads eventName, moderators, and other state from the closure,
+       but those are left out of the dependency array on purpose. The effect only
+       needs to re-run when the conversation type changes, not on every field edit.
+       The snapshot is written exactly once (cleanSnapshot guards it), so reading a
+       stale closure value at that moment is safe. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationTypes, selectedConvType]);
 
   useEffect(() => {
@@ -288,6 +384,101 @@ export const EventCreationForm: React.FC = ({}) => {
     if (availableTopics === null) fetchTopics();
   }, [availableTopics]);
 
+  /* Populates the form with the saved event's data when the user opens an
+     existing event to edit. We wait until conversation types and platforms
+     have loaded before running this, because setting the conversation type
+     triggers a separate effect that needs those lists to be ready. */
+  useEffect(() => {
+    if (mode !== 'edit' || !initialEvent || !conversationTypes || !availablePlatforms) return;
+
+    /* Build the saved event's dynamic field values (bot name, model, feature
+       toggles, etc.) and store them in preFillPending. Setting the conversation
+       type below triggers another effect that initializes all dynamic fields from
+       the type definition. That effect merges these saved values on top of the
+       defaults rather than replacing them. */
+    const dynamicPrefill: Record<string, any> = {};
+    if (initialEvent.properties) {
+      Object.entries(initialEvent.properties).forEach(([key, value]) => {
+        if (key !== 'zoomMeetingUrl') dynamicPrefill[key] = value;
+      });
+    }
+    /* Start each feature at its type default. The saved event's features array
+       overrides this below, but features that aren't in the array stay at the
+       default. This matches what getFeatures() in the backend does for legacy events
+       whose features were never persisted, and for events created before a feature
+       was added to the type. */
+    const savedTypeName = initialEvent.type?.name ?? (initialEvent as any).conversationType;
+    const typeDefinition = conversationTypes?.find((t) => t.name === savedTypeName);
+    typeDefinition?.features?.forEach((featureDef) => {
+      dynamicPrefill[featureDef.name] = Boolean(featureDef.default);
+    });
+
+    initialEvent.features?.forEach((f) => {
+      dynamicPrefill[f.name] = f.enabled !== false;
+      Object.entries(f.config || {}).forEach(([key, value]) => {
+        dynamicPrefill[`${f.name}.${key}`] = value;
+      });
+    });
+    preFillPending.current = dynamicPrefill;
+
+    setEventName(initialEvent.name);
+    setEventDescription(initialEvent.description ?? '');
+    setZoomMeetingUrl((initialEvent.properties?.zoomMeetingUrl as string) ?? '');
+    setZoomMeetingTime(initialEvent.scheduledTime ?? '');
+    setScheduledEndTime((initialEvent as any).scheduledEndTime ?? '');
+    setSelectedPlatforms(initialEvent.platforms ?? []);
+
+    const rawTopic = initialEvent.topic;
+    const topicId =
+      typeof rawTopic === 'string' ? rawTopic : ((rawTopic as any)?.id ?? (rawTopic as any)?._id?.toString() ?? null);
+    if (topicId) setSelectedTopicId(topicId);
+
+    if (initialEvent.moderators?.length) {
+      setShowModerators(true);
+      setModerators(
+        initialEvent.moderators.map((m) => ({
+          name: m.name ?? '',
+          bio: m.bio ?? '',
+          alternateName: (m as any).alternateName,
+        })),
+      );
+    }
+
+    if (initialEvent.presenters?.length) {
+      setSpeakers(
+        initialEvent.presenters.map((p) => ({
+          name: p.name ?? '',
+          bio: p.bio ?? '',
+          alternateName: (p as any).alternateName,
+        })),
+      );
+    }
+
+    const apiResources = (initialEvent as any).resources ?? [];
+    if (apiResources.length) {
+      setResources(
+        apiResources.map((r: any) => ({
+          title: r.title ?? '',
+          authors: Array.isArray(r.authors) ? r.authors.join(', ') : (r.authors ?? ''),
+          year: r.year ?? '',
+          url: r.url ?? '',
+          description: r.description ?? '',
+          citation: r.citation ?? '',
+          pdf: undefined,
+          /* Carry over id (for server-side fileName matching on re-save) and hasPdf
+             (so the UI can show that a PDF is already attached). */
+          id: r.id as string | undefined,
+          hasPdf: !!(r as any).hasPdf,
+          required: r.category === 'required',
+          participantVisible: r.participantVisible ?? true,
+        })),
+      );
+    }
+
+    // Setting the conversation type triggers the type-change effect, which merges preFillPending into the defaults.
+    setSelectedConvType(initialEvent.type?.name ?? (initialEvent as any).conversationType ?? null);
+  }, [mode, initialEvent, conversationTypes, availablePlatforms]);
+
   const validateStep1 = () => {
     // Check that required fields are present
     if (!eventName || eventName.trim() === '') {
@@ -317,7 +508,7 @@ export const EventCreationForm: React.FC = ({}) => {
       return false;
     }
 
-    if (zoomMeetingTime && new Date(zoomMeetingTime) < new Date(Date.now() + 10 * 60 * 1000)) {
+    if (mode !== 'edit' && zoomMeetingTime && new Date(zoomMeetingTime) < new Date(Date.now() + 10 * 60 * 1000)) {
       setFormError('Meeting Start Time must be at least 10 minutes from now');
       setZoomMeetingTimeErrorMessage('Meeting Start Time must be at least 10 minutes from now.');
       setZoomMeetingTimeHasError(true);
@@ -331,7 +522,10 @@ export const EventCreationForm: React.FC = ({}) => {
       return false;
     }
 
-    if (zoomMeetingTime && !scheduledEndTime) {
+    /* In create mode, end time is required once start time is set. In edit mode
+       it's optional: the backend stores scheduledEndTime as an optional Date, so
+       events without one should still be editable. */
+    if (mode !== 'edit' && zoomMeetingTime && !scheduledEndTime) {
       setFormError('Meeting End Time is required when a start time is provided');
       return false;
     }
@@ -475,6 +669,10 @@ export const EventCreationForm: React.FC = ({}) => {
                 }));
               }
             }}
+            /* Blurring on scroll prevents the browser from treating the wheel event as
+               an increment/decrement on a focused number input. The mutation is silent,
+               so users often don't notice until the form submits the wrong value. */
+            onWheel={(e) => (e.target as HTMLInputElement).blur()}
           />
         );
 
@@ -534,7 +732,7 @@ export const EventCreationForm: React.FC = ({}) => {
                 </Typography>
               )}
               <RadioGroup
-                value={JSON.stringify(value || {})}
+                value={sortedStringify(value || {})}
                 name={stateKey}
                 onChange={(e) => {
                   try {
@@ -578,7 +776,7 @@ export const EventCreationForm: React.FC = ({}) => {
                   return (
                     <div key={idx}>
                       <FormControlLabel
-                        value={JSON.stringify(optionValue)}
+                        value={sortedStringify(optionValue)}
                         control={<Radio />}
                         label={option.label || option.name || `Option ${idx + 1}`}
                       />
@@ -824,6 +1022,9 @@ export const EventCreationForm: React.FC = ({}) => {
     const validResources = resources
       .filter((r) => r.title.trim() !== '')
       .map((r) => ({
+        /* Include the server-side id so updateResources can match this resource
+           to its existing DB entry and carry over fileName. Omitted for new resources. */
+        ...(r.id && { id: r.id }),
         source: 'speaker' as const,
         category: r.required ? ('required' as const) : ('suggested' as const),
         title: r.title.trim(),
@@ -878,10 +1079,16 @@ export const EventCreationForm: React.FC = ({}) => {
       });
     }
 
-    const features = (selectedType?.features ?? [])
-      .filter((feature) => Boolean(dynamicPropertyValues[feature.name]))
-      .map((feature) => {
-        const config: Record<string, any> = {};
+    /* Include every feature in the type definition, not just enabled ones.
+       Disabled features must be sent explicitly so the server can persist the
+       intent to disable (silence is ambiguous — it could mean "not set yet"
+       rather than "turned off"). User-controlled features (userControlled: true)
+       are not rendered in the admin form but their saved state still belongs
+       in the payload. */
+    const features = (selectedType?.features ?? []).map((feature) => {
+      const enabled = Boolean(dynamicPropertyValues[feature.name]);
+      const config: Record<string, any> = {};
+      if (enabled) {
         feature.properties?.forEach((prop) => {
           const value = dynamicPropertyValues[`${feature.name}.${prop.name}`];
           if (value !== undefined && value !== null && value !== '') {
@@ -890,61 +1097,101 @@ export const EventCreationForm: React.FC = ({}) => {
             config[prop.name] = prop.default;
           }
         });
-        return { name: feature.name, config };
-      });
+      }
+      return { name: feature.name, enabled, config };
+    });
 
     body = {
       ...body,
       properties,
-      ...(features.length > 0 && { features }),
+      features,
     };
 
     setFormSubmitting(true);
+    setSaveStatus(mode === 'edit' ? 'Saving changes...' : 'Creating event...');
+
+    /* Upload PDFs for resources that have a file attached.
+       Matches local resources to response resources by title to get the resource ID,
+       then POSTs each PDF to the resource endpoint. Collects any upload failures so
+       they can be shown to the user without blocking navigation. */
+    const uploadPdfs = async (conversationId: string, responseResources: components['schemas']['Resource'][]) => {
+      const resourcesWithPdf = resources
+        .filter((r) => r.title.trim() !== '' && r.pdf)
+        .flatMap((r) => {
+          const match = responseResources.find((res) => res.title === r.title.trim());
+          return match?.id ? [{ pdf: r.pdf as File, resourceId: match.id }] : [];
+        });
+
+      if (resourcesWithPdf.length === 0) return;
+
+      const uploadResults = await Promise.allSettled(
+        resourcesWithPdf.map(({ pdf, resourceId }) => {
+          const formData = new FormData();
+          formData.append('pdf', pdf);
+          return SendData(`resources/${conversationId}/${resourceId}/pdf`, null, undefined, {
+            method: 'POST',
+            body: formData,
+          });
+        }),
+      );
+
+      const failures = uploadResults
+        .map((result, i) => ({ result, name: resourcesWithPdf[i].pdf.name }))
+        .filter(({ result }) => result.status === 'rejected' || (result.status === 'fulfilled' && result.value?.error))
+        .map(({ name }) => name);
+
+      if (failures.length > 0) {
+        setPdfUploadWarnings(failures);
+      }
+    };
+
+    if (mode === 'edit' && initialEvent) {
+      updateConversation(initialEvent.id!, body)
+        .then(async (data) => {
+          if (!data || 'error' in data) {
+            setSaveStatus(null);
+            setFormSubmitting(false);
+            setFormError((data as any)?.message?.message || 'Failed to save changes.');
+            return;
+          }
+          const hasPdfs = resources.some((r) => r.title.trim() !== '' && r.pdf);
+          if (hasPdfs) setSaveStatus('Uploading PDF...');
+          // Upload PDFs for any resources with a file attached, same as create mode.
+          await uploadPdfs(data.id as string, (data as any).resources ?? []);
+          navigateToView();
+        })
+        .catch((error: Error) => {
+          setSaveStatus(null);
+          setFormSubmitting(false);
+          setFormError(`Failed to save changes. (${error.message})`);
+        });
+      return;
+    }
+
     Request('conversations/from-type', body)
       .then(async (data) => {
         if (!data) {
-          setFormError('Failed to send data. Please try again.');
+          setSaveStatus(null);
           setFormSubmitting(false);
+          setFormError('Failed to send data. Please try again.');
           return;
         }
         if ('error' in data) {
-          setFormError(data.message?.message || 'Failed to create conversation.');
+          setSaveStatus(null);
           setFormSubmitting(false);
+          setFormError(data.message?.message || 'Failed to create conversation.');
           return;
         }
 
-        // Upload PDFs for any resources that have one attached
         const conversationId = data.id as string;
         const responseResources: components['schemas']['Resource'][] = data.resources ?? [];
-        const resourcesWithPdf = resources
-          .filter((r) => r.title.trim() !== '' && r.pdf)
-          .flatMap((r) => {
-            const match = responseResources.find((res) => res.title === r.title.trim());
-            return match?.id ? [{ pdf: r.pdf as File, resourceId: match.id }] : [];
-          });
 
-        if (resourcesWithPdf.length > 0) {
-          const uploadResults = await Promise.allSettled(
-            resourcesWithPdf.map(({ pdf, resourceId }) => {
-              const formData = new FormData();
-              formData.append('pdf', pdf);
-              return SendData(`resources/${conversationId}/${resourceId}/pdf`, null, undefined, {
-                method: 'POST',
-                body: formData,
-              });
-            }),
-          );
+        const hasPdfs = resources.some((r) => r.title.trim() !== '' && r.pdf);
+        if (hasPdfs) setSaveStatus('Uploading PDF...');
+        // Upload PDFs for any resources with a file attached.
+        await uploadPdfs(conversationId, responseResources);
 
-          const failures = uploadResults
-            .map((result, i) => ({ result, name: resourcesWithPdf[i].pdf.name }))
-            .filter(({ result }) => result.status === 'rejected' || (result.status === 'fulfilled' && result.value?.error))
-            .map(({ name }) => name);
-
-          if (failures.length > 0) {
-            setPdfUploadWarnings(failures);
-          }
-        }
-
+        setSaveStatus(null);
         createConversationFromData(data).then((conversation) => {
           setConversationData(conversation);
           setFormSubmitted(true);
@@ -952,8 +1199,9 @@ export const EventCreationForm: React.FC = ({}) => {
       })
       .catch((error) => {
         console.error('Error sending data:', error);
-        setFormError(`Failed to send data. (${error.message})`);
+        setSaveStatus(null);
         setFormSubmitting(false);
+        setFormError(`Failed to send data. (${error.message})`);
       });
   };
 
@@ -974,7 +1222,7 @@ export const EventCreationForm: React.FC = ({}) => {
   return (
     <>
       <Typography variant="h4" className="text-center" gutterBottom>
-        Create Event
+        {mode === 'edit' ? 'Edit Event' : 'Create Event'}
       </Typography>
       <Paper elevation={3} sx={{ p: 4, maxWidth: 800, mx: 'auto', mt: 4, mb: 4 }}>
         {isMobile ? (
@@ -1023,7 +1271,7 @@ export const EventCreationForm: React.FC = ({}) => {
           </Snackbar>
         )}
 
-        <Box component="form" noValidate action="#" ref={formRef}>
+        <Box component="form" noValidate onSubmit={(e) => e.preventDefault()} ref={formRef}>
           {/* Step 1: Event Details */}
           {activeStep === 0 && (
             <Box>
@@ -1118,8 +1366,8 @@ export const EventCreationForm: React.FC = ({}) => {
                       setSelectedTopicId(value?.id ?? null);
                       setTopicHasError(false);
                     }}
-                    renderOption={(props, option) => (
-                      <Box component="li" {...props} key={option.id}>
+                    renderOption={({ key, ...props }, option) => (
+                      <Box component="li" key={key} {...props}>
                         <Box sx={{ flexGrow: 1 }}>{option.name}</Box>
                         {option.private && (
                           <Typography variant="caption" sx={{ color: 'text.secondary', ml: 1 }}>
@@ -1176,7 +1424,7 @@ export const EventCreationForm: React.FC = ({}) => {
                 <DateTimePicker
                   label="Meeting Day/Time"
                   value={zoomMeetingTime ? dayjs(zoomMeetingTime) : null}
-                  minDateTime={dayjs().add(10, 'minute')}
+                  minDateTime={mode === 'edit' ? undefined : dayjs().add(10, 'minute')}
                   onChange={(newValue) => {
                     const value = newValue?.isValid() ? newValue.toISOString() : '';
                     setZoomMeetingTime(value);
@@ -1306,6 +1554,16 @@ export const EventCreationForm: React.FC = ({}) => {
                   value={selectedConvType}
                   name="selectedConvType"
                   onChange={(e) => {
+                    if (selectedConvType && e.target.value !== selectedConvType) {
+                      setShowAgentTypeHint(true);
+                      /* Save the current model before switching conversation types. The
+                         type-change effect re-initializes all dynamic fields from the new
+                         type's defaults, which would overwrite whatever model the user had
+                         already selected. */
+                      if (dynamicPropertyValues.llmModel !== undefined) {
+                        preFillPending.current = { llmModel: dynamicPropertyValues.llmModel };
+                      }
+                    }
                     setSelectedConvType(e.target.value);
                     setFormGroupsErrors((prev) => ({
                       ...prev,
@@ -1334,6 +1592,11 @@ export const EventCreationForm: React.FC = ({}) => {
                     </div>
                   ))}
                 </RadioGroup>
+                {showAgentTypeHint && (
+                  <Alert severity="info" sx={{ mt: 1 }}>
+                    Changing the agent type will also update the bot name — you can customize it on the next step.
+                  </Alert>
+                )}
               </FormControl>
             </Box>
           )}
@@ -1469,6 +1732,7 @@ export const EventCreationForm: React.FC = ({}) => {
                     onChange={(e) => updateSpeaker(index, 'alternateName', e.target.value)}
                     fullWidth
                     variant="outlined"
+                    margin="dense"
                     placeholder="Separate multiple names with commas, e.g. Jon, Dr. Smith"
                   />
                   <TextField
@@ -1567,6 +1831,7 @@ export const EventCreationForm: React.FC = ({}) => {
                           onChange={(e) => updateModerator(index, 'alternateName', e.target.value)}
                           fullWidth
                           variant="outlined"
+                          margin="dense"
                           placeholder="Separate multiple names with commas, e.g. Jon, Dr. Smith"
                         />
                         <TextField
@@ -1751,6 +2016,32 @@ export const EventCreationForm: React.FC = ({}) => {
                           Remove
                         </Button>
                       </Box>
+                    ) : resource.hasPdf ? (
+                      /* hasPdf came back true from the server, so a PDF is attached.
+                         The API doesn't expose the filename, just the flag. Uploading a
+                         new file replaces it; re-saving without one keeps it. */
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          p: 1.5,
+                          border: '1px solid rgba(0,0,0,0.12)',
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="body2" fontWeight={500}>
+                            PDF already uploaded
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Used as AI background context · Upload a new file to replace it
+                          </Typography>
+                        </Box>
+                        <Button size="small" onClick={() => document.getElementById(`pdf-upload-${index}`)?.click()}>
+                          Replace
+                        </Button>
+                      </Box>
                     ) : (
                       <Box
                         onClick={() => document.getElementById(`pdf-upload-${index}`)?.click()}
@@ -1853,45 +2144,78 @@ export const EventCreationForm: React.FC = ({}) => {
               Back
             </Button>
 
-            {activeStep === steps.length - 1 ? (
-              <Button
-                type="button"
-                variant="contained"
-                disabled={formSubmitting}
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (formRef.current) sendData(new FormData(formRef.current));
-                }}
-                sx={{
-                  ml: { xs: 1, sm: 0 },
-                  fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                }}
-              >
-                {formSubmitting ? (
-                  <>
-                    <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
-                    Creating…
-                  </>
-                ) : (
-                  'Create Conversation'
-                )}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="contained"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleNext();
-                }}
-                sx={{ ml: { xs: 1, sm: 0 } }}
-              >
-                Next
-              </Button>
-            )}
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {mode === 'edit' && (
+                <Button variant="outlined" color="inherit" onClick={handleCancelEdit} type="button">
+                  Cancel
+                </Button>
+              )}
+
+              {activeStep === steps.length - 1 ? (
+                <Button
+                  type="button"
+                  variant="contained"
+                  disabled={formSubmitting}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (formRef.current) sendData(new FormData(formRef.current));
+                  }}
+                  sx={{
+                    ml: { xs: 1, sm: 0 },
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                  }}
+                >
+                  {formSubmitting ? (
+                    <>
+                      <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
+                      {mode === 'edit' ? 'Saving…' : 'Creating…'}
+                    </>
+                  ) : mode === 'edit' ? (
+                    'Save Changes'
+                  ) : (
+                    'Create Conversation'
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="contained"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleNext();
+                  }}
+                  sx={{ ml: { xs: 1, sm: 0 } }}
+                >
+                  Next
+                </Button>
+              )}
+            </Box>
           </Box>
         </Box>
       </Paper>
+
+      {/* Full-page overlay shown while saving or uploading — keeps the user informed
+          during async operations that block navigation */}
+      <Backdrop
+        open={saveStatus !== null}
+        sx={{ zIndex: (theme) => theme.zIndex.modal + 1, color: '#fff', flexDirection: 'column', gap: 2 }}
+      >
+        <CircularProgress color="inherit" />
+        <Typography variant="h6">{saveStatus}</Typography>
+      </Backdrop>
+
+      <Dialog open={cancelDialogOpen} onClose={() => setCancelDialogOpen(false)}>
+        <DialogTitle>Discard changes?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>Your changes will be lost if you leave this page.</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCancelDialogOpen(false)}>Keep editing</Button>
+          <Button onClick={navigateToView} color="error">
+            Discard
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };

@@ -60,9 +60,10 @@ const mockConversations = [
 ];
 
 // Mock dependencies
+const mockPush = jest.fn();
 jest.mock('next/router', () => ({
   useRouter: () => ({
-    push: jest.fn(),
+    push: mockPush,
   }),
 }));
 
@@ -850,5 +851,81 @@ describe('Events Page - Event Ownership', () => {
 
       alertMock.mockRestore();
     });
+  });
+});
+
+describe('Events Page - Edit button', () => {
+  const mockUserId = 'user-123';
+  const futureTime = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  const pastTime = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
+  const makeConversation = (overrides: object) => ({
+    id: 'ev-1',
+    name: 'Editable Event',
+    active: false,
+    scheduledTime: futureTime,
+    createdAt: futureTime,
+    owner: mockUserId,
+    platformTypes: [],
+    type: { name: 'backChannel', label: 'Back Channel' },
+    eventUrls: { zoom: null, moderator: [], participant: [] },
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (getConversation as jest.Mock).mockReset();
+    (useSessionJoin as jest.Mock).mockReturnValue({ userId: mockUserId });
+  });
+
+  const renderWithEvent = async (conv: object) => {
+    (Request as jest.Mock).mockResolvedValue([conv]);
+    (getConversation as jest.Mock).mockResolvedValueOnce(conv);
+    await act(async () => {
+      render(<EventsPage authType="user" />);
+    });
+    await waitFor(() => expect(screen.getByText('Editable Event')).toBeInTheDocument());
+  };
+
+  it('shows an edit button for a future inactive event owned by the current user', async () => {
+    await renderWithEvent(makeConversation({}));
+    expect(screen.getByLabelText('Edit event')).toBeInTheDocument();
+  });
+
+  it('does not show an edit button for an active event', async () => {
+    await renderWithEvent(makeConversation({ active: true }));
+    expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
+  });
+
+  it('does not show an edit button for an event owned by another user', async () => {
+    await renderWithEvent(makeConversation({ owner: 'someone-else' }));
+    expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
+  });
+
+  it('does not show an edit button for a past event', async () => {
+    // Past events are filtered out by filterConversations, so no card renders.
+    // We just verify no edit button appears anywhere on the page.
+    const pastConv = makeConversation({ scheduledTime: pastTime });
+    (Request as jest.Mock).mockResolvedValue([pastConv]);
+    (getConversation as jest.Mock).mockResolvedValueOnce(pastConv);
+    await act(async () => {
+      render(<EventsPage authType="user" />);
+    });
+    await waitFor(() => expect(screen.getByText('No upcoming events')).toBeInTheDocument());
+    expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
+  });
+
+  it('does not show an edit button for an event with no type set', async () => {
+    /* Legacy events may have no type object, which would produce /admin/undefined/edit/<id>
+       if the edit button were shown. The canEdit guard prevents this. */
+    await renderWithEvent(makeConversation({ type: undefined }));
+    expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
+  });
+
+  it('navigates to the edit page when the edit button is clicked', async () => {
+    const user = userEvent.setup();
+    await renderWithEvent(makeConversation({}));
+    await user.click(await screen.findByLabelText('Edit event'));
+    expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/edit/ev-1');
   });
 });

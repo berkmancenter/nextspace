@@ -368,6 +368,15 @@ export const getConversation = async (id: string): Promise<Conversation | null> 
   return await createConversationFromData(response);
 };
 
+/**
+ * Updates an existing conversation via the PUT endpoint.
+ * @param id - The conversation ID to update.
+ * @param fields - The fields to update (any user-settable conversation fields).
+ * @returns The updated conversation data, or error information.
+ */
+export const updateConversation = async (id: string, fields: object) =>
+  SendData('conversations', { id, ...fields }, undefined, undefined, 'PUT');
+
 export const createConversationFromData = async (data: components['schemas']['Conversation']): Promise<Conversation> => {
   const { conversationTypes, availablePlatforms, conversationBotName } = await Api.get().GetConfig();
 

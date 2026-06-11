@@ -22,6 +22,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EventIcon from '@mui/icons-material/Event';
 import ComputerIcon from '@mui/icons-material/Computer';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import ReportProblem from '@mui/icons-material/ReportProblem';
 import DownloadIcon from '@mui/icons-material/Download';
 import { components } from '../../types';
@@ -42,6 +43,7 @@ const EventCard = ({
   onDelete: (id: string) => void;
   currentUserId: string | null;
 }) => {
+  const router = useRouter();
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -49,6 +51,10 @@ const EventCard = ({
 
   // Check if current user is the owner of this event
   const isOwner = currentUserId && event.owner === currentUserId;
+
+  // Edit is available for future, not-yet-started, owned events
+  const eventStarted = event.scheduledTime ? new Date(event.scheduledTime) <= new Date() : false;
+  const canEdit = isOwner && !event.active && !eventStarted && !!event.type?.name;
 
   const handleCopyLink = async (url: string) => {
     try {
@@ -129,6 +135,18 @@ const EventCard = ({
                     className="text-gray-500 hover:text-blue-600"
                   >
                     {isDownloading ? <CircularProgress size={20} /> : <DownloadIcon fontSize="small" />}
+                  </IconButton>
+                </Tooltip>
+              )}
+              {canEdit && (
+                <Tooltip title="Edit event">
+                  <IconButton
+                    size="small"
+                    aria-label="Edit event"
+                    onClick={() => router.push(`/admin/${event.type?.name}/edit/${event.id}`)}
+                    className="text-gray-500 hover:text-blue-600"
+                  >
+                    <EditIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
               )}

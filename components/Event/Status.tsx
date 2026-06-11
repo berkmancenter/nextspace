@@ -1,7 +1,9 @@
 import React from 'react';
-import { Button, Typography } from '@mui/material';
+import { Box, Button, Typography } from '@mui/material';
+import { useRouter } from 'next/router';
 import { SendData } from '../../utils';
 import { Conversation } from '../../types.internal';
+import SessionManager from '../../utils/SessionManager';
 
 /**
  * EventStatus component
@@ -15,8 +17,13 @@ import { Conversation } from '../../types.internal';
 export const EventStatus: React.FC<{
   conversationData: Conversation;
 }> = ({ conversationData }) => {
+  const router = useRouter();
   const [startingEvent, setStartingEvent] = React.useState(false);
   const [eventStarted, setEventStarted] = React.useState(false);
+
+  const userId = SessionManager.get().getSessionInfo()?.userId;
+  const ownerId = typeof conversationData.owner === 'string' ? conversationData.owner : (conversationData.owner as any)?.id;
+  const canEdit = !eventStarted && !conversationData.active && !!userId && userId === ownerId;
 
   // Format list with "and" before last item
   const formatList = (items: string[]) => {
@@ -107,7 +114,17 @@ export const EventStatus: React.FC<{
             ))}
           </>
         )}
-        <StartEventButton />
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 2 }}>
+          <StartEventButton />
+          {canEdit && (
+            <Button
+              variant="outlined"
+              onClick={() => router.push(`/admin/${conversationData.type.name}/edit/${conversationData.id}`)}
+            >
+              Edit Event
+            </Button>
+          )}
+        </Box>
         {eventStarted && <p className="mt-2">The event has started!</p>}
       </div>
     </div>

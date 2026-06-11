@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { EventCreationForm } from '../../components/EventCreationForm';
 import { RetrieveData, Request } from '../../utils';
-import { Api, SendData } from '../../utils/Helpers';
+import { Api, SendData, updateConversation } from '../../utils/Helpers';
 import '@testing-library/jest-dom';
 
 jest.setTimeout(60000);
@@ -43,6 +43,7 @@ jest.mock('../../utils', () => ({
 jest.mock('../../utils/Helpers', () => ({
   ...jest.requireActual('../../utils/Helpers'),
   SendData: jest.fn(),
+  updateConversation: jest.fn(),
 }));
 
 jest.mock('../../utils/SessionManager', () => ({
@@ -271,7 +272,15 @@ const mockConfig = {
           description: 'Contributes to the group chat by surfacing what participants are privately thinking.',
           userControlled: false,
           default: true,
-          properties: [],
+          properties: [
+            {
+              name: 'minContributionInterval',
+              label: 'Minimum Minutes Between Contributions',
+              type: 'number',
+              default: 10,
+              required: false,
+            },
+          ],
         },
         {
           name: 'catalyst',
@@ -279,7 +288,15 @@ const mockConfig = {
           description: 'Participates in the group chat as an active voice, jumping into silences.',
           userControlled: false,
           default: true,
-          properties: [],
+          properties: [
+            {
+              name: 'minContributionInterval',
+              label: 'Minimum Minutes Between Contributions',
+              type: 'number',
+              default: 10,
+              required: false,
+            },
+          ],
         },
         {
           name: 'librarian',
@@ -287,7 +304,15 @@ const mockConfig = {
           description: 'Periodically recommends relevant reading during the event.',
           userControlled: false,
           default: true,
-          properties: [],
+          properties: [
+            {
+              name: 'recommendationsPerInterval',
+              label: 'Number of Reading Recommendations per Interval',
+              type: 'number',
+              default: 2,
+              required: false,
+            },
+          ],
         },
         {
           name: 'mod',
@@ -400,6 +425,25 @@ describe('EventCreationForm Component', () => {
     // Should show Step 1 content
     expect(screen.getByLabelText(/Event Name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Zoom Meeting URL/i)).toBeInTheDocument();
+  });
+
+  it('prevents native form submission to avoid full page reloads on Enter keypress', async () => {
+    await act(async () => {
+      render(<EventCreationForm />);
+    });
+
+    const form = document.querySelector('form');
+    expect(form).toBeInTheDocument();
+
+    /* Pressing Enter inside a text field fires a native submit event. Without
+       onSubmit={e => e.preventDefault()}, the form submits to action="#", which
+       triggers a full browser reload in Next.js — bypassing the router entirely. */
+    const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+    act(() => {
+      form!.dispatchEvent(submitEvent);
+    });
+
+    expect(submitEvent.defaultPrevented).toBe(true);
   });
 
   it('validates Step 1 before allowing navigation to Step 2', async () => {
@@ -1310,7 +1354,7 @@ describe('EventCreationForm Component', () => {
       expect(screen.queryByLabelText(/Transcript Delay/i)).not.toBeInTheDocument();
     });
 
-    it('does not include features in submission payload when none are enabled', async () => {
+    it('includes all features with enabled: false in the payload when none are enabled', async () => {
       const user = userEvent.setup();
       (Request as jest.Mock).mockImplementation(
         makeRequestMock({
@@ -1336,7 +1380,10 @@ describe('EventCreationForm Component', () => {
 
       await waitFor(() => {
         const conversationCall = (Request as jest.Mock).mock.calls.find((call) => call[0] === 'conversations/from-type');
-        expect(conversationCall![1]).not.toHaveProperty('features');
+        expect(conversationCall![1]).toHaveProperty('features', [
+          { name: 'liveTranscript', enabled: false, config: {} },
+          { name: 'autoSummary', enabled: false, config: {} },
+        ]);
       });
     });
 
@@ -1376,8 +1423,8 @@ describe('EventCreationForm Component', () => {
           'conversations/from-type',
           expect.objectContaining({
             features: expect.arrayContaining([
-              { name: 'liveTranscript', config: { transcriptDelay: 5 } },
-              { name: 'autoSummary', config: {} },
+              { name: 'liveTranscript', enabled: true, config: { transcriptDelay: 5 } },
+              { name: 'autoSummary', enabled: true, config: {} },
             ]),
           }),
         );
@@ -1433,6 +1480,34 @@ describe('EventCreationForm Component', () => {
       await waitFor(() => screen.getByLabelText(/Bot Name/i));
 
       expect(screen.queryByText('Features')).not.toBeInTheDocument();
+    });
+
+    it('blurs number inputs on scroll wheel to prevent accidental value changes', async () => {
+      /* MUI type="number" TextFields fire onChange when the scroll wheel moves while
+         the input has focus. If the input is not blurred on wheel events, scrolling the
+         page (or scrolling to find a value) silently mutates the field. The fix adds an
+         onWheel handler that calls blur(), which removes focus and stops the browser from
+         intercepting the scroll. This test confirms that behavior. */
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithBackChannel(user);
+
+      // Enable the liveTranscript feature so its number sub-property (transcriptDelay) is visible
+      await user.click(screen.getByRole('checkbox', { name: /live transcript/i }));
+      const numberInput = await screen.findByLabelText(/Transcript Delay/i);
+
+      // Focus the input, confirm it has focus, then fire a scroll-wheel event
+      numberInput.focus();
+      expect(numberInput).toHaveFocus();
+
+      fireEvent.wheel(numberInput, { deltaY: -100 });
+
+      // After the onWheel handler calls blur(), the input should no longer have focus.
+      // Before the fix, there is no handler and the input stays focused.
+      expect(numberInput).not.toHaveFocus();
     });
   });
 
@@ -2262,6 +2337,1403 @@ describe('EventCreationForm Component', () => {
 
       await waitFor(() => screen.getByText('Event Status'));
       expect(SendData).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Edit mode', () => {
+    const mockInitialEvent: any = {
+      id: 'conv-edit-123',
+      name: 'My Existing Event',
+      description: 'An existing event description',
+      active: false,
+      owner: 'current-user-id',
+      properties: {
+        zoomMeetingUrl: 'https://zoom.us/j/existing',
+        botName: 'ExistingBot',
+      },
+      scheduledTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+      scheduledEndTime: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+      platforms: ['zoom'],
+      conversationType: 'backChannel',
+      type: {
+        name: 'backChannel',
+        label: 'Back Channel',
+        description: 'An agent to analyze participant comments',
+        properties: [],
+        platforms: [],
+      },
+      topic: 'topic-1',
+      moderators: [],
+      presenters: [],
+      features: [],
+      channels: [],
+      agents: [],
+      adapters: [],
+      messages: [],
+      followers: [],
+      enableDMs: [],
+      experiments: [],
+      eventUrls: { moderator: [], participant: [] },
+    };
+
+    beforeEach(() => {
+      (updateConversation as jest.Mock).mockResolvedValue({ id: 'conv-edit-123' });
+    });
+
+    it('shows "Edit Event" as the form title in edit mode', async () => {
+      await act(async () => {
+        render(<EventCreationForm mode="edit" initialEvent={mockInitialEvent} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Edit Event')).toBeInTheDocument();
+      });
+    });
+
+    it('pre-fills the event name from the existing conversation', async () => {
+      await act(async () => {
+        render(<EventCreationForm mode="edit" initialEvent={mockInitialEvent} />);
+      });
+
+      await waitFor(() => {
+        const nameInput = screen.getByLabelText(/Event Name/i) as HTMLInputElement;
+        expect(nameInput.value).toBe('My Existing Event');
+      });
+    });
+
+    it('pre-fills the Zoom URL from the existing conversation', async () => {
+      await act(async () => {
+        render(<EventCreationForm mode="edit" initialEvent={mockInitialEvent} />);
+      });
+
+      await waitFor(() => {
+        const urlInput = screen.getByLabelText(/Zoom Meeting URL/i) as HTMLInputElement;
+        expect(urlInput.value).toBe('https://zoom.us/j/existing');
+      });
+    });
+
+    it('shows "Save Changes" as the submit button in edit mode', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm mode="edit" initialEvent={mockInitialEvent} />);
+      });
+
+      // Navigate to last step
+      await waitFor(() => screen.getByLabelText(/Event Name/i));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Nextspace'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Customize your conversation settings'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('About the Speakers'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Reading & Resources'));
+
+      expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /create conversation/i })).not.toBeInTheDocument();
+    });
+
+    it('calls updateConversation on submit in edit mode, not Request', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm mode="edit" initialEvent={mockInitialEvent} />);
+      });
+
+      // Navigate to last step
+      await waitFor(() => screen.getByLabelText(/Event Name/i));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Nextspace'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Customize your conversation settings'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('About the Speakers'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Reading & Resources'));
+
+      await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+      await waitFor(() => {
+        expect(updateConversation).toHaveBeenCalledWith(
+          'conv-edit-123',
+          expect.objectContaining({
+            name: 'My Existing Event',
+            properties: expect.objectContaining({
+              zoomMeetingUrl: 'https://zoom.us/j/existing',
+            }),
+          }),
+        );
+        expect(Request).not.toHaveBeenCalledWith('conversations/from-type', expect.anything());
+      });
+    });
+
+    it('navigates to the view page after saving a legacy event with no type object set', async () => {
+      /* Legacy events may have conversationType (a string) but no type object. The
+         post-save redirect must not crash by reading type.name directly — it should
+         fall back to conversationType the same way the Cancel button does. */
+      const legacyEvent = {
+        ...mockInitialEvent,
+        type: undefined,
+        conversationType: 'backChannel',
+      };
+      (updateConversation as jest.Mock).mockResolvedValue({ id: 'conv-edit-123' });
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm mode="edit" initialEvent={legacyEvent} />);
+      });
+      await waitFor(() => screen.getByLabelText(/Event Name/i));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Nextspace'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Customize your conversation settings'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('About the Speakers'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Reading & Resources'));
+      await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-edit-123');
+      });
+    });
+
+    describe('Agent type change hint', () => {
+      const navigateToStep2 = async (user: ReturnType<typeof userEvent.setup>) => {
+        await waitFor(() => screen.getByLabelText(/Event Name/i));
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Nextspace'));
+      };
+
+      it('shows hint when the user changes the pre-filled agent type', async () => {
+        const user = userEvent.setup();
+        await act(async () => {
+          render(<EventCreationForm mode="edit" initialEvent={mockInitialEvent} />);
+        });
+
+        await navigateToStep2(user);
+
+        // Back Channel is pre-filled; switching to Event Assistant should trigger the hint
+        await user.click(screen.getByRole('radio', { name: /event assistant$/i }));
+
+        expect(screen.getByText(/changing the agent type will also update the bot name/i)).toBeInTheDocument();
+      });
+
+      it('does not show hint when first arriving at Step 2 without changing the selection', async () => {
+        const user = userEvent.setup();
+        await act(async () => {
+          render(<EventCreationForm mode="edit" initialEvent={mockInitialEvent} />);
+        });
+
+        await navigateToStep2(user);
+
+        expect(screen.queryByText(/changing the agent type will also update the bot name/i)).not.toBeInTheDocument();
+      });
+
+      it('preserves the saved AI model when the agent type is changed', async () => {
+        const eventWithHaikuModel: any = {
+          ...mockInitialEvent,
+          properties: {
+            ...mockInitialEvent.properties,
+            llmModel: { llmPlatform: 'bedrock', llmModel: 'anthropic.claude-3-5-haiku-20241022-v1:0' },
+          },
+        };
+        const user = userEvent.setup();
+        await act(async () => {
+          render(<EventCreationForm mode="edit" initialEvent={eventWithHaikuModel} />);
+        });
+
+        await navigateToStep2(user);
+        // Switch from Back Channel to Event Assistant — whose first/default option is gpt-4o-mini
+        await user.click(screen.getByRole('radio', { name: /event assistant$/i }));
+        // Navigate to Step 3 (Zoom is already pre-filled from the event, no need to re-check)
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Customize your conversation settings'));
+
+        // The saved haiku model should still be selected, not reset to gpt-4o-mini
+        const haikuRadio = screen.getByRole('radio', { name: /AWS Bedrock Claude 3\.5 Haiku/i });
+        expect(haikuRadio).toBeChecked();
+      });
+    });
+
+    describe('Configuration pre-fill (Step 3)', () => {
+      // Uses a richer event that includes a non-default model and an enabled feature
+      // with a non-default sub-property value. Tests fail if the form resets these
+      // to type defaults instead of restoring the saved settings.
+      const mockInitialEventWithConfig: any = {
+        ...mockInitialEvent,
+        properties: {
+          zoomMeetingUrl: 'https://zoom.us/j/existing',
+          botName: 'ExistingBot',
+          // Non-default model (default is gpt-4o-mini / openai)
+          llmModel: { llmPlatform: 'bedrock', llmModel: 'anthropic.claude-3-5-haiku-20241022-v1:0' },
+        },
+        features: [{ name: 'liveTranscript', enabled: true, config: { transcriptDelay: 10 } }],
+      };
+
+      const navigateToStep3 = async (user: ReturnType<typeof userEvent.setup>, event = mockInitialEventWithConfig) => {
+        await act(async () => {
+          render(<EventCreationForm mode="edit" initialEvent={event} />);
+        });
+        await waitFor(() => screen.getByLabelText(/Event Name/i));
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Nextspace'));
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Customize your conversation settings'));
+      };
+
+      it('pre-fills bot name in Step 3', async () => {
+        const user = userEvent.setup();
+        await navigateToStep3(user);
+        const botNameInput = screen.getByLabelText(/Bot Name/i) as HTMLInputElement;
+        expect(botNameInput.value).toBe('ExistingBot');
+      });
+
+      it('pre-selects the saved AI model radio button in Step 3', async () => {
+        const user = userEvent.setup();
+        await navigateToStep3(user);
+        const claudeHaikuRadio = screen.getByRole('radio', {
+          name: /AWS Bedrock Claude 3\.5 Haiku/i,
+        });
+        expect(claudeHaikuRadio).toBeChecked();
+      });
+
+      it('pre-checks enabled feature toggles in Step 3', async () => {
+        const user = userEvent.setup();
+        await navigateToStep3(user);
+        const liveTranscriptCheckbox = screen.getByRole('checkbox', {
+          name: /Live Transcript/i,
+        });
+        expect(liveTranscriptCheckbox).toBeChecked();
+      });
+
+      it('pre-fills feature sub-property values in Step 3', async () => {
+        const user = userEvent.setup();
+        await navigateToStep3(user);
+        // transcriptDelay is only visible when liveTranscript is enabled
+        const delayInput = screen.getByLabelText(/Transcript Delay/i) as HTMLInputElement;
+        expect(delayInput.value).toBe('10');
+      });
+
+      it('pre-selects the correct model even when property keys come back in unexpected order', async () => {
+        // MongoDB Mixed fields don't guarantee key order, so the stored object may have
+        // keys in a different order than the form built when it was saved. The radio
+        // comparison must be key-order-agnostic or it silently resets to the default.
+        const eventWithReversedKeys: any = {
+          ...mockInitialEventWithConfig,
+          properties: {
+            ...mockInitialEventWithConfig.properties,
+            llmModel: { llmModel: 'anthropic.claude-3-5-haiku-20241022-v1:0', llmPlatform: 'bedrock' },
+          },
+        };
+        const user = userEvent.setup();
+        await navigateToStep3(user, eventWithReversedKeys);
+        const claudeHaikuRadio = screen.getByRole('radio', {
+          name: /AWS Bedrock Claude 3\.5 Haiku/i,
+        });
+        expect(claudeHaikuRadio).toBeChecked();
+      });
+    });
+
+    it('includes all features with enabled: false in the payload when none are enabled', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm mode="edit" initialEvent={mockInitialEvent} />);
+      });
+
+      // Navigate through all steps without enabling any features
+      await waitFor(() => screen.getByLabelText(/Event Name/i));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Nextspace'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Customize your conversation settings'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('About the Speakers'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Reading & Resources'));
+
+      await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+      await waitFor(() => {
+        expect(updateConversation).toHaveBeenCalledWith(
+          'conv-edit-123',
+          expect.objectContaining({
+            features: [
+              { name: 'liveTranscript', enabled: false, config: {} },
+              { name: 'autoSummary', enabled: false, config: {} },
+            ],
+          }),
+        );
+      });
+    });
+
+    describe('Features editing — payload', () => {
+      // Event with one feature enabled (liveTranscript)
+      const mockEventWithOneFeature: any = {
+        ...mockInitialEvent,
+        features: [{ name: 'liveTranscript', enabled: true, config: { transcriptDelay: 10 } }],
+      };
+
+      // Event with both features enabled
+      const mockEventWithBothFeatures: any = {
+        ...mockInitialEvent,
+        features: [
+          { name: 'liveTranscript', enabled: true, config: { transcriptDelay: 10 } },
+          { name: 'autoSummary', enabled: true, config: {} },
+        ],
+      };
+
+      const renderAndGoToStep3 = async (user: ReturnType<typeof userEvent.setup>, event: any = mockEventWithOneFeature) => {
+        await act(async () => {
+          render(<EventCreationForm mode="edit" initialEvent={event} />);
+        });
+        await waitFor(() => screen.getByLabelText(/Event Name/i));
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Nextspace'));
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Customize your conversation settings'));
+      };
+
+      const submitFromStep3 = async (user: ReturnType<typeof userEvent.setup>) => {
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('About the Speakers'));
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Reading & Resources'));
+        await user.click(screen.getByRole('button', { name: /save changes/i }));
+      };
+
+      it('preserves a pre-enabled feature in the payload when it is not changed', async () => {
+        const user = userEvent.setup();
+        await renderAndGoToStep3(user);
+
+        await submitFromStep3(user);
+
+        await waitFor(() => {
+          expect(updateConversation).toHaveBeenCalledWith(
+            'conv-edit-123',
+            expect.objectContaining({
+              features: expect.arrayContaining([{ name: 'liveTranscript', enabled: true, config: { transcriptDelay: 10 } }]),
+            }),
+          );
+        });
+      });
+
+      it('sets enabled: false on unchecked feature while preserving enabled: true on others', async () => {
+        const user = userEvent.setup();
+        await renderAndGoToStep3(user, mockEventWithBothFeatures);
+
+        // Uncheck liveTranscript — it should appear in payload with enabled: false
+        await user.click(screen.getByRole('checkbox', { name: /live transcript/i }));
+
+        await submitFromStep3(user);
+
+        await waitFor(() => {
+          const call = (updateConversation as jest.Mock).mock.calls[0];
+          const payload = call[1];
+          const liveTranscript = payload.features.find((f: any) => f.name === 'liveTranscript');
+          const autoSummary = payload.features.find((f: any) => f.name === 'autoSummary');
+          expect(liveTranscript).toMatchObject({ name: 'liveTranscript', enabled: false });
+          expect(autoSummary).toMatchObject({ name: 'autoSummary', enabled: true });
+        });
+      });
+
+      it('sets enabled: false on all features when all are unchecked', async () => {
+        const user = userEvent.setup();
+        await renderAndGoToStep3(user, mockEventWithBothFeatures);
+
+        await user.click(screen.getByRole('checkbox', { name: /live transcript/i }));
+        await user.click(screen.getByRole('checkbox', { name: /auto summary/i }));
+
+        await submitFromStep3(user);
+
+        await waitFor(() => {
+          expect(updateConversation).toHaveBeenCalledWith(
+            'conv-edit-123',
+            expect.objectContaining({
+              features: [
+                { name: 'liveTranscript', enabled: false, config: {} },
+                { name: 'autoSummary', enabled: false, config: {} },
+              ],
+            }),
+          );
+        });
+      });
+
+      it('saves an updated sub-property value in the payload', async () => {
+        const user = userEvent.setup();
+        await renderAndGoToStep3(user);
+
+        const delayInput = screen.getByLabelText(/Transcript Delay/i) as HTMLInputElement;
+        await user.clear(delayInput);
+        await user.type(delayInput, '20');
+
+        await submitFromStep3(user);
+
+        await waitFor(() => {
+          expect(updateConversation).toHaveBeenCalledWith(
+            'conv-edit-123',
+            expect.objectContaining({
+              features: expect.arrayContaining([{ name: 'liveTranscript', enabled: true, config: { transcriptDelay: 20 } }]),
+            }),
+          );
+        });
+      });
+
+      it('falls back to the type default for features absent from the saved features array', async () => {
+        /* Matches the backend's getFeatures() contract: a feature missing from the
+           stored array uses the type's default. This is the legacy event case (features
+           were dropped by the pre-markModified persistence bug), and also covers events
+           created before a feature existed on the type. */
+        const legacyEvent: any = {
+          ...mockInitialEvent,
+          platforms: ['zoom'],
+          conversationType: 'eventAssistantExtraTest',
+          type: {
+            name: 'eventAssistantExtraTest',
+            label: 'Event Assistant With Additional Features',
+            properties: [],
+            platforms: [],
+          },
+          features: [], // no features persisted, so the form falls back to type defaults
+        };
+
+        const user = userEvent.setup();
+        await renderAndGoToStep3(user, legacyEvent);
+
+        // collectiveVoice and librarian both have default: true on the type
+        expect(screen.getByRole('checkbox', { name: /collective voice/i })).toBeChecked();
+        expect(screen.getByRole('checkbox', { name: /reading recommendations/i })).toBeChecked();
+      });
+
+      it('respects an explicit disabled record in the saved features array', async () => {
+        /* The default fallback only applies when a feature is absent from the array.
+           An explicit enabled: false record should still win over the type's default. */
+        const eventWithExplicitDisable: any = {
+          ...mockInitialEvent,
+          platforms: ['zoom'],
+          conversationType: 'eventAssistantExtraTest',
+          type: {
+            name: 'eventAssistantExtraTest',
+            label: 'Event Assistant With Additional Features',
+            properties: [],
+            platforms: [],
+          },
+          features: [{ name: 'collectiveVoice', enabled: false, config: {} }],
+        };
+
+        const user = userEvent.setup();
+        await renderAndGoToStep3(user, eventWithExplicitDisable);
+
+        expect(screen.getByRole('checkbox', { name: /collective voice/i })).not.toBeChecked();
+      });
+
+      it('includes a disabled user-controlled feature (mindmap) in the payload with enabled: false', async () => {
+        /* mindmap is userControlled: true — it is not shown in the admin form,
+           so the admin cannot toggle it. But if the server has it saved as
+           enabled: false, that state must still reach updateConversation so the
+           server can persist the explicit disable rather than falling back to the
+           type default (true). */
+        const eventWithDisabledMindmap: any = {
+          ...mockInitialEvent,
+          platforms: ['zoom'],
+          conversationType: 'eventAssistantExtraTest',
+          type: {
+            name: 'eventAssistantExtraTest',
+            label: 'Event Assistant With Additional Features',
+            properties: [],
+            platforms: [],
+          },
+          features: [{ name: 'mindmap', enabled: false, config: {} }],
+        };
+
+        const user = userEvent.setup();
+        await renderAndGoToStep3(user, eventWithDisabledMindmap);
+        await submitFromStep3(user);
+
+        await waitFor(() => {
+          expect(updateConversation).toHaveBeenCalledWith(
+            'conv-edit-123',
+            expect.objectContaining({
+              features: [
+                { name: 'collectiveVoice', enabled: true, config: { minContributionInterval: 10 } },
+                { name: 'catalyst', enabled: true, config: { minContributionInterval: 10 } },
+                { name: 'librarian', enabled: true, config: { recommendationsPerInterval: 2 } },
+                { name: 'mod', enabled: true, config: {} },
+                { name: 'mindmap', enabled: false, config: {} },
+                { name: 'visual', enabled: true, config: {} },
+                { name: 'jargonFilter', enabled: true, config: {} },
+              ],
+            }),
+          );
+        });
+      });
+
+      it('includes a newly enabled feature in the payload alongside pre-existing ones', async () => {
+        const user = userEvent.setup();
+        // Start with only liveTranscript; enable autoSummary during edit
+        await renderAndGoToStep3(user);
+
+        await user.click(screen.getByRole('checkbox', { name: /auto summary/i }));
+
+        await submitFromStep3(user);
+
+        await waitFor(() => {
+          expect(updateConversation).toHaveBeenCalledWith(
+            'conv-edit-123',
+            expect.objectContaining({
+              features: expect.arrayContaining([
+                { name: 'liveTranscript', enabled: true, config: { transcriptDelay: 10 } },
+                { name: 'autoSummary', enabled: true, config: {} },
+              ]),
+            }),
+          );
+        });
+      });
+    });
+
+    describe('Feature sub-property inputs in edit mode', () => {
+      /* All feature sub-properties (timing intervals, etc.) are editable in edit mode,
+         the same as in create mode. */
+      const mockCatalystEvent: any = {
+        ...mockInitialEvent,
+        platforms: ['zoom'],
+        conversationType: 'eventAssistantExtraTest',
+        type: {
+          name: 'eventAssistantExtraTest',
+          label: 'Event Assistant With Additional Features',
+          properties: [],
+          platforms: [],
+        },
+        features: [
+          { name: 'catalyst', enabled: true, config: { minContributionInterval: 7 } },
+          { name: 'collectiveVoice', enabled: false, config: {} },
+          { name: 'librarian', enabled: false, config: {} },
+        ],
+      };
+
+      const goToStep3 = async (user: ReturnType<typeof userEvent.setup>, event: any) => {
+        await act(async () => {
+          render(<EventCreationForm mode="edit" initialEvent={event} />);
+        });
+        await waitFor(() => screen.getByLabelText(/Event Name/i));
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Nextspace'));
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Customize your conversation settings'));
+      };
+
+      it('shows sub-property inputs for all enabled features in edit mode', async () => {
+        const eventWithAllThree: any = {
+          ...mockInitialEvent,
+          platforms: ['zoom'],
+          conversationType: 'eventAssistantExtraTest',
+          type: {
+            name: 'eventAssistantExtraTest',
+            label: 'Event Assistant With Additional Features',
+            properties: [],
+            platforms: [],
+          },
+          features: [
+            { name: 'catalyst', enabled: true, config: { minContributionInterval: 7 } },
+            { name: 'collectiveVoice', enabled: true, config: { minContributionInterval: 5 } },
+            { name: 'librarian', enabled: true, config: { recommendationsPerInterval: 3 } },
+          ],
+        };
+
+        const user = userEvent.setup();
+        await goToStep3(user, eventWithAllThree);
+
+        // Catalyst's sub-property must render with the saved value
+        const intervalInputs = screen.getAllByLabelText(/Minimum Minutes Between Contributions/i) as HTMLInputElement[];
+        expect(intervalInputs.some((i) => i.value === '7')).toBe(true);
+
+        // Collective Voice's sub-property must also render
+        expect(intervalInputs.some((i) => i.value === '5')).toBe(true);
+
+        // Librarian's sub-property must render with the saved value
+        const libInput = screen.getByLabelText(/Number of Reading Recommendations per Interval/i) as HTMLInputElement;
+        expect(libInput.value).toBe('3');
+      });
+
+      it('preserves the saved catalyst timing in the payload when re-saved unchanged', async () => {
+        const user = userEvent.setup();
+        await goToStep3(user, mockCatalystEvent);
+
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('About the Speakers'));
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Reading & Resources'));
+        await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+        await waitFor(() => {
+          expect(updateConversation).toHaveBeenCalledWith(
+            'conv-edit-123',
+            expect.objectContaining({
+              features: expect.arrayContaining([{ name: 'catalyst', enabled: true, config: { minContributionInterval: 7 } }]),
+            }),
+          );
+        });
+      });
+    });
+
+    it('redirects to the view page after a successful save in edit mode', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm mode="edit" initialEvent={mockInitialEvent} />);
+      });
+
+      await waitFor(() => screen.getByLabelText(/Event Name/i));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Nextspace'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Customize your conversation settings'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('About the Speakers'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Reading & Resources'));
+
+      await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-edit-123');
+      });
+    });
+
+    describe('Cancel button', () => {
+      const renderEditForm = async (event: any = mockInitialEvent) => {
+        await act(async () => {
+          render(<EventCreationForm mode="edit" initialEvent={event} />);
+        });
+        await waitFor(() => screen.getByLabelText(/Event Name/i));
+      };
+
+      it('shows a Cancel button in edit mode', async () => {
+        await renderEditForm();
+        expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+      });
+
+      it('does not show a Cancel button in create mode', async () => {
+        await act(async () => {
+          render(<EventCreationForm />);
+        });
+        await waitFor(() => screen.getByLabelText(/Event Name/i));
+        expect(screen.queryByRole('button', { name: /cancel/i })).not.toBeInTheDocument();
+      });
+
+      it('navigates to the view page immediately when cancelled with no changes', async () => {
+        const user = userEvent.setup();
+        await renderEditForm();
+
+        await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+        await waitFor(() => {
+          expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-edit-123');
+        });
+      });
+
+      it('navigates immediately when a change is reverted back to the original value', async () => {
+        const user = userEvent.setup();
+        await renderEditForm();
+
+        const nameInput = screen.getByLabelText(/Event Name/i);
+        await user.clear(nameInput);
+        await user.type(nameInput, 'Temporary Edit');
+        await user.clear(nameInput);
+        await user.type(nameInput, 'My Existing Event');
+
+        await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+        await waitFor(() => {
+          expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-edit-123');
+        });
+      });
+
+      it('navigates immediately when the API returned a non-UTC ISO date and nothing was edited', async () => {
+        /* The API may return dates with a timezone offset rather than UTC "Z".
+           Without normalizing both sides to the same format, an untouched form
+           compares unequal and shows the unsaved-changes warning on Cancel. This
+           test guards that the normalization stays in place. */
+        const eventWithOffsetDate = {
+          ...mockInitialEvent,
+          scheduledTime: '2030-01-15T15:00:00+00:00',
+          scheduledEndTime: '2030-01-15T16:00:00+00:00',
+        };
+        const user = userEvent.setup();
+        await act(async () => {
+          render(<EventCreationForm mode="edit" initialEvent={eventWithOffsetDate} />);
+        });
+        await waitFor(() => screen.getByLabelText(/Event Name/i));
+
+        await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+        await waitFor(() => {
+          expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-edit-123');
+        });
+      });
+
+      it('shows a confirmation dialog when cancelled after making a change', async () => {
+        const user = userEvent.setup();
+        await renderEditForm();
+
+        const nameInput = screen.getByLabelText(/Event Name/i);
+        await user.clear(nameInput);
+        await user.type(nameInput, 'Changed Name');
+
+        await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByText(/discard changes/i)).toBeInTheDocument();
+      });
+
+      it('navigates away when the user confirms discarding changes', async () => {
+        const user = userEvent.setup();
+        await renderEditForm();
+
+        const nameInput = screen.getByLabelText(/Event Name/i);
+        await user.clear(nameInput);
+        await user.type(nameInput, 'Changed Name');
+
+        await user.click(screen.getByRole('button', { name: /cancel/i }));
+        await screen.findByRole('dialog');
+        await user.click(screen.getByRole('button', { name: /discard/i }));
+
+        await waitFor(() => {
+          expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-edit-123');
+        });
+      });
+
+      it('keeps the user on the form when they dismiss the confirmation dialog', async () => {
+        const user = userEvent.setup();
+        await renderEditForm();
+
+        const nameInput = screen.getByLabelText(/Event Name/i);
+        await user.clear(nameInput);
+        await user.type(nameInput, 'Changed Name');
+
+        await user.click(screen.getByRole('button', { name: /cancel/i }));
+        await screen.findByRole('dialog');
+        await user.click(screen.getByRole('button', { name: /keep editing/i }));
+
+        // The user stays on the form — no navigation occurred and the form is still interactive
+        expect(mockPush).not.toHaveBeenCalled();
+        expect(screen.getByLabelText(/Event Name/i)).toBeInTheDocument();
+      });
+    });
+
+    it('allows proceeding from Step 1 when the pre-filled scheduled time is in the past', async () => {
+      /* In edit mode the start-time picker must not enforce a future-only constraint.
+         An existing event's scheduled time may be in the past, and blocking navigation
+         would prevent the organizer from editing any other field. */
+      const pastEvent = {
+        ...mockInitialEvent,
+        scheduledTime: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      };
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm mode="edit" initialEvent={pastEvent} />);
+      });
+      await waitFor(() => screen.getByLabelText(/Event Name/i));
+
+      await user.click(screen.getByRole('button', { name: /next/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Nextspace')).toBeInTheDocument();
+      });
+    });
+
+    describe('Save overlay', () => {
+      /* Renders the form in edit mode and clicks through to the given step.
+         Defined here so overlay tests can reuse it without depending on the
+         Step payload verification describe block's inner scope. */
+      const goToStep = async (user: ReturnType<typeof userEvent.setup>, step: number, event: any = mockInitialEvent) => {
+        await act(async () => {
+          render(<EventCreationForm mode="edit" initialEvent={event} />);
+        });
+        await waitFor(() => screen.getByLabelText(/Event Name/i));
+        for (let i = 1; i < step; i++) {
+          await user.click(screen.getByRole('button', { name: /next/i }));
+        }
+        if (step >= 5) await waitFor(() => screen.getByText('Reading & Resources'));
+      };
+
+      it('shows a "Saving changes..." overlay while the update request is in flight', async () => {
+        const user = userEvent.setup();
+
+        let resolveUpdate: (value: any) => void;
+        (updateConversation as jest.Mock).mockImplementation(
+          () =>
+            new Promise((resolve) => {
+              resolveUpdate = resolve;
+            }),
+        );
+
+        await goToStep(user, 5);
+        await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+        expect(screen.getByText('Saving changes...')).toBeInTheDocument();
+
+        // Resolve to avoid a dangling promise after the test exits
+        await act(async () => {
+          resolveUpdate({ id: 'conv-edit-123', resources: [] });
+        });
+      });
+
+      it('updates the overlay to "Uploading PDF..." after saving when a PDF is attached', async () => {
+        const user = userEvent.setup();
+
+        (updateConversation as jest.Mock).mockResolvedValue({
+          id: 'conv-edit-123',
+          resources: [{ id: 'res-1', title: 'Test Paper' }],
+        });
+
+        let resolveUpload: (value: any) => void;
+        (SendData as jest.Mock).mockImplementation(
+          () =>
+            new Promise((resolve) => {
+              resolveUpload = resolve;
+            }),
+        );
+
+        await goToStep(user, 5);
+
+        await user.type(screen.getByLabelText(/^Title/i), 'Test Paper');
+        const input = document.getElementById('pdf-upload-0') as HTMLInputElement;
+        await user.upload(input, new File(['content'], 'test.pdf', { type: 'application/pdf' }));
+        await waitFor(() => screen.getByText('test.pdf'));
+
+        await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+        await waitFor(() => {
+          expect(screen.getByText('Uploading PDF...')).toBeInTheDocument();
+        });
+
+        await act(async () => {
+          resolveUpload({});
+        });
+      });
+
+      it('hides the overlay and shows an error if the update request fails', async () => {
+        const user = userEvent.setup();
+
+        (updateConversation as jest.Mock).mockResolvedValue({
+          error: true,
+          message: { message: 'Server error' },
+        });
+
+        await goToStep(user, 5);
+        await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+        await waitFor(() => {
+          expect(screen.queryByText('Saving changes...')).not.toBeInTheDocument();
+          expect(screen.getByText(/Server error/i)).toBeInTheDocument();
+        });
+      });
+    });
+
+    describe('Step payload verification', () => {
+      // Navigate to a specific step starting from the rendered edit form.
+      const renderAndGoToStep = async (
+        user: ReturnType<typeof userEvent.setup>,
+        step: 1 | 2 | 3 | 4 | 5,
+        event: any = mockInitialEvent,
+      ) => {
+        await act(async () => {
+          render(<EventCreationForm mode="edit" initialEvent={event} />);
+        });
+        await waitFor(() => screen.getByLabelText(/Event Name/i));
+        if (step >= 2) {
+          await user.click(screen.getByRole('button', { name: /next/i }));
+          await waitFor(() => screen.getByText('Nextspace'));
+        }
+        if (step >= 3) {
+          await user.click(screen.getByRole('button', { name: /next/i }));
+          await waitFor(() => screen.getByText('Customize your conversation settings'));
+        }
+        if (step >= 4) {
+          await user.click(screen.getByRole('button', { name: /next/i }));
+          await waitFor(() => screen.getByText('About the Speakers'));
+        }
+        if (step >= 5) {
+          await user.click(screen.getByRole('button', { name: /next/i }));
+          await waitFor(() => screen.getByText('Reading & Resources'));
+        }
+      };
+
+      // Continue through remaining steps from the given step and submit the form.
+      const submitFromStep = async (user: ReturnType<typeof userEvent.setup>, fromStep: 1 | 2 | 3 | 4 | 5) => {
+        if (fromStep <= 1) {
+          await user.click(screen.getByRole('button', { name: /next/i }));
+          await waitFor(() => screen.getByText('Nextspace'));
+        }
+        if (fromStep <= 2) {
+          await user.click(screen.getByRole('button', { name: /next/i }));
+          await waitFor(() => screen.getByText('Customize your conversation settings'));
+        }
+        if (fromStep <= 3) {
+          await user.click(screen.getByRole('button', { name: /next/i }));
+          await waitFor(() => screen.getByText('About the Speakers'));
+        }
+        if (fromStep <= 4) {
+          await user.click(screen.getByRole('button', { name: /next/i }));
+          await waitFor(() => screen.getByText('Reading & Resources'));
+        }
+        await user.click(screen.getByRole('button', { name: /save changes/i }));
+      };
+
+      describe('Step 1 — event details', () => {
+        it('includes the updated event name in the payload', async () => {
+          const user = userEvent.setup();
+          await renderAndGoToStep(user, 1);
+
+          const nameInput = screen.getByLabelText(/Event Name/i);
+          await user.clear(nameInput);
+          await user.type(nameInput, 'Updated Event Name');
+
+          await submitFromStep(user, 1);
+
+          await waitFor(() => {
+            expect(updateConversation).toHaveBeenCalledWith(
+              'conv-edit-123',
+              expect.objectContaining({ name: 'Updated Event Name' }),
+            );
+          });
+        });
+
+        it('includes the updated description in the payload', async () => {
+          const user = userEvent.setup();
+          await renderAndGoToStep(user, 1);
+
+          const descriptionInput = screen.getByLabelText(/Description/i);
+          await user.clear(descriptionInput);
+          await user.type(descriptionInput, 'A brand new description');
+
+          await submitFromStep(user, 1);
+
+          await waitFor(() => {
+            expect(updateConversation).toHaveBeenCalledWith(
+              'conv-edit-123',
+              expect.objectContaining({ description: 'A brand new description' }),
+            );
+          });
+        });
+
+        it('includes the updated Zoom URL in the payload', async () => {
+          const user = userEvent.setup();
+          await renderAndGoToStep(user, 1);
+
+          const urlInput = screen.getByLabelText(/Zoom Meeting URL/i);
+          await user.clear(urlInput);
+          await user.type(urlInput, 'https://zoom.us/j/newmeeting');
+
+          await submitFromStep(user, 1);
+
+          await waitFor(() => {
+            expect(updateConversation).toHaveBeenCalledWith(
+              'conv-edit-123',
+              expect.objectContaining({
+                properties: expect.objectContaining({ zoomMeetingUrl: 'https://zoom.us/j/newmeeting' }),
+              }),
+            );
+          });
+        });
+
+        it('includes updated scheduled times in the payload when changed', async () => {
+          const user = userEvent.setup();
+          // Use an event without pre-filled times so we control what gets typed
+          const eventWithoutTimes: any = {
+            ...mockInitialEvent,
+            scheduledTime: undefined,
+            scheduledEndTime: undefined,
+          };
+          await renderAndGoToStep(user, 1, eventWithoutTimes);
+
+          const startTimeInput = screen.getAllByLabelText(/Meeting Day\/Time/i)[0];
+          await user.type(startTimeInput, futureStartTime);
+
+          const endTimeInput = screen.getAllByLabelText(/Meeting End Time/i)[0];
+          await user.type(endTimeInput, futureEndTime);
+
+          await submitFromStep(user, 1);
+
+          await waitFor(() => {
+            expect(updateConversation).toHaveBeenCalledWith(
+              'conv-edit-123',
+              expect.objectContaining({
+                scheduledTime: expect.any(String),
+                scheduledEndTime: expect.any(String),
+              }),
+            );
+          });
+        });
+
+        it('allows advancing past Step 1 when a saved event has a start time but no end time', async () => {
+          /* Regression: in create mode, an end time is required once a start time is set.
+             That rule blocked editing legacy events with no persisted end time. The
+             backend treats scheduledEndTime as optional, so the frontend shouldn't gate
+             edits on it. */
+          const legacyEventNoEndTime: any = {
+            ...mockInitialEvent,
+            scheduledTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+            scheduledEndTime: undefined,
+          };
+
+          const user = userEvent.setup();
+          await act(async () => {
+            render(<EventCreationForm mode="edit" initialEvent={legacyEventNoEndTime} />);
+          });
+          await waitFor(() => screen.getByLabelText(/Event Name/i));
+
+          await user.click(screen.getByRole('button', { name: /next/i }));
+
+          // Reached Step 2 (Conversation Setup) without the end-time-required error
+          await waitFor(() => screen.getByText('Nextspace'));
+          expect(screen.queryByText(/Meeting End Time is required when a start time is provided/i)).not.toBeInTheDocument();
+        });
+
+        it('includes the updated topic ID in the payload', async () => {
+          const user = userEvent.setup();
+          // mockInitialEvent has topic: 'topic-1' — switch to topic-2
+          await renderAndGoToStep(user, 1);
+
+          const topicInput = screen.getByLabelText(/Select a series/i);
+          fireEvent.click(topicInput);
+          fireEvent.keyDown(topicInput, { key: 'ArrowDown' });
+          fireEvent.click(await screen.findByRole('option', { name: /Public Topic 2/i }));
+
+          await submitFromStep(user, 1);
+
+          await waitFor(() => {
+            expect(updateConversation).toHaveBeenCalledWith(
+              'conv-edit-123',
+              expect.objectContaining({ topicId: 'topic-2' }),
+            );
+          });
+        });
+      });
+
+      describe('Step 2 — conversation setup', () => {
+        it('includes the updated platforms list in the payload', async () => {
+          const user = userEvent.setup();
+          // mockInitialEvent has platforms: ['zoom'] — also enable Nextspace
+          await renderAndGoToStep(user, 2);
+
+          await user.click(screen.getByRole('checkbox', { name: /nextspace/i }));
+
+          await submitFromStep(user, 2);
+
+          await waitFor(() => {
+            expect(updateConversation).toHaveBeenCalledWith(
+              'conv-edit-123',
+              expect.objectContaining({
+                platforms: expect.arrayContaining(['zoom', 'nextspace']),
+              }),
+            );
+          });
+        });
+      });
+
+      describe('Step 4 — speakers and moderators', () => {
+        it('reflects an edited speaker name and bio in the payload', async () => {
+          const user = userEvent.setup();
+          const eventWithSpeaker: any = {
+            ...mockInitialEvent,
+            presenters: [{ name: 'Original Speaker', bio: 'Original Bio' }],
+          };
+          await renderAndGoToStep(user, 4, eventWithSpeaker);
+
+          const nameInputs = screen.getAllByLabelText(/^Name$/i);
+          await user.clear(nameInputs[0]);
+          await user.type(nameInputs[0], 'Updated Speaker');
+
+          const bioInputs = screen.getAllByLabelText(/Bio/i);
+          await user.clear(bioInputs[0]);
+          await user.type(bioInputs[0], 'Updated Bio');
+
+          await submitFromStep(user, 4);
+
+          await waitFor(() => {
+            expect(updateConversation).toHaveBeenCalledWith(
+              'conv-edit-123',
+              expect.objectContaining({
+                presenters: expect.arrayContaining([
+                  expect.objectContaining({ name: 'Updated Speaker', bio: 'Updated Bio' }),
+                ]),
+              }),
+            );
+          });
+        });
+
+        it('includes a newly added speaker in the payload', async () => {
+          const user = userEvent.setup();
+          // mockInitialEvent has no presenters — form starts with one empty row
+          await renderAndGoToStep(user, 4);
+
+          await user.click(screen.getByRole('button', { name: /\+ Add Another Speaker/i }));
+          await waitFor(() => screen.getByText('Speaker 2'));
+
+          const nameInputs = screen.getAllByLabelText(/^Name$/i);
+          await user.type(nameInputs[0], 'First Speaker');
+          await user.type(nameInputs[1], 'Second Speaker');
+
+          await submitFromStep(user, 4);
+
+          await waitFor(() => {
+            expect(updateConversation).toHaveBeenCalledWith(
+              'conv-edit-123',
+              expect.objectContaining({
+                presenters: expect.arrayContaining([
+                  expect.objectContaining({ name: 'First Speaker' }),
+                  expect.objectContaining({ name: 'Second Speaker' }),
+                ]),
+              }),
+            );
+          });
+        });
+
+        it('excludes a removed speaker from the payload', async () => {
+          const user = userEvent.setup();
+          const eventWithTwoSpeakers: any = {
+            ...mockInitialEvent,
+            presenters: [
+              { name: 'Speaker One', bio: '' },
+              { name: 'Speaker Two', bio: '' },
+            ],
+          };
+          await renderAndGoToStep(user, 4, eventWithTwoSpeakers);
+          await waitFor(() => screen.getByText('Speaker 2'));
+
+          // With two pre-filled speakers, each has its own Remove button. Click the last
+          // one (Speaker Two's) so Speaker One is what remains in the payload.
+          const removeButtons = screen.getAllByRole('button', { name: /remove/i });
+          await user.click(removeButtons[removeButtons.length - 1]);
+          await waitFor(() => expect(screen.queryByText('Speaker 2')).not.toBeInTheDocument());
+
+          await submitFromStep(user, 4);
+
+          await waitFor(() => {
+            const call = (updateConversation as jest.Mock).mock.calls[0];
+            const presenters = call[1].presenters as { name: string }[];
+            expect(presenters).toHaveLength(1);
+            expect(presenters[0].name).toBe('Speaker One');
+          });
+        });
+
+        it('includes a newly added moderator in the payload', async () => {
+          const user = userEvent.setup();
+          await renderAndGoToStep(user, 4);
+
+          await user.click(screen.getByRole('button', { name: /\+ Add Moderators/i }));
+          await waitFor(() => screen.getByText('Moderator 1'));
+
+          const nameInputs = screen.getAllByLabelText(/^Name$/i);
+          await user.type(nameInputs[nameInputs.length - 1], 'New Moderator');
+
+          await submitFromStep(user, 4);
+
+          await waitFor(() => {
+            expect(updateConversation).toHaveBeenCalledWith(
+              'conv-edit-123',
+              expect.objectContaining({
+                moderators: expect.arrayContaining([expect.objectContaining({ name: 'New Moderator' })]),
+              }),
+            );
+          });
+        });
+
+        it('reflects an edited moderator name and bio in the payload', async () => {
+          const user = userEvent.setup();
+          const eventWithModerator: any = {
+            ...mockInitialEvent,
+            moderators: [{ name: 'Original Moderator', bio: 'Original Bio' }],
+          };
+          await renderAndGoToStep(user, 4, eventWithModerator);
+          await waitFor(() => screen.getByText('Moderator 1'));
+
+          const nameInputs = screen.getAllByLabelText(/^Name$/i);
+          const bioInputs = screen.getAllByLabelText(/Bio/i);
+          // Moderator fields appear after speaker fields — use the last Name/Bio inputs
+          await user.clear(nameInputs[nameInputs.length - 1]);
+          await user.type(nameInputs[nameInputs.length - 1], 'Updated Moderator');
+          await user.clear(bioInputs[bioInputs.length - 1]);
+          await user.type(bioInputs[bioInputs.length - 1], 'Updated Bio');
+
+          await submitFromStep(user, 4);
+
+          await waitFor(() => {
+            expect(updateConversation).toHaveBeenCalledWith(
+              'conv-edit-123',
+              expect.objectContaining({
+                moderators: expect.arrayContaining([
+                  expect.objectContaining({ name: 'Updated Moderator', bio: 'Updated Bio' }),
+                ]),
+              }),
+            );
+          });
+        });
+
+        it('includes alternateName for speakers and moderators in the payload', async () => {
+          const user = userEvent.setup();
+          const eventWithPeople: any = {
+            ...mockInitialEvent,
+            presenters: [{ name: 'Dr. Smith', bio: '' }],
+            moderators: [{ name: 'Ms. Jones', bio: '' }],
+          };
+          await renderAndGoToStep(user, 4, eventWithPeople);
+          await waitFor(() => screen.getByText('Moderator 1'));
+
+          const alternateNameInputs = screen.getAllByLabelText(/Alternate Name/i);
+          // First alternate name input belongs to the speaker, second to the moderator
+          await user.type(alternateNameInputs[0], 'John Smith');
+          await user.type(alternateNameInputs[1], 'Alice Jones');
+
+          await submitFromStep(user, 4);
+
+          await waitFor(() => {
+            expect(updateConversation).toHaveBeenCalledWith(
+              'conv-edit-123',
+              expect.objectContaining({
+                presenters: expect.arrayContaining([expect.objectContaining({ alternateName: 'John Smith' })]),
+                moderators: expect.arrayContaining([expect.objectContaining({ alternateName: 'Alice Jones' })]),
+              }),
+            );
+          });
+        });
+
+        it('excludes a removed moderator from the payload', async () => {
+          const user = userEvent.setup();
+          const eventWithModerator: any = {
+            ...mockInitialEvent,
+            moderators: [{ name: 'Existing Moderator', bio: '' }],
+          };
+          await renderAndGoToStep(user, 4, eventWithModerator);
+          await waitFor(() => screen.getByText('Moderator 1'));
+
+          // showModerators is true because the event has a pre-filled moderator.
+          // The Remove button for the moderator section removes the whole section.
+          const removeButtons = screen.getAllByRole('button', { name: /remove/i });
+          await user.click(removeButtons[removeButtons.length - 1]);
+
+          await submitFromStep(user, 4);
+
+          await waitFor(() => {
+            const call = (updateConversation as jest.Mock).mock.calls[0];
+            expect(call[1].moderators ?? []).toHaveLength(0);
+          });
+        });
+      });
+
+      describe('Step 5 — resources', () => {
+        it('includes a newly added resource in the payload', async () => {
+          const user = userEvent.setup();
+          await renderAndGoToStep(user, 5);
+
+          await user.type(screen.getByLabelText(/^Title/i), 'A New Resource');
+
+          await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+          await waitFor(() => {
+            expect(updateConversation).toHaveBeenCalledWith(
+              'conv-edit-123',
+              expect.objectContaining({
+                resources: expect.arrayContaining([expect.objectContaining({ title: 'A New Resource' })]),
+              }),
+            );
+          });
+        });
+
+        it('excludes a resource whose title has been cleared from the payload', async () => {
+          const user = userEvent.setup();
+          const eventWithResource: any = {
+            ...mockInitialEvent,
+            resources: [{ title: 'Existing Resource', url: '' }],
+          };
+          await renderAndGoToStep(user, 5, eventWithResource);
+
+          const titleInput = screen.getByLabelText(/^Title/i);
+          await user.clear(titleInput);
+
+          await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+          await waitFor(() => {
+            const call = (updateConversation as jest.Mock).mock.calls[0];
+            expect(call[1].resources ?? []).toHaveLength(0);
+          });
+        });
+
+        it('uploads the PDF after saving changes in edit mode when a resource has one attached', async () => {
+          /* In create mode, the PDF upload runs after Request('conversations/from-type') returns.
+             In edit mode, the form calls updateConversation and returns early, so the upload
+             block is skipped. This test confirms the upload happens in edit mode too. */
+          const user = userEvent.setup();
+
+          // Return a resource with an ID so the upload endpoint can be built
+          (updateConversation as jest.Mock).mockResolvedValue({
+            id: 'conv-edit-123',
+            resources: [{ id: 'res-edit-abc', title: 'Edit Paper' }],
+          });
+          (SendData as jest.Mock).mockResolvedValue({});
+
+          await renderAndGoToStep(user, 5);
+
+          await user.type(screen.getByLabelText(/^Title/i), 'Edit Paper');
+
+          const validFile = new File(['content'], 'edit-paper.pdf', { type: 'application/pdf' });
+          const input = document.getElementById('pdf-upload-0') as HTMLInputElement;
+          await user.upload(input, validFile);
+          await waitFor(() => screen.getByText('edit-paper.pdf'));
+
+          await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+          await waitFor(() => {
+            expect(SendData).toHaveBeenCalledWith(
+              'resources/conv-edit-123/res-edit-abc/pdf',
+              null,
+              undefined,
+              expect.objectContaining({ method: 'POST', body: expect.any(FormData) }),
+            );
+          });
+        });
+
+        it('shows "PDF already uploaded" when a resource already has one saved on the server', async () => {
+          /*
+           * The API returns hasPdf: true (derived from fileName, which is private).
+           * The form should display an indicator rather than the empty drop zone so
+           * users know a PDF is attached, and re-saving without changes preserves it.
+           */
+          const user = userEvent.setup();
+          const eventWithPdf: any = {
+            ...mockInitialEvent,
+            resources: [{ id: 'res-abc', title: 'Existing Paper', hasPdf: true }],
+          };
+          await renderAndGoToStep(user, 5, eventWithPdf);
+
+          expect(screen.getByText('PDF already uploaded')).toBeInTheDocument();
+          expect(screen.queryByText(/drop a pdf/i)).not.toBeInTheDocument();
+        });
+
+        it('includes the resource id in the save payload so the server can preserve the existing PDF', async () => {
+          /*
+           * updateResources() on the server matches incoming resources to existing ones by id
+           * to carry over fileName. Without id in the payload, the server can't match, and
+           * fileName is lost on re-save even when the user made no changes.
+           */
+          const user = userEvent.setup();
+          const eventWithPdf: any = {
+            ...mockInitialEvent,
+            resources: [{ id: 'res-abc', title: 'Existing Paper', hasPdf: true }],
+          };
+          await renderAndGoToStep(user, 5, eventWithPdf);
+
+          await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+          await waitFor(() => {
+            expect(updateConversation).toHaveBeenCalledWith(
+              'conv-edit-123',
+              expect.objectContaining({
+                resources: expect.arrayContaining([expect.objectContaining({ id: 'res-abc', title: 'Existing Paper' })]),
+              }),
+            );
+          });
+        });
+      });
     });
   });
 
