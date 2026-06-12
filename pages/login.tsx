@@ -58,16 +58,18 @@ export default function LoginPage() {
         return;
       }
 
+      const userId = response.user?.id || response.userId;
+
       // Store tokens with expiry info so TokenManager can schedule
-      // proactive refresh correctly.
+      // proactive refresh correctly.  Pass the userId so TokenManager knows
+      // which user these tokens belong to.
       Api.get().SetTokens(
         response.tokens.access.token,
         response.tokens.refresh.token,
         response.tokens.access.expires,
         response.tokens.refresh.expires,
+        userId,
       );
-
-      const userId = response.user?.id || response.userId;
 
       // Get the active pseudonym for the user
       const activePseudonym = response.user?.pseudonyms?.find((p: any) => p.active)?.pseudonym;
