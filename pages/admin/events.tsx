@@ -17,6 +17,11 @@ import {
   IconButton,
   Tooltip,
   Dialog,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  Drawer,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EventIcon from '@mui/icons-material/Event';
@@ -33,6 +38,7 @@ import {
   generateAndDownloadUserMetricsReport,
   generateAndDownloadDirectMessageResponsesReport,
 } from '../../utils/eventReportGenerator';
+import { FilterListSharp } from '@mui/icons-material';
 
 const EventCard = ({
   event,
@@ -395,8 +401,15 @@ function EventScreen({ authType }: { authType: AuthType }) {
   const [eventsShown, setEventsShown] = useState(6);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
   const [includePast, setIncludePast] = useState(false);
   const [myEventsOnly, setMyEventsOnly] = useState(false);
+
+  const [statusFilters, setStatusFilters] = useState<string | string[]>(['active', 'upcoming', 'past']);
+  const [typeFilters, setTypeFilters] = useState<string | string[]>(['eventAssistant', 'backChannel']);
+
   const allConversationsRef = useRef<components['schemas']['Conversation'][] | null>(null);
 
   /**
@@ -404,13 +417,11 @@ function EventScreen({ authType }: { authType: AuthType }) {
    * @param includePast true to include all events, false for only active/future
    * @param myEventsOnly true to show only events owned by current user
    */
-  const filterConversations = (
-    conversations: components['schemas']['Conversation'][],
-    includePast: boolean,
-    myEventsOnly: boolean = false,
-  ) => {
+  const filterConversations = (conversations: components['schemas']['Conversation'][], myEventsOnly: boolean = false) => {
     const now = new Date();
-    return conversations.filter((conv) => {
+    const c = conversations.filter((conv) => {
+      if (statusFilters.length === 0) return false; // If no status filters are selected, show nothing
+
       // Filter by owner if myEventsOnly is enabled
       if (myEventsOnly && conv.owner !== userId) {
         return false;
@@ -419,20 +430,19 @@ function EventScreen({ authType }: { authType: AuthType }) {
       const scheduledTime = conv.scheduledTime ? new Date(conv.scheduledTime) : null;
       const isPastEvent = scheduledTime ? scheduledTime <= now : false;
 
-      // Always show active events
-      if (conv.active) return true;
+      // Show active events if selected
+      if (statusFilters.includes('active') && conv.active) return true;
 
-      // Show future events
-      if (scheduledTime && scheduledTime > now) return true;
+      // Show future events if selected, even if they are not active yet
+      if (statusFilters.includes('upcoming') && scheduledTime && scheduledTime > now) return true;
 
-      // Show past events only if includePast is true
-      if (isPastEvent && includePast) return true;
-
-      // Show inactive events without scheduledTime (treat as past events)
-      if (!scheduledTime && includePast) return true;
+      // Show past events only if selected, and if they are not active (active past events are already included above)
+      if (statusFilters.includes('past') && isPastEvent && !conv.active) return true;
 
       return false;
     });
+    console.log('Filtered conversations:', c);
+    return c;
   };
 
   /**
@@ -519,8 +529,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
       // Store raw response for tab switching
       allConversationsRef.current = data;
 
-      // Filter to only active/future events (not past)
-      const filtered = filterConversations(data, false, myEventsOnly);
+      const filtered = filterConversations(data, myEventsOnly);
 
       // Sort: active events first, then all others by most recent
       const sorted = [...filtered].sort((a, b) => {
@@ -562,7 +571,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
     setIsInitialLoading(true);
 
     // Filter based on whether to include past events
-    const filtered = filterConversations(allConversationsRef.current, include, myEventsOnly);
+    const filtered = filterConversations(allConversationsRef.current, myEventsOnly);
 
     // Sort: active events first, then all others by most recent
     const sorted = [...filtered].sort((a, b) => {
@@ -590,7 +599,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
     setIsInitialLoading(true);
 
     // Filter based on owner and past events settings
-    const filtered = filterConversations(allConversationsRef.current, includePast, showOnlyMine);
+    const filtered = filterConversations(allConversationsRef.current, showOnlyMine);
 
     // Sort: active events first, then all others by most recent
     const sorted = [...filtered].sort((a, b) => {
@@ -622,19 +631,79 @@ function EventScreen({ authType }: { authType: AuthType }) {
       ) : (
         <div className="w-3/4 space-y-6">
           <div className="flex justify-end gap-2">
-            <label className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-3 py-1 cursor-pointer">
-              <span className="text-xs text-gray-500 select-none">My events only</span>
-              <Switch
-                checked={myEventsOnly}
-                onChange={(e) => handleMyEventsToggle(e.target.checked)}
-                size="small"
-                sx={{ m: 0 }}
-              />
-            </label>
-            <label className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-3 py-1 cursor-pointer">
-              <span className="text-xs text-gray-500 select-none">Include past events</span>
-              <Switch checked={includePast} onChange={(e) => handleToggle(e.target.checked)} size="small" sx={{ m: 0 }} />
-            </label>
+            <Button
+              startIcon={<FilterListSharp />}
+              onClick={() => setFiltersOpen(true)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              Filters
+            </Button>
+            <Drawer anchor="right" open={filtersOpen} onClose={() => setFiltersOpen(false)}>
+              <div className="flex flex-col gap-6 p-6 w-72">
+                <Typography variant="h6">Filters & Sorting</Typography>
+
+                {/* Sorting dropdown */}
+                <FormControl fullWidth>
+                  <InputLabel id="sorting-label">Sort By</InputLabel>
+                  <Select labelId="sorting-label" id="sorting-select" value="recent" onChange={() => {}} label="Sort By">
+                    <MenuItem value="recent">Scheduled Time (Most Recent)</MenuItem>
+                    <MenuItem value="oldest">Scheduled Time (Oldest)</MenuItem>
+                    <MenuItem value="created">Date Created (Ascending)</MenuItem>
+                    <MenuItem value="created_desc">Date Created (Descending)</MenuItem>
+                    <MenuItem value="status">Status</MenuItem>
+                  </Select>
+                </FormControl>
+
+                {/* Status filter */}
+                <FormControl fullWidth>
+                  <InputLabel id="event-status-label">Status</InputLabel>
+                  <Select
+                    labelId="event-status-label"
+                    id="event-status-select"
+                    multiple
+                    value={statusFilters}
+                    onChange={(e) => {
+                      setStatusFilters(e.target.value);
+                      handleToggle(includePast);
+                    }}
+                    label="Status"
+                  >
+                    <MenuItem value="active">Active Events</MenuItem>
+                    <MenuItem value="upcoming">Upcoming Events</MenuItem>
+                    <MenuItem value="past">Past Events</MenuItem>
+                  </Select>
+                </FormControl>
+
+                {/* Type filter */}
+                <FormControl fullWidth>
+                  <InputLabel id="event-type-label">Type</InputLabel>
+                  <Select
+                    labelId="event-type-label"
+                    id="event-type-select"
+                    multiple
+                    value={typeFilters}
+                    onChange={(e) => {
+                      setTypeFilters(e.target.value);
+                      handleToggle(includePast);
+                    }}
+                    label="Type"
+                  >
+                    <MenuItem value="eventAssistant">Event Assistant</MenuItem>
+                    <MenuItem value="backChannel">Backchannel</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <Divider />
+
+                {/* Toggles */}
+                <div className="flex flex-col gap-3">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-sm text-gray-600">My events only</span>
+                    <Switch checked={myEventsOnly} onChange={(e) => handleMyEventsToggle(e.target.checked)} size="small" />
+                  </label>
+                </div>
+              </div>
+            </Drawer>
           </div>
           {isInitialLoading ? (
             // Show 6 skeleton cards while loading
