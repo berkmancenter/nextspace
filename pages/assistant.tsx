@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
+import CloseIcon from '@mui/icons-material/Close';
 
 import { AssistantChatPanel } from '../components/AssistantChatPanel';
 import { GroupChatPanel } from '../components/GroupChatPanel';
@@ -28,6 +29,7 @@ import { useSessionJoin } from '../utils/useSessionJoin';
 import { NavigationBar, NavTab } from '../components/NavigationBar';
 import { PreferencesPanel } from '../components/PreferencesPanel';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
+import { Button } from '@mui/material';
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -112,8 +114,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const hasJoinedConvRef = useRef(false);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [agentActive, setAgentActive] = useState<boolean>(true);
+  const [resourcesReminderActive, setResourcesReminderActive] = useState<boolean>(true);
   const [agentIds, setAgentIds] = useState<string[]>([]);
   const [conversationFeatures, setConversationFeatures] = useState<{ name: string; enabled?: boolean }[]>([]);
+
   const conversationType = useConversationType();
   const setConversationType = useSetConversationType();
   const setBotNameContext = useSetBotName();
@@ -221,14 +225,24 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       });
     };
 
+    const conversationEndingHandler = () => {
+      console.log('conversation:ending received');
+
+      // Don't activate the resources reminder if the user has already seen it or dismissed it
+      if (resourcesNavBadgeDismissed) return;
+      setResourcesReminderActive(true);
+    };
+
     socket.on('message:new', messageHandler);
     socket.on('resources:updated', resourcesUpdatedHandler);
+    socket.on('conversation:ending', conversationEndingHandler);
 
     return () => {
       socket.off('message:new', messageHandler);
       socket.off('resources:updated', resourcesUpdatedHandler);
+      socket.off('conversation:ending', conversationEndingHandler);
     };
-  }, [socket]);
+  }, [socket, resourcesNavBadgeDismissed]);
 
   // Keep activeTabRef in sync with activeTab state
   useEffect(() => {
@@ -809,6 +823,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
               showChat={!!chatPasscode}
               showTranscript={!!transcriptPasscode}
               showResources={true}
+              showResourcesReminder={resourcesReminderActive}
               botName={botName}
             />
 
@@ -830,6 +845,26 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                 <>
                   {/* Chat / Assistant / Resources / Preferences panel */}
                   <div className="flex-1 flex flex-col relative overflow-hidden">
+                    {/* Show dismissable resources reminder if active  */}
+                    {resourcesReminderActive && (
+                      <div className="absolute top-0 w-full z-10 bg-yellow-100 p-4 rounded shadow-2xl animate-slide-in">
+                        <div className="flex justify-between font-bold">
+                          <p>Don&apos;t forget to check out the resources before the event ends.</p>
+                          <Button className="ml-4 px-2 py-2" onClick={() => setResourcesReminderActive(false)} color="error">
+                            <CloseIcon />
+                          </Button>
+                        </div>
+                        <button
+                          className="mt-2 px-3 py-1 bg-yellow-200 hover:bg-yellow-300 rounded"
+                          onClick={() => {
+                            handleTabChange('resources');
+                            setResourcesReminderActive(false);
+                          }}
+                        >
+                          View Resources
+                        </button>
+                      </div>
+                    )}
                     {router.query.view === 'preferences' ? (
                       <PreferencesPanel botName={botName} />
                     ) : isConnected ? (

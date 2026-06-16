@@ -16,6 +16,7 @@ interface NavItem {
   ActiveIcon: React.ElementType | null;
   InactiveIcon: React.ElementType | null;
   show: boolean;
+  tooltip?: string;
 }
 
 interface NavigationBarProps {
@@ -29,6 +30,7 @@ interface NavigationBarProps {
   showChat: boolean;
   showTranscript: boolean;
   showResources?: boolean;
+  showResourcesReminder?: boolean;
   botName: string;
 }
 
@@ -39,7 +41,7 @@ interface NavigationBarProps {
  *  - Mobile: fixed bottom bar, horizontal layout
  *  - Desktop: left sidebar, vertical layout
  *
- * Three items: Event Bot, Group Chat, Transcript.
+ * Four items: Event Bot, Group Chat, Transcript, Resources.
  * Icons are black when selected, grey when unselected, on a light purple background.
  */
 export function NavigationBar({
@@ -53,6 +55,7 @@ export function NavigationBar({
   showChat,
   showTranscript,
   showResources = false,
+  showResourcesReminder = false,
   botName,
 }: NavigationBarProps) {
   const navItems: NavItem[] = (
@@ -84,6 +87,7 @@ export function NavigationBar({
         ActiveIcon: MenuBook,
         InactiveIcon: MenuBookOutlined,
         show: showResources,
+        tooltip: showResourcesReminder ? "Don't forget to check out the resources before the event ends!" : undefined,
       },
     ] as NavItem[]
   ).filter((item) => item.show);
@@ -180,7 +184,22 @@ export function NavigationBar({
         aria-label="Main navigation"
       >
         {navItems.map((item) => (
-          <NavButton key={item.id} item={item} size={26} />
+          <div key={item.id} className="relative w-full flex justify-center">
+            <NavButton item={item} size={26} />
+            {/* {item.tooltip && (
+              <span
+                className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50
+                  whitespace-nowrap rounded px-2 py-1 text-xs text-white"
+                style={{ backgroundColor: '#4A4A4A' }}
+              >
+                <span
+                  className="absolute top-1/2 -translate-y-1/2 -left-1.5 border-4 border-transparent"
+                  style={{ borderRightColor: '#4A4A4A' }}
+                />
+                {item.tooltip}
+              </span>
+            )} */}
+          </div>
         ))}
       </nav>
 
