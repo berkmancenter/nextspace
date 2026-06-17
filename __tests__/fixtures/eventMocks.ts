@@ -3,15 +3,18 @@ import { getConversation } from '../../utils/Helpers';
 
 export const setupSortedConversations = () => {
   const now = new Date();
-  const earliest = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000); // 1 day from now
-  const middle = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 days from now
-  const latest = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+  // 30 days past
+  const earliest = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  // 1 day future
+  const middle = new Date(now.getTime());
+  // 7 days future
+  const latest = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const conversations = [
     {
       id: 'middle-event',
       name: 'Middle Event',
-      active: false,
+      active: true,
       scheduledTime: middle.toISOString(),
       createdAt: new Date(middle.getTime() - 10000).toISOString(),
       owner: 'user-456',
@@ -21,7 +24,7 @@ export const setupSortedConversations = () => {
     {
       id: 'latest-event',
       name: 'Latest Event',
-      active: false,
+      active: true,
       scheduledTime: latest.toISOString(),
       createdAt: new Date(latest.getTime() - 1000).toISOString(),
       owner: 'user-456',

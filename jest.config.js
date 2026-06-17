@@ -14,6 +14,7 @@ const config = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   // Transform ES modules in node_modules (specifically jose)
   transformIgnorePatterns: ['node_modules/(?!(jose)/)'],
+  testPathIgnorePatterns: ['/node_modules/', '/.next/', '<rootDir>/__tests__/fixtures/'],
 };
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async

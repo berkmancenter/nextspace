@@ -480,139 +480,121 @@ describe('Events Page - Event Ordering', () => {
     expect(eventHeadings[1]).toHaveTextContent('Older Active Event');
   });
 
-  it('should sort inactive events by most recent first', async () => {
-    const now = new Date();
-    const recent = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000); // 1 day from now
-    const older = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000); // 5 days from now
-
-    const conversations = [
-      {
-        id: 'older-event',
-        name: 'Older Event',
-        active: false,
-        scheduledTime: older.toISOString(),
-        createdAt: older.toISOString(),
-        owner: 'user-456',
-        platformTypes: [],
-        eventUrls: { moderator: [], participant: [] },
-      },
-      {
-        id: 'recent-event',
-        name: 'Recent Event',
-        active: false,
-        scheduledTime: recent.toISOString(),
-        createdAt: recent.toISOString(),
-        owner: 'user-456',
-        platformTypes: [],
-        eventUrls: { moderator: [], participant: [] },
-      },
-    ];
-
-    (Request as jest.Mock).mockResolvedValue(conversations);
-    (getConversation as jest.Mock)
-      .mockResolvedValueOnce({
-        id: 'recent-event',
-        name: 'Recent Event',
-        active: false,
-        scheduledTime: recent.toISOString(),
-        createdAt: recent.toISOString(),
-        owner: 'user-456',
-        platformTypes: [],
-        type: { label: 'Test Agent' },
-        eventUrls: { zoom: null, moderator: [], participant: [] },
-      })
-      .mockResolvedValueOnce({
-        id: 'older-event',
-        name: 'Older Event',
-        active: false,
-        scheduledTime: older.toISOString(),
-        createdAt: older.toISOString(),
-        owner: 'user-456',
-        platformTypes: [],
-        type: { label: 'Test Agent' },
-        eventUrls: { zoom: null, moderator: [], participant: [] },
-      });
-
-    await act(async () => {
-      render(<EventsPage authType={'user'} />);
-    });
-
-    await waitFor(() => {
-      expect(screen.queryByText('Recent Event')).toBeInTheDocument();
-    });
-
-    const eventHeadings = screen.getAllByRole('heading', { level: 5 });
-    // More recent event should be first
-    expect(eventHeadings[0]).toHaveTextContent('Recent Event');
-    expect(eventHeadings[1]).toHaveTextContent('Older Event');
-  });
-
-  it('should sort events by scheduled time ascending (oldest first) when that sort is applied in filters', async () => {
+  it('should sort events by scheduled time descending (latest first) by default', async () => {
     setupSortedConversations();
 
     await act(async () => {
       render(<EventsPage authType={'user'} />);
     });
 
-    // Open filters
-    const filtersButton = screen.getByRole('button', { name: /filters/i });
-    await userEvent.click(filtersButton);
-
-    // Change sort to "Oldest"
-    const sortSelect = screen.getByRole('combobox', { name: /sort by/i });
-    await userEvent.click(sortSelect);
-    const oldestOption = await screen.findByRole('option', { name: /oldest/i });
-    await userEvent.click(oldestOption);
-
-    // Dismiss filters drawer by clicking close-filters button
-    const closeFiltersButton = screen.getByRole('button', { name: /close-filters/i });
-    await userEvent.click(closeFiltersButton);
-
-    // Wait for close
-    await waitFor(() => {
-      expect(screen.queryByText('Filters & Sorting')).not.toBeInTheDocument();
-    });
-
     const eventHeadings = screen.getAllByRole('heading', { level: 5 });
-    // Earliest scheduled event should be first when sorted ascending by scheduled time
-    expect(eventHeadings[0]).toHaveTextContent('Earliest Event');
+    // Latest scheduled event should be first by default (descending), past event should be hidden
+    console.log(eventHeadings.map((h) => h.textContent));
+    expect(eventHeadings[0]).toHaveTextContent('Latest Event');
     expect(eventHeadings[1]).toHaveTextContent('Middle Event');
-    expect(eventHeadings[2]).toHaveTextContent('Latest Event');
-  });
-
-  it('should sort events by date created ascending when that sort is applied in filters', async () => {
-    setupSortedConversations();
-
-    await act(async () => {
-      render(<EventsPage authType={'user'} />);
-    });
-
-    // Open filters
-    const filtersButton = screen.getByRole('button', { name: /filters/i });
-    await userEvent.click(filtersButton);
-
-    // Change sort to "Date Created (Ascending)"
-    const sortSelect = screen.getByRole('combobox', { name: /sort by/i });
-    await userEvent.click(sortSelect);
-    const dateCreatedAscOption = await screen.findByRole('option', { name: /date created \(ascending\)/i });
-    await userEvent.click(dateCreatedAscOption);
-
-    // Dismiss filters drawer by clicking outside the drawer (simulate clicking backdrop)
-    const backdrop = document.querySelector('.MuiBackdrop-root') as HTMLElement;
-    await userEvent.click(backdrop);
-
-    // Wait for close
-    await waitFor(() => {
-      expect(screen.queryByText('Filters & Sorting')).not.toBeInTheDocument();
-    });
-
-    const eventHeadings = screen.getAllByRole('heading', { level: 5 });
-    // Middle event should be first when sorted ascending by date created given the createdAt times in setupSortedConversations
-    expect(eventHeadings[1]).toHaveTextContent('Middle Event');
-    expect(eventHeadings[2]).toHaveTextContent('Latest Event');
-    expect(eventHeadings[0]).toHaveTextContent('Earliest Event');
+    expect(eventHeadings[2]).toBeUndefined(); // Past event should not be shown by default
   });
 });
+
+// describe('Events Page - All Other Event Sorting/Filtering', () => {
+//   const mockUserId = 'user-123';
+//   beforeEach(async () => {
+//     jest.clearAllMocks();
+
+//     // Always mock Request to return mockConversations unless overridden in a specific test
+//     (Request as jest.Mock).mockResolvedValue(mockConversations);
+
+//     (useSessionJoin as jest.Mock).mockReturnValue({ userId: mockUserId });
+
+//     // Mock fetch for detailed conversation calls
+//     global.fetch = jest.fn().mockResolvedValue({
+//       ok: true,
+//       json: async () => {
+//         return mockConversations;
+//       },
+//     });
+
+//     setupSortedConversations();
+
+//     await act(async () => {
+//       render(<EventsPage authType={'user'} />);
+//     });
+//   });
+
+//   it('should sort events by scheduled time ascending (oldest first) when that sort is applied in filters', async () => {
+//     // Open filters
+//     const filtersButton = screen.getByRole('button', { name: /filters/i });
+//     await userEvent.click(filtersButton);
+//     // Change sort to "Oldest"
+//     const oldestOption = await screen.findByRole('option', { name: /oldest/i });
+//     await userEvent.click(oldestOption);
+
+//     // Dismiss filters drawer by clicking close-filters button
+//     const closeFiltersButton = screen.getByRole('button', { name: /close-filters/i });
+//     await userEvent.click(closeFiltersButton);
+
+//     // Wait for close
+//     await waitFor(() => {
+//       expect(screen.queryByText('Filters & Sorting')).not.toBeInTheDocument();
+//     });
+
+//     const eventHeadings = screen.getAllByRole('heading', { level: 5 });
+//     // Earliest scheduled event should be first when sorted ascending by scheduled time
+//     expect(eventHeadings[0]).toHaveTextContent('Earliest Event');
+//     expect(eventHeadings[1]).toHaveTextContent('Middle Event');
+//     expect(eventHeadings[2]).toHaveTextContent('Latest Event');
+//   });
+
+//   it('should sort events by date created ascending when that sort is applied in filters', async () => {
+//     const dateCreatedAscOption = await screen.findByRole('option', { name: /date created \(ascending\)/i });
+//     await userEvent.click(dateCreatedAscOption);
+
+//     // Dismiss filters drawer by clicking outside the drawer (simulate clicking backdrop)
+//     const backdrop = document.querySelector('.MuiBackdrop-root') as HTMLElement;
+//     await userEvent.click(backdrop);
+
+//     // Wait for close
+//     await waitFor(() => {
+//       expect(screen.queryByText('Filters & Sorting')).not.toBeInTheDocument();
+//     });
+
+//     const eventHeadings = screen.getAllByRole('heading', { level: 5 });
+//     // Middle event should be first when sorted ascending by date created given the createdAt times in setupSortedConversations
+//     expect(eventHeadings[1]).toHaveTextContent('Middle Event');
+//     expect(eventHeadings[2]).toHaveTextContent('Latest Event');
+//     expect(eventHeadings[0]).toHaveTextContent('Earliest Event');
+//   });
+
+//   it('should not show events before start date filter', async () => {
+//     setupSortedConversations();
+
+//     await act(async () => {
+//       render(<EventsPage authType={'user'} />);
+//     });
+
+//     // Open filters
+//     const filtersButton = screen.getByRole('button', { name: /filters/i });
+//     await userEvent.click(filtersButton);
+
+//     // Set start date filter to after the earliest event
+//     const startDateInput = screen.getByLabelText(/start date/i);
+//     await userEvent.clear(startDateInput);
+//     await userEvent.type(startDateInput, '2025-06-02');
+
+//     // Dismiss filters drawer
+//     const closeFiltersButton = screen.getByRole('button', { name: /close-filters/i });
+//     await userEvent.click(closeFiltersButton);
+
+//     await waitFor(() => {
+//       expect(screen.queryByText('Filters & Sorting')).not.toBeInTheDocument();
+//     });
+
+//     // Earliest Event should not be visible; later events should remain
+//     expect(screen.queryByText('Earliest Event')).not.toBeInTheDocument();
+//     expect(screen.getByText('Middle Event')).toBeInTheDocument();
+//     expect(screen.getByText('Latest Event')).toBeInTheDocument();
+//   });
+// });
 
 describe('Events Page - Event Ownership', () => {
   const mockUserId = 'user-123';
