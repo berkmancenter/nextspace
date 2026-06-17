@@ -5,18 +5,25 @@ import { NextApiRequest, NextApiResponse } from 'next';
 jest.mock('jose', () => {
   const mockEncrypt = jest.fn();
   const mockJwtDecrypt = jest.fn();
+  const mockDecodeJwt = jest.fn();
+  // Capture the payload handed to EncryptJWT so tests can assert on the
+  // fields written into the cookie (e.g. the resolved userId).
+  const mockEncryptJWT = jest.fn().mockImplementation(() => ({
+    setProtectedHeader: jest.fn().mockReturnThis(),
+    setExpirationTime: jest.fn().mockReturnThis(),
+    setSubject: jest.fn().mockReturnThis(),
+    setIssuedAt: jest.fn().mockReturnThis(),
+    encrypt: mockEncrypt,
+  }));
 
   return {
-    EncryptJWT: jest.fn().mockImplementation(() => ({
-      setProtectedHeader: jest.fn().mockReturnThis(),
-      setExpirationTime: jest.fn().mockReturnThis(),
-      setSubject: jest.fn().mockReturnThis(),
-      setIssuedAt: jest.fn().mockReturnThis(),
-      encrypt: mockEncrypt,
-    })),
+    EncryptJWT: mockEncryptJWT,
     jwtDecrypt: mockJwtDecrypt,
+    decodeJwt: mockDecodeJwt,
     __mockEncrypt: mockEncrypt,
     __mockJwtDecrypt: mockJwtDecrypt,
+    __mockDecodeJwt: mockDecodeJwt,
+    __mockEncryptJWT: mockEncryptJWT,
   };
 });
 
@@ -41,6 +48,8 @@ Object.defineProperty(process.env, 'NODE_ENV', {
 const mockJwtDecrypt = jwtDecrypt as jest.MockedFunction<typeof jwtDecrypt>;
 const jose = require('jose');
 const mockEncrypt = jose.__mockEncrypt;
+const mockDecodeJwt = jose.__mockDecodeJwt;
+const mockEncryptJWT = jose.__mockEncryptJWT;
 
 describe('SESSION_SECRET validation', () => {
   const originalSecret = process.env.SESSION_SECRET;
@@ -121,6 +130,12 @@ describe('SESSION_SECRET validation', () => {
 describe('/api/session', () => {
   beforeEach(() => {
     mockEncrypt.mockResolvedValue('encrypted-jwt-token');
+    mockEncryptJWT.mockClear();
+    // Default: access token carries no decodable claims, so userId resolution
+    // falls through to the body / existing-cookie fallbacks. Individual tests
+    // override this to exercise the `sub`-claim path.
+    mockDecodeJwt.mockReset();
+    mockDecodeJwt.mockReturnValue({});
     mockJwtDecrypt.mockResolvedValue({
       payload: {
         access: 'old-access',
@@ -297,6 +312,74 @@ describe('/api/session', () => {
 
       expect(res._getStatusCode()).toBe(200);
       expect(mockJwtDecrypt).toHaveBeenCalled();
+    });
+
+    it("should stamp the cookie userId from the access token's sub claim", async () => {
+      // Cookie currently belongs to user-123, but the new access token was
+      // minted for a different user — the cookie must follow the token.
+      mockDecodeJwt.mockReturnValue({ sub: 'token-owner-999' });
+
+      const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+        method: 'PATCH',
+        body: {
+          accessToken: 'new-access-token',
+          refreshToken: 'new-refresh-token',
+          userId: 'body-user-456',
+        },
+        cookies: {
+          'nextspace-session': 'existing-encrypted-cookie',
+        },
+      });
+
+      await handler(req, res);
+
+      expect(res._getStatusCode()).toBe(200);
+      // sub wins over both the body userId and the stale cookie userId.
+      expect(mockEncryptJWT).toHaveBeenCalledWith(expect.objectContaining({ userId: 'token-owner-999' }));
+    });
+
+    it('should fall back to the body userId when the access token has no claims', async () => {
+      mockDecodeJwt.mockReturnValue({}); // no sub / userId
+
+      const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+        method: 'PATCH',
+        body: {
+          accessToken: 'opaque-access-token',
+          refreshToken: 'new-refresh-token',
+          userId: 'body-user-456',
+        },
+        cookies: {
+          'nextspace-session': 'existing-encrypted-cookie',
+        },
+      });
+
+      await handler(req, res);
+
+      expect(res._getStatusCode()).toBe(200);
+      expect(mockEncryptJWT).toHaveBeenCalledWith(expect.objectContaining({ userId: 'body-user-456' }));
+    });
+
+    it("should fall back to the existing cookie's userId when the token is unparseable and no body userId is sent", async () => {
+      mockDecodeJwt.mockImplementation(() => {
+        throw new Error('not a jwt');
+      });
+
+      const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+        method: 'PATCH',
+        body: {
+          accessToken: 'not-a-jwt',
+          refreshToken: 'new-refresh-token',
+        },
+        cookies: {
+          'nextspace-session': 'existing-encrypted-cookie',
+        },
+      });
+
+      await handler(req, res);
+
+      expect(res._getStatusCode()).toBe(200);
+      // payload.userId from the mocked existing cookie is 'user-123'.
+      expect(mockEncryptJWT).toHaveBeenCalledWith(expect.objectContaining({ userId: 'user-123' }));
     });
 
     it('should return 401 if no session cookie exists', async () => {

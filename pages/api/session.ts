@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { EncryptJWT, jwtDecrypt } from 'jose';
+import { EncryptJWT, jwtDecrypt, decodeJwt } from 'jose';
 import { withEnvValidation } from '../../utils/withEnvValidation';
 import { CURRENT_COOKIE_VERSION } from '../../utils/cookieValidator';
 
@@ -47,6 +47,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // Decrypt existing cookie to get current data
       const { payload } = await jwtDecrypt(existingCookie, secret);
 
+      // Derive the owning user from the access token itself so the cookie's
+      // userId can never drift from the tokens stored next to it. The access
+      // token is a signed (unencrypted) JWT whose `sub` is the user id, so a
+      // decode-only read is sufficient. Fall back to the client-supplied
+      // userId, then the existing cookie's userId, if the token isn't a
+      // decodable JWT.
+      let tokenUserId: string | undefined;
+      try {
+        const claims = decodeJwt(accessToken);
+        tokenUserId = (claims.sub as string | undefined) ?? (claims.userId as string | undefined);
+      } catch {
+        // not a JWT / unparseable — fall through to the fallbacks below
+      }
+
       // Create new cookie with updated tokens but preserve other data.
       // Store accessExpires/refreshExpires so the client can schedule
       // proactive refresh without needing to decode the JWT.
@@ -55,7 +69,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         refresh: refreshToken,
         accessExpires: accessExpires || payload.accessExpires,
         refreshExpires: refreshExpires || payload.refreshExpires,
-        userId: payload.userId,
+        userId: tokenUserId ?? req.body.userId ?? payload.userId,
         authType: payload.authType || 'guest',
         version: CURRENT_COOKIE_VERSION,
       })
