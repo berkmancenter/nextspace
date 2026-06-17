@@ -354,6 +354,10 @@ class TokenManagerClass {
       refreshToken: tokens.refresh.token,
       accessExpires: tokens.access.expires,
       refreshExpires: tokens.refresh.expires,
+      // Stamp the owning user so the cookie's userId can't drift from the
+      // tokens written alongside it. The server prefers the token's own `sub`
+      // claim, falling back to this when the token isn't decodable.
+      userId: this._ownerUserId,
     });
 
     const doFetch = () =>

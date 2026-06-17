@@ -226,7 +226,8 @@ type TokenSet = {
    └─ success:
       a. setTokens(newTokens, { broadcast: true })   ← notifies listeners + other tabs
          (no userId passed — a refresh keeps the existing token owner)
-      b. PATCH /api/session  with new tokens + expiry (retry once on failure)
+      b. PATCH /api/session  with new tokens + expiry + owner userId
+         (retry once on failure; server re-stamps the cookie's userId — see below)
       c. return true
 ```
 
@@ -257,6 +258,8 @@ This means if an HTTP 401 and a WebSocket connect_error both trigger `refresh()`
   - **Cross-tab broadcast** (`_handleTabMessage`): a `TOKENS_REFRESHED` message is adopted **only** if its `userId` matches `_ownerUserId`. It is ignored when the user differs, or when this tab has no owner yet (mid-initialization). This neutralizes the race where two tabs create distinct guest sessions at the same time and broadcast each other's tokens.
   - **Cookie sync** (`_syncFromCookie`): cookie tokens are adopted **only** if the cookie's `userId` matches `_ownerUserId`; otherwise the tab refreshes with its own refresh token instead.
 - `clearTokens()` resets `_ownerUserId` to `null`.
+
+The read-side guards above depend on the cookie's `userId` being an accurate record of whom the stored tokens belong to. The **write side** enforces that invariant: on `PATCH /api/session` the server derives the cookie's `userId` from the access token itself (the backend mints a signed JWT whose `sub` is the user id), so the cookie can never drift from the tokens written next to it. Resolution order is `accessToken.sub` → the `userId` sent in the PATCH body (`_ownerUserId`) → the existing cookie's `userId`. `_patchCookie` includes `userId: _ownerUserId` in the body as the fallback for the rare case where the access token is not a decodable JWT.
 
 ---
 
@@ -550,7 +553,7 @@ Page component
 
 ### "Channel access denied / User is not a participant in direct channel"
 
-This means the tab is calling the API with an access token for one user while building the channel name `direct-${userId}-${agentId}` for a *different* user. `TokenManager` now guards against this: tokens arriving via `TOKENS_REFRESHED` broadcast or `_syncFromCookie` are only adopted if their `userId` matches `_ownerUserId`. If you see this error, check the console for `TokenManager: ignoring broadcast/cookie tokens for a different user (...)` — that means the guard fired and rejected a cross-user token. A stale build without the owner guard, or a `SetTokens` call missing its `userId`, can re-introduce the divergence.
+This means the tab is calling the API with an access token for one user while building the channel name `direct-${userId}-${agentId}` for a *different* user. `TokenManager` now guards against this: tokens arriving via `TOKENS_REFRESHED` broadcast or `_syncFromCookie` are only adopted if their `userId` matches `_ownerUserId`. If you see this error, check the console for `TokenManager: ignoring broadcast/cookie tokens for a different user (...)` — that means the guard fired and rejected a cross-user token. A stale build without the owner guard, or a `SetTokens` call missing its `userId`, can re-introduce the divergence. On the write side, `PATCH /api/session` derives the cookie's `userId` from the access token's `sub` claim, so the cookie's recorded user always matches the tokens stored beside it — preventing a stale cookie `userId` from later mis-firing the cookie-sync guard.
 
 ### "Socket disconnects when token refreshes"
 
