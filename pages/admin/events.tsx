@@ -38,7 +38,11 @@ import {
   generateAndDownloadUserMetricsReport,
   generateAndDownloadDirectMessageResponsesReport,
 } from '../../utils/eventReportGenerator';
-import { FilterListSharp } from '@mui/icons-material';
+import { CloseSharp, FilterListSharp } from '@mui/icons-material';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import dayjs from 'dayjs';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 const EventCard = ({
   event,
@@ -390,6 +394,14 @@ export const getServerSideProps = async (context: { req: any }) => {
 };
 
 function EventScreen({ authType }: { authType: AuthType }) {
+  enum SortOptions {
+    ScheduledTimeDesc = 'scheduledTimeDesc',
+    ScheduledTime = 'scheduledTime',
+    CreatedAt = 'createdAt',
+    CreatedAtDesc = 'createdAtDesc',
+    Status = 'status',
+  }
+
   const router = useRouter();
 
   // Get userId from session
@@ -407,20 +419,33 @@ function EventScreen({ authType }: { authType: AuthType }) {
   const [includePast, setIncludePast] = useState(false);
   const [myEventsOnly, setMyEventsOnly] = useState(false);
 
-  const [statusFilters, setStatusFilters] = useState<string | string[]>(['active', 'upcoming', 'past']);
+  const [sortBy, setSortBy] = useState<SortOptions>(SortOptions.ScheduledTimeDesc);
+  const [statusFilters, setStatusFilters] = useState<string | string[]>(['active', 'upcoming']);
   const [typeFilters, setTypeFilters] = useState<string | string[]>(['eventAssistant', 'backChannel']);
+  const [startDateFilter, setStartDateFilter] = useState<Date | null>(null);
+  const [endDateFilter, setEndDateFilter] = useState<Date | null>(null);
 
   const allConversationsRef = useRef<components['schemas']['Conversation'][] | null>(null);
+
+  const handleClearFilters = () => {
+    setStatusFilters(['active', 'upcoming']);
+    setTypeFilters(['eventAssistant', 'backChannel']);
+    setStartDateFilter(null);
+    setEndDateFilter(null);
+  };
 
   /**
    * Filter conversations based on whether to include past events and owner
    * @param includePast true to include all events, false for only active/future
    * @param myEventsOnly true to show only events owned by current user
    */
-  const filterConversations = (conversations: components['schemas']['Conversation'][], myEventsOnly: boolean = false) => {
+  const filterAndSortConversations = (
+    conversations: components['schemas']['Conversation'][],
+    myEventsOnly: boolean = false,
+  ) => {
     const now = new Date();
     const c = conversations.filter((conv) => {
-      if (statusFilters.length === 0) return false; // If no status filters are selected, show nothing
+      if (statusFilters.length === 0) return true; // If no status filters are selected, show nothing
 
       // Filter by owner if myEventsOnly is enabled
       if (myEventsOnly && conv.owner !== userId) {
@@ -428,7 +453,19 @@ function EventScreen({ authType }: { authType: AuthType }) {
       }
 
       const scheduledTime = conv.scheduledTime ? new Date(conv.scheduledTime) : null;
-      const isPastEvent = scheduledTime ? scheduledTime <= now : false;
+      const isPastEvent = scheduledTime ? scheduledTime <= now : new Date(conv.createdAt!).getTime() <= now.getTime();
+
+      // If startDateFilter is set, filter out events that end after the start date
+      if (startDateFilter) {
+        const eventEndTime = scheduledTime ? scheduledTime : new Date(conv.createdAt!);
+        if (eventEndTime < startDateFilter) return false;
+      }
+
+      // If endDateFilter is set, filter out events that start after the end date
+      if (endDateFilter) {
+        const eventStartTime = scheduledTime ? scheduledTime : new Date(conv.createdAt!);
+        if (eventStartTime > endDateFilter) return false;
+      }
 
       // Show active events if selected
       if (statusFilters.includes('active') && conv.active) return true;
@@ -441,8 +478,34 @@ function EventScreen({ authType }: { authType: AuthType }) {
 
       return false;
     });
-    console.log('Filtered conversations:', c);
-    return c;
+
+    // Sort by selected sort option
+    return c.sort((a, b) => {
+      let aTime: number, bTime: number;
+      if (sortBy === SortOptions.Status) {
+        // Show upcoming events first, then active, then past
+        const getStatusRank = (conv: components['schemas']['Conversation']) => {
+          const scheduledTime = conv.scheduledTime ? new Date(conv.scheduledTime) : null;
+          const isPastEvent = scheduledTime ? scheduledTime <= now : new Date(conv.createdAt!).getTime() <= now.getTime();
+          if (conv.active) return 1;
+          if (scheduledTime && scheduledTime > now) return 2;
+          if (isPastEvent) return 3;
+          return 4; // Should not happen, but just in case
+        };
+        const statusDiff = getStatusRank(a) - getStatusRank(b);
+        if (statusDiff !== 0) return statusDiff;
+      } else {
+        if (sortBy === SortOptions.ScheduledTime || sortBy === SortOptions.ScheduledTimeDesc) {
+          aTime = a.scheduledTime ? new Date(a.scheduledTime).getTime() : new Date(a.createdAt!).getTime();
+          bTime = b.scheduledTime ? new Date(b.scheduledTime).getTime() : new Date(b.createdAt!).getTime();
+        } else {
+          aTime = new Date(a.createdAt!).getTime();
+          bTime = new Date(b.createdAt!).getTime();
+        }
+        return sortBy === SortOptions.ScheduledTimeDesc ? bTime - aTime : aTime - bTime;
+      }
+      return 0;
+    });
   };
 
   /**
@@ -496,6 +559,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
           }
         }),
       );
+      console.log('Batch', batch);
       batch.forEach((conv, i) => {
         if (!conv) {
           console.warn(`Conversation ${list[currentIndex + i].id} returned null`);
@@ -505,6 +569,9 @@ function EventScreen({ authType }: { authType: AuthType }) {
       currentIndex += batchSize;
     }
 
+    console.log(
+      `Fetched detailed conversations from index ${startIndex} to ${currentIndex}, valid count: ${allValid.length}`,
+    );
     setLoadedConversations((prev) => [...(replace ? [] : prev), ...allValid]);
 
     return currentIndex;
@@ -529,24 +596,12 @@ function EventScreen({ authType }: { authType: AuthType }) {
       // Store raw response for tab switching
       allConversationsRef.current = data;
 
-      const filtered = filterConversations(data, myEventsOnly);
+      const filteredAndSorted = filterAndSortConversations(data, myEventsOnly);
 
-      // Sort: active events first, then all others by most recent
-      const sorted = [...filtered].sort((a, b) => {
-        // Pin active events to the top
-        if (a.active && !b.active) return -1;
-        if (!a.active && b.active) return 1;
-
-        // For non-active events (or both active), sort by most recent first
-        const aTime = a.scheduledTime ? new Date(a.scheduledTime).getTime() : new Date(a.createdAt!).getTime();
-        const bTime = b.scheduledTime ? new Date(b.scheduledTime).getTime() : new Date(b.createdAt!).getTime();
-
-        return bTime - aTime; // Most recent first
-      });
-      setConversationsList(sorted);
+      setConversationsList(filteredAndSorted);
 
       // Load first 6 details
-      const nextIndex = await fetchDetailedConversations(sorted, 0, 6);
+      const nextIndex = await fetchDetailedConversations(filteredAndSorted, 0, 6);
       setEventsShown(nextIndex);
       setIsInitialLoading(false);
     }
@@ -565,58 +620,35 @@ function EventScreen({ authType }: { authType: AuthType }) {
     setIsLoadingMore(false);
   };
 
-  const handleToggle = async (include: boolean) => {
-    if (!allConversationsRef.current) return;
-    setIncludePast(include);
-    setIsInitialLoading(true);
+  useEffect(() => {
+    async function fetchConversationsWithFilters(include: boolean) {
+      if (!allConversationsRef.current) return;
+      setIncludePast(include);
+      setIsInitialLoading(true);
 
-    // Filter based on whether to include past events
-    const filtered = filterConversations(allConversationsRef.current, myEventsOnly);
+      // Filter based on whether to include past events
+      const filteredAndSorted = filterAndSortConversations(allConversationsRef.current, myEventsOnly);
+      setConversationsList(filteredAndSorted);
+      const nextIndex = await fetchDetailedConversations(filteredAndSorted, 0, 6, true);
+      setEventsShown(nextIndex);
+      setIsInitialLoading(false);
+    }
 
-    // Sort: active events first, then all others by most recent
-    const sorted = [...filtered].sort((a, b) => {
-      // Pin active events to the top
-      if (a.active && !b.active) return -1;
-      if (!a.active && b.active) return 1;
-
-      // For non-active events (or both active), sort by most recent first
-      const aTime = a.scheduledTime ? new Date(a.scheduledTime).getTime() : new Date(a.createdAt!).getTime();
-      const bTime = b.scheduledTime ? new Date(b.scheduledTime).getTime() : new Date(b.createdAt!).getTime();
-
-      return bTime - aTime; // Most recent first
-    });
-
-    setConversationsList(sorted);
-
-    const nextIndex = await fetchDetailedConversations(sorted, 0, 6, true);
-    setEventsShown(nextIndex);
-    setIsInitialLoading(false);
-  };
+    // Refetch conversations whenever filters change
+    fetchConversationsWithFilters(includePast);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [includePast, statusFilters, typeFilters, myEventsOnly, startDateFilter, endDateFilter, sortBy]);
 
   const handleMyEventsToggle = async (showOnlyMine: boolean) => {
     if (!allConversationsRef.current) return;
     setMyEventsOnly(showOnlyMine);
     setIsInitialLoading(true);
 
-    // Filter based on owner and past events settings
-    const filtered = filterConversations(allConversationsRef.current, showOnlyMine);
+    const filteredAndSorted = filterAndSortConversations(allConversationsRef.current, showOnlyMine);
 
-    // Sort: active events first, then all others by most recent
-    const sorted = [...filtered].sort((a, b) => {
-      // Pin active events to the top
-      if (a.active && !b.active) return -1;
-      if (!a.active && b.active) return 1;
+    setConversationsList(filteredAndSorted);
 
-      // For non-active events (or both active), sort by most recent first
-      const aTime = a.scheduledTime ? new Date(a.scheduledTime).getTime() : new Date(a.createdAt!).getTime();
-      const bTime = b.scheduledTime ? new Date(b.scheduledTime).getTime() : new Date(b.createdAt!).getTime();
-
-      return bTime - aTime; // Most recent first
-    });
-
-    setConversationsList(sorted);
-
-    const nextIndex = await fetchDetailedConversations(sorted, 0, 6, true);
+    const nextIndex = await fetchDetailedConversations(filteredAndSorted, 0, 6, true);
     setEventsShown(nextIndex);
     setIsInitialLoading(false);
   };
@@ -635,25 +667,36 @@ function EventScreen({ authType }: { authType: AuthType }) {
               startIcon={<FilterListSharp />}
               onClick={() => setFiltersOpen(true)}
               className="text-gray-500 hover:text-gray-700"
+              name="filters"
             >
               Filters
             </Button>
             <Drawer anchor="right" open={filtersOpen} onClose={() => setFiltersOpen(false)}>
               <div className="flex flex-col gap-6 p-6 w-72">
-                <Typography variant="h6">Filters & Sorting</Typography>
+                <div className="flex justify-between items-center">
+                  <Typography variant="h6">Filters & Sorting</Typography>
+                  <IconButton aria-label="close-filters" onClick={() => setFiltersOpen(false)} size="small">
+                    <CloseSharp />
+                  </IconButton>
+                </div>
 
                 {/* Sorting dropdown */}
                 <FormControl fullWidth>
                   <InputLabel id="sorting-label">Sort By</InputLabel>
-                  <Select labelId="sorting-label" id="sorting-select" value="recent" onChange={() => {}} label="Sort By">
-                    <MenuItem value="recent">Scheduled Time (Most Recent)</MenuItem>
-                    <MenuItem value="oldest">Scheduled Time (Oldest)</MenuItem>
-                    <MenuItem value="created">Date Created (Ascending)</MenuItem>
-                    <MenuItem value="created_desc">Date Created (Descending)</MenuItem>
-                    <MenuItem value="status">Status</MenuItem>
+                  <Select
+                    labelId="sorting-label"
+                    id="sorting-select"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as SortOptions)}
+                    label="Sort By"
+                  >
+                    <MenuItem value={SortOptions.ScheduledTimeDesc}>Most Recent</MenuItem>
+                    <MenuItem value={SortOptions.ScheduledTime}>Oldest</MenuItem>
+                    <MenuItem value={SortOptions.CreatedAt}>Date Created (Ascending)</MenuItem>
+                    <MenuItem value={SortOptions.CreatedAtDesc}>Date Created (Descending)</MenuItem>
+                    <MenuItem value={SortOptions.Status}>Status</MenuItem>
                   </Select>
                 </FormControl>
-
                 {/* Status filter */}
                 <FormControl fullWidth>
                   <InputLabel id="event-status-label">Status</InputLabel>
@@ -662,10 +705,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
                     id="event-status-select"
                     multiple
                     value={statusFilters}
-                    onChange={(e) => {
-                      setStatusFilters(e.target.value);
-                      handleToggle(includePast);
-                    }}
+                    onChange={(e) => setStatusFilters(e.target.value)}
                     label="Status"
                   >
                     <MenuItem value="active">Active Events</MenuItem>
@@ -673,7 +713,6 @@ function EventScreen({ authType }: { authType: AuthType }) {
                     <MenuItem value="past">Past Events</MenuItem>
                   </Select>
                 </FormControl>
-
                 {/* Type filter */}
                 <FormControl fullWidth>
                   <InputLabel id="event-type-label">Type</InputLabel>
@@ -682,25 +721,47 @@ function EventScreen({ authType }: { authType: AuthType }) {
                     id="event-type-select"
                     multiple
                     value={typeFilters}
-                    onChange={(e) => {
-                      setTypeFilters(e.target.value);
-                      handleToggle(includePast);
-                    }}
+                    onChange={(e) => setTypeFilters(e.target.value)}
                     label="Type"
                   >
                     <MenuItem value="eventAssistant">Event Assistant</MenuItem>
                     <MenuItem value="backChannel">Backchannel</MenuItem>
                   </Select>
                 </FormControl>
-
+                {/* Date filter */}
+                <FormControl fullWidth>
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DateTimePicker
+                      label="Start Date"
+                      value={startDateFilter ? dayjs(startDateFilter) : null}
+                      onChange={(date) => setStartDateFilter(date?.toDate() ?? null)}
+                      views={['year', 'month', 'day']}
+                    />
+                  </LocalizationProvider>
+                </FormControl>
+                <FormControl fullWidth>
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DateTimePicker
+                      label="End Date"
+                      value={endDateFilter?.getDate() ? dayjs(endDateFilter) : null}
+                      onChange={(date) => setEndDateFilter(date?.toDate() ?? null)}
+                      views={['year', 'month', 'day']}
+                    />
+                  </LocalizationProvider>
+                </FormControl>
                 <Divider />
-
                 {/* Toggles */}
                 <div className="flex flex-col gap-3">
                   <label className="flex items-center justify-between cursor-pointer">
                     <span className="text-sm text-gray-600">My events only</span>
                     <Switch checked={myEventsOnly} onChange={(e) => handleMyEventsToggle(e.target.checked)} size="small" />
                   </label>
+                </div>
+
+                <div className="flex justify-end mt-4">
+                  <Button variant="outlined" onClick={handleClearFilters}>
+                    Clear Filters
+                  </Button>
                 </div>
               </div>
             </Drawer>
@@ -718,7 +779,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
                 <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 flex flex-col items-center gap-3">
                   <EventIcon className="text-gray-400" style={{ fontSize: '40px' }} />
                   <Typography variant="body1" className="text-gray-500">
-                    {includePast ? 'No events' : 'No upcoming events'}
+                    No events found. Create your first event, or adjust your filters to see more events.
                   </Typography>
                   <Button variant="outlined" onClick={() => router.push('/admin/events/new')}>
                     Create an event
@@ -726,9 +787,10 @@ function EventScreen({ authType }: { authType: AuthType }) {
                 </div>
               ) : (
                 <>
-                  {loadedConversations.map((event) => (
-                    <EventCard key={event.id} event={event} onDelete={handleDelete} currentUserId={userId} />
-                  ))}
+                  {loadedConversations.map(
+                    (event) =>
+                      event && <EventCard key={event.id} event={event} onDelete={handleDelete} currentUserId={userId} />,
+                  )}
 
                   {conversationsList && eventsShown < conversationsList.length && (
                     <div className="flex justify-center mt-6 mb-6">
