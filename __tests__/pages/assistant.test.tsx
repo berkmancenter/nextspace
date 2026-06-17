@@ -1444,8 +1444,11 @@ describe('EventAssistantRoom', () => {
 
       const messageHandler: Function = mockSocket.on.mock.calls
         .filter(([event]: [string]) => event === 'message:new')
-        .map(([, handler]: [string, Function]) => handler)
-        .at(-1)!;
+        .map(([, handler]: [string, Function]) => {
+          // Need function named "messageHandler"
+          if (handler.name === 'messageHandler') return handler;
+        })
+        .at(0)!;
 
       const user = userEvent.setup();
       await waitFor(() => expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0));
