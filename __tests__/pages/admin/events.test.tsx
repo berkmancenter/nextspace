@@ -9,6 +9,7 @@ import {
   generateAndDownloadUserMetricsReport,
   generateAndDownloadDirectMessageResponsesReport,
 } from '../../../utils/eventReportGenerator';
+import { setupSortedConversations } from '../../fixtures/eventMocks';
 
 const conversationTypes1 = [
   { name: 'Agent1', label: 'Agent 1' },
@@ -274,7 +275,9 @@ describe('Events Page', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/No upcoming events/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/No events found. Create your first event, or adjust your filters to see more events./i),
+      ).toBeInTheDocument();
     });
   });
 });
@@ -543,6 +546,72 @@ describe('Events Page - Event Ordering', () => {
     expect(eventHeadings[0]).toHaveTextContent('Recent Event');
     expect(eventHeadings[1]).toHaveTextContent('Older Event');
   });
+
+  it('should sort events by scheduled time ascending (oldest first) when that sort is applied in filters', async () => {
+    setupSortedConversations();
+
+    await act(async () => {
+      render(<EventsPage authType={'user'} />);
+    });
+
+    // Open filters
+    const filtersButton = screen.getByRole('button', { name: /filters/i });
+    await userEvent.click(filtersButton);
+
+    // Change sort to "Oldest"
+    const sortSelect = screen.getByRole('combobox', { name: /sort by/i });
+    await userEvent.click(sortSelect);
+    const oldestOption = await screen.findByRole('option', { name: /oldest/i });
+    await userEvent.click(oldestOption);
+
+    // Dismiss filters drawer by clicking close-filters button
+    const closeFiltersButton = screen.getByRole('button', { name: /close-filters/i });
+    await userEvent.click(closeFiltersButton);
+
+    // Wait for close
+    await waitFor(() => {
+      expect(screen.queryByText('Filters & Sorting')).not.toBeInTheDocument();
+    });
+
+    const eventHeadings = screen.getAllByRole('heading', { level: 5 });
+    // Earliest scheduled event should be first when sorted ascending by scheduled time
+    expect(eventHeadings[0]).toHaveTextContent('Earliest Event');
+    expect(eventHeadings[1]).toHaveTextContent('Middle Event');
+    expect(eventHeadings[2]).toHaveTextContent('Latest Event');
+  });
+
+  it('should sort events by date created ascending when that sort is applied in filters', async () => {
+    setupSortedConversations();
+
+    await act(async () => {
+      render(<EventsPage authType={'user'} />);
+    });
+
+    // Open filters
+    const filtersButton = screen.getByRole('button', { name: /filters/i });
+    await userEvent.click(filtersButton);
+
+    // Change sort to "Date Created (Ascending)"
+    const sortSelect = screen.getByRole('combobox', { name: /sort by/i });
+    await userEvent.click(sortSelect);
+    const dateCreatedAscOption = await screen.findByRole('option', { name: /date created \(ascending\)/i });
+    await userEvent.click(dateCreatedAscOption);
+
+    // Dismiss filters drawer by clicking outside the drawer (simulate clicking backdrop)
+    const backdrop = document.querySelector('.MuiBackdrop-root') as HTMLElement;
+    await userEvent.click(backdrop);
+
+    // Wait for close
+    await waitFor(() => {
+      expect(screen.queryByText('Filters & Sorting')).not.toBeInTheDocument();
+    });
+
+    const eventHeadings = screen.getAllByRole('heading', { level: 5 });
+    // Middle event should be first when sorted ascending by date created given the createdAt times in setupSortedConversations
+    expect(eventHeadings[1]).toHaveTextContent('Middle Event');
+    expect(eventHeadings[2]).toHaveTextContent('Latest Event');
+    expect(eventHeadings[0]).toHaveTextContent('Earliest Event');
+  });
 });
 
 describe('Events Page - Event Ownership', () => {
@@ -753,11 +822,15 @@ describe('Events Page - Event Ownership', () => {
         render(<EventsPage authType={'user'} />);
       });
 
-      // Enable "Include past events" toggle to show the event
-      const includePastEventsSwitch = screen.getByRole('switch', {
-        name: /include past events/i,
-      });
-      await userEvent.click(includePastEventsSwitch);
+      // Open filters
+      const filtersButton = screen.getByRole('button', { name: /filters/i });
+      await userEvent.click(filtersButton);
+
+      // Enable "past events" in "event-status-select" dropdown
+      const eventStatusSelect = screen.getByLabelText('Status');
+      await userEvent.click(eventStatusSelect);
+      const includePastEventsOption = within(screen.getByRole('listbox')).getByText(/Past Events/i);
+      await userEvent.click(includePastEventsOption);
 
       await waitFor(() => {
         expect(screen.getByText('Test Event 1')).toBeInTheDocument();
@@ -911,7 +984,11 @@ describe('Events Page - Edit button', () => {
     await act(async () => {
       render(<EventsPage authType="user" />);
     });
-    await waitFor(() => expect(screen.getByText('No upcoming events')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByText('No events found. Create your first event, or adjust your filters to see more events.'),
+      ).toBeInTheDocument(),
+    );
     expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
   });
 
