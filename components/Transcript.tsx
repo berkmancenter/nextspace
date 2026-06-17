@@ -439,7 +439,7 @@ export function Transcript(props: TranscriptProps) {
     // socket isn't ready yet and subsequent reconnections after token refresh.
     props.socket.on('connect', joinChannel);
 
-    const messageHandler = (data: PseudonymousMessage) => {
+    const transcriptMessageHandler = (data: PseudonymousMessage) => {
       if (data.channels && data.channels.includes('transcript')) {
         console.log('New transcript message:', data);
         // Capture scroll state before adding message
@@ -461,7 +461,7 @@ export function Transcript(props: TranscriptProps) {
       }
     };
 
-    props.socket.on('message:new', messageHandler);
+    props.socket.on('message:new', transcriptMessageHandler);
 
     const transcriptStatusHandler = (data: { status: 'active' | 'paused' | 'stopped' | 'deleted' }) => {
       console.log('Transcript status update:', data);
@@ -491,7 +491,7 @@ export function Transcript(props: TranscriptProps) {
     return () => {
       // Use off (not once) to remove the persistent reconnect listener
       props.socket?.off('connect', joinChannel);
-      props.socket?.off('message:new', messageHandler);
+      props.socket?.off('message:new', transcriptMessageHandler);
       props.socket?.off('transcript:status', transcriptStatusHandler);
       props.socket?.offAny(catchAllHandler);
     };
