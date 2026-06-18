@@ -259,12 +259,6 @@ export const SendData = async (
       return { success: true };
     }
 
-    // Handle empty 200 response gracefully
-    const text = await response.text();
-    if (!text) {
-      return { success: true };
-    }
-
     const data = await response.json();
     return data;
   } catch (error) {
