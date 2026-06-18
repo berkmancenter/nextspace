@@ -22,6 +22,11 @@ import {
   MenuItem,
   Select,
   Drawer,
+  Alert,
+  Snackbar,
+  Menu,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EventIcon from '@mui/icons-material/Event';
@@ -30,6 +35,9 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import ReportProblem from '@mui/icons-material/ReportProblem';
 import DownloadIcon from '@mui/icons-material/Download';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import StopIcon from '@mui/icons-material/Stop';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { components } from '../../types';
 import { AuthType, Conversation, ErrorMessage } from '../../types.internal';
 import { SendData } from '../../utils/Helpers';
@@ -46,18 +54,21 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 const EventCard = ({
   event,
-  onDelete,
   currentUserId,
+  onDelete,
+  onMessage,
 }: {
   event: Conversation;
   onDelete: (id: string) => void;
   currentUserId: string | null;
+  onMessage: (id: string, message: string, error: boolean) => void;
 }) => {
   const router = useRouter();
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [waitingOnAction, setWaitingOnAction] = useState(false);
 
   // Check if current user is the owner of this event
   const isOwner = currentUserId && event.owner === currentUserId;
@@ -81,7 +92,7 @@ const EventCard = ({
   };
 
   const handleDeleteConfirm = async () => {
-    setIsDeleting(true);
+    setWaitingOnAction(true);
     try {
       await SendData(`conversations/${event.id}`, {}, undefined, {
         method: 'DELETE',
@@ -90,7 +101,7 @@ const EventCard = ({
       onDelete(event.id!);
     } catch (err) {
       console.error('Failed to delete event:', err);
-      setIsDeleting(false);
+      setWaitingOnAction(false);
     }
   };
 
@@ -99,7 +110,7 @@ const EventCard = ({
   };
 
   const handleDownloadReport = async () => {
-    setIsDownloading(true);
+    setWaitingOnAction(true);
     try {
       // Use the scheduled time or created time for the report date
       const reportDate = event.scheduledTime ? new Date(event.scheduledTime) : new Date(event.createdAt!);
@@ -113,7 +124,27 @@ const EventCard = ({
       console.error('Failed to generate report:', err);
       alert('Failed to generate report. Please try again.');
     } finally {
-      setIsDownloading(false);
+      setWaitingOnAction(false);
+    }
+  };
+
+  const handleStartEndEvent = async (id: string, start: boolean) => {
+    setWaitingOnAction(true);
+    try {
+      const response = await SendData(`conversations/${id}/${start ? 'start' : 'stop'}`, {});
+      if (!response || 'error' in response) {
+        onMessage(id, `Failed to ${start ? 'start' : 'end'} event. Please try again.`, true);
+        console.error(response && 'message' in response ? response.message?.message : 'Unknown error');
+        setWaitingOnAction(false);
+        return;
+      }
+      onMessage(id, `Event ${start ? 'started' : 'ended'} successfully.`, false);
+    } catch (err) {
+      setWaitingOnAction(false);
+      console.error(`Failed to ${start ? 'start' : 'end'} event:`, err);
+      onMessage(id, `Failed to ${start ? 'start' : 'end'} event. Please try again.`, true);
+    } finally {
+      setWaitingOnAction(false);
     }
   };
 
@@ -135,38 +166,75 @@ const EventCard = ({
                 </span>
               )}
             </div>
-            <div className="flex gap-1">
-              {!event.active && (
-                <Tooltip title="Download user metrics report">
-                  <IconButton
-                    size="small"
-                    onClick={handleDownloadReport}
-                    disabled={isDownloading}
-                    className="text-gray-500 hover:text-blue-600"
+            <div>
+              {waitingOnAction ? (
+                <CircularProgress />
+              ) : (
+                <IconButton size="small" onClick={(e) => setMenuAnchorEl(e.currentTarget)} className="text-gray-500">
+                  <MoreVertIcon fontSize="small" />
+                </IconButton>
+              )}
+
+              <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={() => setMenuAnchorEl(null)}>
+                {!event.active && (
+                  <MenuItem
+                    onClick={() => {
+                      handleDownloadReport();
+                      setMenuAnchorEl(null);
+                    }}
                   >
-                    {isDownloading ? <CircularProgress size={20} /> : <DownloadIcon fontSize="small" />}
-                  </IconButton>
-                </Tooltip>
-              )}
-              {canEdit && (
-                <Tooltip title="Edit event">
-                  <IconButton
-                    size="small"
-                    aria-label="Edit event"
-                    onClick={() => router.push(`/admin/${event.type?.name}/edit/${event.id}`)}
-                    className="text-gray-500 hover:text-blue-600"
+                    <ListItemIcon>
+                      <DownloadIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Download Metrics</ListItemText>
+                  </MenuItem>
+                )}
+                {canEdit && (
+                  <MenuItem
+                    onClick={() => {
+                      router.push(`/admin/${event.type?.name}/edit/${event.id}`);
+                      setMenuAnchorEl(null);
+                    }}
                   >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              )}
-              {isOwner && (
-                <Tooltip title="Delete event">
-                  <IconButton size="small" onClick={handleDeleteClick} className="text-gray-500 hover:text-red-600">
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              )}
+                    <ListItemIcon>
+                      <EditIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Edit Event</ListItemText>
+                  </MenuItem>
+                )}
+                {isOwner && (
+                  <MenuItem
+                    onClick={() => {
+                      handleStartEndEvent(event.id!, !event.active);
+                      setMenuAnchorEl(null);
+                    }}
+                    disabled={waitingOnAction}
+                  >
+                    <ListItemIcon>
+                      {event.active ? (
+                        <StopIcon fontSize="small" color="error" />
+                      ) : (
+                        <PlayArrowIcon fontSize="small" color="success" />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText>{event.active ? 'End Event' : 'Start Event'}</ListItemText>
+                  </MenuItem>
+                )}
+                {isOwner && (
+                  <MenuItem
+                    onClick={() => {
+                      handleDeleteClick();
+                      setMenuAnchorEl(null);
+                    }}
+                    sx={{ color: 'error.main' }}
+                  >
+                    <ListItemIcon>
+                      <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
+                    </ListItemIcon>
+                    <ListItemText>Delete Event</ListItemText>
+                  </MenuItem>
+                )}
+              </Menu>
             </div>
           </div>
 
@@ -309,7 +377,7 @@ const EventCard = ({
           <div className="flex flex-col gap-3 w-full mt-2">
             <Button
               onClick={handleDeleteConfirm}
-              disabled={isDeleting}
+              disabled={waitingOnAction}
               variant="contained"
               sx={{
                 backgroundColor: '#b91c1c',
@@ -325,11 +393,11 @@ const EventCard = ({
               }}
               autoFocus
             >
-              {isDeleting ? <CircularProgress size={20} /> : 'Yes, Delete'}
+              {waitingOnAction ? <CircularProgress size={20} /> : 'Yes, Delete'}
             </Button>
             <Button
               onClick={handleDeleteCancel}
-              disabled={isDeleting}
+              disabled={waitingOnAction}
               sx={{
                 color: '#4b5563',
                 textTransform: 'none',
@@ -425,6 +493,12 @@ function EventScreen({ authType }: { authType: AuthType }) {
   const [startDateFilter, setStartDateFilter] = useState<Date | null>(null);
   const [endDateFilter, setEndDateFilter] = useState<Date | null>(null);
 
+  const [eventStatusChanged, setEventStatusChanged] = useState<{ changed: boolean; message: string | null }>({
+    changed: false,
+    message: null,
+  });
+  const [eventErrorMessage, setEventErrorMessage] = useState<string | null>(null);
+
   const allConversationsRef = useRef<components['schemas']['Conversation'][] | null>(null);
 
   const handleClearFilters = () => {
@@ -444,18 +518,11 @@ function EventScreen({ authType }: { authType: AuthType }) {
     myEventsOnly: boolean = false,
   ) => {
     const now = new Date();
-    const c = conversations.filter((conv) => {
-      if (statusFilters.length === 0) return true; // If no status filters are selected, show nothing
-
-      // Filter by owner if myEventsOnly is enabled
-      if (myEventsOnly && conv.owner !== userId) {
-        return false;
-      }
-
+    const convos = conversations.filter((conv) => {
       const scheduledTime = conv.scheduledTime ? new Date(conv.scheduledTime) : null;
-      const isPastEvent = scheduledTime ? scheduledTime <= now : new Date(conv.createdAt!).getTime() <= now.getTime();
 
-      // If startDateFilter is set, filter out events that end after the start date
+      // Date filters supercede all
+      // If startDateFilter is set, filter out events that start before the start date
       if (startDateFilter) {
         const eventEndTime = scheduledTime ? scheduledTime : new Date(conv.createdAt!);
         if (eventEndTime < startDateFilter) return false;
@@ -466,6 +533,15 @@ function EventScreen({ authType }: { authType: AuthType }) {
         const eventStartTime = scheduledTime ? scheduledTime : new Date(conv.createdAt!);
         if (eventStartTime > endDateFilter) return false;
       }
+
+      if (statusFilters.length === 0) return true; // If no status filters are selected, show everything
+
+      // Filter by owner if myEventsOnly is enabled
+      if (myEventsOnly && conv.owner !== userId) {
+        return false;
+      }
+
+      const isPastEvent = scheduledTime ? scheduledTime <= now : new Date(conv.createdAt!).getTime() <= now.getTime();
 
       // Show active events if selected
       if (statusFilters.includes('active') && conv.active) return true;
@@ -480,7 +556,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
     });
 
     // Sort by selected sort option
-    return c.sort((a, b) => {
+    return convos.sort((a, b) => {
       let aTime: number, bTime: number;
       if (sortBy === SortOptions.Status) {
         // Show upcoming events first, then active, then past
@@ -509,24 +585,60 @@ function EventScreen({ authType }: { authType: AuthType }) {
   };
 
   /**
+   * Refresh conversations list after an event is acted on (deleted, started, or ended), showing a message if applicable
+   * @param id The conversation ID that was acted on
+
+   */
+  const refreshConversations = async (id: string) => {
+    try {
+      const data = await Request('conversations');
+      const all: components['schemas']['Conversation'][] = data;
+      allConversationsRef.current = all;
+
+      const filtered = filterAndSortConversations(all, myEventsOnly);
+      const updated = filtered.filter((conv) => conv.id !== id);
+
+      setConversationsList(updated);
+
+      const nextIndex = await fetchDetailedConversations(updated, 0, eventsShown, true);
+      setEventsShown(nextIndex);
+    } catch (err) {
+      console.error('Failed to refresh conversations:', err);
+    }
+  };
+
+  /**
    * Handle deletion of an event
    * @param id The conversation ID to delete
    */
   const handleDelete = async (id: string) => {
-    setLoadedConversations((prev) => prev.filter((conv) => conv.id !== id));
-
-    const newList = conversationsList?.filter((conv) => conv.id !== id) ?? [];
-    setConversationsList(newList);
-
-    if (allConversationsRef.current) {
-      allConversationsRef.current = allConversationsRef.current.filter((conv) => conv.id !== id);
-    }
-
+    setEventStatusChanged({
+      changed: true,
+      message: 'Event deleted successfully.',
+    });
+    refreshConversations(id);
     // Load the next event to fill the gap if one exists
+    const newList = conversationsList?.filter((conv) => conv.id !== id) ?? [];
     if (newList.length > eventsShown - 1) {
       const nextIndex = await fetchDetailedConversations(newList, eventsShown - 1, 1);
       setEventsShown(nextIndex);
     }
+  };
+
+  /**
+   * Handle starting or ending an event, showing success or error messages accordingly
+   * @param id The conversation ID
+   * @param message The message to display
+   * @param isError Whether the message is an error
+   */
+  const handleEventStatusChange = (id: string, message: string, isError: boolean) => {
+    if (!isError) {
+      setEventStatusChanged({
+        changed: true,
+        message: `Event ${message.includes('started') ? 'started' : 'ended'} successfully.`,
+      });
+      refreshConversations(id);
+    } else setEventErrorMessage(message);
   };
 
   /**
@@ -559,7 +671,6 @@ function EventScreen({ authType }: { authType: AuthType }) {
           }
         }),
       );
-      console.log('Batch', batch);
       batch.forEach((conv, i) => {
         if (!conv) {
           console.warn(`Conversation ${list[currentIndex + i].id} returned null`);
@@ -568,10 +679,6 @@ function EventScreen({ authType }: { authType: AuthType }) {
       allValid.push(...batch.filter((conv): conv is Conversation => conv !== null));
       currentIndex += batchSize;
     }
-
-    console.log(
-      `Fetched detailed conversations from index ${startIndex} to ${currentIndex}, valid count: ${allValid.length}`,
-    );
     setLoadedConversations((prev) => [...(replace ? [] : prev), ...allValid]);
 
     return currentIndex;
@@ -654,158 +761,181 @@ function EventScreen({ authType }: { authType: AuthType }) {
   };
 
   return (
-    <div className="flex flex-col items-center mt-12 mb-8">
-      <Typography variant="h4" gutterBottom>
-        Events
-      </Typography>
-      {errorMessage ? (
-        <Typography color="error">{errorMessage}</Typography>
-      ) : (
-        <div className="w-3/4 space-y-6">
-          <div className="flex justify-end gap-2">
-            <Button
-              startIcon={<FilterListSharp />}
-              onClick={() => setFiltersOpen(true)}
-              className="text-gray-500 hover:text-gray-700"
-              name="filters"
-            >
-              Filters
-            </Button>
-            <Drawer anchor="right" open={filtersOpen} onClose={() => setFiltersOpen(false)}>
-              <div className="flex flex-col gap-6 p-6 w-72">
-                <div className="flex justify-between items-center">
-                  <Typography variant="h6">Filters & Sorting</Typography>
-                  <IconButton aria-label="close-filters" onClick={() => setFiltersOpen(false)} size="small">
-                    <CloseSharp />
-                  </IconButton>
-                </div>
+    <>
+      <Snackbar
+        autoHideDuration={5000}
+        onClose={() => setEventStatusChanged({ message: null, changed: false })}
+        open={eventStatusChanged.changed}
+      >
+        <Alert severity="info">{eventStatusChanged.message}</Alert>
+      </Snackbar>
+      {/* Error snackbar/alert */}
+      <Snackbar autoHideDuration={5000} onClose={() => setEventErrorMessage(null)} open={!!eventErrorMessage}>
+        <Alert severity="error">{eventErrorMessage}</Alert>
+      </Snackbar>
 
-                {/* Sorting dropdown */}
-                <FormControl fullWidth>
-                  <InputLabel id="sorting-label">Sort By</InputLabel>
-                  <Select
-                    labelId="sorting-label"
-                    id="sorting-select"
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as SortOptions)}
-                    label="Sort By"
-                  >
-                    <MenuItem value={SortOptions.ScheduledTimeDesc}>Most Recent</MenuItem>
-                    <MenuItem value={SortOptions.ScheduledTime}>Oldest</MenuItem>
-                    <MenuItem value={SortOptions.CreatedAt}>Date Created (Ascending)</MenuItem>
-                    <MenuItem value={SortOptions.CreatedAtDesc}>Date Created (Descending)</MenuItem>
-                    <MenuItem value={SortOptions.Status}>Status</MenuItem>
-                  </Select>
-                </FormControl>
-                {/* Status filter */}
-                <FormControl fullWidth>
-                  <InputLabel id="event-status-label">Status</InputLabel>
-                  <Select
-                    labelId="event-status-label"
-                    id="event-status-select"
-                    multiple
-                    value={statusFilters}
-                    onChange={(e) => setStatusFilters(e.target.value)}
-                    label="Status"
-                  >
-                    <MenuItem value="active">Active Events</MenuItem>
-                    <MenuItem value="upcoming">Upcoming Events</MenuItem>
-                    <MenuItem value="past">Past Events</MenuItem>
-                  </Select>
-                </FormControl>
-                {/* Type filter */}
-                <FormControl fullWidth>
-                  <InputLabel id="event-type-label">Type</InputLabel>
-                  <Select
-                    labelId="event-type-label"
-                    id="event-type-select"
-                    multiple
-                    value={typeFilters}
-                    onChange={(e) => setTypeFilters(e.target.value)}
-                    label="Type"
-                  >
-                    <MenuItem value="eventAssistant">Event Assistant</MenuItem>
-                    <MenuItem value="backChannel">Backchannel</MenuItem>
-                  </Select>
-                </FormControl>
-                {/* Date filter */}
-                <FormControl fullWidth>
-                  <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DateTimePicker
-                      label="Start Date"
-                      value={startDateFilter ? dayjs(startDateFilter) : null}
-                      onChange={(date) => setStartDateFilter(date?.toDate() ?? null)}
-                      views={['year', 'month', 'day']}
-                    />
-                  </LocalizationProvider>
-                </FormControl>
-                <FormControl fullWidth>
-                  <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DateTimePicker
-                      label="End Date"
-                      value={endDateFilter?.getDate() ? dayjs(endDateFilter) : null}
-                      onChange={(date) => setEndDateFilter(date?.toDate() ?? null)}
-                      views={['year', 'month', 'day']}
-                    />
-                  </LocalizationProvider>
-                </FormControl>
-                <Divider />
-                {/* Toggles */}
-                <div className="flex flex-col gap-3">
-                  <label className="flex items-center justify-between cursor-pointer">
-                    <span className="text-sm text-gray-600">My events only</span>
-                    <Switch checked={myEventsOnly} onChange={(e) => handleMyEventsToggle(e.target.checked)} size="small" />
-                  </label>
-                </div>
+      <div className="flex flex-col items-center mt-12 mb-8">
+        <Typography variant="h4" gutterBottom>
+          Events
+        </Typography>
 
-                <div className="flex justify-end mt-4">
-                  <Button variant="outlined" onClick={handleClearFilters}>
-                    Clear Filters
-                  </Button>
+        {errorMessage ? (
+          <Typography color="error">{errorMessage}</Typography>
+        ) : (
+          <div className="w-3/4 space-y-6">
+            <div className="flex justify-end gap-2">
+              <Button
+                startIcon={<FilterListSharp />}
+                onClick={() => setFiltersOpen(true)}
+                className="text-gray-500 hover:text-gray-700"
+                name="filters"
+              >
+                Filters
+              </Button>
+              <Drawer anchor="right" open={filtersOpen} onClose={() => setFiltersOpen(false)}>
+                <div className="flex flex-col gap-6 p-6 w-72">
+                  <div className="flex justify-between items-center">
+                    <Typography variant="h6">Filters & Sorting</Typography>
+                    <IconButton aria-label="close-filters" onClick={() => setFiltersOpen(false)} size="small">
+                      <CloseSharp />
+                    </IconButton>
+                  </div>
+
+                  {/* Sorting dropdown */}
+                  <FormControl fullWidth>
+                    <InputLabel id="sorting-label">Sort By</InputLabel>
+                    <Select
+                      labelId="sorting-label"
+                      id="sorting-select"
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as SortOptions)}
+                      label="Sort By"
+                    >
+                      <MenuItem value={SortOptions.ScheduledTimeDesc}>Most Recent</MenuItem>
+                      <MenuItem value={SortOptions.ScheduledTime}>Oldest</MenuItem>
+                      <MenuItem value={SortOptions.CreatedAt}>Date Created (Ascending)</MenuItem>
+                      <MenuItem value={SortOptions.CreatedAtDesc}>Date Created (Descending)</MenuItem>
+                      <MenuItem value={SortOptions.Status}>Status</MenuItem>
+                    </Select>
+                  </FormControl>
+                  {/* Status filter */}
+                  <FormControl fullWidth>
+                    <InputLabel id="event-status-label">Status</InputLabel>
+                    <Select
+                      labelId="event-status-label"
+                      id="event-status-select"
+                      multiple
+                      value={statusFilters}
+                      onChange={(e) => setStatusFilters(e.target.value)}
+                      label="Status"
+                    >
+                      <MenuItem value="active">Active Events</MenuItem>
+                      <MenuItem value="upcoming">Upcoming Events</MenuItem>
+                      <MenuItem value="past">Past Events</MenuItem>
+                    </Select>
+                  </FormControl>
+                  {/* Type filter */}
+                  <FormControl fullWidth>
+                    <InputLabel id="event-type-label">Type</InputLabel>
+                    <Select
+                      labelId="event-type-label"
+                      id="event-type-select"
+                      multiple
+                      value={typeFilters}
+                      onChange={(e) => setTypeFilters(e.target.value)}
+                      label="Type"
+                    >
+                      <MenuItem value="eventAssistant">Event Assistant</MenuItem>
+                      <MenuItem value="backChannel">Backchannel</MenuItem>
+                    </Select>
+                  </FormControl>
+                  {/* Date filter */}
+                  <FormControl fullWidth>
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <DateTimePicker
+                        label="Start Date"
+                        value={startDateFilter ? dayjs(startDateFilter) : null}
+                        onChange={(date) => setStartDateFilter(date?.toDate() ?? null)}
+                        views={['year', 'month', 'day']}
+                      />
+                    </LocalizationProvider>
+                  </FormControl>
+                  <FormControl fullWidth>
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <DateTimePicker
+                        label="End Date"
+                        value={endDateFilter?.getDate() ? dayjs(endDateFilter) : null}
+                        onChange={(date) => setEndDateFilter(date?.toDate() ?? null)}
+                        views={['year', 'month', 'day']}
+                      />
+                    </LocalizationProvider>
+                  </FormControl>
+                  <Divider />
+                  {/* Toggles */}
+                  <div className="flex flex-col gap-3">
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <span className="text-sm text-gray-600">My events only</span>
+                      <Switch checked={myEventsOnly} onChange={(e) => handleMyEventsToggle(e.target.checked)} size="small" />
+                    </label>
+                  </div>
+
+                  <div className="flex justify-end mt-4">
+                    <Button variant="outlined" onClick={handleClearFilters}>
+                      Clear Filters
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </Drawer>
+              </Drawer>
+            </div>
+            {isInitialLoading ? (
+              // Show 6 skeleton cards while loading
+              <>
+                {[...Array(6)].map((_, i) => (
+                  <EventCardSkeleton key={i} />
+                ))}
+              </>
+            ) : (
+              <>
+                {loadedConversations.length === 0 && !isInitialLoading ? (
+                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 flex flex-col items-center gap-3">
+                    <EventIcon className="text-gray-400" style={{ fontSize: '40px' }} />
+                    <Typography variant="body1" className="text-gray-500">
+                      No events found. Create your first event, or adjust your filters to see more events.
+                    </Typography>
+                    <Button variant="outlined" onClick={() => router.push('/admin/events/new')}>
+                      Create an event
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    {loadedConversations.map(
+                      (event) =>
+                        event && (
+                          <EventCard
+                            key={event.id}
+                            event={event}
+                            onDelete={handleDelete}
+                            onMessage={handleEventStatusChange}
+                            currentUserId={userId}
+                          />
+                        ),
+                    )}
+
+                    {conversationsList && eventsShown < conversationsList.length && (
+                      <div className="flex justify-center mt-6 mb-6">
+                        <Button variant="outlined" onClick={handleLoadMore} disabled={isLoadingMore}>
+                          {isLoadingMore ? <CircularProgress size={20} /> : 'Load More'}
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            )}
           </div>
-          {isInitialLoading ? (
-            // Show 6 skeleton cards while loading
-            <>
-              {[...Array(6)].map((_, i) => (
-                <EventCardSkeleton key={i} />
-              ))}
-            </>
-          ) : (
-            <>
-              {loadedConversations.length === 0 && !isInitialLoading ? (
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 flex flex-col items-center gap-3">
-                  <EventIcon className="text-gray-400" style={{ fontSize: '40px' }} />
-                  <Typography variant="body1" className="text-gray-500">
-                    No events found. Create your first event, or adjust your filters to see more events.
-                  </Typography>
-                  <Button variant="outlined" onClick={() => router.push('/admin/events/new')}>
-                    Create an event
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  {loadedConversations.map(
-                    (event) =>
-                      event && <EventCard key={event.id} event={event} onDelete={handleDelete} currentUserId={userId} />,
-                  )}
-
-                  {conversationsList && eventsShown < conversationsList.length && (
-                    <div className="flex justify-center mt-6 mb-6">
-                      <Button variant="outlined" onClick={handleLoadMore} disabled={isLoadingMore}>
-                        {isLoadingMore ? <CircularProgress size={20} /> : 'Load More'}
-                      </Button>
-                    </div>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 }
 
