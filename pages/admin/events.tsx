@@ -167,74 +167,83 @@ const EventCard = ({
               )}
             </div>
             <div>
-              {waitingOnAction ? (
-                <CircularProgress />
-              ) : (
-                <IconButton size="small" onClick={(e) => setMenuAnchorEl(e.currentTarget)} className="text-gray-500">
-                  <MoreVertIcon fontSize="small" />
-                </IconButton>
-              )}
+              {(isOwner || canEdit) && (
+                <>
+                  {waitingOnAction ? (
+                    <CircularProgress />
+                  ) : (
+                    <IconButton
+                      aria-label={`actions-menu-${event.id}`}
+                      size="small"
+                      onClick={(e) => setMenuAnchorEl(e.currentTarget)}
+                      className="text-gray-500"
+                    >
+                      <MoreVertIcon fontSize="small" />
+                    </IconButton>
+                  )}
 
-              <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={() => setMenuAnchorEl(null)}>
-                {!event.active && (
-                  <MenuItem
-                    onClick={() => {
-                      handleDownloadReport();
-                      setMenuAnchorEl(null);
-                    }}
-                  >
-                    <ListItemIcon>
-                      <DownloadIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Download Metrics</ListItemText>
-                  </MenuItem>
-                )}
-                {canEdit && (
-                  <MenuItem
-                    onClick={() => {
-                      router.push(`/admin/${event.type?.name}/edit/${event.id}`);
-                      setMenuAnchorEl(null);
-                    }}
-                  >
-                    <ListItemIcon>
-                      <EditIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Edit Event</ListItemText>
-                  </MenuItem>
-                )}
-                {isOwner && (
-                  <MenuItem
-                    onClick={() => {
-                      handleStartEndEvent(event.id!, !event.active);
-                      setMenuAnchorEl(null);
-                    }}
-                    disabled={waitingOnAction}
-                  >
-                    <ListItemIcon>
-                      {event.active ? (
-                        <StopIcon fontSize="small" color="error" />
-                      ) : (
-                        <PlayArrowIcon fontSize="small" color="success" />
-                      )}
-                    </ListItemIcon>
-                    <ListItemText>{event.active ? 'End Event' : 'Start Event'}</ListItemText>
-                  </MenuItem>
-                )}
-                {isOwner && (
-                  <MenuItem
-                    onClick={() => {
-                      handleDeleteClick();
-                      setMenuAnchorEl(null);
-                    }}
-                    sx={{ color: 'error.main' }}
-                  >
-                    <ListItemIcon>
-                      <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
-                    </ListItemIcon>
-                    <ListItemText>Delete Event</ListItemText>
-                  </MenuItem>
-                )}
-              </Menu>
+                  <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={() => setMenuAnchorEl(null)}>
+                    {!event.active && (
+                      <MenuItem
+                        onClick={() => {
+                          handleDownloadReport();
+                          setMenuAnchorEl(null);
+                        }}
+                      >
+                        <ListItemIcon>
+                          <DownloadIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText>Download Metrics</ListItemText>
+                      </MenuItem>
+                    )}
+                    {canEdit && (
+                      <MenuItem
+                        onClick={() => {
+                          router.push(`/admin/${event.type?.name}/edit/${event.id}`);
+                          setMenuAnchorEl(null);
+                        }}
+                      >
+                        <ListItemIcon>
+                          <EditIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText>Edit Event</ListItemText>
+                      </MenuItem>
+                    )}
+                    {isOwner && (
+                      <MenuItem
+                        onClick={() => {
+                          handleStartEndEvent(event.id!, !event.active);
+                          setMenuAnchorEl(null);
+                        }}
+                        disabled={waitingOnAction}
+                      >
+                        <ListItemIcon>
+                          {event.active ? (
+                            <StopIcon fontSize="small" color="error" />
+                          ) : (
+                            <PlayArrowIcon fontSize="small" color="success" />
+                          )}
+                        </ListItemIcon>
+                        <ListItemText>{event.active ? 'End Event' : 'Start Event'}</ListItemText>
+                      </MenuItem>
+                    )}
+                    {isOwner && (
+                      <MenuItem
+                        onClick={() => {
+                          handleDeleteClick();
+                          setMenuAnchorEl(null);
+                        }}
+                        sx={{ color: 'error.main' }}
+                      >
+                        <ListItemIcon>
+                          <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
+                        </ListItemIcon>
+                        <ListItemText>Delete Event</ListItemText>
+                      </MenuItem>
+                    )}
+                  </Menu>
+                </>
+              )}
             </div>
           </div>
 
