@@ -762,8 +762,12 @@ describe('Events Page - Event Ownership', () => {
     // Verify "My Event" badge appears only for owned event
     expect(screen.getByText('My Event')).toBeInTheDocument();
 
+    // Click menu button (aria-label="actions-menu")
+    const menuButton = screen.getByRole('button', { name: 'actions-menu-my-active' });
+    await userEvent.click(menuButton);
+
     // Verify delete button only appears for owned event
-    const deleteButtons = screen.getAllByLabelText('Delete event');
+    const deleteButtons = screen.getAllByText(/delete event/i);
     expect(deleteButtons).toHaveLength(1);
   });
   describe('Events Page - Download Reports', () => {
@@ -819,18 +823,21 @@ describe('Events Page - Event Ownership', () => {
         expect(screen.getByText('Test Event 1')).toBeInTheDocument();
       });
 
+      const menuButton = screen.getByRole('button', { name: `actions-menu-${inactiveEvent.id}` });
+      await userEvent.click(menuButton);
+
       // Download button should appear for inactive event
-      const downloadButtons = screen.getAllByLabelText('Download user metrics report');
+      const downloadButtons = screen.getAllByText(/download metrics/i);
       expect(downloadButtons).toHaveLength(1);
     });
 
     it('should download reports when download button is clicked', async () => {
-      const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+      const pastDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago (past event)
       const inactiveEvent = {
         ...mockConversations[0],
         active: false,
         owner: mockUserId,
-        scheduledTime: futureDate.toISOString(),
+        scheduledTime: pastDate.toISOString(),
       };
 
       (Request as jest.Mock).mockResolvedValue([inactiveEvent]);
@@ -845,11 +852,33 @@ describe('Events Page - Event Ownership', () => {
         render(<EventsPage authType={'user'} />);
       });
 
+      // Open filters
+      const filtersButton = screen.getByRole('button', { name: /filters/i });
+      await userEvent.click(filtersButton);
+
+      // Enable "past events" in "event-status-select" dropdown
+      const eventStatusSelect = screen.getByLabelText('Status');
+      await userEvent.click(eventStatusSelect);
+      const includePastEventsOption = within(screen.getByRole('listbox')).getByText(/Past Events/i);
+      await userEvent.click(includePastEventsOption);
+
+      // Dismiss filters drawer by clicking outside the drawer (simulate clicking backdrop)
+      const backdrop = document.querySelector('.MuiBackdrop-root') as HTMLElement;
+      await userEvent.click(backdrop);
+
+      await waitFor(() => {
+        expect(screen.queryByText('Filters & Sorting')).not.toBeInTheDocument();
+      });
+
+
       await waitFor(() => {
         expect(screen.getByText('Test Event 1')).toBeInTheDocument();
       });
 
-      const downloadButton = screen.getByLabelText('Download user metrics report');
+      const menuButton = screen.getByRole('button', { name: `actions-menu-${inactiveEvent.id}` });
+      await userEvent.click(menuButton);
+
+      const downloadButton = screen.getByText(/download metrics/i);
       await userEvent.click(downloadButton);
 
       await waitFor(() => {
@@ -893,11 +922,22 @@ describe('Events Page - Event Ownership', () => {
       const includePastEventsOption = within(screen.getByRole('listbox')).getByText(/Past Events/i);
       await userEvent.click(includePastEventsOption);
 
+      // Dismiss filters drawer by clicking outside the drawer (simulate clicking backdrop)
+      const backdrop = document.querySelector('.MuiBackdrop-root') as HTMLElement;
+      await userEvent.click(backdrop);
+
+      await waitFor(() => {
+        expect(screen.queryByText('Filters & Sorting')).not.toBeInTheDocument();
+      });
+
       await waitFor(() => {
         expect(screen.getByText('Test Event 1')).toBeInTheDocument();
       });
 
-      const downloadButton = screen.getByLabelText('Download user metrics report');
+      const menuButton = screen.getByRole('button', { name: `actions-menu-${inactiveEvent.id}` });
+      await userEvent.click(menuButton);
+
+      const downloadButton = screen.getByText(/download metrics/i);
       await userEvent.click(downloadButton);
 
       await waitFor(() => {
@@ -936,16 +976,15 @@ describe('Events Page - Event Ownership', () => {
         expect(screen.getByText('Test Event 1')).toBeInTheDocument();
       });
 
-      const downloadButton = screen.getByLabelText('Download user metrics report');
+      const menuButton = screen.getByRole('button', { name: `actions-menu-${inactiveEvent.id}` });
+      await userEvent.click(menuButton);
+
+      const downloadButton = screen.getByText(/download metrics/i);
       await userEvent.click(downloadButton);
 
-      // Should show loading spinner
+      // Should show loading spinner instead of menu button
       await waitFor(() => {
-        const buttons = screen.getAllByRole('button');
-        const downloadButtonElement = buttons.find(
-          (btn) => btn.getAttribute('aria-label') === 'Download user metrics report',
-        );
-        expect(downloadButtonElement).toBeDisabled();
+        expect(menuButton).not.toBeInTheDocument();
       });
     });
 
@@ -976,7 +1015,10 @@ describe('Events Page - Event Ownership', () => {
         expect(screen.getByText('Test Event 1')).toBeInTheDocument();
       });
 
-      const downloadButton = screen.getByLabelText('Download user metrics report');
+      const menuButton = screen.getByRole('button', { name: `actions-menu-${inactiveEvent.id}` });
+      await userEvent.click(menuButton);
+
+      const downloadButton = screen.getByText(/download metrics/i);
       await userEvent.click(downloadButton);
 
       await waitFor(() => {
@@ -1023,17 +1065,25 @@ describe('Events Page - Edit button', () => {
 
   it('shows an edit button for a future inactive event owned by the current user', async () => {
     await renderWithEvent(makeConversation({}));
-    expect(screen.getByLabelText('Edit event')).toBeInTheDocument();
+    // Click menu button (aria-label="actions-menu")
+    const menuButton = screen.getByRole('button', { name: `actions-menu-ev-1` });
+    await userEvent.click(menuButton);
+
+    expect(screen.getByText(/edit event/i)).toBeInTheDocument();
   });
 
   it('does not show an edit button for an active event', async () => {
     await renderWithEvent(makeConversation({ active: true }));
-    expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
+    const menuButton = screen.getByRole('button', { name: `actions-menu-ev-1` });
+    await userEvent.click(menuButton);
+
+    expect(screen.queryByText(/edit event/i)).not.toBeInTheDocument();
   });
 
-  it('does not show an edit button for an event owned by another user', async () => {
+  it('does not show an actions menu for an event owned by another user', async () => {
     await renderWithEvent(makeConversation({ owner: 'someone-else' }));
-    expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
+    const menuButton = screen.queryByRole('button', { name: `actions-menu-ev-1` });
+    expect(menuButton).not.toBeInTheDocument();
   });
 
   it('does not show an edit button for a past event', async () => {
@@ -1050,20 +1100,27 @@ describe('Events Page - Edit button', () => {
         screen.getByText('No events found. Create your first event, or adjust your filters to see more events.'),
       ).toBeInTheDocument(),
     );
-    expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
+    const menuButton = screen.queryByRole('button', { name: 'actions-menu' });
+    expect(menuButton).not.toBeInTheDocument();
   });
 
   it('does not show an edit button for an event with no type set', async () => {
     /* Legacy events may have no type object, which would produce /admin/undefined/edit/<id>
        if the edit button were shown. The canEdit guard prevents this. */
     await renderWithEvent(makeConversation({ type: undefined }));
-    expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
+    const menuButton = await screen.queryByRole('button', { name: `actions-menu-ev-1` });
+    await userEvent.click(menuButton);
+
+    expect(screen.queryByText(/edit event/i)).not.toBeInTheDocument();
   });
 
   it('navigates to the edit page when the edit button is clicked', async () => {
     const user = userEvent.setup();
     await renderWithEvent(makeConversation({}));
-    await user.click(await screen.findByLabelText('Edit event'));
+    const menuButton = await screen.findByRole('button', { name: `actions-menu-ev-1` });
+    await user.click(menuButton);
+    const editButton = await screen.findByText(/edit event/i);
+    await user.click(editButton);
     expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/edit/ev-1');
   });
 });
