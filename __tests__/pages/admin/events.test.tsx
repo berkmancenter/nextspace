@@ -870,7 +870,6 @@ describe('Events Page - Event Ownership', () => {
         expect(screen.queryByText('Filters & Sorting')).not.toBeInTheDocument();
       });
 
-
       await waitFor(() => {
         expect(screen.getByText('Test Event 1')).toBeInTheDocument();
       });
@@ -1108,7 +1107,7 @@ describe('Events Page - Edit button', () => {
     /* Legacy events may have no type object, which would produce /admin/undefined/edit/<id>
        if the edit button were shown. The canEdit guard prevents this. */
     await renderWithEvent(makeConversation({ type: undefined }));
-    const menuButton = await screen.queryByRole('button', { name: `actions-menu-ev-1` });
+    const menuButton = screen.getByRole('button', { name: `actions-menu-ev-1` });
     await userEvent.click(menuButton);
 
     expect(screen.queryByText(/edit event/i)).not.toBeInTheDocument();
