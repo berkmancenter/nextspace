@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { Api, getUserTimezone } from '../../utils';
-import { CheckAuthHeader, getConversation, getTypeForConversation } from '../../utils/Helpers';
+import { getUserTimezone } from '../../utils';
+import { CheckAuthHeader, getConversation } from '../../utils/Helpers';
 import { useSessionJoin } from '../../utils/useSessionJoin';
 
 import React from 'react';
@@ -519,8 +519,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
   };
 
   /**
-   * Filter conversations based on whether to include past events and owner
-   * @param includePast true to include all events, false for only active/future
+   * Filter conversations based on selected status, type, and date filters. If myEventsOnly is true, also filter by ownership.
    * @param myEventsOnly true to show only events owned by current user
    */
   const filterAndSortConversations = (conversations: Conversation[], myEventsOnly: boolean = false) => {
@@ -589,6 +588,9 @@ function EventScreen({ authType }: { authType: AuthType }) {
         const statusDiff = getStatusRank(a) - getStatusRank(b);
         if (statusDiff !== 0) return statusDiff;
       } else {
+        // Active events always appear before inactive ones within any time-based sort
+        if (a.active !== b.active) return a.active ? -1 : 1;
+
         if (sortBy === SortOptions.ScheduledTime || sortBy === SortOptions.ScheduledTimeDesc) {
           aTime = a.scheduledTime ? new Date(a.scheduledTime).getTime() : new Date(a.createdAt!).getTime();
           bTime = b.scheduledTime ? new Date(b.scheduledTime).getTime() : new Date(b.createdAt!).getTime();
@@ -688,10 +690,9 @@ function EventScreen({ authType }: { authType: AuthType }) {
           }
         }),
       );
-      console.log(`Fetched batch of conversations`, batch);
       batch.forEach((conv, i) => {
         if (!conv) {
-          console.warn(`Conversation ${list[currentIndex + i].id} returned null`);
+          console.warn(`${list[currentIndex + i].name} returned null`);
         }
       });
       allValid.push(...batch.filter((conv): conv is Conversation => conv !== null));
@@ -704,6 +705,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
 
   useEffect(() => {
     setFilteredConversations(filterAndSortConversations(loadedConversations, myEventsOnly));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedConversations, myEventsOnly]);
 
   useEffect(() => {
