@@ -3,7 +3,7 @@ import { render, screen, waitFor, act, within, fireEvent } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import EventsPage from '../../../pages/admin/events';
 import { Request } from '../../../utils';
-import { getConversation } from '../../../utils/Helpers';
+import { getConversation, SendData } from '../../../utils/Helpers';
 import { useSessionJoin } from '../../../utils/useSessionJoin';
 import {
   generateAndDownloadUserMetricsReport,
@@ -80,6 +80,7 @@ jest.mock('../../../utils/Helpers', () => {
   return {
     ...actual,
     getConversation: jest.fn(),
+    SendData: jest.fn(),
   };
 });
 
@@ -1029,7 +1030,7 @@ describe('Events Page - Event Ownership', () => {
   });
 });
 
-describe('Events Page - Edit button', () => {
+describe('Events Page - Admin Actions', () => {
   const mockUserId = 'user-123';
   const futureTime = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
   const pastTime = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
@@ -1051,6 +1052,7 @@ describe('Events Page - Edit button', () => {
     jest.clearAllMocks();
     (getConversation as jest.Mock).mockReset();
     (useSessionJoin as jest.Mock).mockReturnValue({ userId: mockUserId });
+    (SendData as jest.Mock).mockResolvedValue({ id: 'ev-1' });
   });
 
   const renderWithEvent = async (conv: object) => {
@@ -1121,5 +1123,77 @@ describe('Events Page - Edit button', () => {
     const editButton = await screen.findByText(/edit event/i);
     await user.click(editButton);
     expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/edit/ev-1');
+  });
+
+  // --- Delete action ---
+
+  it('shows a delete button for an event owned by the current user', async () => {
+    await renderWithEvent(makeConversation({}));
+    const menuButton = screen.getByRole('button', { name: 'actions-menu-ev-1' });
+    await userEvent.click(menuButton);
+    expect(screen.getByText(/delete event/i)).toBeInTheDocument();
+  });
+
+  it('opens a confirmation dialog when delete event is clicked', async () => {
+    const user = userEvent.setup();
+    await renderWithEvent(makeConversation({}));
+    await user.click(screen.getByRole('button', { name: 'actions-menu-ev-1' }));
+    await user.click(screen.getByText(/delete event/i));
+    expect(screen.getByText('Delete event?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /yes, delete/i })).toBeInTheDocument();
+  });
+
+  it('calls the delete API when the confirmation is accepted', async () => {
+    const user = userEvent.setup();
+    await renderWithEvent(makeConversation({}));
+    await user.click(screen.getByRole('button', { name: 'actions-menu-ev-1' }));
+    await user.click(screen.getByText(/delete event/i));
+    await user.click(screen.getByRole('button', { name: /yes, delete/i }));
+    await waitFor(() =>
+      expect(SendData as jest.Mock).toHaveBeenCalledWith('conversations/ev-1', {}, undefined, {
+        method: 'DELETE',
+      }),
+    );
+  });
+
+  it('does not call the delete API when cancel is clicked', async () => {
+    const user = userEvent.setup();
+    await renderWithEvent(makeConversation({}));
+    await user.click(screen.getByRole('button', { name: 'actions-menu-ev-1' }));
+    await user.click(screen.getByText(/delete event/i));
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(SendData as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  // --- Start / End action ---
+
+  it('shows a start button for a future inactive owned event', async () => {
+    await renderWithEvent(makeConversation({}));
+    const menuButton = screen.getByRole('button', { name: 'actions-menu-ev-1' });
+    await userEvent.click(menuButton);
+    expect(screen.getByText(/start event/i)).toBeInTheDocument();
+  });
+
+  it('shows an end button for an active owned event', async () => {
+    await renderWithEvent(makeConversation({ active: true }));
+    const menuButton = screen.getByRole('button', { name: 'actions-menu-ev-1' });
+    await userEvent.click(menuButton);
+    expect(screen.getByText(/end event/i)).toBeInTheDocument();
+  });
+
+  it('calls the start API when start event is clicked', async () => {
+    const user = userEvent.setup();
+    await renderWithEvent(makeConversation({}));
+    await user.click(screen.getByRole('button', { name: 'actions-menu-ev-1' }));
+    await user.click(screen.getByText(/start event/i));
+    await waitFor(() => expect(SendData as jest.Mock).toHaveBeenCalledWith('conversations/ev-1/start', {}));
+  });
+
+  it('calls the stop API when end event is clicked', async () => {
+    const user = userEvent.setup();
+    await renderWithEvent(makeConversation({ active: true }));
+    await user.click(screen.getByRole('button', { name: 'actions-menu-ev-1' }));
+    await user.click(screen.getByText(/end event/i));
+    await waitFor(() => expect(SendData as jest.Mock).toHaveBeenCalledWith('conversations/ev-1/stop', {}));
   });
 });
