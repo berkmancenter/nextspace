@@ -241,4 +241,31 @@ describe('Analytics Utility', () => {
       expect((global.window as any)._paq[1]).toEqual(['trackEvent', 'assistant', 'command_sent', 'feedback', undefined]);
     });
   });
+
+  describe('tagEventVisit', () => {
+    beforeEach(() => {
+      process.env.NEXT_PUBLIC_ENABLE_ANALYTICS = 'true';
+      process.env.NEXT_PUBLIC_MATOMO_URL = 'https://example.com/matomo.js';
+      // Mock window object for browser environment
+      global.window = {
+        _mtm: [],
+        _paq: [],
+      } as any;
+    });
+
+    afterEach(() => {
+      delete (global as any).window;
+    });
+
+    it('should set the visit-scope conversation_id dimension (index 7)', async () => {
+      const { tagEventVisit } = await import('../../utils/analytics');
+
+      tagEventVisit('conv-123');
+
+      // Visit-scope dimension 7 carries the conversation id for every event visit,
+      // which is what the Vibes Analyst segment (dimension7==<id>) matches on.
+      expect((global.window as any)._paq.length).toBe(1);
+      expect((global.window as any)._paq[0]).toEqual(['setCustomDimension', 7, 'conv-123']);
+    });
+  });
 });

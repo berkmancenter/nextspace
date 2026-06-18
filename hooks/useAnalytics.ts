@@ -7,6 +7,7 @@ import {
   trackSessionEnd,
   setCustomDimension,
   trackUserLocation,
+  tagEventVisit,
 } from '../utils/analytics';
 import { useVisibilityAwareDuration } from './useVisibilityAwareDuration';
 
@@ -14,6 +15,20 @@ interface UseAnalyticsOptions {
   pageName?: string;
   pageType?: string;
 }
+
+/*
+ * Page types that represent a PARTICIPANT (audience member) viewing an event. Only these
+ * tag the visit-scope conversation_id (dimension 7), so the Vibes Analyst tracked-session
+ * count reflects the audience.
+ *
+ * This is an allowlist by design: any page type NOT listed here is dropped entirely from
+ * tracked sessions, never tagged with dimension 7, and so never matched by the recap's
+ * dimension7==<id> segment. In particular the MODERATOR page is intentionally excluded:
+ * moderators are staff, not audience, and counting their visits would muddy the
+ * "big audience, few talkers" signal the tracked-session count exists to show. To start
+ * counting another participant-facing page, add its pageType here.
+ */
+const PARTICIPANT_EVENT_PAGE_TYPES = ['assistant', 'backchannel'];
 
 /**
  * Custom hook for automatic analytics tracking
@@ -36,6 +51,16 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
   useEffect(() => {
     const currentPageName = pageName || router.pathname;
 
+    /*
+     * Tag the whole visit with the event's conversation id (visit-scope dimension 7) before
+     * the page view fires, so every participant is counted, not only those who interact.
+     * Only participant pages are tagged: moderator (and any non-participant) visits are
+     * dropped entirely from tracked sessions on purpose. See PARTICIPANT_EVENT_PAGE_TYPES.
+     */
+    if (router.query.conversationId && pageType && PARTICIPANT_EVENT_PAGE_TYPES.includes(pageType)) {
+      tagEventVisit(router.query.conversationId as string);
+    }
+
     // Track page view
     trackPageView(currentPageName, {
       path: router.asPath,
@@ -54,7 +79,7 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
         setCustomDimension(4, 'page_duration', activeDuration.toString(), 'action');
       }
     };
-  }, [pageName, router.pathname, router.asPath, router.query.conversationId, pageDuration]);
+  }, [pageName, pageType, router.pathname, router.asPath, router.query.conversationId, pageDuration]);
 
   // Page visibility tracking
   useEffect(() => {
