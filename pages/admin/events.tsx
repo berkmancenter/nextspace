@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { getUserTimezone } from '../../utils';
-import { CheckAuthHeader, getConversation } from '../../utils/Helpers';
+import { Api, getUserTimezone } from '../../utils';
+import { CheckAuthHeader, getConversation, getTypeForConversation } from '../../utils/Helpers';
 import { useSessionJoin } from '../../utils/useSessionJoin';
 
 import React from 'react';
@@ -484,8 +484,9 @@ function EventScreen({ authType }: { authType: AuthType }) {
   // Get userId from session
   const { userId } = useSessionJoin();
 
-  const [conversationsList, setConversationsList] = useState<components['schemas']['Conversation'][]>();
+  const [conversationsCount, setConversationsCount] = useState<number>(0);
   const [loadedConversations, setLoadedConversations] = useState<Conversation[]>([]);
+  const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [eventsShown, setEventsShown] = useState(6);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -522,10 +523,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
    * @param includePast true to include all events, false for only active/future
    * @param myEventsOnly true to show only events owned by current user
    */
-  const filterAndSortConversations = (
-    conversations: components['schemas']['Conversation'][],
-    myEventsOnly: boolean = false,
-  ) => {
+  const filterAndSortConversations = (conversations: Conversation[], myEventsOnly: boolean = false) => {
     const now = new Date();
     const convos = conversations.filter((conv) => {
       const scheduledTime = conv.scheduledTime ? new Date(conv.scheduledTime) : null;
@@ -543,7 +541,8 @@ function EventScreen({ authType }: { authType: AuthType }) {
         if (eventStartTime > endDateFilter) return false;
       }
 
-      if (statusFilters.length === 0) return true; // If no status filters are selected, show everything
+      // If no status filters are selected, show nothing
+      if (statusFilters.length === 0) return false;
 
       // Filter by owner if myEventsOnly is enabled
       if (myEventsOnly && conv.owner !== userId) {
@@ -552,14 +551,24 @@ function EventScreen({ authType }: { authType: AuthType }) {
 
       const isPastEvent = scheduledTime ? scheduledTime <= now : new Date(conv.createdAt!).getTime() <= now.getTime();
 
+      if (conv.type && typeFilters.length > 0 && !typeFilters.includes(conv.type.name)) {
+        return false;
+      }
+
       // Show active events if selected
-      if (statusFilters.includes('active') && conv.active) return true;
+      if (conv.active) {
+        return statusFilters.includes('active');
+      }
 
       // Show future events if selected, even if they are not active yet
-      if (statusFilters.includes('upcoming') && scheduledTime && scheduledTime > now) return true;
+      if (statusFilters.includes('upcoming') && scheduledTime && scheduledTime > now) {
+        return true;
+      }
 
       // Show past events only if selected, and if they are not active (active past events are already included above)
-      if (statusFilters.includes('past') && isPastEvent && !conv.active) return true;
+      if (statusFilters.includes('past') && isPastEvent && !conv.active) {
+        return true;
+      }
 
       return false;
     });
@@ -587,7 +596,9 @@ function EventScreen({ authType }: { authType: AuthType }) {
           aTime = new Date(a.createdAt!).getTime();
           bTime = new Date(b.createdAt!).getTime();
         }
-        return sortBy === SortOptions.ScheduledTimeDesc ? bTime - aTime : aTime - bTime;
+        return sortBy === SortOptions.ScheduledTimeDesc || sortBy === SortOptions.CreatedAtDesc
+          ? bTime - aTime
+          : aTime - bTime;
       }
       return 0;
     });
@@ -604,10 +615,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
       const all: components['schemas']['Conversation'][] = data;
       allConversationsRef.current = all;
 
-      const filtered = filterAndSortConversations(all, myEventsOnly);
-      const updated = filtered.filter((conv) => conv.id !== id);
-
-      setConversationsList(updated);
+      const updated = all.filter((conv) => conv.id !== id);
 
       const nextIndex = await fetchDetailedConversations(updated, 0, eventsShown, true);
       setEventsShown(nextIndex);
@@ -627,7 +635,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
     });
     refreshConversations(id);
     // Load the next event to fill the gap if one exists
-    const newList = conversationsList?.filter((conv) => conv.id !== id) ?? [];
+    const newList = filteredConversations?.filter((conv) => conv.id !== id) ?? [];
     if (newList.length > eventsShown - 1) {
       const nextIndex = await fetchDetailedConversations(newList, eventsShown - 1, 1);
       setEventsShown(nextIndex);
@@ -675,11 +683,12 @@ function EventScreen({ authType }: { authType: AuthType }) {
           try {
             return await getConversation(id!);
           } catch (err) {
-            console.error(`Failed to fetch conversation ${id}:`, err);
+            console.log(`Failed to fetch conversation ${id}:`, err);
             return null;
           }
         }),
       );
+      console.log(`Fetched batch of conversations`, batch);
       batch.forEach((conv, i) => {
         if (!conv) {
           console.warn(`Conversation ${list[currentIndex + i].id} returned null`);
@@ -692,6 +701,10 @@ function EventScreen({ authType }: { authType: AuthType }) {
 
     return currentIndex;
   };
+
+  useEffect(() => {
+    setFilteredConversations(filterAndSortConversations(loadedConversations, myEventsOnly));
+  }, [loadedConversations, myEventsOnly]);
 
   useEffect(() => {
     async function fetchInitialConversations() {
@@ -712,26 +725,25 @@ function EventScreen({ authType }: { authType: AuthType }) {
       // Store raw response for tab switching
       allConversationsRef.current = data;
 
-      const filteredAndSorted = filterAndSortConversations(data, myEventsOnly);
-
-      setConversationsList(filteredAndSorted);
-
       // Load first 6 details
-      const nextIndex = await fetchDetailedConversations(filteredAndSorted, 0, 6);
+      const nextIndex = await fetchDetailedConversations(data, 0, 6);
+      setConversationsCount(data.length);
+
       setEventsShown(nextIndex);
       setIsInitialLoading(false);
     }
 
-    if (!conversationsList) fetchInitialConversations();
-  }, [conversationsList]);
+    if (!conversationsCount) fetchInitialConversations();
+  }, [conversationsCount]);
 
   const handleLoadMore = async () => {
-    if (!conversationsList || isLoadingMore) return;
-    if (eventsShown >= conversationsList.length) return;
+    if (!conversationsCount || isLoadingMore) return;
+    if (eventsShown >= conversationsCount) return;
+    if (!allConversationsRef.current) return;
 
     setIsLoadingMore(true);
 
-    const nextIndex = await fetchDetailedConversations(conversationsList, eventsShown, 6);
+    const nextIndex = await fetchDetailedConversations(allConversationsRef.current, eventsShown, 6);
     setEventsShown(nextIndex);
     setIsLoadingMore(false);
   };
@@ -742,17 +754,14 @@ function EventScreen({ authType }: { authType: AuthType }) {
       setIncludePast(include);
       setIsInitialLoading(true);
 
+      const filteredAndSorted = filterAndSortConversations(loadedConversations, myEventsOnly);
       // Filter based on whether to include past events
-      const filteredAndSorted = filterAndSortConversations(allConversationsRef.current, myEventsOnly);
-      setConversationsList(filteredAndSorted);
-      const nextIndex = await fetchDetailedConversations(filteredAndSorted, 0, 6, true);
-      setEventsShown(nextIndex);
+      setFilteredConversations(filteredAndSorted);
       setIsInitialLoading(false);
     }
 
     // Refetch conversations whenever filters change
     fetchConversationsWithFilters(includePast);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [includePast, statusFilters, typeFilters, myEventsOnly, startDateFilter, endDateFilter, sortBy]);
 
   const handleMyEventsToggle = async (showOnlyMine: boolean) => {
@@ -760,11 +769,8 @@ function EventScreen({ authType }: { authType: AuthType }) {
     setMyEventsOnly(showOnlyMine);
     setIsInitialLoading(true);
 
-    const filteredAndSorted = filterAndSortConversations(allConversationsRef.current, showOnlyMine);
+    const nextIndex = await fetchDetailedConversations(allConversationsRef.current, 0, 6, true);
 
-    setConversationsList(filteredAndSorted);
-
-    const nextIndex = await fetchDetailedConversations(filteredAndSorted, 0, 6, true);
     setEventsShown(nextIndex);
     setIsInitialLoading(false);
   };
@@ -905,7 +911,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
               </>
             ) : (
               <>
-                {loadedConversations.length === 0 && !isInitialLoading ? (
+                {filteredConversations.length === 0 && !isInitialLoading ? (
                   <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 flex flex-col items-center gap-3">
                     <EventIcon className="text-gray-400" style={{ fontSize: '40px' }} />
                     <Typography variant="body1" className="text-gray-500">
@@ -917,7 +923,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
                   </div>
                 ) : (
                   <>
-                    {loadedConversations.map(
+                    {filteredConversations.map(
                       (event) =>
                         event && (
                           <EventCard
@@ -930,7 +936,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
                         ),
                     )}
 
-                    {conversationsList && eventsShown < conversationsList.length && (
+                    {conversationsCount && eventsShown < conversationsCount && (
                       <div className="flex justify-center mt-6 mb-6">
                         <Button variant="outlined" onClick={handleLoadMore} disabled={isLoadingMore}>
                           {isLoadingMore ? <CircularProgress size={20} /> : 'Load More'}
