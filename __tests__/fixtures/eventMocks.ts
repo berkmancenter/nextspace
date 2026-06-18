@@ -6,7 +6,7 @@ export const setupSortedConversations = () => {
   // 30 days past
   const past = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   // 1 day future
-  const middle = new Date(now.getTime());
+  const middle = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
   // 7 days future
   const future = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
@@ -53,7 +53,7 @@ export const setupSortedConversations = () => {
       createdAt: new Date(future.getTime() - 10000).toISOString(),
       owner: 'user-456',
       platformTypes: [],
-      type: { label: 'Test Agent' },
+      type: { name: 'eventAssistant', label: 'Test Agent' },
       eventUrls: { zoom: null, moderator: [], participant: [] },
     },
     'future-event': {
@@ -64,7 +64,7 @@ export const setupSortedConversations = () => {
       createdAt: new Date(future.getTime() - 1000).toISOString(),
       owner: 'user-456',
       platformTypes: [],
-      type: { label: 'Test Agent' },
+      type: { name: 'eventAssistant', label: 'Test Agent' },
       eventUrls: { zoom: null, moderator: [], participant: [] },
     },
     'earliest-event': {
@@ -75,7 +75,7 @@ export const setupSortedConversations = () => {
       createdAt: past.toISOString(),
       owner: 'user-456',
       platformTypes: [],
-      type: { label: 'Test Agent' },
+      type: { name: 'eventAssistant', label: 'Test Agent' },
       eventUrls: { zoom: null, moderator: [], participant: [] },
     },
   };

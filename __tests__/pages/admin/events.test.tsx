@@ -99,6 +99,9 @@ describe('Events Page', () => {
     // Always mock Request to return mockConversations unless overridden in a specific test
     (Request as jest.Mock).mockResolvedValue(mockConversations);
 
+    // Reset getConversation mock to avoid stale one-time mock values leaking between tests
+    (getConversation as jest.Mock).mockReset();
+
     // Mock useSessionJoin to return a default user ID
     (useSessionJoin as jest.Mock).mockReturnValue({ userId: 'user-123' });
 
@@ -158,6 +161,9 @@ describe('Events Page', () => {
           moderator: [],
           participant: [],
         },
+      })
+      .mockResolvedValueOnce({
+        ...mockConversations[2],
       });
 
     await act(async () => {
@@ -304,7 +310,7 @@ describe('Events Page - Event Ordering', () => {
   });
 
   it('should display events from mockConversations', async () => {
-    (Request as jest.Mock).mockResolvedValue([...mockConversations]);
+    (Request as jest.Mock).mockResolvedValue([mockConversations[0], mockConversations[1]]);
 
     (getConversation as jest.Mock)
       .mockResolvedValueOnce({
@@ -374,7 +380,7 @@ describe('Events Page - Event Ordering', () => {
         active: true,
         owner: mockUserId,
         platformTypes: [],
-        type: { label: 'Test Agent' },
+        type: { name: 'eventAssistant', label: 'Test Agent' },
         eventUrls: {
           zoom: null,
           moderator: [],
@@ -389,7 +395,7 @@ describe('Events Page - Event Ordering', () => {
         active: false,
         owner: mockUserId,
         platformTypes: [],
-        type: { label: 'Test Agent' },
+        type: { name: 'eventAssistant', label: 'Test Agent' },
         eventUrls: {
           zoom: null,
           moderator: [],
@@ -399,6 +405,21 @@ describe('Events Page - Event Ordering', () => {
 
     await act(async () => {
       render(<EventsPage authType={'user'} />);
+    });
+
+    // Enable past events filter to show both events
+    const filtersButton = screen.getByRole('button', { name: /filters/i });
+    await userEvent.click(filtersButton);
+    const statusFilter = screen.getByLabelText(/status/i);
+    await userEvent.click(statusFilter);
+    const pastEventsOption = await screen.findByRole('option', { name: /past events/i });
+    await userEvent.click(pastEventsOption);
+    const backdrop = document.querySelector('.MuiBackdrop-root') as HTMLElement;
+    await userEvent.click(backdrop);
+
+    // Wait for the Drawer to close before querying accessible headings
+    await waitFor(() => {
+      expect(screen.queryByText('Filters & Sorting')).not.toBeInTheDocument();
     });
 
     await waitFor(
@@ -452,7 +473,7 @@ describe('Events Page - Event Ordering', () => {
         createdAt: recentActive.toISOString(),
         owner: 'user-456',
         platformTypes: [],
-        type: { label: 'Test Agent' },
+        type: { name: 'eventAssistant', label: 'Test Agent' },
         eventUrls: { zoom: null, moderator: [], participant: [] },
       })
       .mockResolvedValueOnce({
@@ -463,7 +484,7 @@ describe('Events Page - Event Ordering', () => {
         createdAt: olderActive.toISOString(),
         owner: 'user-456',
         platformTypes: [],
-        type: { label: 'Test Agent' },
+        type: { name: 'eventAssistant', label: 'Test Agent' },
         eventUrls: { zoom: null, moderator: [], participant: [] },
       });
 
@@ -731,7 +752,7 @@ describe('Events Page - Event Ownership', () => {
         createdAt: olderDate.toISOString(),
         owner: mockUserId,
         platformTypes: [],
-        type: { label: 'Test Agent' },
+        type: { name: 'eventAssistant', label: 'Test Agent' },
         eventUrls: { zoom: null, moderator: [], participant: [] },
       })
       .mockResolvedValueOnce({
@@ -742,7 +763,7 @@ describe('Events Page - Event Ownership', () => {
         createdAt: recentDate.toISOString(),
         owner: otherUserId,
         platformTypes: [],
-        type: { label: 'Test Agent' },
+        type: { name: 'eventAssistant', label: 'Test Agent' },
         eventUrls: { zoom: null, moderator: [], participant: [] },
       });
 
@@ -806,13 +827,13 @@ describe('Events Page - Event Ownership', () => {
         .mockResolvedValueOnce({
           ...inactiveEvent,
           platformTypes: availablePlatforms1,
-          type: { label: 'Test Agent' },
+          type: { name: 'eventAssistant', label: 'Test Agent' },
           eventUrls: { zoom: null, moderator: [], participant: [] },
         })
         .mockResolvedValueOnce({
           ...activeEvent,
           platformTypes: availablePlatforms2,
-          type: { label: 'Test Agent' },
+          type: { name: 'eventAssistant', label: 'Test Agent' },
           eventUrls: { zoom: null, moderator: [], participant: [] },
         });
 
@@ -845,7 +866,7 @@ describe('Events Page - Event Ownership', () => {
       (getConversation as jest.Mock).mockResolvedValueOnce({
         ...inactiveEvent,
         platformTypes: availablePlatforms1,
-        type: { label: 'Test Agent' },
+        type: { name: 'eventAssistant', label: 'Test Agent' },
         eventUrls: { zoom: null, moderator: [], participant: [] },
       });
 
@@ -904,7 +925,7 @@ describe('Events Page - Event Ownership', () => {
       (getConversation as jest.Mock).mockResolvedValueOnce({
         ...inactiveEvent,
         platformTypes: availablePlatforms1,
-        type: { label: 'Test Agent' },
+        type: { name: 'eventAssistant', label: 'Test Agent' },
         eventUrls: { zoom: null, moderator: [], participant: [] },
       });
 
@@ -964,7 +985,7 @@ describe('Events Page - Event Ownership', () => {
       (getConversation as jest.Mock).mockResolvedValueOnce({
         ...inactiveEvent,
         platformTypes: availablePlatforms1,
-        type: { label: 'Test Agent' },
+        type: { name: 'eventAssistant', label: 'Test Agent' },
         eventUrls: { zoom: null, moderator: [], participant: [] },
       });
 
@@ -1003,7 +1024,7 @@ describe('Events Page - Event Ownership', () => {
       (getConversation as jest.Mock).mockResolvedValueOnce({
         ...inactiveEvent,
         platformTypes: availablePlatforms1,
-        type: { label: 'Test Agent' },
+        type: { name: 'eventAssistant', label: 'Test Agent' },
         eventUrls: { zoom: null, moderator: [], participant: [] },
       });
 
