@@ -4,11 +4,11 @@ import { getConversation } from '../../utils/Helpers';
 export const setupSortedConversations = () => {
   const now = new Date();
   // 30 days past
-  const earliest = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const past = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   // 1 day future
   const middle = new Date(now.getTime());
   // 7 days future
-  const latest = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const future = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const conversations = [
     {
@@ -22,11 +22,11 @@ export const setupSortedConversations = () => {
       eventUrls: { moderator: [], participant: [] },
     },
     {
-      id: 'latest-event',
-      name: 'Latest Event',
+      id: 'future-event',
+      name: 'Future Event',
       active: true,
-      scheduledTime: latest.toISOString(),
-      createdAt: new Date(latest.getTime() - 1000).toISOString(),
+      scheduledTime: future.toISOString(),
+      createdAt: new Date(future.getTime() - 1000).toISOString(),
       owner: 'user-456',
       platformTypes: [],
       eventUrls: { moderator: [], participant: [] },
@@ -35,8 +35,8 @@ export const setupSortedConversations = () => {
       id: 'earliest-event',
       name: 'Earliest Event',
       active: false,
-      scheduledTime: earliest.toISOString(),
-      createdAt: earliest.toISOString(),
+      scheduledTime: past.toISOString(),
+      createdAt: past.toISOString(),
       owner: 'user-456',
       platformTypes: [],
       eventUrls: { moderator: [], participant: [] },
@@ -50,18 +50,18 @@ export const setupSortedConversations = () => {
       name: 'Middle Event',
       active: false,
       scheduledTime: middle.toISOString(),
-      createdAt: new Date(latest.getTime() - 10000).toISOString(),
+      createdAt: new Date(future.getTime() - 10000).toISOString(),
       owner: 'user-456',
       platformTypes: [],
       type: { label: 'Test Agent' },
       eventUrls: { zoom: null, moderator: [], participant: [] },
     },
-    'latest-event': {
-      id: 'latest-event',
-      name: 'Latest Event',
+    'future-event': {
+      id: 'future-event',
+      name: 'Future Event',
       active: false,
-      scheduledTime: latest.toISOString(),
-      createdAt: new Date(latest.getTime() - 1000).toISOString(),
+      scheduledTime: future.toISOString(),
+      createdAt: new Date(future.getTime() - 1000).toISOString(),
       owner: 'user-456',
       platformTypes: [],
       type: { label: 'Test Agent' },
@@ -71,8 +71,8 @@ export const setupSortedConversations = () => {
       id: 'earliest-event',
       name: 'Earliest Event',
       active: false,
-      scheduledTime: earliest.toISOString(),
-      createdAt: earliest.toISOString(),
+      scheduledTime: past.toISOString(),
+      createdAt: past.toISOString(),
       owner: 'user-456',
       platformTypes: [],
       type: { label: 'Test Agent' },
