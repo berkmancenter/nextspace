@@ -11,6 +11,7 @@ import { useAutoScroll } from '../hooks/useAutoScroll';
 import { BotIcon } from './BotIcon';
 import { createMentionsEnhancer } from './enhancers/mentionsEnhancer';
 import { normalizeAssistantPseudonym, parseMessageBody } from '../utils/Helpers';
+import { PollMessage, PollMessageBody } from './messages/PollMessage';
 import { IconButton, Tooltip } from '@mui/material';
 import ArrowCircleDownIcon from '@mui/icons-material/ArrowCircleDown';
 
@@ -63,6 +64,8 @@ interface GroupChatPanelProps {
   onInputChange?: (value: string) => void;
   /** Callback when a message is sent; should return true if the message was successfully sent */
   onSendMessage: (message: string, parentMessageId?: string) => Promise<boolean>;
+  /** Poll vote counts keyed by pollId */
+  pollCounts?: Record<string, Record<string, number>>;
 }
 
 export const GroupChatPanel: FC<GroupChatPanelProps> = ({
@@ -80,6 +83,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   onInputChange,
   onMarkAsRead,
   onSendMessage,
+  pollCounts = {},
 }) => {
   // State for tracking which thread is open in split view
   const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(null);
@@ -166,6 +170,28 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     if (!isAssistant) {
       return (
         <UserMessage message={message} contributors={contributors} backgroundColor={style.bubbleBg} isHovered={isHovered} />
+      );
+    }
+
+    // Poll messages — rendered as an inline poll widget below the agent's intro text
+    if (parsed.type === 'poll') {
+      const rawBody = typeof message.body === 'string' ? JSON.parse(message.body) : message.body;
+      const pollBody = rawBody as PollMessageBody;
+      const counts = pollCounts[pollBody.pollId] ?? null;
+      return (
+        <div style={{ width: '85%' }}>
+          <div
+            className="rounded-2xl px-2 py-1 text-gray-800 self-start"
+            style={{
+              backgroundColor: isHovered ? 'white' : style.bubbleBg,
+              width: '100%',
+              border: '1px solid rgba(0, 0, 0, 0.1)',
+            }}
+          >
+            {parsed.text && renderAssistantMessage(parsed.text)}
+            <PollMessage body={pollBody} counts={counts} />
+          </div>
+        </div>
       );
     }
 
