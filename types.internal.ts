@@ -116,6 +116,8 @@ export type ModeratorInsightsMessage = PseudonymousMessage & {
         text: string;
       }[];
       value: string;
+      source?: 'ai' | 'participant';
+      recommendations?: string[];
     }[];
     timestamp: {
       start: number;
