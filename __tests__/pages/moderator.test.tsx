@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { axe } from 'jest-axe';
 import { act } from 'react';
 import { useRouter } from 'next/router';
 import { io } from 'socket.io-client';
@@ -118,7 +119,13 @@ describe('ModeratorScreen', () => {
       createdAt: '2025-10-17T12:00:00Z',
       channels: ['moderator'],
       body: {
-        insights: [{ value: 'Test insight' }],
+        insights: [
+          {
+            value: 'Test insight',
+            source: 'ai',
+            recommendations: ['Follow up on this topic.', 'Ask for clarifying questions.'],
+          },
+        ],
         timestamp: {
           start: '2025-10-17T12:00:00Z',
           end: '2025-10-17T12:05:00Z',
@@ -147,7 +154,25 @@ describe('ModeratorScreen', () => {
         insights: [
           {
             value: 'At least 2 participants are independently reporting they cannot hear the speaker/audio.',
-            type: 'insight',
+            source: 'ai',
+          },
+        ],
+        timestamp: {
+          start: 1773361630922,
+          end: 1773361881969,
+        },
+      },
+    },
+    {
+      id: '4',
+      pseudonym: 'Event Mediator',
+      createdAt: '2026-03-13T00:35:00.000Z',
+      channels: ['moderator'],
+      body: {
+        insights: [
+          {
+            value: 'Will slides be shared after the session?',
+            source: 'participant',
           },
         ],
         timestamp: {
@@ -596,6 +621,70 @@ describe('ModeratorScreen', () => {
         expect(screen.queryByText(/Moderator question submission is not enabled/)).not.toBeInTheDocument();
       });
     });
+  });
+
+  it('renders AI Insight badge for insights with source: ai', async () => {
+    await act(async () => {
+      render(<ModeratorScreen authType={'user'} />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText('AI Insight').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('renders Question badge for insights with source: participant', async () => {
+    await act(async () => {
+      render(<ModeratorScreen authType={'user'} />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Question')).toBeInTheDocument();
+      expect(screen.getByText('Will slides be shared after the session?')).toBeInTheDocument();
+    });
+  });
+
+  it('renders Reaction badge for metric messages', async () => {
+    await act(async () => {
+      render(<ModeratorScreen authType={'user'} />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Reaction')).toBeInTheDocument();
+    });
+  });
+
+  it('renders Suggested Actions section when recommendations are present', async () => {
+    await act(async () => {
+      render(<ModeratorScreen authType={'user'} />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Suggested Actions/)).toBeInTheDocument();
+      expect(screen.getByText('Follow up on this topic.')).toBeInTheDocument();
+      expect(screen.getByText('Ask for clarifying questions.')).toBeInTheDocument();
+    });
+  });
+
+  it('does not render Suggested Actions section when recommendations are absent', async () => {
+    await act(async () => {
+      render(<ModeratorScreen authType={'user'} />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Will slides be shared after the session?')).toBeInTheDocument();
+    });
+
+    // The participant question has no recommendations — only one Suggested Actions block should exist
+    expect(screen.getAllByText(/Suggested Actions/)).toHaveLength(1);
+  });
+
+  it('has no accessibility violations in the loaded state', async () => {
+    const { container } = await act(async () => render(<ModeratorScreen authType={'user'} />));
+
+    await waitFor(() => expect(screen.getByText('Test insight')).toBeInTheDocument());
+
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('logs messages with preset but no text property', async () => {

@@ -678,11 +678,12 @@ describe('TokenManager', () => {
         access: { token: 'acc', expires: FUTURE_ACCESS_EXPIRES },
         refresh: { token: 'ref', expires: FUTURE_REFRESH_EXPIRES },
       };
-      tokenManager.setTokens(tokens, true);
+      tokenManager.setTokens(tokens, { broadcast: true });
 
       expect(mockBroadcastPostMessage).toHaveBeenCalledWith({
         type: 'TOKENS_REFRESHED',
         tokens,
+        userId: null,
       });
     });
 
@@ -692,13 +693,22 @@ describe('TokenManager', () => {
           access: { token: 'acc', expires: FUTURE_ACCESS_EXPIRES },
           refresh: { token: 'ref', expires: FUTURE_REFRESH_EXPIRES },
         },
-        false,
+        { broadcast: false },
       );
 
       expect(mockBroadcastPostMessage).not.toHaveBeenCalled();
     });
 
     it('reschedules the proactive refresh timer when adopting tokens from another tab', () => {
+      // Establish this tab's token owner so a same-user broadcast is accepted.
+      tokenManager.setTokens(
+        {
+          access: { token: 'acc', expires: FUTURE_ACCESS_EXPIRES },
+          refresh: { token: 'ref', expires: FUTURE_REFRESH_EXPIRES },
+        },
+        { userId: 'user-1' },
+      );
+
       const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
       setTimeoutSpy.mockClear();
 
@@ -707,9 +717,9 @@ describe('TokenManager', () => {
         refresh: { token: 'tab2-ref', expires: FUTURE_REFRESH_EXPIRES },
       };
 
-      // Simulate another tab broadcasting refreshed tokens
+      // Simulate another tab (same user) broadcasting refreshed tokens
       broadcastMessageHandler?.({
-        data: { type: 'TOKENS_REFRESHED', tokens: newTokens },
+        data: { type: 'TOKENS_REFRESHED', tokens: newTokens, userId: 'user-1' },
       } as MessageEvent);
 
       // setTokens(broadcast=false) is called internally, which triggers
@@ -738,17 +748,71 @@ describe('TokenManager', () => {
     });
 
     it('receives TOKENS_REFRESHED from another tab and updates tokens without re-broadcasting', () => {
+      // Establish this tab's token owner so a same-user broadcast is accepted.
+      tokenManager.setTokens(
+        {
+          access: { token: 'acc', expires: FUTURE_ACCESS_EXPIRES },
+          refresh: { token: 'ref', expires: FUTURE_REFRESH_EXPIRES },
+        },
+        { userId: 'user-1' },
+      );
+      mockBroadcastPostMessage.mockClear();
+
       const newTokens = {
         access: { token: 'cross-tab-acc', expires: FUTURE_ACCESS_EXPIRES },
         refresh: { token: 'cross-tab-ref', expires: FUTURE_REFRESH_EXPIRES },
       };
 
       broadcastMessageHandler?.({
-        data: { type: 'TOKENS_REFRESHED', tokens: newTokens },
+        data: { type: 'TOKENS_REFRESHED', tokens: newTokens, userId: 'user-1' },
       } as MessageEvent);
 
       expect(tokenManager.getAccessToken()).toBe('cross-tab-acc');
       expect(mockBroadcastPostMessage).not.toHaveBeenCalled();
+    });
+
+    it('IGNORES TOKENS_REFRESHED from another tab when the userId differs from ours', () => {
+      // This tab belongs to user-1.
+      tokenManager.setTokens(
+        {
+          access: { token: 'user1-acc', expires: FUTURE_ACCESS_EXPIRES },
+          refresh: { token: 'user1-ref', expires: FUTURE_REFRESH_EXPIRES },
+        },
+        { userId: 'user-1' },
+      );
+
+      // Another tab (user-2) broadcasts ITS tokens. Adopting them would make us
+      // authenticate as user-2 while building channels for user-1.
+      broadcastMessageHandler?.({
+        data: {
+          type: 'TOKENS_REFRESHED',
+          tokens: {
+            access: { token: 'user2-acc', expires: FUTURE_ACCESS_EXPIRES },
+            refresh: { token: 'user2-ref', expires: FUTURE_REFRESH_EXPIRES },
+          },
+          userId: 'user-2',
+        },
+      } as MessageEvent);
+
+      // Our tokens are unchanged — the foreign tokens were rejected.
+      expect(tokenManager.getAccessToken()).toBe('user1-acc');
+    });
+
+    it('IGNORES TOKENS_REFRESHED when we have no owner yet (tab mid-initialization)', () => {
+      // No setTokens call yet → no owner. A broadcast arriving now (e.g. another
+      // tab creating a distinct guest session) must not establish our identity.
+      broadcastMessageHandler?.({
+        data: {
+          type: 'TOKENS_REFRESHED',
+          tokens: {
+            access: { token: 'other-acc', expires: FUTURE_ACCESS_EXPIRES },
+            refresh: { token: 'other-ref', expires: FUTURE_REFRESH_EXPIRES },
+          },
+          userId: 'user-2',
+        },
+      } as MessageEvent);
+
+      expect(tokenManager.getAccessToken()).toBe('');
     });
 
     it('broadcasts REFRESH_STARTING when a refresh begins', async () => {
@@ -785,6 +849,100 @@ describe('TokenManager', () => {
 
       const startMsg = mockBroadcastPostMessage.mock.calls.find((call: any[]) => call[0]?.type === 'REFRESH_STARTING');
       expect(startMsg).toBeDefined();
+    });
+  });
+
+  // ─── Identity ownership guard ─────────────────────────────────────────────
+
+  describe('token identity ownership', () => {
+    it('_syncFromCookie ignores cookie tokens that belong to a different user', async () => {
+      (global.fetch as jest.Mock)
+        // /api/cookie — another tab/login overwrote the shared cookie with user-2
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            tokens: {
+              access: 'user2-acc',
+              refresh: 'user2-ref',
+              accessExpires: FUTURE_ACCESS_EXPIRES,
+            },
+            userId: 'user-2',
+          }),
+        })
+        // refresh API — called because the cookie was rejected; returns fresh user-1 tokens
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            access: { token: 'user1-new-acc', expires: FUTURE_ACCESS_EXPIRES },
+            refresh: { token: 'user1-new-ref', expires: FUTURE_REFRESH_EXPIRES },
+          }),
+        })
+        // PATCH /api/session
+        .mockResolvedValueOnce({ ok: true });
+
+      // This tab belongs to user-1 with a near-expiry token to trigger refresh.
+      tokenManager.setTokens(
+        {
+          access: { token: 'user1-acc', expires: NEAR_EXPIRY_ACCESS },
+          refresh: { token: 'user1-ref', expires: FUTURE_REFRESH_EXPIRES },
+        },
+        { userId: 'user-1' },
+      );
+
+      await flush();
+      for (let i = 0; i < 6; i++) await Promise.resolve();
+
+      // The cookie's user-2 token was never adopted; we refreshed our own session.
+      expect(tokenManager.getAccessToken()).not.toBe('user2-acc');
+      expect(tokenManager.getAccessToken()).toBe('user1-new-acc');
+    });
+
+    it('authoritative local setTokens updates the owner (guest → admin via login)', () => {
+      // Guest session establishes owner = guest-1.
+      tokenManager.setTokens(
+        {
+          access: { token: 'guest-acc', expires: FUTURE_ACCESS_EXPIRES },
+          refresh: { token: 'guest-ref', expires: FUTURE_REFRESH_EXPIRES },
+        },
+        { userId: 'guest-1' },
+      );
+      mockBroadcastPostMessage.mockClear();
+
+      // Login as admin in the same tab — an authoritative local write updates owner.
+      tokenManager.setTokensFromStrings(
+        'admin-acc',
+        'admin-ref',
+        FUTURE_ACCESS_EXPIRES,
+        FUTURE_REFRESH_EXPIRES,
+        'admin-1',
+      );
+
+      expect(tokenManager.getAccessToken()).toBe('admin-acc');
+
+      // The broadcast carries the NEW owner so other tabs validate against admin-1.
+      expect(mockBroadcastPostMessage).toHaveBeenCalledWith({
+        type: 'TOKENS_REFRESHED',
+        tokens: {
+          access: { token: 'admin-acc', expires: FUTURE_ACCESS_EXPIRES },
+          refresh: { token: 'admin-ref', expires: FUTURE_REFRESH_EXPIRES },
+        },
+        userId: 'admin-1',
+      });
+
+      // A late broadcast for the OLD guest user is now rejected.
+      broadcastMessageHandler?.({
+        data: {
+          type: 'TOKENS_REFRESHED',
+          tokens: {
+            access: { token: 'guest-acc-2', expires: FUTURE_ACCESS_EXPIRES },
+            refresh: { token: 'guest-ref-2', expires: FUTURE_REFRESH_EXPIRES },
+          },
+          userId: 'guest-1',
+        },
+      } as MessageEvent);
+
+      expect(tokenManager.getAccessToken()).toBe('admin-acc');
     });
   });
 

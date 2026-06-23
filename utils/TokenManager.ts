@@ -40,13 +40,23 @@ type TokenChangeListener = (tokens: TokenSet) => void;
 
 /**
  * BroadcastChannel message types for cross-tab coordination.
+ *
+ * TOKENS_REFRESHED carries the `userId` the tokens belong to so receiving tabs
+ * can refuse to adopt tokens for a different user (which would cause the tab to
+ * authenticate as one user while building channel names for another).
  */
-type TabMessage = { type: 'TOKENS_REFRESHED'; tokens: TokenSet } | { type: 'REFRESH_STARTING' };
+type TabMessage =
+  | { type: 'TOKENS_REFRESHED'; tokens: TokenSet; userId: string | null }
+  | { type: 'REFRESH_STARTING' };
 
 class TokenManagerClass {
   private static _instance: TokenManagerClass;
 
   private _tokens: TokenSet | null = null;
+  // The user the current tokens belong to.  Set by authoritative local writes
+  // (guest creation, login, cookie restore, in-tab refresh).  Used to reject
+  // tokens from other users arriving via BroadcastChannel or cookie sync.
+  private _ownerUserId: string | null = null;
   private _inflightRefresh: Promise<boolean> | null = null;
   private _proactiveTimer: ReturnType<typeof setTimeout> | null = null;
   private _lastRefreshAt: number = 0;
@@ -73,15 +83,25 @@ class TokenManagerClass {
    * refresh and notifies subscribers + other tabs.
    *
    * @param tokens  Full token set including expires timestamps.
-   * @param broadcast  Set false when the tokens came from a broadcast (to
-   *                   avoid an infinite loop). Defaults to true.
+   * @param opts.broadcast  Set false when the tokens came from a broadcast or
+   *                        cookie sync (to avoid an infinite loop). Defaults to true.
+   * @param opts.userId  The user the tokens belong to.  Provided by authoritative
+   *                     local writes (guest creation, login, cookie restore) to
+   *                     (re)establish the token owner.  When omitted the existing
+   *                     owner is preserved (e.g. an in-tab refresh keeps the same
+   *                     user).  The owner is broadcast so other tabs can reject
+   *                     tokens that belong to a different user.
    */
-  setTokens(tokens: TokenSet, broadcast = true): void {
+  setTokens(tokens: TokenSet, opts: { broadcast?: boolean; userId?: string | null } = {}): void {
+    const { broadcast = true, userId } = opts;
     this._tokens = tokens;
+    if (userId !== undefined) {
+      this._ownerUserId = userId;
+    }
     this._scheduleProactiveRefresh();
     this._notifyListeners(tokens);
     if (broadcast) {
-      this._broadcast({ type: 'TOKENS_REFRESHED', tokens });
+      this._broadcast({ type: 'TOKENS_REFRESHED', tokens, userId: this._ownerUserId });
     }
   }
 
@@ -89,17 +109,26 @@ class TokenManagerClass {
    * Convenience overload for callers that only have token strings and expiry
    * info available at the same time.
    */
-  setTokensFromStrings(accessToken: string, refreshToken: string, accessExpires?: string, refreshExpires?: string): void {
+  setTokensFromStrings(
+    accessToken: string,
+    refreshToken: string,
+    accessExpires?: string,
+    refreshExpires?: string,
+    userId?: string,
+  ): void {
     // When expires info is unavailable (legacy callers) synthesise a plausible
     // expiry so scheduling still works — 30 min for access, 30 days for refresh.
     const now = Date.now();
     const safeAccessExpires = accessExpires ?? new Date(now + 30 * 60 * 1000).toISOString();
     const safeRefreshExpires = refreshExpires ?? new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    this.setTokens({
-      access: { token: accessToken, expires: safeAccessExpires },
-      refresh: { token: refreshToken, expires: safeRefreshExpires },
-    });
+    this.setTokens(
+      {
+        access: { token: accessToken, expires: safeAccessExpires },
+        refresh: { token: refreshToken, expires: safeRefreshExpires },
+      },
+      { userId },
+    );
   }
 
   /**
@@ -181,6 +210,7 @@ class TokenManagerClass {
    */
   clearTokens(): void {
     this._tokens = null;
+    this._ownerUserId = null;
     this._cancelProactiveRefresh();
   }
 
@@ -240,8 +270,10 @@ class TokenManagerClass {
           },
         };
 
-        // Update in-memory store and schedule next refresh.
-        this.setTokens(newTokens, true); // broadcasts to other tabs
+        // Update in-memory store and schedule next refresh.  An in-tab refresh
+        // keeps the same user, so we don't pass userId — the existing owner is
+        // preserved and broadcast to other tabs.
+        this.setTokens(newTokens, { broadcast: true }); // broadcasts to other tabs
         this._lastRefreshAt = Date.now();
 
         // Persist to the cookie so server-side routes and other tabs can read.
@@ -273,6 +305,19 @@ class TokenManagerClass {
 
       const cookieAccess = data.tokens.access as string;
       const cookieRefresh = data.tokens.refresh as string;
+      const cookieUserId = (data.userId ?? null) as string | null;
+
+      // Refuse to adopt tokens belonging to a different user.  The cookie is
+      // shared across tabs, so another tab (or a login) may have overwritten it
+      // with a different user's session.  Adopting it here would make this tab
+      // authenticate as that user while still building channel names for our own
+      // user.  Let the caller fall back to refreshing with our own refresh token.
+      if (this._ownerUserId !== null && cookieUserId !== null && cookieUserId !== this._ownerUserId) {
+        console.warn(
+          `TokenManager: ignoring cookie tokens for a different user (cookie=${cookieUserId}, owner=${this._ownerUserId})`,
+        );
+        return false;
+      }
 
       // Only update if the cookie has a different (presumably newer) token.
       if (cookieAccess !== this._tokens?.access.token) {
@@ -287,7 +332,7 @@ class TokenManagerClass {
               expires: data.tokens.refreshExpires ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
             },
           },
-          false, // don't re-broadcast — this came from the cookie
+          { broadcast: false }, // don't re-broadcast — this came from the cookie
         );
         return true;
       }
@@ -309,6 +354,10 @@ class TokenManagerClass {
       refreshToken: tokens.refresh.token,
       accessExpires: tokens.access.expires,
       refreshExpires: tokens.refresh.expires,
+      // Stamp the owning user so the cookie's userId can't drift from the
+      // tokens written alongside it. The server prefers the token's own `sub`
+      // claim, falling back to this when the token isn't decodable.
+      userId: this._ownerUserId,
     });
 
     const doFetch = () =>
@@ -449,10 +498,19 @@ class TokenManagerClass {
   private _handleTabMessage(message: TabMessage): void {
     switch (message.type) {
       case 'TOKENS_REFRESHED': {
-        // Another tab completed a refresh — adopt its tokens without triggering
-        // our own refresh.  The `broadcast=false` flag prevents an echo loop.
+        // Another tab completed a refresh.  Only adopt its tokens if they belong
+        // to the same user as ours — otherwise we'd authenticate as that user
+        // while building channel names for our own user.  Ignore when we have no
+        // owner yet (a tab mid-initialization must not adopt another tab's
+        // identity, e.g. two tabs creating distinct guest sessions at once).
+        if (this._ownerUserId === null || message.userId !== this._ownerUserId) {
+          console.warn(
+            `TokenManager: ignoring broadcast tokens for a different user (message=${message.userId}, owner=${this._ownerUserId})`,
+          );
+          break;
+        }
         console.log('TokenManager: received refreshed tokens from another tab');
-        this.setTokens(message.tokens, false);
+        this.setTokens(message.tokens, { broadcast: false });
         break;
       }
 
