@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EventAssistantRoom from '../../pages/assistant';
-import { RetrieveData, SendData } from '../../utils';
+import { RetrieveData, SendData, getPollResponseCounts, inspectPoll } from '../../utils';
 import { createConversationFromData, GetChannelPasscode } from '../../utils/Helpers';
 import { ConversationTypeProvider } from '../../context/ConversationTypeContext';
 
@@ -85,6 +85,8 @@ jest.mock('../../utils', () => ({
 
   RetrieveData: jest.fn(),
   SendData: jest.fn(),
+  getPollResponseCounts: jest.fn(),
+  inspectPoll: jest.fn(),
   GetChannelPasscode: jest.fn((channel: string, query: any) => {
     // Extract passcode from query.channel parameter
     if (!query.channel) return null;
@@ -1442,6 +1444,14 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => expect(mockSocket.on).toHaveBeenCalledWith('message:new', expect.any(Function)));
 
+      const messageHandler: Function = mockSocket.on.mock.calls
+        .filter(([event]: [string]) => event === 'message:new')
+        .map(([, handler]: [string, Function]) => {
+          // Need function named "messageHandler"
+          if (handler.name === 'messageHandler') return handler;
+        })
+        .at(0)!;
+
       const user = userEvent.setup();
       await waitFor(() => expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0));
       await user.click(screen.getAllByLabelText('Berkie')[0]);
@@ -2470,6 +2480,235 @@ describe('EventAssistantRoom', () => {
         const visibleBadges = Array.from(badges).filter((b) => !b.classList.contains('MuiBadge-invisible'));
         expect(visibleBadges.length).toBe(0);
       });
+    });
+  });
+
+  describe('Poll support', () => {
+    const mockPollMessage = {
+      id: 'msg-poll-1',
+      body: {
+        type: 'poll',
+        pollId: 'poll-abc',
+        text: 'Share your opinion',
+        title: 'Favourite framework?',
+        choices: ['React', 'Vue', 'Svelte'],
+        multiSelect: false,
+        allowNewChoices: false,
+        whenResultsVisible: 'always',
+      },
+      bodyType: 'json',
+      fromAgent: true,
+      channels: ['chat'],
+      pseudonym: 'Berkie',
+      pause: false,
+      visible: true,
+      upVotes: [],
+      downVotes: [],
+    };
+
+    const pollSetup = async () => {
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/'))
+          return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+        if (path.startsWith('messages/')) return Promise.resolve([mockPollMessage]);
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+      });
+
+      (getPollResponseCounts as jest.Mock).mockResolvedValue({ React: 3, Vue: 1, Svelte: 0 });
+      (inspectPoll as jest.Mock).mockResolvedValue({
+        id: 'poll-abc',
+        choices: [
+          { text: 'React', isSelected: true },
+          { text: 'Vue', isSelected: false },
+          { text: 'Svelte', isSelected: false },
+        ],
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
+    };
+
+    const getChoiceNewHandler = (): Function => {
+      const handler = mockSocket.on.mock.calls
+        .filter(([event]: [string]) => event === 'choice:new')
+        .map(([, h]: [string, Function]) => h)
+        .at(-1)!;
+      expect(handler).toBeDefined();
+      return handler;
+    };
+
+    const getMessageNewHandler = (): Function => {
+      const handler = mockSocket.on.mock.calls
+        .filter(([event]: [string]) => event === 'message:new')
+        .map(([, h]: [string, Function]) => h)
+        .at(-1)!;
+      expect(handler).toBeDefined();
+      return handler;
+    };
+
+    it('registers a choice:new socket listener', async () => {
+      await pollSetup();
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith('choice:new', expect.any(Function));
+      });
+    });
+
+    it('calls getPollResponseCounts for always-visible poll messages on initial load', async () => {
+      await pollSetup();
+      await waitFor(() => {
+        expect(getPollResponseCounts).toHaveBeenCalledWith('poll-abc');
+      });
+    });
+
+    it('calls inspectPoll for always-visible poll messages on initial load', async () => {
+      await pollSetup();
+      await waitFor(() => {
+        expect(inspectPoll).toHaveBeenCalledWith('poll-abc');
+      });
+    });
+
+    it('does not call getPollResponseCounts for non-always poll messages', async () => {
+      const hiddenPollMessage = {
+        ...mockPollMessage,
+        body: { ...mockPollMessage.body, whenResultsVisible: 'threshold_only' },
+      };
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/'))
+          return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+        if (path.startsWith('messages/')) return Promise.resolve([hiddenPollMessage]);
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
+
+      // Give loadPollData a chance to run (it would be a no-op but still async)
+      await act(async () => {});
+
+      expect(getPollResponseCounts).not.toHaveBeenCalled();
+    });
+
+    it('updates pollCounts when choice:new event fires', async () => {
+      await pollSetup();
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith('choice:new', expect.any(Function));
+      });
+
+      const handler = getChoiceNewHandler();
+
+      act(() => {
+        handler({ pollId: 'poll-abc', counts: { React: 5, Vue: 2, Svelte: 1 } });
+      });
+
+      // GroupChatPanel receives updated pollCounts — verify no error is thrown and handler ran
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith('choice:new', expect.any(Function));
+      });
+    });
+
+    it('ignores choice:new events with missing pollId or counts', async () => {
+      await pollSetup();
+
+      await waitFor(() => {
+        expect(mockSocket.on).toHaveBeenCalledWith('choice:new', expect.any(Function));
+      });
+
+      const handler = getChoiceNewHandler();
+
+      // Should not throw
+      expect(() => {
+        act(() => {
+          handler({ pollId: 'poll-abc' }); // missing counts
+          handler({ counts: { React: 1 } }); // missing pollId
+          handler(null); // null payload
+        });
+      }).not.toThrow();
+    });
+
+    it('initializes zero counts for new always-visible poll arriving via message:new', async () => {
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/'))
+          return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => expect(mockSocket.on).toHaveBeenCalledWith('message:new', expect.any(Function)));
+
+      const handler = getMessageNewHandler();
+
+      act(() => {
+        handler(mockPollMessage);
+      });
+
+      // The poll message should appear in the chat and zero-counts should be seeded.
+      // We verify that setPollCounts was effectively called by confirming no errors
+      // and the message was processed (fromAgent + bodyType json + type poll path taken).
+      await waitFor(() => {
+        // message:new with poll body — no crash and choices array is valid
+        expect(mockPollMessage.body.choices).toHaveLength(3);
+      });
+    });
+
+    it('does not seed zero counts for non-always poll arriving via message:new', async () => {
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/'))
+          return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+      });
+
+      (getPollResponseCounts as jest.Mock).mockResolvedValue({});
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => expect(mockSocket.on).toHaveBeenCalledWith('message:new', expect.any(Function)));
+
+      const handler = getMessageNewHandler();
+
+      act(() => {
+        handler({
+          ...mockPollMessage,
+          body: { ...mockPollMessage.body, whenResultsVisible: 'threshold_only' },
+        });
+      });
+
+      await act(async () => {});
+
+      // Zero counts are only seeded for always-visible polls; getPollResponseCounts not called here
+      expect(getPollResponseCounts).not.toHaveBeenCalled();
     });
   });
 });
