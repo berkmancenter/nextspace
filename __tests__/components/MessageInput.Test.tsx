@@ -161,6 +161,50 @@ describe('MessageInput Component', () => {
       expect(mockOnSendMessage).not.toHaveBeenCalled();
     });
 
+    it('does not send whitespace-only message', async () => {
+      const user = userEvent.setup();
+      render(<MessageInput {...defaultProps} />);
+
+      const input = screen.getByPlaceholderText('Enter your message here');
+      await user.type(input, '   {Enter}');
+
+      expect(mockOnSendMessage).not.toHaveBeenCalled();
+    });
+
+    it('clears input immediately on send before server responds', async () => {
+      let resolveSend!: (value: boolean) => void;
+      const slowSend = jest.fn(() => new Promise<boolean>((resolve) => { resolveSend = resolve; }));
+
+      const user = userEvent.setup();
+      render(<MessageInput {...defaultProps} onSendMessage={slowSend} />);
+
+      const input = screen.getByPlaceholderText('Enter your message here') as HTMLInputElement;
+      await user.type(input, 'Test message{Enter}');
+
+      // Input should be cleared before the promise resolves
+      expect(input.value).toBe('');
+
+      resolveSend(true);
+    });
+
+    it('does not send duplicate when Enter is pressed twice rapidly', async () => {
+      let resolveFirst!: (value: boolean) => void;
+      const slowSend = jest.fn(() => new Promise<boolean>((resolve) => { resolveFirst = resolve; }));
+
+      const user = userEvent.setup();
+      render(<MessageInput {...defaultProps} onSendMessage={slowSend} />);
+
+      const input = screen.getByPlaceholderText('Enter your message here');
+      await user.type(input, 'Test message{Enter}');
+
+      // Input is cleared immediately; second Enter on empty input should not send
+      await user.keyboard('{Enter}');
+
+      expect(slowSend).toHaveBeenCalledTimes(1);
+
+      resolveFirst(true);
+    });
+
     it('sends message with slash command prefix', async () => {
       const user = userEvent.setup();
       render(<MessageInput {...defaultProps} />);
