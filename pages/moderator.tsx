@@ -36,8 +36,8 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
 
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [paramsError, setParamsError] = useState<{ header: string; params: string[] } | null>(null);
-  const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
   const [conversationName, setConversationName] = useState<string>('');
+  const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
 
   const [conversationActive, setConversationActive] = useState<boolean>(true);
   const [moderatorSupportEnabled, setModeratorSupportEnabled] = useState<boolean>(true);
@@ -218,17 +218,52 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
     // Check for insights array in body (handles multiple pseudonyms)
     if (message.body.hasOwnProperty('insights') && Array.isArray(message.body.insights)) {
       return (
-        <div>
+        <div className="space-y-3">
           {(message as ModeratorInsightsMessage).body.insights.map((insight: any, index: number) => (
-            <div key={index} className="mt-2">
-              {insight.value}
+            <div
+              key={index}
+              className="border border-[#E5E7EB] rounded-xl bg-white p-3"
+              style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                {insight.source === 'participant' ? (
+                  <span className="inline-flex items-center text-xs font-bold tracking-widest uppercase px-2 py-0.5 rounded-full bg-[#DDD6FE] text-[#4A0979]">
+                    Question
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center text-xs font-bold tracking-widest uppercase px-2 py-0.5 rounded-full bg-[#EEEDFB] text-[#2E2BA8] border border-[#C8C6F2]">
+                    AI Insight
+                  </span>
+                )}
+              </div>
+              <p className="text-base text-[#1F2937] leading-relaxed">{insight.value}</p>
+              {insight.recommendations && insight.recommendations.length > 0 && (
+                <div
+                  className="mt-3 rounded-lg overflow-hidden"
+                  style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.04)', border: '1px solid #E8C9A9' }}
+                >
+                  <div className="px-3 py-1.5 flex items-center gap-1.5 bg-[#B25B19]">
+                    <span className="text-white font-bold text-xs uppercase tracking-widest">&#9654; Suggested Actions</span>
+                  </div>
+                  <ul className="bg-[#FBEEDE] divide-y divide-[#E8C9A9]">
+                    {insight.recommendations.map((rec: string, rIdx: number) => (
+                      <li key={rIdx} className="flex items-start gap-3 px-4 py-2.5">
+                        <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-[#B25B19] text-white text-xs font-bold flex items-center justify-center">
+                          {rIdx + 1}
+                        </span>
+                        <span className="text-base font-medium text-[#6B3812]">{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           ))}
         </div>
       );
     } else if (message.body.hasOwnProperty('metrics') && Array.isArray(message.body.metrics)) {
       const metrics = message.body.metrics;
-      const messages = metrics.map((m: any, i: number) => {
+      const metricSpans = metrics.map((m: any, i: number) => {
         const lastInList = i === metrics.length - 1;
         // Create quoted name with proper formatting
         return (
@@ -240,9 +275,16 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
       });
 
       return (
-        <div className="text-medium-slate-blue font-bold">
-          The audience is expressing&nbsp;
-          {messages}.
+        <div className="border border-[#E5E7EB] rounded-xl bg-white p-3" style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="inline-flex items-center text-xs font-bold tracking-widest uppercase px-2 py-0.5 rounded-full bg-[#FAE8C6] text-[#7E6017]">
+              Reaction
+            </span>
+          </div>
+          <div className="text-medium-slate-blue font-bold text-base">
+            The audience is expressing&nbsp;
+            {metricSpans}.
+          </div>
         </div>
       );
     } else if (message.body.hasOwnProperty('preset') && message.body.hasOwnProperty('text')) {
@@ -330,7 +372,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
                               </>
                             )}
                           </span>
-                          <div>{renderMessageBody(message)}</div>
+                          <div className="flex-1 min-w-0">{renderMessageBody(message)}</div>
                         </div>
                       ))
                     : moderatorSupportEnabled && <p>No messages yet.</p>}

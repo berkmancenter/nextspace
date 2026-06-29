@@ -61,8 +61,15 @@ class SessionManager {
 
       if (response.status === 200 && data.tokens) {
         // Valid session cookie exists — restore tokens with expiry info so
-        // TokenManager can schedule the proactive refresh correctly.
-        Api.get().SetTokens(data.tokens.access, data.tokens.refresh, data.tokens.accessExpires, data.tokens.refreshExpires);
+        // TokenManager can schedule the proactive refresh correctly.  Pass the
+        // userId so TokenManager knows which user these tokens belong to.
+        Api.get().SetTokens(
+          data.tokens.access,
+          data.tokens.refresh,
+          data.tokens.accessExpires,
+          data.tokens.refreshExpires,
+          data.userId,
+        );
 
         // Determine if this is a guest or authenticated user using the
         // authType field stored in the cookie (set when the session was created).
@@ -116,12 +123,15 @@ class SessionManager {
         }),
       }).then((res) => res.json());
 
-      // Set tokens in memory (with expiry so TokenManager can schedule refresh)
+      // Set tokens in memory (with expiry so TokenManager can schedule refresh).
+      // Pass the userId so TokenManager refuses tokens broadcast from a sibling
+      // tab that created its own distinct guest session at the same time.
       Api.get().SetTokens(
         registerResponse.tokens.access.token,
         registerResponse.tokens.refresh.token,
         registerResponse.tokens.access.expires,
         registerResponse.tokens.refresh.expires,
+        registerResponse.user.id,
       );
 
       // Set encrypted cookie via API route, including expiry timestamps so

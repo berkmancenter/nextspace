@@ -815,6 +815,7 @@ describe('EventCreationForm Component', () => {
           type: 'backChannel',
           platforms: ['zoom'],
           topicId: 'topic-1',
+          analyticsRefs: { matomo: 'dimension7' },
           properties: expect.objectContaining({
             zoomMeetingUrl: 'https://huitstage.zoom.us/j/1234567890',
             botName: 'Back Channel',

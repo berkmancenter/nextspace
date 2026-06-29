@@ -80,13 +80,15 @@ describe('SessionManager', () => {
 
       expect(result).toEqual({ userId: 'user-123', username: 'testuser' });
       expect(global.fetch).toHaveBeenCalledWith('/api/cookie');
-      // SetTokens is now called with 4 params; last two may be undefined when
-      // the cookie doesn't include accessExpires / refreshExpires.
+      // SetTokens is now called with 5 params; expires are undefined when the
+      // cookie doesn't include them, and the userId is passed so TokenManager
+      // can reject cross-user tokens arriving via broadcast / cookie sync.
       expect(mockApiInstance.SetTokens).toHaveBeenCalledWith(
         'mock-access-token',
         'mock-refresh-token',
         undefined,
         undefined,
+        'user-123',
       );
       expect(sessionManager.getState()).toBe('authenticated');
     });

@@ -120,9 +120,11 @@ export const MessageInput: FC<MessageInputProps> = ({
   /** Send message */
   const handleSend = async () => {
     const canSend = disableWhileWaiting ? !waitingForResponse : true;
-    if (currentMessage && currentMessage.length > 0 && canSend) {
-      const success = await onSendMessage(currentMessage);
-      if (success) setCurrentMessage('');
+    if (currentMessage.trim() && canSend) {
+      const messageToSend = currentMessage;
+      setCurrentMessage('');
+      const success = await onSendMessage(messageToSend);
+      if (!success) setCurrentMessage(messageToSend);
     }
   };
 
@@ -134,7 +136,7 @@ export const MessageInput: FC<MessageInputProps> = ({
       return;
     }
     const canSend = disableWhileWaiting ? !waitingForResponse : true;
-    if (e.key === 'Enter' && currentMessage.length > 0 && canSend && !activeEnhancer) {
+    if (e.key === 'Enter' && currentMessage.trim() && canSend && !activeEnhancer) {
       e.preventDefault();
       handleSend();
     }

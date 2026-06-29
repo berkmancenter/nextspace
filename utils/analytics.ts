@@ -180,6 +180,22 @@ export function trackConversationEvent(
 }
 
 /**
+ * Tags the current visit with the event's conversation id on the visit-scope custom
+ * dimension (index 7). Call this on event page load so every visit is attributed to the
+ * event, not just visits that fired an interaction (those ride the action-scope dimension
+ * 6 set in trackConversationEvent, which undercounts to roughly the people who spoke). The
+ * Vibes Analyst recap segments tracked sessions on dimension7==<conversationId>.
+ *
+ * Only call this for PARTICIPANT (audience) page visits. Moderator visits are intentionally
+ * left untagged so they are dropped entirely from tracked sessions; the participant-vs-other
+ * decision lives in useAnalytics (see PARTICIPANT_EVENT_PAGE_TYPES), which is the only caller.
+ * @param conversationId - The conversation UUID
+ */
+export function tagEventVisit(conversationId: string): void {
+  setCustomDimension(7, 'conversation_id', conversationId, 'visit');
+}
+
+/**
  * Sets a custom dimension using Matomo's native tracker API
  * @param index - Dimension index (1-5 for visit scope, 1-20 for action scope)
  * @param name - Dimension name (for logging purposes)

@@ -39,6 +39,11 @@ export const whatsNewEntries: WhatsNewEntry[] = [
     body: 'Customize your experience with the new Preferences panel.',
     releasedAt: '2026-05-26',
   },
+  {
+    title: 'Polls',
+    body: 'Group chat may include agent-generated polls that allow participants to vote on various topics.',
+    releasedAt: '2026-06-22',
+  },
 ];
 
 /**

@@ -1049,6 +1049,10 @@ export const EventCreationForm: React.FC<{
       platforms: selectedPlatforms,
       type: selectedConvType,
       topicId,
+      // Opt every event into Matomo tracked sessions. The backend pairs this ref with the
+      // conversation id to build the segment dimension7==<id>; dimension 7 is the visit-scope
+      // conversation_id we tag on event page load, so the recap can show tracked-session data.
+      analyticsRefs: { matomo: 'dimension7' },
       ...(validModerators.length > 0 && { moderators: validModerators }),
       ...(validSpeakers.length > 0 && { presenters: validSpeakers }),
       ...(validResources.length > 0 && { resources: validResources }),

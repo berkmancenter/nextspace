@@ -35,6 +35,16 @@ jest.mock('../../components/MessageInput', () => ({
   ),
 }));
 
+// Mock PollMessage component
+jest.mock('../../components/messages/PollMessage', () => ({
+  PollMessage: ({ body, counts }: any) => (
+    <div data-testid="poll-message">
+      <div data-testid="poll-title">{body.title}</div>
+      <div data-testid="poll-counts">{JSON.stringify(counts)}</div>
+    </div>
+  ),
+}));
+
 // Mock MessageFeedback component
 jest.mock('../../components/MessageFeedback', () => ({
   MessageFeedback: ({ messageId, initialRating, onPopulateFeedbackText, onSendFeedbackRating }: any) => (
@@ -2140,6 +2150,91 @@ describe('GroupChatPanel', () => {
          wrapper. In tests the mock renders an <input data-testid="message-input-field">,
          so that element should receive focus. */
       expect(document.activeElement).toBe(screen.getByTestId('message-input-field'));
+    });
+  });
+
+  describe('Poll message support', () => {
+    const pollMessage = {
+      id: 'poll-msg-1',
+      pseudonym: 'Berkie',
+      createdAt: '2025-10-17T12:00:00Z',
+      body: {
+        type: 'poll',
+        pollId: 'poll-1',
+        text: 'What do you think?',
+        title: 'Favourite colour?',
+        choices: ['Red', 'Blue', 'Green'],
+        multiSelect: false,
+        allowNewChoices: false,
+        whenResultsVisible: 'always',
+      },
+      bodyType: 'json',
+      fromAgent: true,
+      channels: ['chat'],
+      conversation: 'conv-1',
+      pseudonymId: 'berkie-1',
+      pause: false,
+      visible: true,
+      upVotes: [],
+      downVotes: [],
+    };
+
+    it('renders PollMessage for a poll-type agent message', () => {
+      render(<GroupChatPanel {...baseProps} messages={[pollMessage]} />);
+      expect(screen.getByTestId('poll-message')).toBeInTheDocument();
+      expect(screen.getByTestId('poll-title')).toHaveTextContent('Favourite colour?');
+    });
+
+    it('passes counts from pollCounts to PollMessage', () => {
+      const counts = { Red: 3, Blue: 7, Green: 1 };
+      render(<GroupChatPanel {...baseProps} messages={[pollMessage]} pollCounts={{ 'poll-1': counts }} />);
+      expect(screen.getByTestId('poll-counts')).toHaveTextContent(JSON.stringify(counts));
+    });
+
+    it('passes null counts when pollId is not in pollCounts', () => {
+      render(<GroupChatPanel {...baseProps} messages={[pollMessage]} pollCounts={{}} />);
+      expect(screen.getByTestId('poll-counts')).toHaveTextContent('null');
+    });
+
+    it('does not render PollMessage for regular text messages', () => {
+      const textMessage = {
+        id: 'msg-1',
+        pseudonym: 'Alice',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: 'Hello world',
+        bodyType: 'text',
+        fromAgent: false,
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'alice-1',
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+      render(<GroupChatPanel {...baseProps} messages={[textMessage]} />);
+      expect(screen.queryByTestId('poll-message')).not.toBeInTheDocument();
+    });
+
+    it('renders both a poll message and a text message in the same list', () => {
+      const textMessage = {
+        id: 'msg-1',
+        pseudonym: 'Alice',
+        createdAt: '2025-10-17T12:01:00Z',
+        body: { text: 'Great poll!' },
+        bodyType: 'text',
+        fromAgent: false,
+        channels: ['chat'],
+        conversation: 'conv-1',
+        pseudonymId: 'alice-1',
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+      render(<GroupChatPanel {...baseProps} messages={[pollMessage, textMessage]} />);
+      expect(screen.getByTestId('poll-message')).toBeInTheDocument();
+      expect(screen.getByText('Great poll!')).toBeInTheDocument();
     });
   });
 

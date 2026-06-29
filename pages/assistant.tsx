@@ -14,6 +14,8 @@ import {
   emitWithTokenRefresh,
   buildDirectChannels,
   QueryParamsError,
+  getPollResponseCounts,
+  inspectPoll,
 } from '../utils';
 import { components } from '../types';
 import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
@@ -103,6 +105,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [assistantPreviousReplyCounts, setAssistantPreviousReplyCounts] = useState<Map<string, number>>(new Map());
   const [assistantMessages, setAssistantMessages] = useState<PseudonymousMessage[]>([]);
   const [chatMessages, setChatMessages] = useState<PseudonymousMessage[]>([]);
+  const [pollCounts, setPollCounts] = useState<Record<string, Record<string, number>>>({});
   const [resources, setResources] = useState<Resource[]>([]);
   // Tracks whether the first conversation:join has completed so initial message
   // fetches wait until intros (returned in the join callback) are applied first.
@@ -184,6 +187,17 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     const messageHandler = (data: PseudonymousMessage) => {
       if (process.env.NODE_ENV !== 'production') console.log('New message:', data);
 
+      // If a new poll arrives, seed its counts to zero for all choices so the
+      // UI can display the bar immediately without waiting for a vote.
+      if (data.fromAgent && data.bodyType === 'json') {
+        const body = typeof data.body === 'string' ? JSON.parse(data.body as string) : (data.body as any);
+        // Only handle polls where results are visible immediately for now. Visible on threshold met and/or expiration to be handled in future
+        if (body?.type === 'poll' && body.whenResultsVisible === 'always') {
+          const zeroCounts = Object.fromEntries((body.choices as string[]).map((c) => [c, 0]));
+          setPollCounts((prev) => ({ ...prev, [body.pollId]: zeroCounts }));
+        }
+      }
+
       // Route messages to appropriate array based on channel
       if (data.channels && data.channels.includes('chat')) {
         setChatMessages((prev) => [...prev, data]);
@@ -225,22 +239,36 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       });
     };
 
+<<<<<<< HEAD
     const conversationEndingHandler = () => {
       console.log('conversation:ending received');
 
       // Don't activate the resources reminder if the user has already seen it or dismissed it
       if (resourcesNavBadgeDismissed) return;
       setResourcesReminderActive(true);
+=======
+    const pollChoiceHandler = (data: { pollId: string; counts: Record<string, number> }) => {
+      if (!data?.pollId || !data?.counts) return;
+      setPollCounts((prev) => ({ ...prev, [data.pollId]: data.counts }));
+>>>>>>> main
     };
 
     socket.on('message:new', messageHandler);
     socket.on('resources:updated', resourcesUpdatedHandler);
+<<<<<<< HEAD
     socket.on('conversation:ending', conversationEndingHandler);
+=======
+    socket.on('choice:new', pollChoiceHandler);
+>>>>>>> main
 
     return () => {
       socket.off('message:new', messageHandler);
       socket.off('resources:updated', resourcesUpdatedHandler);
+<<<<<<< HEAD
       socket.off('conversation:ending', conversationEndingHandler);
+=======
+      socket.off('choice:new', pollChoiceHandler);
+>>>>>>> main
     };
   }, [socket, resourcesNavBadgeDismissed]);
 
@@ -532,20 +560,48 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   };
 
   /**
+   * For a list of already-filtered messages, fetches counts and user selections
+   * for any always-visible polls and updates both pollCounts state and the
+   * initialVotedChoice field on each poll message body (mutating local copies).
+   */
+  const loadPollData = async (messages: PseudonymousMessage[]) => {
+    const pollMessages = messages.filter((m) => {
+      if (m.bodyType !== 'json') return false;
+      const body = (typeof m.body === 'string' ? JSON.parse(m.body) : m.body) as any;
+      return body?.type === 'poll' && body?.whenResultsVisible === 'always';
+    });
+    if (pollMessages.length === 0) return;
+
+    await Promise.all(
+      pollMessages.map(async (m) => {
+        const body = (typeof m.body === 'string' ? JSON.parse(m.body) : m.body) as any;
+        const [counts, pollData] = await Promise.all([getPollResponseCounts(body.pollId), inspectPoll(body.pollId)]);
+        setPollCounts((prev) => ({ ...prev, [body.pollId]: counts }));
+        // Inject the user's voted choice back into the message body so PollMessage
+        // can seed its local votedChoices state correctly on mount.
+        if (pollData?.choices) {
+          const selected = pollData.choices.find((c) => c.isSelected);
+          if (selected) body.initialVotedChoice = selected.text;
+        }
+      }),
+    );
+  };
+
+  /**
    * Fetch chat messages for the current conversation.
    * This includes filtering out intro messages and inserting replies.
    */
   const fetchChatMessages = async () => {
     try {
-      const chatMessages = await RetrieveData(
+      const fetched = await RetrieveData(
         `messages/${router.query.conversationId}?channel=chat,${chatPasscode}`,
         Api.get().getAccessToken(),
       );
 
-      if (Array.isArray(chatMessages)) {
-        // Filter intro messages from older conversations where intros were persisted
-        const nonIntros = chatMessages.filter((m) => parseMessageBody(m.body)?.type !== 'intro');
+      if (Array.isArray(fetched)) {
+        const nonIntros = fetched.filter((m) => parseMessageBody(m.body)?.type !== 'intro');
         const messagesWithReplies = await fetchAndInsertReplies(nonIntros);
+        await loadPollData(messagesWithReplies);
         setChatMessages([...chatIntroRef.current, ...messagesWithReplies]);
       }
     } catch (error) {
@@ -605,15 +661,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     console.log('Assistant re-fetching message history after gap-reconnect...');
 
     if (chatPasscode) {
-      RetrieveData(`messages/${router.query.conversationId}?channel=chat,${chatPasscode}`, Api.get().getAccessToken())
-        .then((msgs) => {
-          // Filter intro messages from older conversations where intros were persisted
-          if (Array.isArray(msgs)) {
-            const nonIntros = msgs.filter((m) => parseMessageBody(m.body)?.type !== 'intro');
-            setChatMessages([...chatIntroRef.current, ...nonIntros]);
-          }
-        })
-        .catch((err) => console.error('Error re-fetching chat messages:', err));
+      fetchChatMessages().catch((err) => console.error('Error re-fetching chat messages:', err));
     }
 
     RetrieveData(`conversations/${router.query.conversationId}`, Api.get().getAccessToken())
@@ -896,6 +944,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                               return newSet;
                             });
                           }}
+                          pollCounts={pollCounts}
                         />
                       ) : activeTab === 'resources' ? (
                         <ResourcesPanel
