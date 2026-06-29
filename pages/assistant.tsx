@@ -117,7 +117,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const hasJoinedConvRef = useRef(false);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [agentActive, setAgentActive] = useState<boolean>(true);
-  const [resourcesReminderActive, setResourcesReminderActive] = useState<boolean>(true);
+  const [resourcesReminderActive, setResourcesReminderActive] = useState<boolean>(false);
   const [agentIds, setAgentIds] = useState<string[]>([]);
   const [conversationFeatures, setConversationFeatures] = useState<{ name: string; enabled?: boolean }[]>([]);
 
@@ -239,38 +239,31 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       });
     };
 
-<<<<<<< HEAD
     const conversationEndingHandler = () => {
       console.log('conversation:ending received');
 
-      // Don't activate the resources reminder if the user has already seen it or dismissed it
-      if (resourcesNavBadgeDismissed) return;
+      // Don't activate the resources reminder if the user has already seen it or dismissed it, or if no resources are available
+      if (resourcesNavBadgeDismissed || resources.length === 0) return;
       setResourcesReminderActive(true);
-=======
+    };
+
     const pollChoiceHandler = (data: { pollId: string; counts: Record<string, number> }) => {
       if (!data?.pollId || !data?.counts) return;
       setPollCounts((prev) => ({ ...prev, [data.pollId]: data.counts }));
->>>>>>> main
     };
 
     socket.on('message:new', messageHandler);
     socket.on('resources:updated', resourcesUpdatedHandler);
-<<<<<<< HEAD
     socket.on('conversation:ending', conversationEndingHandler);
-=======
     socket.on('choice:new', pollChoiceHandler);
->>>>>>> main
 
     return () => {
       socket.off('message:new', messageHandler);
       socket.off('resources:updated', resourcesUpdatedHandler);
-<<<<<<< HEAD
       socket.off('conversation:ending', conversationEndingHandler);
-=======
       socket.off('choice:new', pollChoiceHandler);
->>>>>>> main
     };
-  }, [socket, resourcesNavBadgeDismissed]);
+  }, [socket, resourcesNavBadgeDismissed, resources.length]);
 
   // Keep activeTabRef in sync with activeTab state
   useEffect(() => {
@@ -871,7 +864,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
               showChat={!!chatPasscode}
               showTranscript={!!transcriptPasscode}
               showResources={true}
-              showResourcesReminder={resourcesReminderActive}
               botName={botName}
             />
 
