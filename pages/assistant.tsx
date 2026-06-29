@@ -151,6 +151,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   // Ref to track active tab for socket handler
   const activeTabRef = useRef<NavTab>('assistant');
 
+  // Ref to track resources value
+  const resourcesRef = useRef<Resource[]>(resources);
+
   // Use custom hook for session joining
   const { socket, pseudonym, userId, isConnected, errorMessage: sessionError, lastReconnectTime } = useSessionJoin();
 
@@ -243,7 +246,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       console.log('conversation:ending received');
 
       // Don't activate the resources reminder if the user has already seen it or dismissed it, or if no resources are available
-      if (resourcesNavBadgeDismissed || resources.length === 0) return;
+      if (resourcesNavBadgeDismissed || resourcesRef.current.length === 0) return;
       setResourcesReminderActive(true);
     };
 
@@ -256,6 +259,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     socket.on('resources:updated', resourcesUpdatedHandler);
     socket.on('conversation:ending', conversationEndingHandler);
     socket.on('choice:new', pollChoiceHandler);
+
+    console.log('Socket event listeners registered');
 
     return () => {
       socket.off('message:new', messageHandler);
@@ -329,6 +334,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         }
 
         if (Array.isArray(conversation?.resources)) {
+          console.log('Fetched conversation resources:', conversation.resources);
           setResources(conversation.resources);
         }
 
@@ -768,6 +774,11 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [controlledMode]);
+
+  // Keep resourcesRef in sync with resources state
+  useEffect(() => {
+    resourcesRef.current = resources;
+  }, [resources]);
 
   const sendFeedbackRating = async (messageId: string, rating: string) => {
     const conversationId = router.query.conversationId as string;
