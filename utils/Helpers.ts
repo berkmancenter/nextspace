@@ -17,6 +17,7 @@ export interface ParsedMessageBody {
   text: string;
   type?: string;
   message?: string;
+  moderatorSuggested?: boolean;
   media?: MediaItem[];
   source?: string;
   sourceMessage?: string;
@@ -36,6 +37,7 @@ export const parseMessageBody = (body: string | object): ParsedMessageBody => {
       text: obj.text?.toString() || '',
       type: obj.type?.toString(),
       message: obj.message?.toString(),
+      moderatorSuggested: obj.moderatorSuggested === true,
       media: Array.isArray(obj.media) ? obj.media : undefined,
       source: obj.source?.toString(),
       sourceMessage: obj.sourceMessage?.toString(),
