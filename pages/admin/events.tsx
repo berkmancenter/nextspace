@@ -525,18 +525,19 @@ function EventScreen({ authType }: { authType: AuthType }) {
   const filterAndSortConversations = (conversations: Conversation[], myEventsOnly: boolean = false) => {
     const now = new Date();
     const convos = conversations.filter((conv) => {
-      const scheduledTime = conv.scheduledTime ? new Date(conv.scheduledTime) : null;
+      const startTime = conv.startTime ?? conv.scheduledTime ?? conv.createdAt!;
+      const startDateTime = new Date(startTime);
 
       // Date filters supercede all
       // If startDateFilter is set, filter out events that start before the start date
       if (startDateFilter) {
-        const eventEndTime = scheduledTime ? scheduledTime : new Date(conv.createdAt!);
+        const eventEndTime = startDateTime;
         if (eventEndTime < startDateFilter) return false;
       }
 
       // If endDateFilter is set, filter out events that start after the end date
       if (endDateFilter) {
-        const eventStartTime = scheduledTime ? scheduledTime : new Date(conv.createdAt!);
+        const eventStartTime = startDateTime;
         if (eventStartTime > endDateFilter) return false;
       }
 
@@ -548,7 +549,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
         return false;
       }
 
-      const isPastEvent = scheduledTime ? scheduledTime <= now : new Date(conv.createdAt!).getTime() <= now.getTime();
+      const isPastEvent = startDateTime ? startDateTime <= now : new Date(conv.createdAt!).getTime() <= now.getTime();
 
       if (conv.type && typeFilters.length > 0 && !typeFilters.includes(conv.type.name)) {
         return false;
@@ -560,7 +561,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
       }
 
       // Show future events if selected, even if they are not active yet
-      if (statusFilters.includes('upcoming') && scheduledTime && scheduledTime > now) {
+      if (statusFilters.includes('upcoming') && startDateTime && startDateTime > now) {
         return true;
       }
 
