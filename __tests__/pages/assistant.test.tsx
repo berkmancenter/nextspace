@@ -2752,7 +2752,11 @@ describe('EventAssistantRoom', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Don't forget to check out the resources before the event ends.")).toBeInTheDocument();
+        expect(
+          screen.getByText(
+            "This event ends soon. Don't forget to check the Resources tab for follow-up readings worth bookmarking.",
+          ),
+        ).toBeInTheDocument();
       });
     });
   });
