@@ -902,10 +902,15 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                         <div className="flex justify-between font-bold">
                           <p>
                             {resourcesNavBadgeDismissed
-                              ? 'This event ends soon. Don&apos;t forget to review Resources and bookmark or save them for your reference.'
-                              : 'This event ends soon. Don&apos;t forget to check the Resources tab for follow-up readings worth bookmarking.'}
+                              ? "This event ends soon. Don't forget to review Resources and bookmark or save them for your reference."
+                              : "This event ends soon. Don't forget to check the Resources tab for follow-up readings worth bookmarking."}
                           </p>
-                          <Button className="ml-4 px-2 py-2" onClick={() => setResourcesReminderActive(false)} color="error">
+                          <Button
+                            aria-label="Dismiss resources reminder"
+                            className="ml-4 px-2 py-2"
+                            onClick={() => setResourcesReminderActive(false)}
+                            color="error"
+                          >
                             <CloseIcon />
                           </Button>
                         </div>
