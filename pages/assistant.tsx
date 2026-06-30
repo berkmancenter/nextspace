@@ -900,7 +900,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                     {resourcesReminderActive && (
                       <div className="absolute top-0 w-full z-10 bg-yellow-100 p-4 rounded shadow-2xl animate-slide-in">
                         <div className="flex justify-between font-bold">
-                          <p>Don&apos;t forget to check out the resources before the event ends.</p>
+                          <p>
+                            This event ends soon. Don&apos;t forget to check the Resources tab for follow-up readings worth
+                            bookmarking.
+                          </p>
                           <Button className="ml-4 px-2 py-2" onClick={() => setResourcesReminderActive(false)} color="error">
                             <CloseIcon />
                           </Button>
