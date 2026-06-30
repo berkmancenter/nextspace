@@ -245,8 +245,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     const conversationEndingHandler = () => {
       console.log('conversation:ending received');
 
-      // Don't activate the resources reminder if the user has already seen it or dismissed it, or if no resources are available
-      if (resourcesNavBadgeDismissed || resourcesRef.current.length === 0) return;
+      // Don't activate the resources reminder if no resources are available
+      if (resourcesRef.current.length === 0) return;
       setResourcesReminderActive(true);
     };
 
@@ -901,8 +901,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                       <div className="absolute top-0 w-full z-10 bg-yellow-100 p-4 rounded shadow-2xl animate-slide-in">
                         <div className="flex justify-between font-bold">
                           <p>
-                            This event ends soon. Don&apos;t forget to check the Resources tab for follow-up readings worth
-                            bookmarking.
+                            {resourcesNavBadgeDismissed
+                              ? 'This event ends soon. Don&apos;t forget to review Resources and bookmark or save them for your reference.'
+                              : 'This event ends soon. Don&apos;t forget to check the Resources tab for follow-up readings worth bookmarking.'}
                           </p>
                           <Button className="ml-4 px-2 py-2" onClick={() => setResourcesReminderActive(false)} color="error">
                             <CloseIcon />
