@@ -39,7 +39,7 @@ interface NavigationBarProps {
  *  - Mobile: fixed bottom bar, horizontal layout
  *  - Desktop: left sidebar, vertical layout
  *
- * Three items: Event Bot, Group Chat, Transcript.
+ * Four items: Event Bot, Group Chat, Transcript, Resources.
  * Icons are black when selected, grey when unselected, on a light purple background.
  */
 export function NavigationBar({
@@ -180,7 +180,9 @@ export function NavigationBar({
         aria-label="Main navigation"
       >
         {navItems.map((item) => (
-          <NavButton key={item.id} item={item} size={26} />
+          <div key={item.id} className="relative w-full flex justify-center">
+            <NavButton item={item} size={26} />
+          </div>
         ))}
       </nav>
 

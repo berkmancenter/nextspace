@@ -2711,4 +2711,107 @@ describe('EventAssistantRoom', () => {
       expect(getPollResponseCounts).not.toHaveBeenCalled();
     });
   });
+
+  describe('Conversation almost over notification', () => {
+    const endTime = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes from now
+
+    beforeEach(async () => {
+      const mockResources = [
+        { id: 'res-1', source: 'ai', category: 'suggested', title: 'Book A', participantVisible: true },
+        { id: 'res-2', source: 'ai', category: 'suggested', title: 'Book B', participantVisible: true },
+      ];
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        endTime,
+        resources: mockResources,
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
+      await waitFor(() => expect(mockSocket.on).toHaveBeenCalledWith('conversation:ending', expect.any(Function)));
+    });
+    it('displays a banner, reminding user to access resources if they never checked them', async () => {
+      // Check the handler was registered and simulate the event
+      const endingHandlerCall = mockSocket.on.mock.calls.find(([event]: [string]) => event === 'conversation:ending');
+      const endingHandler = endingHandlerCall?.[1];
+      expect(endingHandler).toBeDefined();
+
+      act(() => {
+        endingHandler({ endTime });
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(
+            "This event ends soon. Don't forget to check the Resources tab for follow-up readings worth bookmarking.",
+          ),
+        ).toBeInTheDocument();
+      });
+
+      // Simulate clicking the close button to dismiss the banner
+      const closeButton = screen.getByRole('button', { name: /dismiss resources reminder/i });
+      await act(async () => {
+        await userEvent.click(closeButton);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByText(
+            "This event ends soon. Don't forget to check the Resources tab for follow-up readings worth bookmarking.",
+          ),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it('displays a banner, reminding user to access resources if they did previously check them', async () => {
+      // Click the Resources tab to simulate user checking resources
+      const resourcesTab = await screen.getAllByLabelText('Resources')[0];
+      await act(async () => {
+        await userEvent.click(resourcesTab);
+      });
+
+      // Check the handler was registered and simulate the event
+      const endingHandlerCall = mockSocket.on.mock.calls.find(([event]: [string]) => event === 'conversation:ending');
+      const endingHandler = endingHandlerCall?.[1];
+      expect(endingHandler).toBeDefined();
+
+      act(() => {
+        endingHandler({ endTime });
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(
+            "This event ends soon. Don't forget to review Resources and bookmark or save them for your reference.",
+          ),
+        ).toBeInTheDocument();
+      });
+
+      // Simulate clicking the close button to dismiss the banner
+      const closeButton = screen.getByRole('button', { name: /dismiss resources reminder/i });
+      await act(async () => {
+        await userEvent.click(closeButton);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByText(
+            "This event ends soon. Don't forget to review Resources and bookmark or save them for your reference.",
+          ),
+        ).not.toBeInTheDocument();
+      });
+    });
+  });
 });
