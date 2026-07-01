@@ -860,6 +860,36 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           <Errors generalError={generalError} sessionError={sessionError} setGeneralError={setGeneralError} />
         )}
 
+        <Dialog
+          open={true}
+          // onClose={handleDeleteCancel}
+          // aria-labelledby="delete-dialog-title"
+          // aria-describedby="delete-dialog-description"
+          slotProps={{
+            paper: {
+              sx: {
+                borderRadius: '16px',
+                padding: '32px 24px',
+                maxWidth: '440px',
+                textAlign: 'center',
+              },
+            },
+          }}
+        >
+          <div className="flex flex-col items-center gap-4">
+            <h2 id="delete-dialog-title" className="text-2xl font-bold text-gray-900">
+              Event Has Ended
+            </h2>
+            <p id="delete-dialog-description" className="text-gray-600 text-base leading-relaxed max-w-sm">
+              This event has ended and the assistant is no longer available. You can still view the transcript and resources,
+              but you will not be able to send new messages.
+            </p>
+            <div className="flex flex-col gap-3 w-full mt-2">
+              <Button>Ok</Button>
+            </div>
+          </div>
+        </Dialog>
+
         {/* Display parameter errors if present */}
         {paramsError ? (
           <ParamErrors paramsError={paramsError} />
