@@ -603,9 +603,6 @@ function EventScreen({ authType }: { authType: AuthType }) {
       return true;
     });
 
-    // If all filters failed, return the sorted conversations without filtering
-    if (convos.length === 0) return sortConversations(conversations);
-
     // Sort by selected sort option
     return sortConversations(convos);
   };
