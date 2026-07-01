@@ -31,7 +31,8 @@ import { useSessionJoin } from '../utils/useSessionJoin';
 import { NavigationBar, NavTab } from '../components/NavigationBar';
 import { PreferencesPanel } from '../components/PreferencesPanel';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
-import { Button } from '@mui/material';
+import { Button, Dialog } from '@mui/material';
+import { Info } from '@mui/icons-material';
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -148,6 +149,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   // Track assistant messages with unread replies separately
   const [assistantMessagesWithUnreadReplies, setAssistantMessagesWithUnreadReplies] = useState<Set<string>>(new Set());
 
+  const [eventStatusLoaded, setEventStatusLoaded] = useState<boolean>(false);
+  const [eventHasEnded, setEventHasEnded] = useState<boolean>(false);
+  const [showEndedDialog, setShowEndedDialog] = useState<boolean>(false);
+
   // Ref to track active tab for socket handler
   const activeTabRef = useRef<NavTab>('assistant');
 
@@ -155,7 +160,14 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const resourcesRef = useRef<Resource[]>(resources);
 
   // Use custom hook for session joining
-  const { socket, pseudonym, userId, isConnected, errorMessage: sessionError, lastReconnectTime } = useSessionJoin();
+  const {
+    socket,
+    pseudonym,
+    userId,
+    isConnected,
+    errorMessage: sessionError,
+    lastReconnectTime,
+  } = useSessionJoin(eventStatusLoaded && !eventHasEnded);
 
   const [pseudonymFunFact, setPseudonymFunFact] = useState<string | undefined>(undefined);
 
@@ -185,7 +197,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   // Set up message listener
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !socket.connected) return;
 
     const messageHandler = (data: PseudonymousMessage) => {
       if (process.env.NODE_ENV !== 'production') console.log('New message:', data);
@@ -371,6 +383,13 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
         const ids = conversation.agents.map((agent: components['schemas']['Agent']) => agent.id!);
         setAgentIds(ids);
+
+        // Check if the event has ended
+        if (conversation.active === false) {
+          setEventHasEnded(true);
+          setShowEndedDialog(true);
+        }
+        setEventStatusLoaded(true);
       } catch (error) {
         console.error('Error fetching conversation data:', error);
         setGeneralError('Failed to fetch conversation data.');
@@ -860,11 +879,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           <Errors generalError={generalError} sessionError={sessionError} setGeneralError={setGeneralError} />
         )}
 
+        {/* Dialog for when the event has ended */}
         <Dialog
-          open={true}
-          // onClose={handleDeleteCancel}
-          // aria-labelledby="delete-dialog-title"
-          // aria-describedby="delete-dialog-description"
+          open={showEndedDialog}
+          onClose={() => setShowEndedDialog(false)}
+          aria-labelledby="ended-dialog-title"
+          aria-describedby="ended-dialog-description"
           slotProps={{
             paper: {
               sx: {
@@ -877,15 +897,15 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           }}
         >
           <div className="flex flex-col items-center gap-4">
-            <h2 id="delete-dialog-title" className="text-2xl font-bold text-gray-900">
-              Event Has Ended
+            <h2 id="ended-dialog-title" className="text-2xl font-bold text-gray-900 flex items-center justify-center">
+              <Info className="inline-block mr-2" /> <span>Event Has Ended</span>
             </h2>
-            <p id="delete-dialog-description" className="text-gray-600 text-base leading-relaxed max-w-sm">
+            <p id="ended-dialog-description" className="text-gray-600 text-base leading-relaxed">
               This event has ended and the assistant is no longer available. You can still view the transcript and resources,
               but you will not be able to send new messages.
             </p>
             <div className="flex flex-col gap-3 w-full mt-2">
-              <Button>Ok</Button>
+              <Button onClick={() => setShowEndedDialog(false)}>Ok</Button>
             </div>
           </div>
         </Dialog>
@@ -959,7 +979,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                     )}
                     {router.query.view === 'preferences' ? (
                       <PreferencesPanel botName={botName} />
-                    ) : isConnected ? (
+                    ) : isConnected || eventHasEnded ? (
                       activeTab === 'chat' ? (
                         <GroupChatPanel
                           messages={chatMessages}
