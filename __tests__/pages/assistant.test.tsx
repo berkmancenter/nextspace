@@ -2814,4 +2814,37 @@ describe('EventAssistantRoom', () => {
       });
     });
   });
+
+  describe('Event has ended dialog', () => {
+    it('displays the event has ended dialog when the conversation is not active', async () => {
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({
+            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+            active: false, // Simulate conversation not active
+          });
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        active: false,
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Event Has Ended')).toBeInTheDocument();
+        expect(
+          screen.getByText(
+            'This event has ended and the assistant is no longer available. You can still view the transcript and resources, but you will not be able to send new messages.',
+          ),
+        ).toBeInTheDocument();
+      });
+    });
+  });
 });
