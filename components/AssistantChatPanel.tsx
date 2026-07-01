@@ -1,12 +1,6 @@
 import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTheme, useMediaQuery } from '@mui/material';
-import {
-  AssistantMessage,
-  SubmittedMessage,
-  ModeratorSubmittedMessage,
-  UserMessage,
-  JargonClarificationMessage,
-} from '../components/messages';
+import { AssistantMessage, UserMessage, JargonClarificationMessage } from '../components/messages';
 import { MessageInput } from './MessageInput';
 import { SlashCommand, createSlashCommandEnhancer } from './enhancers/slashCommandEnhancer';
 import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
@@ -17,6 +11,7 @@ import { BotIcon } from './BotIcon';
 import { MediaLightbox } from './MediaLightbox';
 import { ThreadedMessage } from './ThreadedMessage';
 import { ThreadPanel } from './ThreadPanel';
+import { ModSuggestButton } from './messages/ModSuggestButton';
 
 interface AssistantChatPanelProps {
   messages: PseudonymousMessage[];
@@ -108,24 +103,52 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     return registered;
   }, [slashCommands]);
 
-  // Collect all message IDs referenced by moderator_submitted messages
-  const submittedIds = messages
-    .filter((msg) => {
-      if (typeof msg.body === 'object' && msg.body !== null) {
-        const bodyObj = msg.body as Record<string, any>;
-        return bodyObj.type === 'moderator_submitted' && bodyObj.message;
-      }
-      return false;
-    })
-    .map((msg) => (msg.body as any).message);
+  // Collect user message IDs for which the assistant has suggested moderator escalation
+  const moderatorSuggestedIds = new Set<string>(
+    messages
+      .filter((msg) => {
+        if (typeof msg.body === 'object' && msg.body !== null) {
+          const bodyObj = msg.body as Record<string, any>;
+          return bodyObj.moderatorSuggested === true && bodyObj.message;
+        }
+        return false;
+      })
+      .map((msg) => (msg.body as any).message as string),
+  );
+
+  const submittedIds = new Set<string>(
+    messages
+      .filter((msg) => {
+        if (typeof msg.body === 'object' && msg.body !== null) {
+          return (msg.body as any).type === 'moderator_submitted' && (msg.body as any).message;
+        }
+        return false;
+      })
+      .map((msg) => (msg.body as any).message as string),
+  );
 
   // Helper to check if a message is a prompt response
   const isPromptResponse = (msg: PseudonymousMessage): boolean => {
     return !!msg.answersPrompt;
   };
 
+  const isModeratorSubmitted = (msg: PseudonymousMessage): boolean => {
+    if (typeof msg.body === 'object' && msg.body !== null) {
+      return (msg.body as any).type === 'moderator_submitted';
+    }
+    return false;
+  };
+
+  const isEscalateCommand = (msg: PseudonymousMessage): boolean => {
+    return typeof msg.body === 'object' && msg.body !== null && (msg.body as any).command === 'escalate';
+  };
+
   // Organize messages into threads
-  const parentMessages = messages.filter((m) => !m.parentMessage).filter((m) => !isPromptResponse(m));
+  const parentMessages = messages
+    .filter((m) => !m.parentMessage)
+    .filter((m) => !isPromptResponse(m))
+    .filter((m) => !isModeratorSubmitted(m))
+    .filter((m) => !isEscalateCommand(m));
 
   // Auto-scroll based on parent messages only (not threaded replies)
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(parentMessages);
@@ -221,24 +244,6 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
       return <JargonClarificationMessage message={msg} />;
     }
 
-    // Moderator submitted messages
-    if (messageType === 'moderator_submitted' || submittedIds.includes(msg.id)) {
-      return (
-        <div style={{ width: '85%' }}>
-          {messageType === 'moderator_submitted' ? (
-            <ModeratorSubmittedMessage
-              message={{
-                ...msg,
-                body: parsed.text,
-              }}
-            />
-          ) : (
-            <SubmittedMessage message={msg} />
-          )}
-        </div>
-      );
-    }
-
     // Assistant messages
     if (isAssistant) {
       if (hasPromptOptions) {
@@ -303,8 +308,22 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
       }
     }
 
-    // User messages
-    return <UserMessage message={msg} backgroundColor={style.bubbleBg} />;
+    const isModSuggested = msg.id ? moderatorSuggestedIds.has(msg.id) : false;
+    const isModSubmitted = msg.id ? submittedIds.has(msg.id) : false;
+    return (
+      <div style={{ width: '85%' }}>
+        <UserMessage message={msg} backgroundColor={style.bubbleBg} />
+        {(isModSuggested || isModSubmitted) && (
+          <div style={{ marginTop: '6px', paddingLeft: '4px' }}>
+            <ModSuggestButton
+              onSubmit={isModSuggested && msg.id ? () => onSendMessage(`/escalate ${msg.id}`) : () => {}}
+              submitted={isModSubmitted}
+              botName={botName}
+            />
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (

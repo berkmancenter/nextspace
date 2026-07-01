@@ -8,14 +8,6 @@ jest.mock('../../components/messages', () => ({
     const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
     return <div data-testid="assistant-message">{messageText}</div>;
   },
-  SubmittedMessage: ({ message }: any) => {
-    const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
-    return <div data-testid="submitted-message">{messageText}</div>;
-  },
-  ModeratorSubmittedMessage: ({ message }: any) => {
-    const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
-    return <div data-testid="moderator-submitted-message">{messageText}</div>;
-  },
   UserMessage: ({ message }: any) => {
     const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
     return <div data-testid="user-message">{messageText}</div>;
@@ -29,6 +21,15 @@ jest.mock('../../components/messages', () => ({
       </div>
     );
   },
+}));
+
+// Mock ModSuggestButton so we can inspect submitted/onSubmit props
+jest.mock('../../components/messages/ModSuggestButton', () => ({
+  ModSuggestButton: ({ submitted, onSubmit }: any) => (
+    <button data-testid="mod-suggest-button" data-submitted={submitted} onClick={onSubmit}>
+      {submitted ? 'Submitted' : 'Moderator'}
+    </button>
+  ),
 }));
 
 // Mock MessageFeedback component
@@ -154,45 +155,17 @@ describe('AssistantChatPanel', () => {
     expect(screen.getByText('I need help')).toBeInTheDocument();
   });
 
-  it('renders moderator_submitted messages', () => {
-    const messages = [
-      {
-        id: '3',
-        pseudonym: 'test-user',
-        createdAt: '2025-10-17T12:02:00Z',
-        body: {
-          text: 'This was submitted',
-          type: 'moderator_submitted',
-          message: '1',
-        },
-        channels: ['user'],
-        conversation: 'conv-1',
-        pseudonymId: 'ea-1',
-        fromAgent: true,
-        pause: false,
-        visible: true,
-        upVotes: [],
-        downVotes: [],
-      },
-    ];
-
-    render(<AssistantChatPanel {...baseProps} messages={messages} />);
-
-    expect(screen.getByText('This was submitted')).toBeInTheDocument();
-    expect(screen.getByTestId('moderator-submitted-message')).toBeInTheDocument();
-  });
-
-  it('renders submitted messages (referenced by moderator)', () => {
+  it('suppresses moderator_submitted messages from the list', () => {
     const messages = [
       {
         id: '1',
         pseudonym: 'test-user',
         createdAt: '2025-10-17T12:00:00Z',
-        body: { text: 'Original message' },
-        channels: ['user'],
+        body: 'My question',
+        channels: ['participant'],
         conversation: 'conv-1',
-        pseudonymId: 'ea-1',
-        fromAgent: true,
+        pseudonymId: 'tu-1',
+        fromAgent: false,
         pause: false,
         visible: true,
         upVotes: [],
@@ -202,8 +175,8 @@ describe('AssistantChatPanel', () => {
         id: '2',
         pseudonym: 'Event Assistant',
         createdAt: '2025-10-17T12:01:00Z',
-        body: { text: 'Response', type: 'moderator_submitted', message: '1' },
-        channels: ['user'],
+        body: { type: 'moderator_submitted', text: 'Your message has been submitted.', message: '1' },
+        channels: ['participant'],
         conversation: 'conv-1',
         pseudonymId: 'ea-1',
         fromAgent: true,
@@ -216,8 +189,225 @@ describe('AssistantChatPanel', () => {
 
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-    expect(screen.getByText('Original message')).toBeInTheDocument();
-    expect(screen.getByTestId('submitted-message')).toBeInTheDocument();
+    expect(screen.queryByText('Your message has been submitted.')).not.toBeInTheDocument();
+  });
+
+  describe('Moderator suggest button', () => {
+    const baseMsg = {
+      channels: ['participant'],
+      conversation: 'conv-1',
+      pseudonymId: 'tu-1',
+      fromAgent: false,
+      pause: false,
+      visible: true,
+      upVotes: [],
+      downVotes: [],
+    };
+
+    it('shows the mod suggest button on a question flagged by the assistant', () => {
+      const messages = [
+        {
+          id: 'q1',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: 'Why is the sky blue?',
+          ...baseMsg,
+        },
+        {
+          id: 'a1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Great question!', moderatorSuggested: true, message: 'q1' },
+          channels: ['participant'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      const btn = screen.getByTestId('mod-suggest-button');
+      expect(btn).toBeInTheDocument();
+      expect(btn).toHaveAttribute('data-submitted', 'false');
+    });
+
+    it('sends /escalate <questionId> when the button is clicked', async () => {
+      const user = userEvent.setup();
+      const messages = [
+        {
+          id: 'q1',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: 'Why is the sky blue?',
+          ...baseMsg,
+        },
+        {
+          id: 'a1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Great question!', moderatorSuggested: true, message: 'q1' },
+          channels: ['participant'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      await user.click(screen.getByTestId('mod-suggest-button'));
+      expect(mockOnSendMessage).toHaveBeenCalledWith('/escalate q1');
+    });
+
+    it('shows the button in submitted state after /escalate confirmation arrives', () => {
+      const escalateMsg = {
+        id: 'esc1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:02:00Z',
+        body: { command: 'escalate', text: 'q1' },
+        ...baseMsg,
+      };
+      const messages = [
+        {
+          id: 'q1',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: 'Why is the sky blue?',
+          ...baseMsg,
+        },
+        {
+          id: 'a1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { text: 'Great question!', moderatorSuggested: true, message: 'q1' },
+          channels: ['participant'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+        escalateMsg,
+        {
+          id: 'conf1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:02:01Z',
+          body: { type: 'moderator_submitted', text: 'Submitted.', message: 'q1' },
+          channels: ['participant'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      const btn = screen.getByTestId('mod-suggest-button');
+      expect(btn).toHaveAttribute('data-submitted', 'true');
+    });
+
+    it('shows the submitted pill on a message sent with /mod', () => {
+      const modMsg = {
+        id: 'mod1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: '/mod',
+        ...baseMsg,
+      };
+      const messages = [
+        modMsg,
+        {
+          id: 'conf1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:00:30Z',
+          body: { type: 'moderator_submitted', text: 'Submitted.', message: 'mod1' },
+          channels: ['participant'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      const btn = screen.getByTestId('mod-suggest-button');
+      expect(btn).toBeInTheDocument();
+      expect(btn).toHaveAttribute('data-submitted', 'true');
+    });
+
+    it('does not show the mod suggest button on messages without a suggestion', () => {
+      const messages = [
+        {
+          id: 'q1',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: 'A regular question',
+          ...baseMsg,
+        },
+        {
+          id: 'a1',
+          pseudonym: 'Event Assistant',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: 'A regular answer',
+          channels: ['participant'],
+          conversation: 'conv-1',
+          pseudonymId: 'ea-1',
+          fromAgent: true,
+          pause: false,
+          visible: true,
+          upVotes: [],
+          downVotes: [],
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.queryByTestId('mod-suggest-button')).not.toBeInTheDocument();
+    });
+
+    it('hides /escalate command messages from the list', () => {
+      const messages = [
+        {
+          id: 'q1',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T12:00:00Z',
+          body: 'Why is the sky blue?',
+          ...baseMsg,
+        },
+        {
+          id: 'esc1',
+          pseudonym: 'test-user',
+          createdAt: '2025-10-17T12:01:00Z',
+          body: { command: 'escalate', text: 'q1' },
+          ...baseMsg,
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      const userMessages = screen.getAllByTestId('user-message');
+      expect(userMessages).toHaveLength(1);
+      expect(screen.getByText('Why is the sky blue?')).toBeInTheDocument();
+    });
   });
 
   it('shows source context for multimodal messages with sourceMessage', () => {
@@ -454,14 +644,11 @@ describe('AssistantChatPanel', () => {
 
     jest.mock('../../components/messages', () => ({
       AssistantMessage: mockAssistantMessage,
-      SubmittedMessage: ({ message }: any) => {
+      UserMessage: ({ message }: any) => {
         const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
-        return <div data-testid="submitted-message">{messageText}</div>;
+        return <div data-testid="user-message">{messageText}</div>;
       },
-      ModeratorSubmittedMessage: ({ message }: any) => {
-        const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
-        return <div data-testid="moderator-submitted-message">{messageText}</div>;
-      },
+      JargonClarificationMessage: () => null,
     }));
 
     const messages = [
@@ -742,14 +929,11 @@ describe('AssistantChatPanel', () => {
 
       jest.mock('../../components/messages', () => ({
         AssistantMessage: mockAssistantMessage,
-        SubmittedMessage: ({ message }: any) => {
+        UserMessage: ({ message }: any) => {
           const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
-          return <div data-testid="submitted-message">{messageText}</div>;
+          return <div data-testid="user-message">{messageText}</div>;
         },
-        ModeratorSubmittedMessage: ({ message }: any) => {
-          const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
-          return <div data-testid="moderator-submitted-message">{messageText}</div>;
-        },
+        JargonClarificationMessage: () => null,
       }));
 
       const messages = [
@@ -1195,7 +1379,7 @@ describe('AssistantChatPanel', () => {
       expect(timestamps.length).toBe(1);
     });
 
-    it('shows timestamp for moderator_submitted messages when minute changes', () => {
+    it('suppresses moderator_submitted messages so they do not affect timestamp count', () => {
       const messages = [
         {
           id: '1',
@@ -1215,11 +1399,7 @@ describe('AssistantChatPanel', () => {
           id: '2',
           pseudonym: 'test-user',
           createdAt: '2025-10-17T12:01:00Z',
-          body: {
-            text: 'Submitted message',
-            type: 'moderator_submitted',
-            message: '1',
-          },
+          body: { text: 'Submitted message', type: 'moderator_submitted', message: '1' },
           channels: ['user'],
           conversation: 'conv-1',
           pseudonymId: 'tu-1',
@@ -1233,89 +1413,7 @@ describe('AssistantChatPanel', () => {
 
       const { container } = render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-      // Should show two timestamps (one for each different minute)
-      const timestamps = container.querySelectorAll('.text-gray-400');
-      expect(timestamps.length).toBe(2);
-    });
-
-    it('shows timestamp for submitted messages referenced by moderator when minute changes', () => {
-      const messages = [
-        {
-          id: '1',
-          pseudonym: 'test-user',
-          createdAt: '2025-10-17T12:00:00Z',
-          body: { text: 'Original message' },
-          channels: ['user'],
-          conversation: 'conv-1',
-          pseudonymId: 'tu-1',
-          fromAgent: false,
-          pause: false,
-          visible: true,
-          upVotes: [],
-          downVotes: [],
-        },
-        {
-          id: '2',
-          pseudonym: 'Event Assistant',
-          createdAt: '2025-10-17T12:01:00Z',
-          body: { text: 'Response', type: 'moderator_submitted', message: '1' },
-          channels: ['user'],
-          conversation: 'conv-1',
-          pseudonymId: 'ea-1',
-          fromAgent: true,
-          pause: false,
-          visible: true,
-          upVotes: [],
-          downVotes: [],
-        },
-      ];
-
-      const { container } = render(<AssistantChatPanel {...baseProps} messages={messages} />);
-
-      // Should show two timestamps (one for each different minute)
-      const timestamps = container.querySelectorAll('.text-gray-400');
-      expect(timestamps.length).toBe(2);
-    });
-
-    it('does not show timestamp for moderator_submitted messages in same minute', () => {
-      const messages = [
-        {
-          id: '1',
-          pseudonym: 'Event Assistant',
-          createdAt: '2025-10-17T12:00:00Z',
-          body: 'First message',
-          channels: ['user'],
-          conversation: 'conv-1',
-          pseudonymId: 'ea-1',
-          fromAgent: true,
-          pause: false,
-          visible: true,
-          upVotes: [],
-          downVotes: [],
-        },
-        {
-          id: '2',
-          pseudonym: 'test-user',
-          createdAt: '2025-10-17T12:00:30Z',
-          body: {
-            text: 'Submitted message',
-            type: 'moderator_submitted',
-            message: '1',
-          },
-          channels: ['user'],
-          conversation: 'conv-1',
-          pseudonymId: 'tu-1',
-          fromAgent: false,
-          pause: false,
-          visible: true,
-          upVotes: [],
-          downVotes: [],
-        },
-      ];
-
-      const { container } = render(<AssistantChatPanel {...baseProps} messages={messages} />);
-
-      // Should only show one timestamp (for the first message)
+      // moderator_submitted is filtered out — only one message renders, one timestamp
       const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(1);
     });

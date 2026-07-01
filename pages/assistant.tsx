@@ -719,7 +719,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     }
 
     // Set waiting state for assistant or chat mode messages
-    if (shouldWaitForResponse && !controlledMode) {
+    // /escalate and /mod are silent moderator commands — suppress the waiting indicator
+    const isModeratorCommand = finalMessage.trimStart().startsWith('/escalate ') || finalMessage.trim() === '/mod';
+    if (shouldWaitForResponse && !controlledMode && !isModeratorCommand) {
       if (effectiveTab === 'assistant') {
         setWaitingForResponse(true);
       } else if (effectiveTab === 'chat') {
