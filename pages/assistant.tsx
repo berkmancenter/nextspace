@@ -374,6 +374,11 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
         const ids = conversation.agents.map((agent: components['schemas']['Agent']) => agent.id!);
         setAgentIds(ids);
+
+        // Check if the event has ended
+        if (conversation.active === false) setEventHasEnded(true);
+
+        console.log('Fetched conversation data:', conversation.active);
       } catch (error) {
         console.error('Error fetching conversation data:', error);
         setGeneralError('Failed to fetch conversation data.');
@@ -886,10 +891,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
               }}
             >
               <div className="flex flex-col items-center gap-4">
-                <h2 id="ended-dialog-title" className="text-2xl font-bold text-gray-900">
-                  <Info className="inline-block mr-2" /> Event Has Ended
+                <h2 id="ended-dialog-title" className="text-2xl font-bold text-gray-900 flex items-center justify-center">
+                  <Info className="inline-block mr-2" /> <span>Event Has Ended</span>
                 </h2>
-                <p id="ended-dialog-description" className="text-gray-600 text-base leading-relaxed max-w-sm">
+                <p id="ended-dialog-description" className="text-gray-600 text-base leading-relaxed">
                   This event has ended and the assistant is no longer available. You can still view the transcript and
                   resources, but you will not be able to send new messages.
                 </p>
