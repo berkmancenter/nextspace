@@ -519,6 +519,43 @@ function EventScreen({ authType }: { authType: AuthType }) {
   };
 
   /**
+   * Sort conversations based on selected sort option. If sorting by status, show upcoming events first, then active, then past.
+   * @param conversations The list of conversations to sort
+   */
+  const sortConversations = (conversations: Conversation[]) => {
+    const now = new Date();
+    return conversations.sort((a, b) => {
+      let aTime: number, bTime: number;
+      if (sortBy === SortOptions.Status) {
+        // Show upcoming events first, then active, then past
+        const getStatusRank = (conv: components['schemas']['Conversation']) => {
+          const scheduledTime = conv.scheduledTime ? new Date(conv.scheduledTime) : null;
+          const startDateTime = new Date(conv.startTime ?? conv.scheduledTime ?? conv.createdAt!);
+          const isPastEvent = startDateTime <= now;
+          if (scheduledTime && scheduledTime > now) return 1;
+          if (conv.active) return 2;
+          if (isPastEvent) return 3;
+          return 4;
+        };
+        const statusDiff = getStatusRank(a) - getStatusRank(b);
+        if (statusDiff !== 0) return statusDiff;
+      } else {
+        if (sortBy === SortOptions.ScheduledTime || sortBy === SortOptions.ScheduledTimeDesc) {
+          aTime = a.scheduledTime ? new Date(a.scheduledTime).getTime() : new Date(a.createdAt!).getTime();
+          bTime = b.scheduledTime ? new Date(b.scheduledTime).getTime() : new Date(b.createdAt!).getTime();
+        } else {
+          aTime = new Date(a.createdAt!).getTime();
+          bTime = new Date(b.createdAt!).getTime();
+        }
+        return sortBy === SortOptions.ScheduledTimeDesc || sortBy === SortOptions.CreatedAtDesc
+          ? bTime - aTime
+          : aTime - bTime;
+      }
+      return 0;
+    });
+  };
+
+  /**
    * Filter conversations based on selected status, type, and date filters. If myEventsOnly is true, also filter by ownership.
    * @param myEventsOnly true to show only events owned by current user
    */
@@ -551,60 +588,26 @@ function EventScreen({ authType }: { authType: AuthType }) {
 
       const isPastEvent = startDateTime ? startDateTime <= now : new Date(conv.createdAt!).getTime() <= now.getTime();
 
-      if (conv.type && typeFilters.length > 0 && !typeFilters.includes(conv.type.name)) {
-        return false;
-      }
+      if (conv.type && typeFilters.length > 0 && !typeFilters.includes(conv.type.name)) return false;
 
       // Show active events if selected
-      if (conv.active) {
-        return statusFilters.includes('active');
-      }
+      if (conv.active) return statusFilters.includes('active');
 
       // Show future events if selected, even if they are not active yet
-      if (statusFilters.includes('upcoming') && startDateTime && startDateTime > now) {
-        return true;
-      }
+      if (startDateTime && startDateTime > now) return statusFilters.includes('upcoming');
 
       // Show past events only if selected, and if they are not active (active past events are already included above)
-      if (statusFilters.includes('past') && isPastEvent && !conv.active) {
-        return true;
-      }
+      if (isPastEvent && !conv.active) return statusFilters.includes('past');
 
-      return false;
+      // Default to show all
+      return true;
     });
+
+    // If all filters failed, return the sorted conversations without filtering
+    if (convos.length === 0) return sortConversations(conversations);
 
     // Sort by selected sort option
-    return convos.sort((a, b) => {
-      let aTime: number, bTime: number;
-      if (sortBy === SortOptions.Status) {
-        // Show upcoming events first, then active, then past
-        const getStatusRank = (conv: components['schemas']['Conversation']) => {
-          const scheduledTime = conv.scheduledTime ? new Date(conv.scheduledTime) : null;
-          const isPastEvent = scheduledTime ? scheduledTime <= now : new Date(conv.createdAt!).getTime() <= now.getTime();
-          if (conv.active) return 1;
-          if (scheduledTime && scheduledTime > now) return 2;
-          if (isPastEvent) return 3;
-          return 4; // Should not happen, but just in case
-        };
-        const statusDiff = getStatusRank(a) - getStatusRank(b);
-        if (statusDiff !== 0) return statusDiff;
-      } else {
-        // Active events always appear before inactive ones within any time-based sort
-        if (a.active !== b.active) return a.active ? -1 : 1;
-
-        if (sortBy === SortOptions.ScheduledTime || sortBy === SortOptions.ScheduledTimeDesc) {
-          aTime = a.scheduledTime ? new Date(a.scheduledTime).getTime() : new Date(a.createdAt!).getTime();
-          bTime = b.scheduledTime ? new Date(b.scheduledTime).getTime() : new Date(b.createdAt!).getTime();
-        } else {
-          aTime = new Date(a.createdAt!).getTime();
-          bTime = new Date(b.createdAt!).getTime();
-        }
-        return sortBy === SortOptions.ScheduledTimeDesc || sortBy === SortOptions.CreatedAtDesc
-          ? bTime - aTime
-          : aTime - bTime;
-      }
-      return 0;
-    });
+    return sortConversations(convos);
   };
 
   /**
@@ -696,8 +699,16 @@ function EventScreen({ authType }: { authType: AuthType }) {
           console.warn(`${list[currentIndex + i].name} returned null`);
         }
       });
-      allValid.push(...batch.filter((conv): conv is Conversation => conv !== null));
-      currentIndex += batchSize;
+      // Prevent duplicates, which can happen if there are not enough conversations in entire list that match current filter criteria and replace is false
+      allValid.push(
+        ...batch.filter((conv): conv is Conversation => {
+          const notNull = conv !== null;
+          const notDuplicate = !loadedConversations.some((loaded) => loaded.id === conv?.id);
+          return notNull && notDuplicate;
+        }),
+      );
+
+      currentIndex += allValid.length;
     }
     setLoadedConversations((prev) => [...(replace ? [] : prev), ...allValid]);
 
@@ -725,12 +736,15 @@ function EventScreen({ authType }: { authType: AuthType }) {
         return;
       }
 
-      // Store raw response for tab switching
-      allConversationsRef.current = data;
+      // Sort conversations
+      const sortedConversations = sortConversations(data as Conversation[]);
+
+      // Store sorted conversations in ref for later use
+      allConversationsRef.current = sortedConversations;
 
       // Load first 6 details
-      const nextIndex = await fetchDetailedConversations(data, 0, 6);
-      setConversationsCount(data.length);
+      const nextIndex = await fetchDetailedConversations(sortedConversations, 0, 6);
+      setConversationsCount(sortedConversations.length);
 
       setEventsShown(nextIndex);
       setIsInitialLoading(false);
@@ -756,6 +770,20 @@ function EventScreen({ authType }: { authType: AuthType }) {
       if (!allConversationsRef.current) return;
       setIncludePast(include);
       setIsInitialLoading(true);
+
+      // If active is the only selected status, but there are none in the current loaded stack, we should load the most recent, up to six
+      if (
+        statusFilters.length === 1 &&
+        statusFilters[0] === 'active' &&
+        !loadedConversations.find((c) => c.active === true)
+      ) {
+        const nextIndex = await fetchDetailedConversations(
+          allConversationsRef.current.filter((c) => c.active === true),
+          0,
+          6,
+        );
+        setEventsShown(nextIndex);
+      }
 
       const filteredAndSorted = filterAndSortConversations(loadedConversations, myEventsOnly);
       // Filter based on whether to include past events
@@ -810,8 +838,19 @@ function EventScreen({ authType }: { authType: AuthType }) {
               >
                 Filters
               </Button>
-              <Drawer anchor="right" open={filtersOpen} onClose={() => setFiltersOpen(false)}>
-                <div className="flex flex-col gap-6 p-6 w-72">
+              <Drawer
+                anchor="right"
+                open={filtersOpen}
+                onClose={() => setFiltersOpen(false)}
+                slotProps={{
+                  paper: {
+                    sx: {
+                      width: 400,
+                    },
+                  },
+                }}
+              >
+                <div className="flex flex-col gap-6 p-6 w-full">
                   <div className="flex justify-between items-center">
                     <Typography variant="h6">Filters & Sorting</Typography>
                     <IconButton aria-label="close-filters" onClick={() => setFiltersOpen(false)} size="small">
