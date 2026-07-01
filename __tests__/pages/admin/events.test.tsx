@@ -431,8 +431,8 @@ describe('Events Page - Event Ordering', () => {
 
     // Get all event cards and check their order
     const eventHeadings = screen.getAllByRole('heading', { level: 5 });
-    expect(eventHeadings[0]).toHaveTextContent('Active Past Event');
-    expect(eventHeadings[1]).toHaveTextContent('Future Inactive Event');
+    expect(eventHeadings[0]).toHaveTextContent('Future Inactive Event');
+    expect(eventHeadings[1]).toHaveTextContent('Active Past Event');
   });
 
   it('should sort multiple active events by most recent first', async () => {
@@ -502,7 +502,7 @@ describe('Events Page - Event Ordering', () => {
     expect(eventHeadings[1]).toHaveTextContent('Older Active Event');
   });
 
-  it('should sort events by scheduled time descending (latest first) by default', async () => {
+  it('should sort events by scheduled time descending (upcoming first) by default', async () => {
     setupSortedConversations();
 
     await act(async () => {
@@ -512,9 +512,11 @@ describe('Events Page - Event Ordering', () => {
     const eventHeadings = screen.getAllByRole('heading', { level: 5 });
     // Future scheduled event should be first by default (descending), past event should be hidden
     console.log(eventHeadings.map((h) => h.textContent));
-    expect(eventHeadings[0]).toHaveTextContent('Future Event');
-    expect(eventHeadings[1]).toHaveTextContent('Middle Event');
-    expect(eventHeadings[2]).toBeUndefined(); // Past event should not be shown by default
+    expect(eventHeadings[0]).toHaveTextContent('Other Future Event');
+    expect(eventHeadings[1]).toHaveTextContent('Future Event');
+    expect(eventHeadings[2]).toHaveTextContent('Middle Event');
+    expect(eventHeadings[3]).toHaveTextContent('Now Event');
+    expect(eventHeadings[4]).toBeUndefined(); // Earliest Event (past) should not be visible by default
   });
 });
 
@@ -569,9 +571,11 @@ describe('Events Page - All Other Event Sorting/Filtering', () => {
 
     const eventHeadings = screen.getAllByRole('heading', { level: 5 });
     // Earliest scheduled event should be first when sorted ascending by scheduled time
-    // expect(eventHeadings[0]).toHaveTextContent('Earliest Event');
-    expect(eventHeadings[0]).toHaveTextContent('Middle Event');
-    expect(eventHeadings[1]).toHaveTextContent('Future Event');
+    expect(eventHeadings[0]).toHaveTextContent('Now Event');
+    expect(eventHeadings[1]).toHaveTextContent('Middle Event');
+    expect(eventHeadings[2]).toHaveTextContent('Future Event');
+    expect(eventHeadings[3]).toHaveTextContent('Other Future Event');
+    expect(eventHeadings[4]).toBeUndefined(); // Earliest Event (past) should not be visible by default
   });
 
   it('should sort events by scheduled time ascending (oldest first) and show past events when that sort/filter is applied', async () => {
@@ -603,8 +607,8 @@ describe('Events Page - All Other Event Sorting/Filtering', () => {
     const eventHeadings = screen.getAllByRole('heading', { level: 5 });
     // Earliest scheduled event in the past should be first when sorted ascending by scheduled time
     expect(eventHeadings[0]).toHaveTextContent('Earliest Event');
-    expect(eventHeadings[1]).toHaveTextContent('Middle Event');
-    expect(eventHeadings[2]).toHaveTextContent('Future Event');
+    expect(eventHeadings[1]).toHaveTextContent('Now Event');
+    expect(eventHeadings[2]).toHaveTextContent('Middle Event');
   });
 
   it('should sort events by date created ascending when that sort is applied in filters', async () => {
@@ -626,17 +630,12 @@ describe('Events Page - All Other Event Sorting/Filtering', () => {
 
     const eventHeadings = screen.getAllByRole('heading', { level: 5 });
     // Middle event should be first when sorted ascending by date created given the createdAt times in setupSortedConversations
-    expect(eventHeadings[0]).toHaveTextContent('Middle Event');
-    expect(eventHeadings[1]).toHaveTextContent('Future Event');
+    expect(eventHeadings[0]).toHaveTextContent('Now Event');
+    expect(eventHeadings[1]).toHaveTextContent('Other Future Event');
+    expect(eventHeadings[2]).toHaveTextContent('Middle Event');
   });
 
   it('should not show events before start date filter', async () => {
-    // Set start date <input> field to after the earliest event
-    // const startDateInput = screen.getByLabelText(/start date/i, { selector: 'input' });
-    // fireEvent.change(startDateInput, { target: { value: '2025-11-01' } });
-    // // Ensure value is set correctly (some date libraries/components can be finicky about this)
-    // expect(startDateInput).toHaveValue('2025-11-01');
-
     // Find the "Start Date" picker's container group
     const startDateGroup = screen.getByRole('group', { name: /start date/i });
 
@@ -720,8 +719,8 @@ describe('Events Page - Event Ownership', () => {
 
   it('should correctly order and label owned vs non-owned events', async () => {
     const now = new Date();
-    const recentDate = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
     const olderDate = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
+    const futureDate = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000);
 
     const conversations = [
       {
@@ -733,11 +732,19 @@ describe('Events Page - Event Ownership', () => {
         owner: mockUserId,
       },
       {
+        id: 'non-active',
+        name: 'Non-Active Event',
+        active: false,
+        scheduledTime: olderDate, // Date object, not string
+        createdAt: olderDate.toISOString(),
+        owner: otherUserId,
+      },
+      {
         id: 'other-future',
         name: 'Other Future Event',
         active: false,
-        scheduledTime: recentDate, // Date object, not string
-        createdAt: recentDate.toISOString(),
+        scheduledTime: futureDate, // Date object, not string
+        createdAt: futureDate.toISOString(),
         owner: otherUserId,
       },
     ];
@@ -756,11 +763,22 @@ describe('Events Page - Event Ownership', () => {
         eventUrls: { zoom: null, moderator: [], participant: [] },
       })
       .mockResolvedValueOnce({
+        id: 'non-active',
+        name: 'Non-Active Event',
+        active: false,
+        scheduledTime: olderDate.toISOString(),
+        createdAt: olderDate.toISOString(),
+        owner: otherUserId,
+        platformTypes: [],
+        type: { name: 'eventAssistant', label: 'Test Agent' },
+        eventUrls: { zoom: null, moderator: [], participant: [] },
+      })
+      .mockResolvedValueOnce({
         id: 'other-future',
         name: 'Other Future Event',
         active: false,
-        scheduledTime: recentDate.toISOString(),
-        createdAt: recentDate.toISOString(),
+        scheduledTime: futureDate.toISOString(),
+        createdAt: futureDate.toISOString(),
         owner: otherUserId,
         platformTypes: [],
         type: { name: 'eventAssistant', label: 'Test Agent' },
@@ -774,12 +792,14 @@ describe('Events Page - Event Ownership', () => {
     await waitFor(() => {
       expect(screen.queryByText('My Active Event')).toBeInTheDocument();
       expect(screen.queryByText('Other Future Event')).toBeInTheDocument();
+      expect(screen.queryByText('Non-Active Event')).toBeInTheDocument();
     });
 
-    // Verify ordering: active first, then non-active by most recent
+    // Verify ordering: upcoming first, then active, then non-active by most recent
     const allHeadings = screen.getAllByRole('heading', { level: 5 });
-    expect(allHeadings[0]).toHaveTextContent('My Active Event');
-    expect(allHeadings[1]).toHaveTextContent('Other Future Event');
+    expect(allHeadings[0]).toHaveTextContent('Other Future Event');
+    expect(allHeadings[1]).toHaveTextContent('My Active Event');
+    expect(allHeadings[2]).toHaveTextContent('Non-Active Event');
 
     // Verify "My Event" badge appears only for owned event
     expect(screen.getByText('My Event')).toBeInTheDocument();
