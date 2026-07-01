@@ -2742,6 +2742,7 @@ describe('EventAssistantRoom', () => {
       await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
       await waitFor(() => expect(mockSocket.on).toHaveBeenCalledWith('conversation:ending', expect.any(Function)));
     });
+
     it('displays a banner, reminding user to access resources if they never checked them', async () => {
       // Check the handler was registered and simulate the event
       const endingHandlerCall = mockSocket.on.mock.calls.find(([event]: [string]) => event === 'conversation:ending');
@@ -2811,6 +2812,39 @@ describe('EventAssistantRoom', () => {
             "This event ends soon. Don't forget to review Resources and bookmark or save them for your reference.",
           ),
         ).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Event has ended dialog', () => {
+    it('displays the event has ended dialog when the conversation is not active', async () => {
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({
+            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+            active: false, // Simulate conversation not active
+          });
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        active: false,
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Event Has Ended')).toBeInTheDocument();
+        expect(
+          screen.getByText(
+            'This event has ended and the assistant is no longer available. You can still view the transcript and resources, but you will not be able to send new messages.',
+          ),
+        ).toBeInTheDocument();
       });
     });
   });

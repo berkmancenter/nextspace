@@ -31,7 +31,8 @@ import { useSessionJoin } from '../utils/useSessionJoin';
 import { NavigationBar, NavTab } from '../components/NavigationBar';
 import { PreferencesPanel } from '../components/PreferencesPanel';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
-import { Button } from '@mui/material';
+import { Button, Dialog } from '@mui/material';
+import { Info } from '@mui/icons-material';
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -147,6 +148,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [messagesWithUnreadReplies, setMessagesWithUnreadReplies] = useState<Set<string>>(new Set());
   // Track assistant messages with unread replies separately
   const [assistantMessagesWithUnreadReplies, setAssistantMessagesWithUnreadReplies] = useState<Set<string>>(new Set());
+
+  const [eventHasEnded, setEventHasEnded] = useState<boolean>(false);
 
   // Ref to track active tab for socket handler
   const activeTabRef = useRef<NavTab>('assistant');
@@ -865,6 +868,37 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           <ParamErrors paramsError={paramsError} />
         ) : (
           <>
+            {/* Dialog for when the event has ended */}
+            <Dialog
+              open={eventHasEnded}
+              onClose={() => setEventHasEnded(false)}
+              aria-labelledby="ended-dialog-title"
+              aria-describedby="ended-dialog-description"
+              slotProps={{
+                paper: {
+                  sx: {
+                    borderRadius: '16px',
+                    padding: '32px 24px',
+                    maxWidth: '440px',
+                    textAlign: 'center',
+                  },
+                },
+              }}
+            >
+              <div className="flex flex-col items-center gap-4">
+                <h2 id="ended-dialog-title" className="text-2xl font-bold text-gray-900">
+                  <Info className="inline-block mr-2" /> Event Has Ended
+                </h2>
+                <p id="ended-dialog-description" className="text-gray-600 text-base leading-relaxed max-w-sm">
+                  This event has ended and the assistant is no longer available. You can still view the transcript and
+                  resources, but you will not be able to send new messages.
+                </p>
+                <div className="flex flex-col gap-3 w-full mt-2">
+                  <Button onClick={() => setEventHasEnded(false)}>Ok</Button>
+                </div>
+              </div>
+            </Dialog>
+
             {/* ── Navigation Bar (left sidebar on desktop, bottom bar on mobile) ── */}
             <NavigationBar
               activeTab={router.query.view === 'preferences' ? null : activeTab}
