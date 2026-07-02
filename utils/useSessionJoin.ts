@@ -54,18 +54,14 @@ export function useSessionJoin(
   // Keep a stable ref to the socket for use inside closures.
   const socketRef = useRef<Socket | null>(null);
 
-  // Initialize socket and session info once (runs exactly once per mount).
-  // onSuccess / onError are intentionally omitted from the dep array so that
-  // callers don't need to memoize them — the socket is created once and the
-  // callbacks captured at that moment are correct for the lifetime of the hook.
-  // enabled is included so the effect re-runs when it transitions from false→true.
-  // onSuccess / onError are intentionally omitted — see comment below.
-
+  // Initialize session info once per mount. The ref guard prevents re-running
+  // on subsequent renders; enableSocket changes are handled by the effect below.
+  // onSuccess / onError are intentionally omitted from the dep array so callers
+  // don't need to memoize them.
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
 
-    // Get session info from SessionManager (already initialized by _app.tsx)
     const sessionInfo = SessionManager.get().getSessionInfo();
 
     if (!sessionInfo) {
@@ -83,13 +79,22 @@ export function useSessionJoin(
       return;
     }
 
-    // Set session info
     setPseudonym(sessionInfo.username);
     setUserId(sessionInfo.userId);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Create (or tear down) the socket connection whenever enableSocket changes.
+  // Runs after the session-info effect above, so pseudonym/userId are already set.
+  useEffect(() => {
     if (!enableSocket) return;
+    if (socketRef.current) return; // already connected
 
-    // Create socket connection
+    const sessionInfo = SessionManager.get().getSessionInfo();
+    if (!sessionInfo) return;
+
+    const tokens = Api.get().GetTokens();
+    if (!tokens.access) return;
+
     const socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
       auth: { token: tokens.access },
     });
@@ -97,18 +102,16 @@ export function useSessionJoin(
     socketRef.current = socketLocal;
     setSocket(socketLocal);
 
-    // Call optional success callback
     onSuccess?.({
       userId: sessionInfo.userId,
       pseudonym: sessionInfo.username,
     });
 
-    // Disconnect the socket when the component unmounts to prevent orphaned
-    // socket connections (e.g. when navigating away from the assistant page).
     return () => {
       socketLocal.disconnect();
+      socketRef.current = null;
     };
-  }, [enableSocket, onError, onSuccess]);
+  }, [enableSocket, onSuccess]);
 
   // Handle socket connection events and auth errors
   useEffect(() => {
