@@ -140,18 +140,18 @@ describe('useSessionJoin', () => {
     });
   });
 
-  it('should do nothing and return null if not enabled', async () => {
+  it('should return userId and pseudonym only if socket is not enabled', async () => {
     const { result } = renderHook(() => useSessionJoin(false, false));
 
     await waitFor(() => {
+      expect(result.current.pseudonym).toBe('test-pseudonym');
+      expect(result.current.userId).toBe('test-user');
       expect(result.current.socket).toBeNull();
-      expect(result.current.pseudonym).toBeNull();
-      expect(result.current.userId).toBeNull();
       expect(result.current.isConnected).toBe(false);
       expect(result.current.errorMessage).toBeNull();
     });
 
-    expect(mockGetSessionInfo).not.toHaveBeenCalled();
+    expect(mockGetSessionInfo).toHaveBeenCalledTimes(1);
   });
 
   it('should get session info from SessionManager on mount', async () => {

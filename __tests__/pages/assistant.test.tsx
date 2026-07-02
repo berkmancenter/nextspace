@@ -2846,5 +2846,37 @@ describe('EventAssistantRoom', () => {
         ).toBeInTheDocument();
       });
     });
+
+    it('shows "This event has ended" below group chat panel', async () => {
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({
+            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+            active: false,
+          });
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        active: false,
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      // Dismiss the dialog to see the group chat panel
+      const closeButton = screen.getByRole('button', { name: /close event has ended dialog/i });
+      await act(async () => {
+        await userEvent.click(closeButton);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('This event has ended.')).toBeInTheDocument();
+      });
+    });
   });
 });
