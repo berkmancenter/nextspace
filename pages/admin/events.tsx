@@ -822,6 +822,12 @@ function EventScreen({ authType }: { authType: AuthType }) {
           Events
         </Typography>
 
+        {!typeFilters.includes('past') && (
+          <Typography variant="body1" color="textSecondary" gutterBottom>
+            Past events are hidden by default. Use the filters to view them.
+          </Typography>
+        )}
+
         {errorMessage ? (
           <Typography color="error">{errorMessage}</Typography>
         ) : (
