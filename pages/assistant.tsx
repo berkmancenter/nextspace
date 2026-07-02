@@ -703,7 +703,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     messageSource: 'message' | 'promptResponse' = 'message',
     promptQuestionId?: string,
   ) {
-    if (!Api.get().GetTokens() || !message) return false;
+    if (!Api.get().GetTokens() || !message || !initialJoinComplete) return false;
 
     // Use different channel based on active tab
     // When in transcript view, default to assistant channel for sending
@@ -908,7 +908,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
               but you will not be able to send new messages.
             </p>
             <div className="flex flex-col gap-3 w-full mt-2">
-              <Button onClick={() => setShowEndedDialog(false)}>Ok</Button>
+              <Button aria-label="Close event has ended dialog" onClick={() => setShowEndedDialog(false)}>
+                Ok
+              </Button>
             </div>
           </div>
         </Dialog>
