@@ -66,6 +66,8 @@ interface GroupChatPanelProps {
   onSendMessage: (message: string, parentMessageId?: string) => Promise<boolean>;
   /** Poll vote counts keyed by pollId */
   pollCounts?: Record<string, Record<string, number>>;
+  /** Whether the event is inactive (ended) */
+  inactive?: boolean;
 }
 
 export const GroupChatPanel: FC<GroupChatPanelProps> = ({
@@ -84,6 +86,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   onMarkAsRead,
   onSendMessage,
   pollCounts = {},
+  inactive = false,
 }) => {
   // State for tracking which thread is open in split view
   const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(null);
@@ -376,20 +379,26 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
         </div>
 
         {/* MessageInput*/}
-        <div ref={messageInputRef} className="flex-shrink-0">
-          <MessageInput
-            pseudonym={pseudonym}
-            pseudonymFunFact={pseudonymFunFact}
-            enhancers={enhancers}
-            onSendMessage={onSendMessage}
-            waitingForResponse={waitingForResponse && !waitingForThreadedReply}
-            controlledMode={controlledMode || null}
-            onExitControlledMode={onExitControlledMode || (() => {})}
-            inputValue={inputValue}
-            onInputChange={onInputChange}
-            disableWhileWaiting={false}
-          />
-        </div>
+        {inactive ? (
+          <div className="px-4 py-3 text-sm text-gray-500 italic text-center border-t border-gray-200">
+            This event has ended.
+          </div>
+        ) : (
+          <div ref={messageInputRef} className="flex-shrink-0">
+            <MessageInput
+              pseudonym={pseudonym}
+              pseudonymFunFact={pseudonymFunFact}
+              enhancers={enhancers}
+              onSendMessage={onSendMessage}
+              waitingForResponse={waitingForResponse && !waitingForThreadedReply}
+              controlledMode={controlledMode || null}
+              onExitControlledMode={onExitControlledMode || (() => {})}
+              inputValue={inputValue}
+              onInputChange={onInputChange}
+              disableWhileWaiting={false}
+            />
+          </div>
+        )}
       </div>
 
       {/* Thread panel - shown when a thread is selected */}

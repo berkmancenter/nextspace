@@ -29,7 +29,7 @@ const RECONNECT_GAP_THRESHOLD_MS = 10_000; // 10 seconds
  *          re-fetch message history when this value changes)
  */
 export function useSessionJoin(
-  enabled: boolean = true,
+  enableSocket: boolean = true,
   isAuthenticated?: boolean,
   onSuccess?: (result: { userId: string; pseudonym: string }) => void,
   onError?: (error: string) => void,
@@ -62,7 +62,6 @@ export function useSessionJoin(
   // onSuccess / onError are intentionally omitted — see comment below.
 
   useEffect(() => {
-    if (!enabled) return;
     if (initializedRef.current) return;
     initializedRef.current = true;
 
@@ -88,6 +87,8 @@ export function useSessionJoin(
     setPseudonym(sessionInfo.username);
     setUserId(sessionInfo.userId);
 
+    if (!enableSocket) return;
+
     // Create socket connection
     const socketLocal = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
       auth: { token: tokens.access },
@@ -107,7 +108,7 @@ export function useSessionJoin(
     return () => {
       socketLocal.disconnect();
     };
-  }, [enabled]);
+  }, [enableSocket, onError, onSuccess]);
 
   // Handle socket connection events and auth errors
   useEffect(() => {
@@ -206,7 +207,7 @@ export function useSessionJoin(
    * and we now have valid tokens.
    */
   useEffect(() => {
-    if (!socket || !enabled) return;
+    if (!socket || !enableSocket) return;
 
     const unsubscribe = TokenManagerDefault.onTokensChanged((tokens) => {
       const newToken = tokens.access.token;
@@ -225,7 +226,7 @@ export function useSessionJoin(
     });
 
     return unsubscribe;
-  }, [socket, enabled]);
+  }, [socket, enableSocket]);
 
   /**
    * Visibility change handler — when the user returns to this tab after being
@@ -243,12 +244,12 @@ export function useSessionJoin(
       }
     };
 
-    if (enabled) document.addEventListener('visibilitychange', handleVisibilityChange);
+    if (enableSocket) document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      if (enabled) document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (enableSocket) document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [enabled]);
+  }, [enableSocket]);
 
   return {
     socket,

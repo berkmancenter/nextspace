@@ -197,8 +197,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   // Set up message listener
   useEffect(() => {
-    if (!socket || !socket.connected) return;
-
     const messageHandler = (data: PseudonymousMessage) => {
       if (process.env.NODE_ENV !== 'production') console.log('New message:', data);
 
@@ -266,6 +264,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       if (!data?.pollId || !data?.counts) return;
       setPollCounts((prev) => ({ ...prev, [data.pollId]: data.counts }));
     };
+
+    if (!socket || !socket.connected) return;
 
     socket.on('message:new', messageHandler);
     socket.on('resources:updated', resourcesUpdatedHandler);
@@ -657,18 +657,21 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   // Load initial chat messages after the conversation:join completes (so intros
   // are already in state before DB messages are prepended).
+  // Also fetch once if event has ended (no join will occur, but messages may still be available).
   useEffect(() => {
-    if (!chatPasscode || !router.query.conversationId || !initialJoinComplete) return;
+    const hasNoArchivedMessages = chatMessages.length === 0 && eventHasEnded;
+    if (!chatPasscode || !router.query.conversationId || (!initialJoinComplete && !hasNoArchivedMessages)) return;
 
     fetchChatMessages();
-  }, [chatPasscode, router.query.conversationId, initialJoinComplete]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatPasscode, router.query.conversationId, initialJoinComplete, eventHasEnded]);
 
   // Load initial assistant messages after the conversation:join completes (so
   // intros are already in state before DB messages are prepended).
   useEffect(() => {
-    if (!initialJoinComplete) return;
+    if (!initialJoinComplete && !eventHasEnded) return;
     fetchAllAssistantMessages();
-  }, [fetchAllAssistantMessages, initialJoinComplete]);
+  }, [fetchAllAssistantMessages, initialJoinComplete, eventHasEnded]);
 
   // Re-fetch all message history when the socket reconnects after a significant
   // gap (user was on another tab/app for a while). Fills any messages missed
@@ -1009,6 +1012,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                             });
                           }}
                           pollCounts={pollCounts}
+                          inactive={eventHasEnded}
                         />
                       ) : activeTab === 'resources' ? (
                         <ResourcesPanel
@@ -1041,7 +1045,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                           onPromptSelect={handlePromptSelect}
                           userId={userId}
                           feedbackConfig={assistantFeedbackConfig}
-                          inactive={!agentActive}
+                          inactive={!agentActive || eventHasEnded}
                           messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
                           onMarkAsRead={(messageId) => {
                             setAssistantMessagesWithUnreadReplies((prev) => {
