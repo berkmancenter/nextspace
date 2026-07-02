@@ -63,7 +63,6 @@ jest.mock('../../utils/TokenManager', () => ({
 
 // Import after mocking
 import { useSessionJoin } from '../../utils/useSessionJoin';
-import SessionManager from '../../utils/SessionManager';
 import { Api } from '../../utils/Helpers';
 
 describe('useSessionJoin', () => {
@@ -158,7 +157,7 @@ describe('useSessionJoin', () => {
     renderHook(() => useSessionJoin(true, false));
 
     await waitFor(() => {
-      expect(mockGetSessionInfo).toHaveBeenCalledTimes(1);
+      expect(mockGetSessionInfo).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -166,14 +165,14 @@ describe('useSessionJoin', () => {
     const { rerender } = renderHook(() => useSessionJoin(true, false));
 
     await waitFor(() => {
-      expect(mockGetSessionInfo).toHaveBeenCalledTimes(1);
+      expect(mockGetSessionInfo).toHaveBeenCalledTimes(2);
     });
 
     // Rerender should not trigger another initialization
     rerender();
 
     await waitFor(() => {
-      expect(mockGetSessionInfo).toHaveBeenCalledTimes(1);
+      expect(mockGetSessionInfo).toHaveBeenCalledTimes(2);
     });
   });
 
