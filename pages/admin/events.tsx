@@ -64,7 +64,7 @@ const EventCard = ({
   const isOwner = currentUserId && event.owner === currentUserId;
 
   // Edit is available for future inactive events with a known type
-  const eventStarted = event.scheduledTime ? new Date(event.scheduledTime) <= new Date() : false;
+  const eventStarted = !!event.startTime;
   const canEdit = !event.active && !eventStarted && !!event.type?.name;
 
   const handleCopyLink = async (url: string) => {
@@ -493,29 +493,21 @@ function EventScreen({ authType }: { authType: AuthType }) {
     includePast: boolean,
     myEventsOnly: boolean = false,
   ) => {
-    const now = new Date();
     return conversations.filter((conv) => {
       // Filter by owner if myEventsOnly is enabled
-      if (myEventsOnly && conv.owner !== userId) {
-        return false;
-      }
-
-      const scheduledTime = conv.scheduledTime ? new Date(conv.scheduledTime) : null;
-      const isPastEvent = scheduledTime ? scheduledTime <= now : false;
+      if (myEventsOnly && conv.owner !== userId) return false;
 
       // Always show active events
       if (conv.active) return true;
 
-      // Show future events
-      if (scheduledTime && scheduledTime > now) return true;
+      // For inactive events, startTime being set means it ran
+      if (conv.startTime) return includePast;
 
-      // Show past events only if includePast is true
-      if (isPastEvent && includePast) return true;
+      // Not yet started — show if scheduled in the future
+      if (conv.scheduledTime && new Date(conv.scheduledTime) > new Date()) return true;
 
-      // Show inactive events without scheduledTime (treat as past events)
-      if (!scheduledTime && includePast) return true;
-
-      return false;
+      // Scheduled but window passed without starting (auto-start edge case), treat as past
+      return includePast;
     });
   };
 

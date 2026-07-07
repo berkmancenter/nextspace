@@ -917,6 +917,22 @@ describe('Events Page - Admin Actions', () => {
     await waitFor(() => expect(screen.getByText('No upcoming events')).toBeInTheDocument());
     expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
   });
+  it('does not show an edit button for a past inactive event that was previously started', async () => {
+    const pastConv = makeConversation({ scheduledTime: pastTime, startTime: pastTime });
+    (Request as jest.Mock).mockResolvedValue([pastConv]);
+    (getConversation as jest.Mock).mockResolvedValue(pastConv);
+    await act(async () => {
+      render(<EventsPage authType="user" />);
+    });
+
+    const includePastSwitch = screen.getByRole('switch', { name: /include past events/i });
+    await userEvent.click(includePastSwitch);
+
+    await waitFor(() => expect(screen.getByText('Editable Event')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: 'actions-menu-ev-1' }));
+    expect(screen.queryByText(/edit event/i)).not.toBeInTheDocument();
+  });
 
   it('does not show an edit button for an event with no type set', async () => {
     /* Legacy events may have no type object, which would produce /admin/undefined/edit/<id>
