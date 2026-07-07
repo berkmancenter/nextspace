@@ -17,6 +17,12 @@ import {
   IconButton,
   Tooltip,
   Dialog,
+  Alert,
+  Snackbar,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EventIcon from '@mui/icons-material/Event';
@@ -25,6 +31,9 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import ReportProblem from '@mui/icons-material/ReportProblem';
 import DownloadIcon from '@mui/icons-material/Download';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import StopIcon from '@mui/icons-material/Stop';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { components } from '../../types';
 import { AuthType, Conversation, ErrorMessage } from '../../types.internal';
 import { SendData } from '../../utils/Helpers';
@@ -36,25 +45,27 @@ import {
 
 const EventCard = ({
   event,
-  onDelete,
   currentUserId,
+  onDelete,
+  onMessage,
 }: {
   event: Conversation;
   onDelete: (id: string) => void;
   currentUserId: string | null;
+  onMessage: (id: string, message: string, error: boolean) => void;
 }) => {
   const router = useRouter();
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [waitingOnAction, setWaitingOnAction] = useState(false);
 
-  // Check if current user is the owner of this event
+  // Check if current user is the owner of this event (used for "My Event" badge only)
   const isOwner = currentUserId && event.owner === currentUserId;
 
-  // Edit is available for future, not-yet-started, owned events
+  // Edit is available for future inactive events with a known type
   const eventStarted = event.scheduledTime ? new Date(event.scheduledTime) <= new Date() : false;
-  const canEdit = isOwner && !event.active && !eventStarted && !!event.type?.name;
+  const canEdit = !event.active && !eventStarted && !!event.type?.name;
 
   const handleCopyLink = async (url: string) => {
     try {
@@ -71,7 +82,7 @@ const EventCard = ({
   };
 
   const handleDeleteConfirm = async () => {
-    setIsDeleting(true);
+    setWaitingOnAction(true);
     try {
       await SendData(`conversations/${event.id}`, {}, undefined, {
         method: 'DELETE',
@@ -80,7 +91,7 @@ const EventCard = ({
       onDelete(event.id!);
     } catch (err) {
       console.error('Failed to delete event:', err);
-      setIsDeleting(false);
+      setWaitingOnAction(false);
     }
   };
 
@@ -89,7 +100,7 @@ const EventCard = ({
   };
 
   const handleDownloadReport = async () => {
-    setIsDownloading(true);
+    setWaitingOnAction(true);
     try {
       // Use the scheduled time or created time for the report date
       const reportDate = event.scheduledTime ? new Date(event.scheduledTime) : new Date(event.createdAt!);
@@ -103,7 +114,27 @@ const EventCard = ({
       console.error('Failed to generate report:', err);
       alert('Failed to generate report. Please try again.');
     } finally {
-      setIsDownloading(false);
+      setWaitingOnAction(false);
+    }
+  };
+
+  const handleStartEndEvent = async (id: string, start: boolean) => {
+    setWaitingOnAction(true);
+    try {
+      const response = await SendData(`conversations/${id}/${start ? 'start' : 'stop'}`, {});
+      if (!response || 'error' in response) {
+        onMessage(id, `Failed to ${start ? 'start' : 'end'} event. Please try again.`, true);
+        console.error(response && 'message' in response ? response.message?.message : 'Unknown error');
+        setWaitingOnAction(false);
+        return;
+      }
+      onMessage(id, `Event ${start ? 'started' : 'ended'} successfully.`, false);
+    } catch (err) {
+      setWaitingOnAction(false);
+      console.error(`Failed to ${start ? 'start' : 'end'} event:`, err);
+      onMessage(id, `Failed to ${start ? 'start' : 'end'} event. Please try again.`, true);
+    } finally {
+      setWaitingOnAction(false);
     }
   };
 
@@ -125,38 +156,76 @@ const EventCard = ({
                 </span>
               )}
             </div>
-            <div className="flex gap-1">
-              {!event.active && (
-                <Tooltip title="Download user metrics report">
-                  <IconButton
-                    size="small"
-                    onClick={handleDownloadReport}
-                    disabled={isDownloading}
-                    className="text-gray-500 hover:text-blue-600"
+            <div>
+              {waitingOnAction ? (
+                <CircularProgress />
+              ) : (
+                <IconButton
+                  aria-label={`actions-menu-${event.id}`}
+                  size="small"
+                  onClick={(e) => setMenuAnchorEl(e.currentTarget)}
+                  className="text-gray-500"
+                >
+                  <MoreVertIcon fontSize="small" />
+                </IconButton>
+              )}
+
+              <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={() => setMenuAnchorEl(null)}>
+                {!event.active && (
+                  <MenuItem
+                    onClick={() => {
+                      handleDownloadReport();
+                      setMenuAnchorEl(null);
+                    }}
                   >
-                    {isDownloading ? <CircularProgress size={20} /> : <DownloadIcon fontSize="small" />}
-                  </IconButton>
-                </Tooltip>
-              )}
-              {canEdit && (
-                <Tooltip title="Edit event">
-                  <IconButton
-                    size="small"
-                    aria-label="Edit event"
-                    onClick={() => router.push(`/admin/${event.type?.name}/edit/${event.id}`)}
-                    className="text-gray-500 hover:text-blue-600"
+                    <ListItemIcon>
+                      <DownloadIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Download Reports</ListItemText>
+                  </MenuItem>
+                )}
+                {canEdit && (
+                  <MenuItem
+                    onClick={() => {
+                      router.push(`/admin/${event.type?.name}/edit/${event.id}`);
+                      setMenuAnchorEl(null);
+                    }}
                   >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              )}
-              {isOwner && (
-                <Tooltip title="Delete event">
-                  <IconButton size="small" onClick={handleDeleteClick} className="text-gray-500 hover:text-red-600">
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              )}
+                    <ListItemIcon>
+                      <EditIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Edit Event</ListItemText>
+                  </MenuItem>
+                )}
+                <MenuItem
+                  onClick={() => {
+                    handleStartEndEvent(event.id!, !event.active);
+                    setMenuAnchorEl(null);
+                  }}
+                  disabled={waitingOnAction}
+                >
+                  <ListItemIcon>
+                    {event.active ? (
+                      <StopIcon fontSize="small" color="error" />
+                    ) : (
+                      <PlayArrowIcon fontSize="small" color="success" />
+                    )}
+                  </ListItemIcon>
+                  <ListItemText>{event.active ? 'End Event' : 'Start Event'}</ListItemText>
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    handleDeleteClick();
+                    setMenuAnchorEl(null);
+                  }}
+                  sx={{ color: 'error.main' }}
+                >
+                  <ListItemIcon>
+                    <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
+                  </ListItemIcon>
+                  <ListItemText>Delete Event</ListItemText>
+                </MenuItem>
+              </Menu>
             </div>
           </div>
 
@@ -299,7 +368,7 @@ const EventCard = ({
           <div className="flex flex-col gap-3 w-full mt-2">
             <Button
               onClick={handleDeleteConfirm}
-              disabled={isDeleting}
+              disabled={waitingOnAction}
               variant="contained"
               sx={{
                 backgroundColor: '#b91c1c',
@@ -315,11 +384,11 @@ const EventCard = ({
               }}
               autoFocus
             >
-              {isDeleting ? <CircularProgress size={20} /> : 'Yes, Delete'}
+              {waitingOnAction ? <CircularProgress size={20} /> : 'Yes, Delete'}
             </Button>
             <Button
               onClick={handleDeleteCancel}
-              disabled={isDeleting}
+              disabled={waitingOnAction}
               sx={{
                 color: '#4b5563',
                 textTransform: 'none',
@@ -383,6 +452,15 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
+const sortByActiveAndRecent = (list: components['schemas']['Conversation'][]) =>
+  [...list].sort((a, b) => {
+    if (a.active && !b.active) return -1;
+    if (!a.active && b.active) return 1;
+    const aTime = a.scheduledTime ? new Date(a.scheduledTime).getTime() : new Date(a.createdAt!).getTime();
+    const bTime = b.scheduledTime ? new Date(b.scheduledTime).getTime() : new Date(b.createdAt!).getTime();
+    return bTime - aTime;
+  });
+
 function EventScreen({ authType }: { authType: AuthType }) {
   const router = useRouter();
 
@@ -398,6 +476,12 @@ function EventScreen({ authType }: { authType: AuthType }) {
   const [includePast, setIncludePast] = useState(false);
   const [myEventsOnly, setMyEventsOnly] = useState(false);
   const allConversationsRef = useRef<components['schemas']['Conversation'][] | null>(null);
+
+  const [eventStatusChanged, setEventStatusChanged] = useState<{ changed: boolean; message: string | null }>({
+    changed: false,
+    message: null,
+  });
+  const [eventErrorMessage, setEventErrorMessage] = useState<string | null>(null);
 
   /**
    * Filter conversations based on whether to include past events and owner
@@ -453,6 +537,41 @@ function EventScreen({ authType }: { authType: AuthType }) {
     if (newList.length > eventsShown - 1) {
       const nextIndex = await fetchDetailedConversations(newList, eventsShown - 1, 1);
       setEventsShown(nextIndex);
+    }
+    setEventStatusChanged({ changed: true, message: 'Event deleted successfully.' });
+  };
+
+  /**
+   * Refresh conversations list after an event is started or ended
+   */
+  const refreshConversations = async (_id: string) => {
+    try {
+      const data = await Request('conversations');
+      if ('error' in data) return;
+      const all = data as components['schemas']['Conversation'][];
+      allConversationsRef.current = all;
+      const filtered = filterConversations(all, includePast, myEventsOnly);
+      const sorted = sortByActiveAndRecent(filtered);
+      setConversationsList(sorted);
+      const nextIndex = await fetchDetailedConversations(sorted, 0, eventsShown, true);
+      setEventsShown(nextIndex);
+    } catch (err) {
+      console.error('Failed to refresh conversations:', err);
+    }
+  };
+
+  /**
+   * Handle starting or ending an event, showing success or error messages accordingly
+   */
+  const handleEventStatusChange = (id: string, message: string, isError: boolean) => {
+    if (!isError) {
+      setEventStatusChanged({
+        changed: true,
+        message: `Event ${message.includes('started') ? 'started' : 'ended'} successfully.`,
+      });
+      refreshConversations(id);
+    } else {
+      setEventErrorMessage(message);
     }
   };
 
@@ -522,18 +641,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
       // Filter to only active/future events (not past)
       const filtered = filterConversations(data, false, myEventsOnly);
 
-      // Sort: active events first, then all others by most recent
-      const sorted = [...filtered].sort((a, b) => {
-        // Pin active events to the top
-        if (a.active && !b.active) return -1;
-        if (!a.active && b.active) return 1;
-
-        // For non-active events (or both active), sort by most recent first
-        const aTime = a.scheduledTime ? new Date(a.scheduledTime).getTime() : new Date(a.createdAt!).getTime();
-        const bTime = b.scheduledTime ? new Date(b.scheduledTime).getTime() : new Date(b.createdAt!).getTime();
-
-        return bTime - aTime; // Most recent first
-      });
+      const sorted = sortByActiveAndRecent(filtered);
       setConversationsList(sorted);
 
       // Load first 6 details
@@ -564,19 +672,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
     // Filter based on whether to include past events
     const filtered = filterConversations(allConversationsRef.current, include, myEventsOnly);
 
-    // Sort: active events first, then all others by most recent
-    const sorted = [...filtered].sort((a, b) => {
-      // Pin active events to the top
-      if (a.active && !b.active) return -1;
-      if (!a.active && b.active) return 1;
-
-      // For non-active events (or both active), sort by most recent first
-      const aTime = a.scheduledTime ? new Date(a.scheduledTime).getTime() : new Date(a.createdAt!).getTime();
-      const bTime = b.scheduledTime ? new Date(b.scheduledTime).getTime() : new Date(b.createdAt!).getTime();
-
-      return bTime - aTime; // Most recent first
-    });
-
+    const sorted = sortByActiveAndRecent(filtered);
     setConversationsList(sorted);
 
     const nextIndex = await fetchDetailedConversations(sorted, 0, 6, true);
@@ -592,19 +688,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
     // Filter based on owner and past events settings
     const filtered = filterConversations(allConversationsRef.current, includePast, showOnlyMine);
 
-    // Sort: active events first, then all others by most recent
-    const sorted = [...filtered].sort((a, b) => {
-      // Pin active events to the top
-      if (a.active && !b.active) return -1;
-      if (!a.active && b.active) return 1;
-
-      // For non-active events (or both active), sort by most recent first
-      const aTime = a.scheduledTime ? new Date(a.scheduledTime).getTime() : new Date(a.createdAt!).getTime();
-      const bTime = b.scheduledTime ? new Date(b.scheduledTime).getTime() : new Date(b.createdAt!).getTime();
-
-      return bTime - aTime; // Most recent first
-    });
-
+    const sorted = sortByActiveAndRecent(filtered);
     setConversationsList(sorted);
 
     const nextIndex = await fetchDetailedConversations(sorted, 0, 6, true);
@@ -613,68 +697,89 @@ function EventScreen({ authType }: { authType: AuthType }) {
   };
 
   return (
-    <div className="flex flex-col items-center mt-12 mb-8">
-      <Typography variant="h4" gutterBottom>
-        Events
-      </Typography>
-      {errorMessage ? (
-        <Typography color="error">{errorMessage}</Typography>
-      ) : (
-        <div className="w-3/4 space-y-6">
-          <div className="flex justify-end gap-2">
-            <label className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-3 py-1 cursor-pointer">
-              <span className="text-xs text-gray-500 select-none">My events only</span>
-              <Switch
-                checked={myEventsOnly}
-                onChange={(e) => handleMyEventsToggle(e.target.checked)}
-                size="small"
-                sx={{ m: 0 }}
-              />
-            </label>
-            <label className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-3 py-1 cursor-pointer">
-              <span className="text-xs text-gray-500 select-none">Include past events</span>
-              <Switch checked={includePast} onChange={(e) => handleToggle(e.target.checked)} size="small" sx={{ m: 0 }} />
-            </label>
-          </div>
-          {isInitialLoading ? (
-            // Show 6 skeleton cards while loading
-            <>
-              {[...Array(6)].map((_, i) => (
-                <EventCardSkeleton key={i} />
-              ))}
-            </>
-          ) : (
-            <>
-              {loadedConversations.length === 0 && !isInitialLoading ? (
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 flex flex-col items-center gap-3">
-                  <EventIcon className="text-gray-400" style={{ fontSize: '40px' }} />
-                  <Typography variant="body1" className="text-gray-500">
-                    {includePast ? 'No events' : 'No upcoming events'}
-                  </Typography>
-                  <Button variant="outlined" onClick={() => router.push('/admin/events/new')}>
-                    Create an event
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  {loadedConversations.map((event) => (
-                    <EventCard key={event.id} event={event} onDelete={handleDelete} currentUserId={userId} />
-                  ))}
+    <>
+      <Snackbar
+        autoHideDuration={5000}
+        onClose={() => setEventStatusChanged({ message: null, changed: false })}
+        open={eventStatusChanged.changed}
+      >
+        <Alert severity="info">{eventStatusChanged.message}</Alert>
+      </Snackbar>
+      <Snackbar autoHideDuration={5000} onClose={() => setEventErrorMessage(null)} open={!!eventErrorMessage}>
+        <Alert severity="error">{eventErrorMessage}</Alert>
+      </Snackbar>
+      <div className="flex flex-col items-center mt-12 mb-8">
+        <Typography variant="h4" gutterBottom>
+          Events
+        </Typography>
+        {errorMessage ? (
+          <Typography color="error">{errorMessage}</Typography>
+        ) : (
+          <div className="w-3/4 space-y-6">
+            <div className="flex justify-end gap-2">
+              <label className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-3 py-1 cursor-pointer">
+                <span className="text-xs text-gray-500 select-none">My events only</span>
+                <Switch
+                  checked={myEventsOnly}
+                  onChange={(e) => handleMyEventsToggle(e.target.checked)}
+                  size="small"
+                  sx={{ m: 0 }}
+                />
+              </label>
+              <label className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-3 py-1 cursor-pointer">
+                <span className="text-xs text-gray-500 select-none">Include past events</span>
+                <Switch checked={includePast} onChange={(e) => handleToggle(e.target.checked)} size="small" sx={{ m: 0 }} />
+              </label>
+            </div>
+            {isInitialLoading ? (
+              // Show 6 skeleton cards while loading
+              <>
+                {[...Array(6)].map((_, i) => (
+                  <EventCardSkeleton key={i} />
+                ))}
+              </>
+            ) : (
+              <>
+                {loadedConversations.length === 0 && !isInitialLoading ? (
+                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 flex flex-col items-center gap-3">
+                    <EventIcon className="text-gray-400" style={{ fontSize: '40px' }} />
+                    <Typography variant="body1" className="text-gray-500">
+                      {includePast ? 'No events' : 'No upcoming events'}
+                    </Typography>
+                    <Button variant="outlined" onClick={() => router.push('/admin/events/new')}>
+                      Create an event
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    {loadedConversations.map(
+                      (event) =>
+                        event && (
+                          <EventCard
+                            key={event.id}
+                            event={event}
+                            onDelete={handleDelete}
+                            onMessage={handleEventStatusChange}
+                            currentUserId={userId}
+                          />
+                        ),
+                    )}
 
-                  {conversationsList && eventsShown < conversationsList.length && (
-                    <div className="flex justify-center mt-6 mb-6">
-                      <Button variant="outlined" onClick={handleLoadMore} disabled={isLoadingMore}>
-                        {isLoadingMore ? <CircularProgress size={20} /> : 'Load More'}
-                      </Button>
-                    </div>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </div>
-      )}
-    </div>
+                    {conversationsList && eventsShown < conversationsList.length && (
+                      <div className="flex justify-center mt-6 mb-6">
+                        <Button variant="outlined" onClick={handleLoadMore} disabled={isLoadingMore}>
+                          {isLoadingMore ? <CircularProgress size={20} /> : 'Load More'}
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
