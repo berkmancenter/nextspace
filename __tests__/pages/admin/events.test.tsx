@@ -3,7 +3,7 @@ import { render, screen, waitFor, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EventsPage from '../../../pages/admin/events';
 import { Request } from '../../../utils';
-import { getConversation } from '../../../utils/Helpers';
+import { getConversation, SendData } from '../../../utils/Helpers';
 import { useSessionJoin } from '../../../utils/useSessionJoin';
 import {
   generateAndDownloadUserMetricsReport,
@@ -79,6 +79,7 @@ jest.mock('../../../utils/Helpers', () => {
   return {
     ...actual,
     getConversation: jest.fn(),
+    SendData: jest.fn(),
   };
 });
 
@@ -96,6 +97,9 @@ describe('Events Page', () => {
     jest.clearAllMocks();
     // Always mock Request to return mockConversations unless overridden in a specific test
     (Request as jest.Mock).mockResolvedValue(mockConversations);
+
+    // Reset getConversation mock to avoid stale one-time mock values leaking between tests
+    (getConversation as jest.Mock).mockReset();
 
     // Mock useSessionJoin to return a default user ID
     (useSessionJoin as jest.Mock).mockReturnValue({ userId: 'user-123' });
@@ -632,9 +636,9 @@ describe('Events Page - Event Ownership', () => {
     // Verify "My Event" badge appears only for owned event
     expect(screen.getByText('My Event')).toBeInTheDocument();
 
-    // Verify delete button only appears for owned event
-    const deleteButtons = screen.getAllByLabelText('Delete event');
-    expect(deleteButtons).toHaveLength(1);
+    // Verify actions menu appears for all events
+    const menuButtons = screen.getAllByRole('button', { name: /actions-menu-/i });
+    expect(menuButtons).toHaveLength(2);
   });
   describe('Events Page - Download Reports', () => {
     const mockUserId = 'user-123';
@@ -689,9 +693,10 @@ describe('Events Page - Event Ownership', () => {
         expect(screen.getByText('Test Event 1')).toBeInTheDocument();
       });
 
-      // Download button should appear for inactive event
-      const downloadButtons = screen.getAllByLabelText('Download user metrics report');
-      expect(downloadButtons).toHaveLength(1);
+      // Open menu for inactive event and verify Download Reports option is present
+      const menuButton = screen.getByRole('button', { name: 'actions-menu-1' });
+      await userEvent.click(menuButton);
+      expect(screen.getByText('Download Reports')).toBeInTheDocument();
     });
 
     it('should download reports when download button is clicked', async () => {
@@ -719,8 +724,8 @@ describe('Events Page - Event Ownership', () => {
         expect(screen.getByText('Test Event 1')).toBeInTheDocument();
       });
 
-      const downloadButton = screen.getByLabelText('Download user metrics report');
-      await userEvent.click(downloadButton);
+      await userEvent.click(screen.getByRole('button', { name: 'actions-menu-1' }));
+      await userEvent.click(screen.getByText('Download Reports'));
 
       await waitFor(() => {
         expect(generateAndDownloadUserMetricsReport).toHaveBeenCalledWith(
@@ -763,8 +768,8 @@ describe('Events Page - Event Ownership', () => {
         expect(screen.getByText('Test Event 1')).toBeInTheDocument();
       });
 
-      const downloadButton = screen.getByLabelText('Download user metrics report');
-      await userEvent.click(downloadButton);
+      await userEvent.click(screen.getByRole('button', { name: 'actions-menu-1' }));
+      await userEvent.click(screen.getByText('Download Reports'));
 
       await waitFor(() => {
         expect(generateAndDownloadUserMetricsReport).toHaveBeenCalledWith(
@@ -802,16 +807,14 @@ describe('Events Page - Event Ownership', () => {
         expect(screen.getByText('Test Event 1')).toBeInTheDocument();
       });
 
-      const downloadButton = screen.getByLabelText('Download user metrics report');
-      await userEvent.click(downloadButton);
+      const menuButton = screen.getByRole('button', { name: 'actions-menu-1' });
+      await userEvent.click(menuButton);
+      await userEvent.click(screen.getByText('Download Reports'));
 
-      // Should show loading spinner
+      // Should show loading spinner instead of menu button
       await waitFor(() => {
-        const buttons = screen.getAllByRole('button');
-        const downloadButtonElement = buttons.find(
-          (btn) => btn.getAttribute('aria-label') === 'Download user metrics report',
-        );
-        expect(downloadButtonElement).toBeDisabled();
+        expect(screen.queryByRole('button', { name: 'actions-menu-1' })).not.toBeInTheDocument();
+        expect(screen.getByRole('progressbar')).toBeInTheDocument();
       });
     });
 
@@ -842,8 +845,8 @@ describe('Events Page - Event Ownership', () => {
         expect(screen.getByText('Test Event 1')).toBeInTheDocument();
       });
 
-      const downloadButton = screen.getByLabelText('Download user metrics report');
-      await userEvent.click(downloadButton);
+      await userEvent.click(screen.getByRole('button', { name: 'actions-menu-1' }));
+      await userEvent.click(screen.getByText('Download Reports'));
 
       await waitFor(() => {
         expect(alertMock).toHaveBeenCalledWith('Failed to generate report. Please try again.');
@@ -854,7 +857,7 @@ describe('Events Page - Event Ownership', () => {
   });
 });
 
-describe('Events Page - Edit button', () => {
+describe('Events Page - Admin Actions', () => {
   const mockUserId = 'user-123';
   const futureTime = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
   const pastTime = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
@@ -865,7 +868,7 @@ describe('Events Page - Edit button', () => {
     active: false,
     scheduledTime: futureTime,
     createdAt: futureTime,
-    owner: mockUserId,
+    owner: 'event-owner-456', //owner intentionally not the mockUserId used to perform the actions, to test that all admins can perform actions on each others' events
     platformTypes: [],
     type: { name: 'backChannel', label: 'Back Channel' },
     eventUrls: { zoom: null, moderator: [], participant: [] },
@@ -876,6 +879,7 @@ describe('Events Page - Edit button', () => {
     jest.clearAllMocks();
     (getConversation as jest.Mock).mockReset();
     (useSessionJoin as jest.Mock).mockReturnValue({ userId: mockUserId });
+    (SendData as jest.Mock).mockResolvedValue({ id: 'ev-1' });
   });
 
   const renderWithEvent = async (conv: object) => {
@@ -887,19 +891,18 @@ describe('Events Page - Edit button', () => {
     await waitFor(() => expect(screen.getByText('Editable Event')).toBeInTheDocument());
   };
 
-  it('shows an edit button for a future inactive event owned by the current user', async () => {
+  it('shows an edit button for a future inactive event', async () => {
     await renderWithEvent(makeConversation({}));
-    expect(screen.getByLabelText('Edit event')).toBeInTheDocument();
+    const menuButton = screen.getByRole('button', { name: `actions-menu-ev-1` });
+    await userEvent.click(menuButton);
+    expect(screen.getByText(/edit event/i)).toBeInTheDocument();
   });
 
   it('does not show an edit button for an active event', async () => {
     await renderWithEvent(makeConversation({ active: true }));
-    expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
-  });
-
-  it('does not show an edit button for an event owned by another user', async () => {
-    await renderWithEvent(makeConversation({ owner: 'someone-else' }));
-    expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
+    const menuButton = screen.getByRole('button', { name: `actions-menu-ev-1` });
+    await userEvent.click(menuButton);
+    expect(screen.queryByText(/edit event/i)).not.toBeInTheDocument();
   });
 
   it('does not show an edit button for a past event', async () => {
@@ -919,13 +922,90 @@ describe('Events Page - Edit button', () => {
     /* Legacy events may have no type object, which would produce /admin/undefined/edit/<id>
        if the edit button were shown. The canEdit guard prevents this. */
     await renderWithEvent(makeConversation({ type: undefined }));
-    expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
+    const menuButton = screen.getByRole('button', { name: `actions-menu-ev-1` });
+    await userEvent.click(menuButton);
+    expect(screen.queryByText(/edit event/i)).not.toBeInTheDocument();
   });
 
   it('navigates to the edit page when the edit button is clicked', async () => {
     const user = userEvent.setup();
     await renderWithEvent(makeConversation({}));
-    await user.click(await screen.findByLabelText('Edit event'));
+    const menuButton = await screen.findByRole('button', { name: `actions-menu-ev-1` });
+    await user.click(menuButton);
+    const editButton = await screen.findByText(/edit event/i);
+    await user.click(editButton);
     expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/edit/ev-1');
+  });
+
+  // --- Delete action ---
+
+  it('shows a delete button in the actions menu', async () => {
+    await renderWithEvent(makeConversation({}));
+    const menuButton = screen.getByRole('button', { name: 'actions-menu-ev-1' });
+    await userEvent.click(menuButton);
+    expect(screen.getByText(/delete event/i)).toBeInTheDocument();
+  });
+
+  it('opens a confirmation dialog when delete event is clicked', async () => {
+    const user = userEvent.setup();
+    await renderWithEvent(makeConversation({}));
+    await user.click(screen.getByRole('button', { name: 'actions-menu-ev-1' }));
+    await user.click(screen.getByText(/delete event/i));
+    expect(screen.getByText('Delete event?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /yes, delete/i })).toBeInTheDocument();
+  });
+
+  it('calls the delete API when the confirmation is accepted', async () => {
+    const user = userEvent.setup();
+    await renderWithEvent(makeConversation({}));
+    await user.click(screen.getByRole('button', { name: 'actions-menu-ev-1' }));
+    await user.click(screen.getByText(/delete event/i));
+    await user.click(screen.getByRole('button', { name: /yes, delete/i }));
+    await waitFor(() =>
+      expect(SendData as jest.Mock).toHaveBeenCalledWith('conversations/ev-1', {}, undefined, {
+        method: 'DELETE',
+      }),
+    );
+  });
+
+  it('does not call the delete API when cancel is clicked', async () => {
+    const user = userEvent.setup();
+    await renderWithEvent(makeConversation({}));
+    await user.click(screen.getByRole('button', { name: 'actions-menu-ev-1' }));
+    await user.click(screen.getByText(/delete event/i));
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(SendData as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  // --- Start / End action ---
+
+  it('shows a start button for a future inactive event', async () => {
+    await renderWithEvent(makeConversation({}));
+    const menuButton = screen.getByRole('button', { name: 'actions-menu-ev-1' });
+    await userEvent.click(menuButton);
+    expect(screen.getByText(/start event/i)).toBeInTheDocument();
+  });
+
+  it('shows an end button for an active event', async () => {
+    await renderWithEvent(makeConversation({ active: true }));
+    const menuButton = screen.getByRole('button', { name: 'actions-menu-ev-1' });
+    await userEvent.click(menuButton);
+    expect(screen.getByText(/end event/i)).toBeInTheDocument();
+  });
+
+  it('calls the start API when start event is clicked', async () => {
+    const user = userEvent.setup();
+    await renderWithEvent(makeConversation({}));
+    await user.click(screen.getByRole('button', { name: 'actions-menu-ev-1' }));
+    await user.click(screen.getByText(/start event/i));
+    await waitFor(() => expect(SendData as jest.Mock).toHaveBeenCalledWith('conversations/ev-1/start', {}));
+  });
+
+  it('calls the stop API when end event is clicked', async () => {
+    const user = userEvent.setup();
+    await renderWithEvent(makeConversation({ active: true }));
+    await user.click(screen.getByRole('button', { name: 'actions-menu-ev-1' }));
+    await user.click(screen.getByText(/end event/i));
+    await waitFor(() => expect(SendData as jest.Mock).toHaveBeenCalledWith('conversations/ev-1/stop', {}));
   });
 });
