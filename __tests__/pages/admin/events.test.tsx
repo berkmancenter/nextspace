@@ -561,6 +561,7 @@ describe('Events Page - Event Ordering', () => {
       active: false,
       scheduledTime: scheduledLater.toISOString(),
       startTime: startedEarly.toISOString(),
+      endTime: new Date(startedEarly.getTime() + 60 * 60 * 1000).toISOString(),
       createdAt: scheduledLater.toISOString(),
       owner: 'user-456',
       platformTypes: [],
@@ -581,9 +582,9 @@ describe('Events Page - Event Ordering', () => {
 
     (Request as jest.Mock).mockResolvedValue([earlyStartedEvent, upcomingEvent]);
     (getConversation as jest.Mock)
-      .mockResolvedValueOnce(upcomingEvent)       // initial load (earlyStartedEvent filtered as past)
-      .mockResolvedValueOnce(upcomingEvent)       // re-fetch after toggle: sorted[0]
-      .mockResolvedValueOnce(earlyStartedEvent);  // re-fetch after toggle: sorted[1]
+      .mockResolvedValueOnce(upcomingEvent) // initial load (earlyStartedEvent filtered as past)
+      .mockResolvedValueOnce(upcomingEvent) // re-fetch after toggle: sorted[0]
+      .mockResolvedValueOnce(earlyStartedEvent); // re-fetch after toggle: sorted[1]
 
     await act(async () => {
       render(<EventsPage authType={'user'} />);
@@ -611,6 +612,7 @@ describe('Events Page - Event Ordering', () => {
       active: false,
       scheduledTime: scheduledLater.toISOString(),
       startTime: startedEarly.toISOString(),
+      endTime: new Date(startedEarly.getTime() + 60 * 60 * 1000).toISOString(),
       createdAt: scheduledLater.toISOString(),
       owner: 'user-456',
       platformTypes: [],
@@ -1003,7 +1005,7 @@ describe('Events Page - Admin Actions', () => {
     expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
   });
   it('does not show an edit button for a past inactive event that was previously started', async () => {
-    const pastConv = makeConversation({ scheduledTime: pastTime, startTime: pastTime });
+    const pastConv = makeConversation({ scheduledTime: pastTime, startTime: pastTime, endTime: pastTime });
     (Request as jest.Mock).mockResolvedValue([pastConv]);
     (getConversation as jest.Mock).mockResolvedValue(pastConv);
     await act(async () => {
