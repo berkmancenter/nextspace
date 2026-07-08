@@ -71,8 +71,7 @@ const EventCard = ({
     !event.active &&
     !event.startTime &&
     !event.endTime &&
-    !!event.scheduledTime &&
-    new Date(event.scheduledTime) <= new Date();
+    (!event.scheduledTime || new Date(event.scheduledTime) <= new Date());
   const canEdit = !event.active && !eventStarted && !!event.type?.name;
 
   const handleCopyLink = async (url: string) => {

@@ -595,6 +595,133 @@ describe('Events Page - Event Ordering', () => {
   });
 });
 
+describe('Events Page - Missed badge', () => {
+  const mockUserId = 'user-123';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (getConversation as jest.Mock).mockReset();
+    (useSessionJoin as jest.Mock).mockReturnValue({ userId: mockUserId });
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => [] });
+  });
+
+  const renderWithEvent = async (event: object) => {
+    (Request as jest.Mock).mockResolvedValue([event]);
+    (getConversation as jest.Mock).mockResolvedValue(event);
+    await act(async () => {
+      render(<EventsPage authType={'user'} />);
+    });
+    await userEvent.click(screen.getByRole('switch', { name: /include past events/i }));
+  };
+
+  it('shows Missed badge for a scheduled event whose time has passed and never started', async () => {
+    const pastScheduled = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    await renderWithEvent({
+      id: 'missed-scheduled',
+      name: 'Missed Scheduled Event',
+      active: false,
+      scheduledTime: pastScheduled,
+      createdAt: pastScheduled,
+      owner: mockUserId,
+      platformTypes: [],
+      type: { name: 'eventAssistant', label: 'Test Agent' },
+      eventUrls: { zoom: null, moderator: [], participant: [] },
+    });
+    await waitFor(() => expect(screen.getByText('Missed Scheduled Event')).toBeInTheDocument());
+    expect(screen.getByText('Missed')).toBeInTheDocument();
+  });
+
+  it('shows Missed badge for an event with no scheduledTime that never started', async () => {
+    const createdAt = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
+    await renderWithEvent({
+      id: 'missed-no-schedule',
+      name: 'Unscheduled Failed Event',
+      active: false,
+      scheduledTime: null,
+      createdAt,
+      owner: mockUserId,
+      platformTypes: [],
+      type: { name: 'eventAssistant', label: 'Test Agent' },
+      eventUrls: { zoom: null, moderator: [], participant: [] },
+    });
+    await waitFor(() => expect(screen.getByText('Unscheduled Failed Event')).toBeInTheDocument());
+    expect(screen.getByText('Missed')).toBeInTheDocument();
+  });
+
+  it('does not show Missed badge for an active event', async () => {
+    const pastScheduled = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
+    (Request as jest.Mock).mockResolvedValue([{
+      id: 'active-event',
+      name: 'Active Event',
+      active: true,
+      scheduledTime: pastScheduled,
+      startTime: pastScheduled,
+      createdAt: pastScheduled,
+      owner: mockUserId,
+    }]);
+    (getConversation as jest.Mock).mockResolvedValue({
+      id: 'active-event',
+      name: 'Active Event',
+      active: true,
+      scheduledTime: pastScheduled,
+      startTime: pastScheduled,
+      createdAt: pastScheduled,
+      owner: mockUserId,
+      platformTypes: [],
+      type: { name: 'eventAssistant', label: 'Test Agent' },
+      eventUrls: { zoom: null, moderator: [], participant: [] },
+    });
+    await act(async () => { render(<EventsPage authType={'user'} />); });
+    await waitFor(() => expect(screen.getByText('Active Event')).toBeInTheDocument());
+    expect(screen.queryByText('Missed')).not.toBeInTheDocument();
+  });
+
+  it('does not show Missed badge for a completed event (has endTime)', async () => {
+    const pastTime = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    await renderWithEvent({
+      id: 'completed',
+      name: 'Completed Event',
+      active: false,
+      scheduledTime: pastTime,
+      startTime: pastTime,
+      endTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      createdAt: pastTime,
+      owner: mockUserId,
+      platformTypes: [],
+      type: { name: 'eventAssistant', label: 'Test Agent' },
+      eventUrls: { zoom: null, moderator: [], participant: [] },
+    });
+    await waitFor(() => expect(screen.getByText('Completed Event')).toBeInTheDocument());
+    expect(screen.queryByText('Missed')).not.toBeInTheDocument();
+  });
+
+  it('does not show Missed badge for an upcoming scheduled event', async () => {
+    const futureTime = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+    (Request as jest.Mock).mockResolvedValue([{
+      id: 'upcoming',
+      name: 'Upcoming Event',
+      active: false,
+      scheduledTime: futureTime,
+      createdAt: futureTime,
+      owner: mockUserId,
+    }]);
+    (getConversation as jest.Mock).mockResolvedValue({
+      id: 'upcoming',
+      name: 'Upcoming Event',
+      active: false,
+      scheduledTime: futureTime,
+      createdAt: futureTime,
+      owner: mockUserId,
+      platformTypes: [],
+      type: { name: 'eventAssistant', label: 'Test Agent' },
+      eventUrls: { zoom: null, moderator: [], participant: [] },
+    });
+    await act(async () => { render(<EventsPage authType={'user'} />); });
+    await waitFor(() => expect(screen.getByText('Upcoming Event')).toBeInTheDocument());
+    expect(screen.queryByText('Missed')).not.toBeInTheDocument();
+  });
+});
+
 describe('Events Page - Event Ownership', () => {
   const mockUserId = 'user-123';
   const otherUserId = 'user-456';
