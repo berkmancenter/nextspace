@@ -23,6 +23,7 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
+  Select,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EventIcon from '@mui/icons-material/Event';
@@ -458,14 +459,13 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
-const sortByActiveAndRecent = (list: components['schemas']['Conversation'][]) =>
-  [...list].sort((a, b) => {
-    if (a.active && !b.active) return -1;
-    if (!a.active && b.active) return 1;
-    const aTime = new Date(a.startTime ?? a.scheduledTime ?? a.createdAt!).getTime();
-    const bTime = new Date(b.startTime ?? b.scheduledTime ?? b.createdAt!).getTime();
-    return bTime - aTime;
-  });
+enum SortOptions {
+  StartTimeDesc = 'startTimeDesc',
+  StartTime = 'startTime',
+  CreatedAtDesc = 'createdAtDesc',
+  CreatedAt = 'createdAt',
+  Status = 'status',
+}
 
 function EventScreen({ authType }: { authType: AuthType }) {
   const router = useRouter();
@@ -481,7 +481,35 @@ function EventScreen({ authType }: { authType: AuthType }) {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [includePast, setIncludePast] = useState(false);
   const [myEventsOnly, setMyEventsOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOptions>(SortOptions.StartTimeDesc);
   const allConversationsRef = useRef<components['schemas']['Conversation'][] | null>(null);
+
+  const sortConversations = (list: components['schemas']['Conversation'][]) => {
+    const now = new Date();
+    return [...list].sort((a, b) => {
+      if (sortBy === SortOptions.Status) {
+        const getStatusRank = (conv: components['schemas']['Conversation']) => {
+          if (conv.active) return 1;
+          if (conv.scheduledTime && new Date(conv.scheduledTime) > now) return 2;
+          if (conv.endTime) return 3;
+          return 4; // missed: no startTime, no endTime, schedule passed or never scheduled
+        };
+        const diff = getStatusRank(a) - getStatusRank(b);
+        if (diff !== 0) return diff;
+      }
+      const aTime = new Date(
+        sortBy === SortOptions.CreatedAt || sortBy === SortOptions.CreatedAtDesc
+          ? a.createdAt!
+          : (a.startTime ?? a.scheduledTime ?? a.createdAt!),
+      ).getTime();
+      const bTime = new Date(
+        sortBy === SortOptions.CreatedAt || sortBy === SortOptions.CreatedAtDesc
+          ? b.createdAt!
+          : (b.startTime ?? b.scheduledTime ?? b.createdAt!),
+      ).getTime();
+      return sortBy === SortOptions.StartTime || sortBy === SortOptions.CreatedAt ? aTime - bTime : bTime - aTime;
+    });
+  };
 
   const [eventStatusChanged, setEventStatusChanged] = useState<{ changed: boolean; message: string | null }>({
     changed: false,
@@ -549,7 +577,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
       const all = data as components['schemas']['Conversation'][];
       allConversationsRef.current = all;
       const filtered = filterConversations(all, includePast, myEventsOnly);
-      const sorted = sortByActiveAndRecent(filtered);
+      const sorted = sortConversations(filtered);
       setConversationsList(sorted);
       const nextIndex = await fetchDetailedConversations(sorted, 0, eventsShown, true);
       setEventsShown(nextIndex);
@@ -639,7 +667,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
       // Filter to only active/future events (not past)
       const filtered = filterConversations(data, false, myEventsOnly);
 
-      const sorted = sortByActiveAndRecent(filtered);
+      const sorted = sortConversations(filtered);
       setConversationsList(sorted);
 
       // Load first 6 details
@@ -670,7 +698,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
     // Filter based on whether to include past events
     const filtered = filterConversations(allConversationsRef.current, include, myEventsOnly);
 
-    const sorted = sortByActiveAndRecent(filtered);
+    const sorted = sortConversations(filtered);
     setConversationsList(sorted);
 
     const nextIndex = await fetchDetailedConversations(sorted, 0, 6, true);
@@ -686,13 +714,22 @@ function EventScreen({ authType }: { authType: AuthType }) {
     // Filter based on owner and past events settings
     const filtered = filterConversations(allConversationsRef.current, includePast, showOnlyMine);
 
-    const sorted = sortByActiveAndRecent(filtered);
+    const sorted = sortConversations(filtered);
     setConversationsList(sorted);
 
     const nextIndex = await fetchDetailedConversations(sorted, 0, 6, true);
     setEventsShown(nextIndex);
     setIsInitialLoading(false);
   };
+
+  useEffect(() => {
+    if (!allConversationsRef.current) return;
+    const filtered = filterConversations(allConversationsRef.current, includePast, myEventsOnly);
+    const sorted = sortConversations(filtered);
+    setConversationsList(sorted);
+    setIsInitialLoading(true);
+    fetchDetailedConversations(sorted, 0, eventsShown, true).then(() => setIsInitialLoading(false));
+  }, [sortBy]);
 
   return (
     <>
@@ -714,7 +751,28 @@ function EventScreen({ authType }: { authType: AuthType }) {
           <Typography color="error">{errorMessage}</Typography>
         ) : (
           <div className="w-3/4 space-y-6">
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap justify-end items-center gap-2">
+              <div className="flex items-center bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-3 py-1">
+                <Select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOptions)}
+                  variant="standard"
+                  disableUnderline
+                  sx={{
+                    fontSize: '0.75rem',
+                    color: 'text.secondary',
+                    maxWidth: 160,
+                    '& .MuiSelect-select': { overflow: 'hidden', textOverflow: 'ellipsis' },
+                    '& .MuiSelect-icon': { color: 'text.secondary' },
+                  }}
+                >
+                  <MenuItem value={SortOptions.StartTimeDesc}>Start Date (newest)</MenuItem>
+                  <MenuItem value={SortOptions.StartTime}>Start Date (oldest)</MenuItem>
+                  <MenuItem value={SortOptions.CreatedAtDesc}>Created Date (newest)</MenuItem>
+                  <MenuItem value={SortOptions.CreatedAt}>Created Date (oldest)</MenuItem>
+                  <MenuItem value={SortOptions.Status}>Status</MenuItem>
+                </Select>
+              </div>
               <label className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-3 py-1 cursor-pointer">
                 <span className="text-xs text-gray-500 select-none">My events only</span>
                 <Switch
