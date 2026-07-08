@@ -65,6 +65,13 @@ const EventCard = ({
 
   // Edit is available for future inactive events with a known type
   const eventStarted = !!event.startTime;
+  const isPast = !!event.endTime;
+  const isMissed =
+    !event.active &&
+    !event.startTime &&
+    !event.endTime &&
+    !!event.scheduledTime &&
+    new Date(event.scheduledTime) <= new Date();
   const canEdit = !event.active && !eventStarted && !!event.type?.name;
 
   const handleCopyLink = async (url: string) => {
@@ -153,6 +160,16 @@ const EventCard = ({
               {isOwner && (
                 <span className="inline-block mt-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
                   My Event
+                </span>
+              )}
+              {isPast && (
+                <span className="inline-block mt-1 ml-1 px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-full">
+                  Past
+                </span>
+              )}
+              {isMissed && (
+                <span className="inline-block mt-1 ml-1 px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">
+                  Missed
                 </span>
               )}
             </div>
@@ -489,8 +506,8 @@ function EventScreen({ authType }: { authType: AuthType }) {
       // Always show active events
       if (conv.active) return true;
 
-      // For inactive events, startTime being set means it ran
-      if (conv.startTime) return includePast;
+      // For inactive events, endTime being set means it completed
+      if (conv.endTime) return includePast;
 
       // Not yet started — show if scheduled in the future
       if (conv.scheduledTime && new Date(conv.scheduledTime) > new Date()) return true;
