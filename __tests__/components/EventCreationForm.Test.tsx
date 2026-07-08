@@ -3019,14 +3019,14 @@ describe('EventCreationForm Component', () => {
         expect(screen.queryByRole('button', { name: /cancel/i })).not.toBeInTheDocument();
       });
 
-      it('navigates to the view page immediately when cancelled with no changes', async () => {
+      it('navigates to the events list immediately when cancelled with no changes', async () => {
         const user = userEvent.setup();
         await renderEditForm();
 
         await user.click(screen.getByRole('button', { name: /cancel/i }));
 
         await waitFor(() => {
-          expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-edit-123');
+          expect(mockPush).toHaveBeenCalledWith('/admin/events');
         });
       });
 
@@ -3043,7 +3043,7 @@ describe('EventCreationForm Component', () => {
         await user.click(screen.getByRole('button', { name: /cancel/i }));
 
         await waitFor(() => {
-          expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-edit-123');
+          expect(mockPush).toHaveBeenCalledWith('/admin/events');
         });
       });
 
@@ -3066,7 +3066,7 @@ describe('EventCreationForm Component', () => {
         await user.click(screen.getByRole('button', { name: /cancel/i }));
 
         await waitFor(() => {
-          expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-edit-123');
+          expect(mockPush).toHaveBeenCalledWith('/admin/events');
         });
       });
 
@@ -3084,7 +3084,7 @@ describe('EventCreationForm Component', () => {
         expect(screen.getByText(/discard changes/i)).toBeInTheDocument();
       });
 
-      it('navigates away when the user confirms discarding changes', async () => {
+      it('navigates to the events list when the user confirms discarding changes', async () => {
         const user = userEvent.setup();
         await renderEditForm();
 
@@ -3097,7 +3097,7 @@ describe('EventCreationForm Component', () => {
         await user.click(screen.getByRole('button', { name: /discard/i }));
 
         await waitFor(() => {
-          expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-edit-123');
+          expect(mockPush).toHaveBeenCalledWith('/admin/events');
         });
       });
 
