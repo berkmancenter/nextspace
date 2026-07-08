@@ -288,6 +288,7 @@ describe('Events Page - Event Ordering', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (getConversation as jest.Mock).mockReset();
 
     // Always mock Request to return mockConversations unless overridden in a specific test
     (Request as jest.Mock).mockResolvedValue(mockConversations);
@@ -546,6 +547,90 @@ describe('Events Page - Event Ordering', () => {
     // More recent event should be first
     expect(eventHeadings[0]).toHaveTextContent('Recent Event');
     expect(eventHeadings[1]).toHaveTextContent('Older Event');
+  });
+
+  it('should sort an early-started event by startTime, not scheduledTime', async () => {
+    const now = new Date();
+    const scheduledLater = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000); // scheduled 5 days from now
+    const startedEarly = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000); // but actually started yesterday
+    const scheduledSoon = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000); // another event scheduled 1 day from now
+
+    const earlyStartedEvent = {
+      id: 'early-started',
+      name: 'Early Started Event',
+      active: false,
+      scheduledTime: scheduledLater.toISOString(),
+      startTime: startedEarly.toISOString(),
+      createdAt: scheduledLater.toISOString(),
+      owner: 'user-456',
+      platformTypes: [],
+      type: { name: 'eventAssistant', label: 'Test Agent' },
+      eventUrls: { zoom: null, moderator: [], participant: [] },
+    };
+    const upcomingEvent = {
+      id: 'upcoming',
+      name: 'Upcoming Event',
+      active: false,
+      scheduledTime: scheduledSoon.toISOString(),
+      createdAt: scheduledSoon.toISOString(),
+      owner: 'user-456',
+      platformTypes: [],
+      type: { name: 'eventAssistant', label: 'Test Agent' },
+      eventUrls: { zoom: null, moderator: [], participant: [] },
+    };
+
+    (Request as jest.Mock).mockResolvedValue([earlyStartedEvent, upcomingEvent]);
+    (getConversation as jest.Mock)
+      .mockResolvedValueOnce(upcomingEvent)       // initial load (earlyStartedEvent filtered as past)
+      .mockResolvedValueOnce(upcomingEvent)       // re-fetch after toggle: sorted[0]
+      .mockResolvedValueOnce(earlyStartedEvent);  // re-fetch after toggle: sorted[1]
+
+    await act(async () => {
+      render(<EventsPage authType={'user'} />);
+    });
+
+    await waitFor(() => expect(screen.getByText('Upcoming Event')).toBeInTheDocument());
+
+    // Enable past events to also show the early-started event
+    await userEvent.click(screen.getByRole('switch', { name: /include past events/i }));
+    await waitFor(() => expect(screen.getByText('Early Started Event')).toBeInTheDocument());
+
+    const eventHeadings = screen.getAllByRole('heading', { level: 5 });
+    // Upcoming event (1 day away) should sort before early-started event (startTime yesterday)
+    expect(eventHeadings[0]).toHaveTextContent('Upcoming Event');
+    expect(eventHeadings[1]).toHaveTextContent('Early Started Event');
+  });
+
+  it('should display startTime on the card when an event was started early', async () => {
+    const scheduledLater = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+    const startedEarly = new Date(2026, 0, 1, 9, 0, 0); // Jan 1 2026 09:00
+
+    const event = {
+      id: 'early-started',
+      name: 'Early Started Event',
+      active: false,
+      scheduledTime: scheduledLater.toISOString(),
+      startTime: startedEarly.toISOString(),
+      createdAt: scheduledLater.toISOString(),
+      owner: 'user-456',
+      platformTypes: [],
+      type: { name: 'eventAssistant', label: 'Test Agent' },
+      eventUrls: { zoom: null, moderator: [], participant: [] },
+    };
+
+    (Request as jest.Mock).mockResolvedValue([event]);
+    (getConversation as jest.Mock).mockResolvedValue(event);
+
+    await act(async () => {
+      render(<EventsPage authType={'user'} />);
+    });
+
+    // Enable past events to show the early-started event
+    await userEvent.click(screen.getByRole('switch', { name: /include past events/i }));
+    await waitFor(() => expect(screen.getByText('Early Started Event')).toBeInTheDocument());
+
+    // Should show January 1 (startTime), not the scheduledTime
+    expect(screen.getByText(/january 1/i)).toBeInTheDocument();
   });
 });
 
