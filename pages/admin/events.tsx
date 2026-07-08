@@ -234,27 +234,16 @@ const EventCard = ({
             <div className="flex-1 flex items-start gap-2">
               <EventIcon color={event.active ? 'success' : 'inherit'} style={{ fontSize: '18px' }} className="mt-0.5" />
               <div>
-                {event.scheduledTime
-                  ? new Date(event.scheduledTime).toLocaleString('en-US', {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true,
-                      timeZone: getUserTimezone(),
-                      timeZoneName: 'short',
-                    })
-                  : new Date(event.createdAt!).toLocaleString('en-US', {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true,
-                      timeZone: getUserTimezone(),
-                      timeZoneName: 'short',
-                    })}
+                {new Date(event.startTime ?? event.scheduledTime ?? event.createdAt!).toLocaleString('en-US', {
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true,
+                  timeZone: getUserTimezone(),
+                  timeZoneName: 'short',
+                })}
                 {event.active && <span className="ml-2 text-green-600 font-medium">• In Progress</span>}
               </div>
             </div>
@@ -456,8 +445,8 @@ const sortByActiveAndRecent = (list: components['schemas']['Conversation'][]) =>
   [...list].sort((a, b) => {
     if (a.active && !b.active) return -1;
     if (!a.active && b.active) return 1;
-    const aTime = a.scheduledTime ? new Date(a.scheduledTime).getTime() : new Date(a.createdAt!).getTime();
-    const bTime = b.scheduledTime ? new Date(b.scheduledTime).getTime() : new Date(b.createdAt!).getTime();
+    const aTime = new Date(a.startTime ?? a.scheduledTime ?? a.createdAt!).getTime();
+    const bTime = new Date(b.startTime ?? b.scheduledTime ?? b.createdAt!).getTime();
     return bTime - aTime;
   });
 
