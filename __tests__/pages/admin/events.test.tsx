@@ -342,211 +342,171 @@ describe('Events Page - Event Ordering', () => {
     );
   });
 
-  it('should display active events before inactive events', async () => {
+  const makeEventDetail = (
+    id: string,
+    name: string,
+    active: boolean,
+    scheduledTime: string,
+    startTime?: string,
+    endTime?: string,
+  ) => ({
+    id,
+    name,
+    active,
+    scheduledTime,
+    startTime,
+    endTime,
+    createdAt: scheduledTime,
+    owner: 'user-456',
+    platformTypes: [],
+    type: { name: 'eventAssistant', label: 'Test Agent' },
+    eventUrls: { zoom: null, moderator: [], participant: [] },
+  });
+
+  it('default sort (Start Date newest) places future events before past events', async () => {
     const now = new Date();
-    const pastDate = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
-    const futureDate = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000); // 2 days from now
+    const futureTime = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString();
+    const pastTime = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Use similar structure to mockConversations at top of file
-    const conversations = [
-      {
-        id: '1',
-        name: 'Future Inactive Event',
-        createdAt: '2025-11-05T10:00:00Z',
-        scheduledTime: futureDate, // Date object, not string
-        active: false,
-      },
-      {
-        id: '2',
-        name: 'Active Past Event',
-        createdAt: '2025-11-04T10:00:00Z',
-        scheduledTime: pastDate, // Date object, not string
-        active: true,
-      },
-    ];
+    const futureEvent = makeEventDetail('future', 'Future Event', false, futureTime);
+    const pastEvent = makeEventDetail('past', 'Past Active Event', true, pastTime);
 
-    (Request as jest.Mock).mockResolvedValue(conversations);
-    (getConversation as jest.Mock)
-      .mockResolvedValueOnce({
-        id: '2',
-        name: 'Active Past Event',
-        createdAt: '2025-11-04T10:00:00Z',
-        scheduledTime: pastDate,
-        active: true,
-        owner: mockUserId,
-        platformTypes: [],
-        type: { label: 'Test Agent' },
-        eventUrls: {
-          zoom: null,
-          moderator: [],
-          participant: [],
-        },
-      })
-      .mockResolvedValueOnce({
-        id: '1',
-        name: 'Future Inactive Event',
-        createdAt: '2025-11-05T10:00:00Z',
-        scheduledTime: futureDate,
-        active: false,
-        owner: mockUserId,
-        platformTypes: [],
-        type: { label: 'Test Agent' },
-        eventUrls: {
-          zoom: null,
-          moderator: [],
-          participant: [],
-        },
-      });
-
-    await act(async () => {
-      render(<EventsPage authType={'user'} />);
-    });
-
-    await waitFor(
-      () => {
-        expect(screen.queryByText('Active Past Event')).toBeInTheDocument();
-      },
-      { timeout: 3000 },
+    (Request as jest.Mock).mockResolvedValue([futureEvent, pastEvent]);
+    (getConversation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve(id === 'future' ? futureEvent : pastEvent),
     );
 
-    // Get all event cards and check their order
-    const eventHeadings = screen.getAllByRole('heading', { level: 5 });
-    expect(eventHeadings[0]).toHaveTextContent('Active Past Event');
-    expect(eventHeadings[1]).toHaveTextContent('Future Inactive Event');
+    await act(async () => {
+      render(<EventsPage authType={'user'} />);
+    });
+
+    await waitFor(() => expect(screen.getByText('Future Event')).toBeInTheDocument());
+
+    const headings = screen.getAllByRole('heading', { level: 5 });
+    expect(headings[0]).toHaveTextContent('Future Event');
+    expect(headings[1]).toHaveTextContent('Past Active Event');
   });
 
-  it('should sort multiple active events by most recent first', async () => {
+  it('Status sort places active → upcoming → past → missed', async () => {
     const now = new Date();
-    const recentActive = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000); // 1 day ago
-    const olderActive = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000); // 5 days ago
+    const futureTime = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString();
+    const pastTime = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
 
-    const conversations = [
-      {
-        id: 'older-active',
-        name: 'Older Active Event',
-        active: true,
-        scheduledTime: olderActive.toISOString(),
-        createdAt: olderActive.toISOString(),
-        owner: 'user-456',
-        platformTypes: [],
-        eventUrls: { moderator: [], participant: [] },
-      },
-      {
-        id: 'recent-active',
-        name: 'Recent Active Event',
-        active: true,
-        scheduledTime: recentActive.toISOString(),
-        createdAt: recentActive.toISOString(),
-        owner: 'user-456',
-        platformTypes: [],
-        eventUrls: { moderator: [], participant: [] },
-      },
-    ];
+    const activeEvent = makeEventDetail('active', 'Active Event', true, pastTime, pastTime);
+    const upcomingEvent = makeEventDetail('upcoming', 'Upcoming Event', false, futureTime);
+    const pastEvent = { ...makeEventDetail('past', 'Past Event', false, pastTime, pastTime), endTime: pastTime };
+    const missedEvent = makeEventDetail('missed', 'Missed Event', false, pastTime); // no startTime, no endTime
 
-    (Request as jest.Mock).mockResolvedValue(conversations);
-    (getConversation as jest.Mock)
-      .mockResolvedValueOnce({
-        id: 'recent-active',
-        name: 'Recent Active Event',
-        active: true,
-        scheduledTime: recentActive.toISOString(),
-        createdAt: recentActive.toISOString(),
-        owner: 'user-456',
-        platformTypes: [],
-        type: { label: 'Test Agent' },
-        eventUrls: { zoom: null, moderator: [], participant: [] },
-      })
-      .mockResolvedValueOnce({
-        id: 'older-active',
-        name: 'Older Active Event',
-        active: true,
-        scheduledTime: olderActive.toISOString(),
-        createdAt: olderActive.toISOString(),
-        owner: 'user-456',
-        platformTypes: [],
-        type: { label: 'Test Agent' },
-        eventUrls: { zoom: null, moderator: [], participant: [] },
-      });
+    (Request as jest.Mock).mockResolvedValue([missedEvent, pastEvent, upcomingEvent, activeEvent]);
+    (getConversation as jest.Mock).mockImplementation((id: string) => {
+      const map: Record<string, object> = {
+        active: activeEvent,
+        upcoming: upcomingEvent,
+        past: pastEvent,
+        missed: missedEvent,
+      };
+      return Promise.resolve(map[id]);
+    });
 
     await act(async () => {
       render(<EventsPage authType={'user'} />);
     });
 
-    await waitFor(() => {
-      expect(screen.queryByText('Recent Active Event')).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByText('Upcoming Event')).toBeInTheDocument());
 
-    const eventHeadings = screen.getAllByRole('heading', { level: 5 });
-    // More recent active event should be first
-    expect(eventHeadings[0]).toHaveTextContent('Recent Active Event');
-    expect(eventHeadings[1]).toHaveTextContent('Older Active Event');
+    // Switch to Status sort
+    await userEvent.click(screen.getByRole('combobox'));
+    await userEvent.click(screen.getByRole('option', { name: 'Status' }));
+
+    // Enable past events so all four are visible
+    await userEvent.click(screen.getByRole('switch', { name: /include past events/i }));
+    await waitFor(() => expect(screen.getByText('Missed Event')).toBeInTheDocument());
+
+    const headings = screen.getAllByRole('heading', { level: 5 });
+    expect(headings[0]).toHaveTextContent('Active Event');
+    expect(headings[1]).toHaveTextContent('Upcoming Event');
+    expect(headings[2]).toHaveTextContent('Past Event');
+    expect(headings[3]).toHaveTextContent('Missed Event');
   });
 
-  it('should sort inactive events by most recent first', async () => {
+  it('Start Date oldest sort places past events before future events', async () => {
     const now = new Date();
-    const recent = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000); // 1 day from now
-    const older = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000); // 5 days from now
+    const futureTime = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString();
+    const pastTime = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
 
-    const conversations = [
-      {
-        id: 'older-event',
-        name: 'Older Event',
-        active: false,
-        scheduledTime: older.toISOString(),
-        createdAt: older.toISOString(),
-        owner: 'user-456',
-        platformTypes: [],
-        eventUrls: { moderator: [], participant: [] },
-      },
-      {
-        id: 'recent-event',
-        name: 'Recent Event',
-        active: false,
-        scheduledTime: recent.toISOString(),
-        createdAt: recent.toISOString(),
-        owner: 'user-456',
-        platformTypes: [],
-        eventUrls: { moderator: [], participant: [] },
-      },
-    ];
+    const futureEvent = makeEventDetail('future', 'Future Event', false, futureTime);
+    const pastEvent = { ...makeEventDetail('past', 'Past Event', false, pastTime, pastTime), endTime: pastTime };
 
-    (Request as jest.Mock).mockResolvedValue(conversations);
-    (getConversation as jest.Mock)
-      .mockResolvedValueOnce({
-        id: 'recent-event',
-        name: 'Recent Event',
-        active: false,
-        scheduledTime: recent.toISOString(),
-        createdAt: recent.toISOString(),
-        owner: 'user-456',
-        platformTypes: [],
-        type: { label: 'Test Agent' },
-        eventUrls: { zoom: null, moderator: [], participant: [] },
-      })
-      .mockResolvedValueOnce({
-        id: 'older-event',
-        name: 'Older Event',
-        active: false,
-        scheduledTime: older.toISOString(),
-        createdAt: older.toISOString(),
-        owner: 'user-456',
-        platformTypes: [],
-        type: { label: 'Test Agent' },
-        eventUrls: { zoom: null, moderator: [], participant: [] },
-      });
+    (Request as jest.Mock).mockResolvedValue([futureEvent, pastEvent]);
+    (getConversation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve(id === 'future' ? futureEvent : pastEvent),
+    );
 
     await act(async () => {
       render(<EventsPage authType={'user'} />);
     });
 
-    await waitFor(() => {
-      expect(screen.queryByText('Recent Event')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Future Event')).toBeInTheDocument());
+
+    // Switch to ascending sort
+    await userEvent.click(screen.getByRole('combobox'));
+    await userEvent.click(screen.getByRole('option', { name: 'Start Date (oldest)' }));
+
+    // Enable past events
+    await userEvent.click(screen.getByRole('switch', { name: /include past events/i }));
+    await waitFor(() => expect(screen.getByText('Past Event')).toBeInTheDocument());
+
+    const headings = screen.getAllByRole('heading', { level: 5 });
+    expect(headings[0]).toHaveTextContent('Past Event');
+    expect(headings[1]).toHaveTextContent('Future Event');
+  });
+
+  it('should sort multiple active events by start time descending', async () => {
+    const now = new Date();
+    const recentStart = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(); // 1 day ago
+    const olderStart = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(); // 5 days ago
+
+    const recentActiveEvent = makeEventDetail('recent-active', 'Recent Active Event', true, recentStart, recentStart);
+    const olderActiveEvent = makeEventDetail('older-active', 'Older Active Event', true, olderStart, olderStart);
+
+    (Request as jest.Mock).mockResolvedValue([olderActiveEvent, recentActiveEvent]);
+    (getConversation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve(id === 'recent-active' ? recentActiveEvent : olderActiveEvent),
+    );
+
+    await act(async () => {
+      render(<EventsPage authType={'user'} />);
     });
 
-    const eventHeadings = screen.getAllByRole('heading', { level: 5 });
-    // More recent event should be first
-    expect(eventHeadings[0]).toHaveTextContent('Recent Event');
-    expect(eventHeadings[1]).toHaveTextContent('Older Event');
+    await waitFor(() => expect(screen.getByText('Recent Active Event')).toBeInTheDocument());
+
+    const headings = screen.getAllByRole('heading', { level: 5 });
+    expect(headings[0]).toHaveTextContent('Recent Active Event');
+    expect(headings[1]).toHaveTextContent('Older Active Event');
+  });
+
+  it('should sort upcoming events by scheduled time descending (furthest first)', async () => {
+    const now = new Date();
+    const soonTime = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000).toISOString(); // 1 day from now
+    const laterTime = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString(); // 5 days from now
+
+    const soonEvent = makeEventDetail('soon', 'Soon Event', false, soonTime);
+    const laterEvent = makeEventDetail('later', 'Later Event', false, laterTime);
+
+    (Request as jest.Mock).mockResolvedValue([soonEvent, laterEvent]);
+    (getConversation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve(id === 'soon' ? soonEvent : laterEvent),
+    );
+
+    await act(async () => {
+      render(<EventsPage authType={'user'} />);
+    });
+
+    await waitFor(() => expect(screen.getByText('Later Event')).toBeInTheDocument());
+
+    const headings = screen.getAllByRole('heading', { level: 5 });
+    expect(headings[0]).toHaveTextContent('Later Event');
+    expect(headings[1]).toHaveTextContent('Soon Event');
   });
 
   it('should sort an early-started event by startTime, not scheduledTime', async () => {
@@ -581,10 +541,9 @@ describe('Events Page - Event Ordering', () => {
     };
 
     (Request as jest.Mock).mockResolvedValue([earlyStartedEvent, upcomingEvent]);
-    (getConversation as jest.Mock)
-      .mockResolvedValueOnce(upcomingEvent) // initial load (earlyStartedEvent filtered as past)
-      .mockResolvedValueOnce(upcomingEvent) // re-fetch after toggle: sorted[0]
-      .mockResolvedValueOnce(earlyStartedEvent); // re-fetch after toggle: sorted[1]
+    (getConversation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve(id === 'early-started' ? earlyStartedEvent : upcomingEvent),
+    );
 
     await act(async () => {
       render(<EventsPage authType={'user'} />);
@@ -681,30 +640,33 @@ describe('Events Page - Event Ownership', () => {
       },
     ];
 
+    const myActiveDetail = {
+      id: 'my-active',
+      name: 'My Active Event',
+      active: true,
+      scheduledTime: olderDate.toISOString(),
+      createdAt: olderDate.toISOString(),
+      owner: mockUserId,
+      platformTypes: [],
+      type: { label: 'Test Agent' },
+      eventUrls: { zoom: null, moderator: [], participant: [] },
+    };
+    const otherFutureDetail = {
+      id: 'other-future',
+      name: 'Other Future Event',
+      active: false,
+      scheduledTime: recentDate.toISOString(),
+      createdAt: recentDate.toISOString(),
+      owner: otherUserId,
+      platformTypes: [],
+      type: { label: 'Test Agent' },
+      eventUrls: { zoom: null, moderator: [], participant: [] },
+    };
+
     (Request as jest.Mock).mockResolvedValue(conversations);
-    (getConversation as jest.Mock)
-      .mockResolvedValueOnce({
-        id: 'my-active',
-        name: 'My Active Event',
-        active: true,
-        scheduledTime: olderDate.toISOString(),
-        createdAt: olderDate.toISOString(),
-        owner: mockUserId,
-        platformTypes: [],
-        type: { label: 'Test Agent' },
-        eventUrls: { zoom: null, moderator: [], participant: [] },
-      })
-      .mockResolvedValueOnce({
-        id: 'other-future',
-        name: 'Other Future Event',
-        active: false,
-        scheduledTime: recentDate.toISOString(),
-        createdAt: recentDate.toISOString(),
-        owner: otherUserId,
-        platformTypes: [],
-        type: { label: 'Test Agent' },
-        eventUrls: { zoom: null, moderator: [], participant: [] },
-      });
+    (getConversation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve(id === 'my-active' ? myActiveDetail : otherFutureDetail),
+    );
 
     await act(async () => {
       render(<EventsPage authType={'user'} />);
@@ -715,7 +677,7 @@ describe('Events Page - Event Ownership', () => {
       expect(screen.queryByText('Other Future Event')).toBeInTheDocument();
     });
 
-    // Verify ordering: active first, then non-active by most recent
+    // olderDate (+5 days) > recentDate (+1 day), so My Active Event sorts first under Start Date newest
     const allHeadings = screen.getAllByRole('heading', { level: 5 });
     expect(allHeadings[0]).toHaveTextContent('My Active Event');
     expect(allHeadings[1]).toHaveTextContent('Other Future Event');
@@ -823,7 +785,7 @@ describe('Events Page - Event Ownership', () => {
       });
     });
 
-    it('should use createdAt when scheduledTime is not available', async () => {
+    it('should use createdAt when startTime and scheduledTime are not available', async () => {
       const createdDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago (past event)
       const inactiveEvent = {
         ...mockConversations[0],
@@ -845,11 +807,8 @@ describe('Events Page - Event Ownership', () => {
         render(<EventsPage authType={'user'} />);
       });
 
-      // Enable "Include past events" toggle to show the event
-      const includePastEventsSwitch = screen.getByRole('switch', {
-        name: /include past events/i,
-      });
-      await userEvent.click(includePastEventsSwitch);
+      // Enable "Include past events" toggle to show the missed event
+      await userEvent.click(screen.getByRole('switch', { name: /include past events/i }));
 
       await waitFor(() => {
         expect(screen.getByText('Test Event 1')).toBeInTheDocument();
