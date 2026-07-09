@@ -278,7 +278,7 @@ describe('Events Page', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/No upcoming events/i)).toBeInTheDocument();
+      expect(screen.getByText(/No events found/i)).toBeInTheDocument();
     });
   });
 });
@@ -342,6 +342,20 @@ describe('Events Page - Event Ordering', () => {
     );
   });
 
+  // Opens the filter drawer and adds the given statuses to the Status multi-select.
+  // Existing selections (active, upcoming) are preserved.
+  const enableStatusFilters = async (...statuses: string[]) => {
+    await userEvent.click(screen.getByRole('button', { name: /filters/i }));
+    const statusSelect = await screen.findByLabelText('Status');
+    await userEvent.click(statusSelect);
+    for (const status of statuses) {
+      await userEvent.click(await screen.findByRole('option', { name: new RegExp(status, 'i') }));
+    }
+    await userEvent.keyboard('{Escape}'); // close Select dropdown
+    await userEvent.keyboard('{Escape}'); // close Drawer
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  };
+
   const makeEventDetail = (
     id: string,
     name: string,
@@ -363,28 +377,37 @@ describe('Events Page - Event Ordering', () => {
     eventUrls: { zoom: null, moderator: [], participant: [] },
   });
 
-  it('default sort (Start Date newest) places future events before past events', async () => {
+  it('default sort (Start Date newest) sorts by start/scheduled time descending', async () => {
     const now = new Date();
     const futureTime = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString();
-    const pastTime = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const recentPastTime = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString();
+    const olderPastTime = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
 
+    const activeEvent = makeEventDetail('active', 'Active Event', true, recentPastTime, recentPastTime);
     const futureEvent = makeEventDetail('future', 'Future Event', false, futureTime);
-    const pastEvent = makeEventDetail('past', 'Past Active Event', true, pastTime);
+    const pastEvent = {
+      ...makeEventDetail('past', 'Past Event', false, olderPastTime, olderPastTime),
+      endTime: olderPastTime,
+    };
 
-    (Request as jest.Mock).mockResolvedValue([futureEvent, pastEvent]);
-    (getConversation as jest.Mock).mockImplementation((id: string) =>
-      Promise.resolve(id === 'future' ? futureEvent : pastEvent),
-    );
+    (Request as jest.Mock).mockResolvedValue([pastEvent, activeEvent, futureEvent]);
+    (getConversation as jest.Mock).mockImplementation((id: string) => {
+      const map: Record<string, object> = { active: activeEvent, future: futureEvent, past: pastEvent };
+      return Promise.resolve(map[id]);
+    });
 
     await act(async () => {
       render(<EventsPage authType={'user'} />);
     });
 
-    await waitFor(() => expect(screen.getByText('Future Event')).toBeInTheDocument());
+    // Enable past status filter to see all three
+    await enableStatusFilters('past');
+    await waitFor(() => expect(screen.getByText('Past Event')).toBeInTheDocument());
 
     const headings = screen.getAllByRole('heading', { level: 5 });
     expect(headings[0]).toHaveTextContent('Future Event');
-    expect(headings[1]).toHaveTextContent('Past Active Event');
+    expect(headings[1]).toHaveTextContent('Active Event');
+    expect(headings[2]).toHaveTextContent('Past Event');
   });
 
   it('Status sort places active → upcoming → past → missed', async () => {
@@ -414,12 +437,18 @@ describe('Events Page - Event Ordering', () => {
 
     await waitFor(() => expect(screen.getByText('Upcoming Event')).toBeInTheDocument());
 
-    // Switch to Status sort
-    await userEvent.click(screen.getByRole('combobox'));
-    await userEvent.click(screen.getByRole('option', { name: 'Status' }));
+    // Open drawer, switch to Status sort, and enable past + missed status filters
+    await userEvent.click(screen.getByRole('button', { name: /filters/i }));
+    await userEvent.click(await screen.findByLabelText('Sort By'));
+    await userEvent.click(await screen.findByRole('option', { name: 'Status' }));
+    // Sort By closes on selection — re-open Status select within the still-open drawer
+    await userEvent.click(await screen.findByLabelText('Status'));
+    await userEvent.click(await screen.findByRole('option', { name: /past/i }));
+    await userEvent.click(await screen.findByRole('option', { name: /missed/i }));
+    await userEvent.keyboard('{Escape}'); // close Status dropdown
+    await userEvent.keyboard('{Escape}'); // close Drawer
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
-    // Enable past events so all four are visible
-    await userEvent.click(screen.getByRole('switch', { name: /include past events/i }));
     await waitFor(() => expect(screen.getByText('Missed Event')).toBeInTheDocument());
 
     const headings = screen.getAllByRole('heading', { level: 5 });
@@ -448,12 +477,15 @@ describe('Events Page - Event Ordering', () => {
 
     await waitFor(() => expect(screen.getByText('Future Event')).toBeInTheDocument());
 
-    // Switch to ascending sort
-    await userEvent.click(screen.getByRole('combobox'));
-    await userEvent.click(screen.getByRole('option', { name: 'Start Date (oldest)' }));
+    // Open drawer, switch to ascending sort, enable past events
+    await userEvent.click(screen.getByRole('button', { name: /filters/i }));
+    await userEvent.click(await screen.findByLabelText('Sort By'));
+    await userEvent.click(await screen.findByRole('option', { name: 'Start Date (oldest)' }));
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(await screen.findByLabelText('Status'));
+    await userEvent.click(await screen.findByRole('option', { name: /past/i }));
+    await userEvent.keyboard('{Escape}');
 
-    // Enable past events
-    await userEvent.click(screen.getByRole('switch', { name: /include past events/i }));
     await waitFor(() => expect(screen.getByText('Past Event')).toBeInTheDocument());
 
     const headings = screen.getAllByRole('heading', { level: 5 });
@@ -552,7 +584,7 @@ describe('Events Page - Event Ordering', () => {
     await waitFor(() => expect(screen.getByText('Upcoming Event')).toBeInTheDocument());
 
     // Enable past events to also show the early-started event
-    await userEvent.click(screen.getByRole('switch', { name: /include past events/i }));
+    await enableStatusFilters('past');
     await waitFor(() => expect(screen.getByText('Early Started Event')).toBeInTheDocument());
 
     const eventHeadings = screen.getAllByRole('heading', { level: 5 });
@@ -587,11 +619,286 @@ describe('Events Page - Event Ordering', () => {
     });
 
     // Enable past events to show the early-started event
-    await userEvent.click(screen.getByRole('switch', { name: /include past events/i }));
+    await enableStatusFilters('past');
     await waitFor(() => expect(screen.getByText('Early Started Event')).toBeInTheDocument());
 
     // Should show January 1 (startTime), not the scheduledTime
     expect(screen.getByText(/january 1/i)).toBeInTheDocument();
+  });
+});
+
+describe('Events Page - Filtering', () => {
+  const mockUserId = 'user-123';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (getConversation as jest.Mock).mockReset();
+    (useSessionJoin as jest.Mock).mockReturnValue({ userId: mockUserId });
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => [] });
+  });
+
+  const now = () => new Date();
+  const fromNow = (ms: number) => new Date(Date.now() + ms).toISOString();
+
+  const makeEvent = (overrides: object) => ({
+    id: 'ev',
+    name: 'Event',
+    active: false,
+    scheduledTime: null,
+    startTime: undefined,
+    endTime: undefined,
+    createdAt: new Date().toISOString(),
+    owner: mockUserId,
+    platformTypes: [],
+    type: { name: 'eventAssistant', label: 'Test Agent' },
+    eventUrls: { zoom: null, moderator: [], participant: [] },
+    ...overrides,
+  });
+
+  const setStatusFilter = async (...statuses: string[]) => {
+    await userEvent.click(screen.getByRole('button', { name: /filters/i }));
+    const drawer = await screen.findByRole('dialog');
+    // Remove all current status chips using Delete key while focused
+    for (const name of ['Active', 'Upcoming', 'Past', 'Missed']) {
+      const chip = within(drawer).queryByRole('button', { name: new RegExp(`^${name}$`) });
+      if (chip) {
+        chip.focus();
+        await userEvent.keyboard('{Delete}');
+      }
+    }
+    await waitFor(() =>
+      expect(within(drawer).queryAllByRole('button', { name: /^Active$|^Upcoming$|^Past$|^Missed$/i })).toHaveLength(0),
+    );
+    if (statuses.length > 0) {
+      const statusSelect = within(drawer).getByLabelText('Status');
+      await userEvent.click(statusSelect);
+      for (const status of statuses) {
+        await userEvent.click(await screen.findByRole('option', { name: new RegExp(`^${status}$`, 'i') }));
+      }
+      await userEvent.keyboard('{Escape}'); // close dropdown
+      await userEvent.keyboard('{Escape}'); // close drawer
+    } else {
+      // No dropdown was opened, close drawer directly via close button
+      await userEvent.click(screen.getByRole('button', { name: 'close-filters' }));
+    }
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  };
+
+  it('empty status filter shows all events', async () => {
+    const activeEvent = makeEvent({ id: 'a', name: 'Active Event', active: true, startTime: fromNow(-1000) });
+    const upcomingEvent = makeEvent({ id: 'b', name: 'Upcoming Event', scheduledTime: fromNow(86400000) });
+    const pastEvent = makeEvent({ id: 'c', name: 'Past Event', startTime: fromNow(-86400000), endTime: fromNow(-3600000) });
+
+    (Request as jest.Mock).mockResolvedValue([activeEvent, upcomingEvent, pastEvent]);
+    (getConversation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve({ a: activeEvent, b: upcomingEvent, c: pastEvent }[id]),
+    );
+
+    await act(async () => {
+      render(<EventsPage authType="user" />);
+    });
+    await waitFor(() => expect(screen.getByText('Active Event')).toBeInTheDocument());
+
+    await setStatusFilter(); // no statuses = clear all = show all
+
+    await waitFor(() => {
+      expect(screen.getByText('Active Event')).toBeInTheDocument();
+      expect(screen.getByText('Upcoming Event')).toBeInTheDocument();
+      expect(screen.getByText('Past Event')).toBeInTheDocument();
+    });
+  });
+
+  it('active-only filter hides upcoming and past events', async () => {
+    const activeEvent = makeEvent({ id: 'a', name: 'Active Event', active: true, startTime: fromNow(-1000) });
+    const upcomingEvent = makeEvent({ id: 'b', name: 'Upcoming Event', scheduledTime: fromNow(86400000) });
+    const pastEvent = makeEvent({ id: 'c', name: 'Past Event', startTime: fromNow(-86400000), endTime: fromNow(-3600000) });
+
+    (Request as jest.Mock).mockResolvedValue([activeEvent, upcomingEvent, pastEvent]);
+    (getConversation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve({ a: activeEvent, b: upcomingEvent, c: pastEvent }[id]),
+    );
+
+    await act(async () => {
+      render(<EventsPage authType="user" />);
+    });
+    await waitFor(() => expect(screen.getByText('Active Event')).toBeInTheDocument());
+
+    await setStatusFilter('active');
+
+    await waitFor(() => expect(screen.queryByText('Upcoming Event')).not.toBeInTheDocument());
+    expect(screen.getByText('Active Event')).toBeInTheDocument();
+    expect(screen.queryByText('Past Event')).not.toBeInTheDocument();
+  });
+
+  it('past-only filter shows only past events', async () => {
+    const activeEvent = makeEvent({ id: 'a', name: 'Active Event', active: true, startTime: fromNow(-1000) });
+    const pastEvent = makeEvent({ id: 'c', name: 'Past Event', startTime: fromNow(-86400000), endTime: fromNow(-3600000) });
+
+    (Request as jest.Mock).mockResolvedValue([activeEvent, pastEvent]);
+    (getConversation as jest.Mock).mockImplementation((id: string) => Promise.resolve({ a: activeEvent, c: pastEvent }[id]));
+
+    await act(async () => {
+      render(<EventsPage authType="user" />);
+    });
+    await waitFor(() => expect(screen.getByText('Active Event')).toBeInTheDocument());
+
+    await setStatusFilter('past');
+
+    await waitFor(() => expect(screen.getByText('Past Event')).toBeInTheDocument());
+    expect(screen.queryByText('Active Event')).not.toBeInTheDocument();
+  });
+
+  it('missed-only filter shows events with no start and no end time', async () => {
+    const missedEvent = makeEvent({ id: 'a', name: 'Missed Event', scheduledTime: fromNow(-86400000) });
+    const upcomingEvent = makeEvent({ id: 'b', name: 'Upcoming Event', scheduledTime: fromNow(86400000) });
+
+    (Request as jest.Mock).mockResolvedValue([missedEvent, upcomingEvent]);
+    (getConversation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve({ a: missedEvent, b: upcomingEvent }[id]),
+    );
+
+    await act(async () => {
+      render(<EventsPage authType="user" />);
+    });
+    await waitFor(() => expect(screen.getByText('Upcoming Event')).toBeInTheDocument());
+
+    await setStatusFilter('missed');
+
+    await waitFor(() => expect(screen.getByText('Missed Event')).toBeInTheDocument());
+    expect(screen.queryByText('Upcoming Event')).not.toBeInTheDocument();
+  });
+
+  it('my events only hides events owned by other users', async () => {
+    const myEvent = makeEvent({ id: 'a', name: 'Owned Event', scheduledTime: fromNow(86400000), owner: mockUserId });
+    const otherEvent = makeEvent({
+      id: 'b',
+      name: 'Other User Event',
+      scheduledTime: fromNow(86400000),
+      owner: 'other-user',
+    });
+
+    (Request as jest.Mock).mockResolvedValue([myEvent, otherEvent]);
+    (getConversation as jest.Mock).mockImplementation((id: string) => Promise.resolve({ a: myEvent, b: otherEvent }[id]));
+
+    await act(async () => {
+      render(<EventsPage authType="user" />);
+    });
+    await waitFor(() => expect(screen.getByText('Owned Event')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: /filters/i }));
+    await userEvent.click(await screen.findByText('My events only'));
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    await waitFor(() => expect(screen.queryByText('Other User Event')).not.toBeInTheDocument());
+    expect(screen.getByText('Owned Event')).toBeInTheDocument();
+  });
+
+  it('my events only combined with status filter shows only my events of that status', async () => {
+    const myUpcoming = makeEvent({ id: 'a', name: 'My Upcoming', scheduledTime: fromNow(86400000), owner: mockUserId });
+    const otherUpcoming = makeEvent({
+      id: 'b',
+      name: 'Other Upcoming',
+      scheduledTime: fromNow(86400000),
+      owner: 'other-user',
+    });
+    const myActive = makeEvent({ id: 'c', name: 'My Active', active: true, startTime: fromNow(-1000), owner: mockUserId });
+
+    (Request as jest.Mock).mockResolvedValue([myUpcoming, otherUpcoming, myActive]);
+    (getConversation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve({ a: myUpcoming, b: otherUpcoming, c: myActive }[id]),
+    );
+
+    await act(async () => {
+      render(<EventsPage authType="user" />);
+    });
+    await waitFor(() => expect(screen.getByText('My Upcoming')).toBeInTheDocument());
+
+    // Enable my events only and set status to upcoming only
+    await userEvent.click(screen.getByRole('button', { name: /filters/i }));
+    const drawer = await screen.findByRole('dialog');
+    await userEvent.click(within(drawer).getByText('My events only'));
+    // Remove active chip via Delete key
+    const activeChip = within(drawer).getByRole('button', { name: /^Active$/i });
+    activeChip.focus();
+    await userEvent.keyboard('{Delete}');
+    await waitFor(() => expect(within(drawer).queryByRole('button', { name: /^Active$/i })).not.toBeInTheDocument());
+    await userEvent.click(within(drawer).getByRole('button', { name: 'close-filters' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    await waitFor(() => expect(screen.queryByText('Other Upcoming')).not.toBeInTheDocument());
+    expect(screen.getByText('My Upcoming')).toBeInTheDocument();
+    expect(screen.queryByText('My Active')).not.toBeInTheDocument();
+  });
+
+  it('Load More button is hidden when all filtered results are loaded', async () => {
+    const events = Array.from({ length: 3 }, (_, i) =>
+      makeEvent({ id: `ev-${i}`, name: `Event ${i}`, scheduledTime: fromNow(86400000 * (i + 1)) }),
+    );
+
+    (Request as jest.Mock).mockResolvedValue(events);
+    (getConversation as jest.Mock).mockImplementation((id: string) => Promise.resolve(events.find((e: any) => e.id === id)));
+
+    await act(async () => {
+      render(<EventsPage authType="user" />);
+    });
+    await waitFor(() => expect(screen.getByText('Event 0')).toBeInTheDocument());
+
+    expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument();
+  });
+
+  it('filter drawer shows From and To date range fields', async () => {
+    (Request as jest.Mock).mockResolvedValue([]);
+
+    await act(async () => {
+      render(<EventsPage authType="user" />);
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: /filters/i }));
+
+    const drawer = await screen.findByRole('dialog');
+    expect(within(drawer).getAllByText('From').length).toBeGreaterThan(0);
+    expect(within(drawer).getAllByText('To').length).toBeGreaterThan(0);
+
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('reset button restores default filters and sort', async () => {
+    const activeEvent = makeEvent({
+      id: 'a',
+      name: 'Active Event',
+      active: true,
+      startTime: fromNow(-1000),
+      owner: mockUserId,
+    });
+    const pastEvent = makeEvent({ id: 'b', name: 'Past Event', startTime: fromNow(-86400000), endTime: fromNow(-3600000) });
+
+    (Request as jest.Mock).mockResolvedValue([activeEvent, pastEvent]);
+    (getConversation as jest.Mock).mockImplementation((id: string) => Promise.resolve({ a: activeEvent, b: pastEvent }[id]));
+
+    await act(async () => {
+      render(<EventsPage authType="user" />);
+    });
+    await waitFor(() => expect(screen.getByText('Active Event')).toBeInTheDocument());
+
+    // Change filters: enable past, enable my events only, change sort
+    await userEvent.click(screen.getByRole('button', { name: /filters/i }));
+    const statusSelect = await screen.findByLabelText('Status');
+    await userEvent.click(statusSelect);
+    await userEvent.click(await screen.findByRole('option', { name: /^past$/i }));
+    await userEvent.keyboard('{Escape}'); // close Status dropdown
+    await userEvent.click(await screen.findByText('My events only'));
+    await userEvent.click(await screen.findByLabelText('Sort By'));
+    await userEvent.click(await screen.findByRole('option', { name: /status/i }));
+    // Sort By dropdown closes on selection; click Reset while drawer is still open
+    await userEvent.click(await screen.findByRole('button', { name: /reset/i }));
+    await userEvent.keyboard('{Escape}'); // close drawer
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // Past event should no longer be visible (back to active/upcoming only)
+    await waitFor(() => expect(screen.getByText('Active Event')).toBeInTheDocument());
+    expect(screen.queryByText('Past Event')).not.toBeInTheDocument();
   });
 });
 
@@ -605,13 +912,22 @@ describe('Events Page - Missed badge', () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => [] });
   });
 
-  const renderWithEvent = async (event: object) => {
+  const renderWithEvent = async (event: object, statuses = ['past', 'missed']) => {
     (Request as jest.Mock).mockResolvedValue([event]);
     (getConversation as jest.Mock).mockResolvedValue(event);
     await act(async () => {
       render(<EventsPage authType={'user'} />);
     });
-    await userEvent.click(screen.getByRole('switch', { name: /include past events/i }));
+    // Open filter drawer and enable the relevant statuses
+    await userEvent.click(screen.getByRole('button', { name: /filters/i }));
+    const statusSelect = await screen.findByLabelText('Status');
+    await userEvent.click(statusSelect);
+    for (const status of statuses) {
+      await userEvent.click(await screen.findByRole('option', { name: new RegExp(status, 'i') }));
+    }
+    await userEvent.keyboard('{Escape}'); // close dropdown
+    await userEvent.keyboard('{Escape}'); // close drawer
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   };
 
   it('shows Missed badge for a scheduled event whose time has passed and never started', async () => {
@@ -628,7 +944,7 @@ describe('Events Page - Missed badge', () => {
       eventUrls: { zoom: null, moderator: [], participant: [] },
     });
     await waitFor(() => expect(screen.getByText('Missed Scheduled Event')).toBeInTheDocument());
-    expect(screen.getByText('Missed')).toBeInTheDocument();
+    expect(document.querySelector('.bg-yellow-100')).toBeInTheDocument();
   });
 
   it('shows Missed badge for an event with no scheduledTime that never started', async () => {
@@ -645,20 +961,22 @@ describe('Events Page - Missed badge', () => {
       eventUrls: { zoom: null, moderator: [], participant: [] },
     });
     await waitFor(() => expect(screen.getByText('Unscheduled Failed Event')).toBeInTheDocument());
-    expect(screen.getByText('Missed')).toBeInTheDocument();
+    expect(document.querySelector('.bg-yellow-100')).toBeInTheDocument();
   });
 
   it('does not show Missed badge for an active event', async () => {
     const pastScheduled = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
-    (Request as jest.Mock).mockResolvedValue([{
-      id: 'active-event',
-      name: 'Active Event',
-      active: true,
-      scheduledTime: pastScheduled,
-      startTime: pastScheduled,
-      createdAt: pastScheduled,
-      owner: mockUserId,
-    }]);
+    (Request as jest.Mock).mockResolvedValue([
+      {
+        id: 'active-event',
+        name: 'Active Event',
+        active: true,
+        scheduledTime: pastScheduled,
+        startTime: pastScheduled,
+        createdAt: pastScheduled,
+        owner: mockUserId,
+      },
+    ]);
     (getConversation as jest.Mock).mockResolvedValue({
       id: 'active-event',
       name: 'Active Event',
@@ -671,7 +989,9 @@ describe('Events Page - Missed badge', () => {
       type: { name: 'eventAssistant', label: 'Test Agent' },
       eventUrls: { zoom: null, moderator: [], participant: [] },
     });
-    await act(async () => { render(<EventsPage authType={'user'} />); });
+    await act(async () => {
+      render(<EventsPage authType={'user'} />);
+    });
     await waitFor(() => expect(screen.getByText('Active Event')).toBeInTheDocument());
     expect(screen.queryByText('Missed')).not.toBeInTheDocument();
   });
@@ -692,19 +1012,21 @@ describe('Events Page - Missed badge', () => {
       eventUrls: { zoom: null, moderator: [], participant: [] },
     });
     await waitFor(() => expect(screen.getByText('Completed Event')).toBeInTheDocument());
-    expect(screen.queryByText('Missed')).not.toBeInTheDocument();
+    expect(document.querySelector('.bg-yellow-100')).not.toBeInTheDocument();
   });
 
   it('does not show Missed badge for an upcoming scheduled event', async () => {
     const futureTime = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
-    (Request as jest.Mock).mockResolvedValue([{
-      id: 'upcoming',
-      name: 'Upcoming Event',
-      active: false,
-      scheduledTime: futureTime,
-      createdAt: futureTime,
-      owner: mockUserId,
-    }]);
+    (Request as jest.Mock).mockResolvedValue([
+      {
+        id: 'upcoming',
+        name: 'Upcoming Event',
+        active: false,
+        scheduledTime: futureTime,
+        createdAt: futureTime,
+        owner: mockUserId,
+      },
+    ]);
     (getConversation as jest.Mock).mockResolvedValue({
       id: 'upcoming',
       name: 'Upcoming Event',
@@ -716,7 +1038,9 @@ describe('Events Page - Missed badge', () => {
       type: { name: 'eventAssistant', label: 'Test Agent' },
       eventUrls: { zoom: null, moderator: [], participant: [] },
     });
-    await act(async () => { render(<EventsPage authType={'user'} />); });
+    await act(async () => {
+      render(<EventsPage authType={'user'} />);
+    });
     await waitFor(() => expect(screen.getByText('Upcoming Event')).toBeInTheDocument());
     expect(screen.queryByText('Missed')).not.toBeInTheDocument();
   });
@@ -913,17 +1237,19 @@ describe('Events Page - Event Ownership', () => {
     });
 
     it('should use createdAt when startTime and scheduledTime are not available', async () => {
-      const createdDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago (past event)
+      const createdDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
       const inactiveEvent = {
         ...mockConversations[0],
         active: false,
         owner: mockUserId,
         scheduledTime: null,
+        startTime: undefined,
+        endTime: undefined,
         createdAt: createdDate.toISOString(),
       };
 
       (Request as jest.Mock).mockResolvedValue([inactiveEvent]);
-      (getConversation as jest.Mock).mockResolvedValueOnce({
+      (getConversation as jest.Mock).mockResolvedValue({
         ...inactiveEvent,
         platformTypes: availablePlatforms1,
         type: { label: 'Test Agent' },
@@ -934,8 +1260,30 @@ describe('Events Page - Event Ownership', () => {
         render(<EventsPage authType={'user'} />);
       });
 
-      // Enable "Include past events" toggle to show the missed event
-      await userEvent.click(screen.getByRole('switch', { name: /include past events/i }));
+      // Enable missed events via filter drawer
+      await userEvent.click(screen.getByRole('button', { name: /filters/i }));
+      const drawer = await screen.findByRole('dialog');
+      // Remove default Active and Upcoming chips before selecting Missed
+      for (const name of ['Active', 'Upcoming']) {
+        const chip = within(drawer).queryByRole('button', { name: new RegExp(`^${name}$`) });
+        if (chip) {
+          chip.focus();
+          await userEvent.keyboard('{Delete}');
+        }
+      }
+      await waitFor(() =>
+        expect(within(drawer).queryAllByRole('button', { name: /^Active$|^Upcoming$/i })).toHaveLength(0),
+      );
+      // Wait for the filter=[] re-fetch to complete (event becomes visible when status filter is empty)
+      await waitFor(() => expect(screen.getByText('Test Event 1')).toBeInTheDocument());
+      const statusSelect = within(drawer).getByLabelText('Status');
+      await userEvent.click(statusSelect);
+      await userEvent.click(await screen.findByRole('option', { name: /^missed$/i }));
+      act(() => statusSelect.focus()); // restore focus to select before closing
+      await userEvent.keyboard('{Escape}'); // close Select dropdown
+      await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument());
+      await userEvent.keyboard('{Escape}'); // close Drawer
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
       await waitFor(() => {
         expect(screen.getByText('Test Event 1')).toBeInTheDocument();
@@ -1087,7 +1435,7 @@ describe('Events Page - Admin Actions', () => {
     await act(async () => {
       render(<EventsPage authType="user" />);
     });
-    await waitFor(() => expect(screen.getByText('No upcoming events')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/No events found/i)).toBeInTheDocument());
     expect(screen.queryByLabelText('Edit event')).not.toBeInTheDocument();
   });
   it('does not show an edit button for a past inactive event that was previously started', async () => {
@@ -1098,8 +1446,13 @@ describe('Events Page - Admin Actions', () => {
       render(<EventsPage authType="user" />);
     });
 
-    const includePastSwitch = screen.getByRole('switch', { name: /include past events/i });
-    await userEvent.click(includePastSwitch);
+    // Enable past events via filter drawer
+    await userEvent.click(screen.getByRole('button', { name: /filters/i }));
+    await userEvent.click(await screen.findByLabelText('Status'));
+    await userEvent.click(await screen.findByRole('option', { name: /past/i }));
+    await userEvent.keyboard('{Escape}'); // close Select dropdown
+    await userEvent.keyboard('{Escape}'); // close Drawer
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
     await waitFor(() => expect(screen.getByText('Editable Event')).toBeInTheDocument());
 

@@ -24,6 +24,11 @@ import {
   ListItemIcon,
   ListItemText,
   Select,
+  Drawer,
+  FormControl,
+  InputLabel,
+  Chip,
+  Box,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EventIcon from '@mui/icons-material/Event';
@@ -35,6 +40,11 @@ import DownloadIcon from '@mui/icons-material/Download';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import StopIcon from '@mui/icons-material/Stop';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { CloseSharp, FilterListSharp } from '@mui/icons-material';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
 import { components } from '../../types';
 import { AuthType, Conversation, ErrorMessage } from '../../types.internal';
 import { SendData } from '../../utils/Helpers';
@@ -472,18 +482,26 @@ function EventScreen({ authType }: { authType: AuthType }) {
   // Get userId from session
   const { userId } = useSessionJoin();
 
-  const [conversationsList, setConversationsList] = useState<components['schemas']['Conversation'][]>();
+  const [conversationsCount, setConversationsCount] = useState<number>(0);
+  const [filteredRefCount, setFilteredRefCount] = useState<number>(0);
   const [loadedConversations, setLoadedConversations] = useState<Conversation[]>([]);
+  const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [eventsShown, setEventsShown] = useState(6);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [includePast, setIncludePast] = useState(false);
   const [myEventsOnly, setMyEventsOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOptions>(SortOptions.StartTimeDesc);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [statusFilters, setStatusFilters] = useState<string[]>(['active', 'upcoming']);
+
+  const [startDateFilter, setStartDateFilter] = useState<Date | null>(null);
+  const [endDateFilter, setEndDateFilter] = useState<Date | null>(null);
+  const [startDateDisplay, setStartDateDisplay] = useState<dayjs.Dayjs | null>(null);
+  const [endDateDisplay, setEndDateDisplay] = useState<dayjs.Dayjs | null>(null);
   const allConversationsRef = useRef<components['schemas']['Conversation'][] | null>(null);
 
-  const sortConversations = (list: components['schemas']['Conversation'][]) => {
+  const sortConversations = <T extends components['schemas']['Conversation']>(list: T[]) => {
     const now = new Date();
     return [...list].sort((a, b) => {
       if (sortBy === SortOptions.Status) {
@@ -516,33 +534,37 @@ function EventScreen({ authType }: { authType: AuthType }) {
   });
   const [eventErrorMessage, setEventErrorMessage] = useState<string | null>(null);
 
-  /**
-   * Filter conversations based on whether to include past events and owner
-   * @param includePast true to include all events, false for only active/future
-   * @param myEventsOnly true to show only events owned by current user
-   */
-  const filterConversations = (
-    conversations: components['schemas']['Conversation'][],
-    includePast: boolean,
-    myEventsOnly: boolean = false,
-  ) => {
+  const handleClearFilters = () => {
+    setStatusFilters(['active', 'upcoming']);
+
+    setStartDateFilter(null);
+    setEndDateFilter(null);
+    setStartDateDisplay(null);
+    setEndDateDisplay(null);
+    setMyEventsOnly(false);
+    setSortBy(SortOptions.StartTimeDesc);
+  };
+
+  const applyFilters = <T extends components['schemas']['Conversation']>(conversations: T[]) => {
+    const now = new Date();
     return conversations.filter((conv) => {
-      // Filter by owner if myEventsOnly is enabled
       if (myEventsOnly && conv.owner !== userId) return false;
+      if (statusFilters.length === 0) return true;
 
-      // Always show active events
-      if (conv.active) return true;
+      const eventTime = new Date(conv.startTime ?? conv.scheduledTime ?? conv.createdAt!);
+      if (startDateFilter && eventTime < startDateFilter) return false;
+      if (endDateFilter && eventTime > endDateFilter) return false;
 
-      // For inactive events, endTime being set means it completed
-      if (conv.endTime) return includePast;
-
-      // Not yet started — show if scheduled in the future
-      if (conv.scheduledTime && new Date(conv.scheduledTime) > new Date()) return true;
-
-      // Scheduled but window passed without starting (auto-start edge case), treat as past
-      return includePast;
+      if (conv.active) return statusFilters.includes('active');
+      if (conv.scheduledTime && new Date(conv.scheduledTime) > now) return statusFilters.includes('upcoming');
+      if (conv.endTime) return statusFilters.includes('past');
+      return statusFilters.includes('missed');
     });
   };
+
+  // Returns the full ref list pre-filtered and sorted for the current filter/sort state.
+  // Used as the fetch source so pagination and initial load always pull the right events.
+  const getFilteredRef = () => sortConversations(applyFilters(allConversationsRef.current ?? []));
 
   /**
    * Handle deletion of an event
@@ -551,17 +573,15 @@ function EventScreen({ authType }: { authType: AuthType }) {
   const handleDelete = async (id: string) => {
     setLoadedConversations((prev) => prev.filter((conv) => conv.id !== id));
 
-    const newList = conversationsList?.filter((conv) => conv.id !== id) ?? [];
-    setConversationsList(newList);
-
     if (allConversationsRef.current) {
       allConversationsRef.current = allConversationsRef.current.filter((conv) => conv.id !== id);
-    }
+      setConversationsCount(allConversationsRef.current.length);
 
-    // Load the next event to fill the gap if one exists
-    if (newList.length > eventsShown - 1) {
-      const nextIndex = await fetchDetailedConversations(newList, eventsShown - 1, 1);
-      setEventsShown(nextIndex);
+      const filteredRef = getFilteredRef();
+      if (filteredRef.length > eventsShown - 1) {
+        const nextIndex = await fetchDetailedConversations(filteredRef, eventsShown - 1, 1);
+        setEventsShown(nextIndex);
+      }
     }
     setEventStatusChanged({ changed: true, message: 'Event deleted successfully.' });
   };
@@ -575,10 +595,8 @@ function EventScreen({ authType }: { authType: AuthType }) {
       if ('error' in data) return;
       const all = data as components['schemas']['Conversation'][];
       allConversationsRef.current = all;
-      const filtered = filterConversations(all, includePast, myEventsOnly);
-      const sorted = sortConversations(filtered);
-      setConversationsList(sorted);
-      const nextIndex = await fetchDetailedConversations(sorted, 0, eventsShown, true);
+      setConversationsCount(all.length);
+      const nextIndex = await fetchDetailedConversations(getFilteredRef(), 0, eventsShown, true);
       setEventsShown(nextIndex);
     } catch (err) {
       console.error('Failed to refresh conversations:', err);
@@ -635,7 +653,13 @@ function EventScreen({ authType }: { authType: AuthType }) {
           console.warn(`Conversation ${list[currentIndex + i].id} returned null`);
         }
       });
-      allValid.push(...batch.filter((conv): conv is Conversation => conv !== null));
+      allValid.push(
+        ...batch.filter((conv): conv is Conversation => {
+          if (!conv) return false;
+          if (replace) return true;
+          return !loadedConversations.some((loaded) => loaded.id === conv.id);
+        }),
+      );
       currentIndex += batchSize;
     }
 
@@ -660,75 +684,49 @@ function EventScreen({ authType }: { authType: AuthType }) {
         return;
       }
 
-      // Store raw response for tab switching
+      // Store full list for pagination and filter changes
       allConversationsRef.current = data;
+      setConversationsCount(data.length);
 
-      // Filter to only active/future events (not past)
-      const filtered = filterConversations(data, false, myEventsOnly);
-
-      const sorted = sortConversations(filtered);
-      setConversationsList(sorted);
-
-      // Load first 6 details
-      const nextIndex = await fetchDetailedConversations(sorted, 0, 6);
+      // Load first 6 matching the current filters/sort
+      const filteredRef = getFilteredRef();
+      setFilteredRefCount(filteredRef.length);
+      const nextIndex = await fetchDetailedConversations(filteredRef, 0, 6);
       setEventsShown(nextIndex);
       setIsInitialLoading(false);
     }
 
-    if (!conversationsList) fetchInitialConversations();
-  }, [conversationsList]);
+    if (!conversationsCount) fetchInitialConversations();
+  }, [conversationsCount]);
 
   const handleLoadMore = async () => {
-    if (!conversationsList || isLoadingMore) return;
-    if (eventsShown >= conversationsList.length) return;
+    if (!conversationsCount || isLoadingMore) return;
+    if (!allConversationsRef.current) return;
+    const filteredRef = getFilteredRef();
+    if (eventsShown >= filteredRef.length) return;
 
     setIsLoadingMore(true);
-
-    const nextIndex = await fetchDetailedConversations(conversationsList, eventsShown, 6);
+    const nextIndex = await fetchDetailedConversations(filteredRef, eventsShown, 6);
     setEventsShown(nextIndex);
     setIsLoadingMore(false);
   };
 
-  const handleToggle = async (include: boolean) => {
-    if (!allConversationsRef.current) return;
-    setIncludePast(include);
-    setIsInitialLoading(true);
-
-    // Filter based on whether to include past events
-    const filtered = filterConversations(allConversationsRef.current, include, myEventsOnly);
-
-    const sorted = sortConversations(filtered);
-    setConversationsList(sorted);
-
-    const nextIndex = await fetchDetailedConversations(sorted, 0, 6, true);
-    setEventsShown(nextIndex);
-    setIsInitialLoading(false);
-  };
-
-  const handleMyEventsToggle = async (showOnlyMine: boolean) => {
-    if (!allConversationsRef.current) return;
-    setMyEventsOnly(showOnlyMine);
-    setIsInitialLoading(true);
-
-    // Filter based on owner and past events settings
-    const filtered = filterConversations(allConversationsRef.current, includePast, showOnlyMine);
-
-    const sorted = sortConversations(filtered);
-    setConversationsList(sorted);
-
-    const nextIndex = await fetchDetailedConversations(sorted, 0, 6, true);
-    setEventsShown(nextIndex);
-    setIsInitialLoading(false);
-  };
-
+  // Re-fetch from the filtered+sorted ref whenever filter or sort state changes.
   useEffect(() => {
     if (!allConversationsRef.current) return;
-    const filtered = filterConversations(allConversationsRef.current, includePast, myEventsOnly);
-    const sorted = sortConversations(filtered);
-    setConversationsList(sorted);
     setIsInitialLoading(true);
-    fetchDetailedConversations(sorted, 0, eventsShown, true).then(() => setIsInitialLoading(false));
-  }, [sortBy]);
+    const filteredRef = getFilteredRef();
+    setFilteredRefCount(filteredRef.length);
+    fetchDetailedConversations(filteredRef, 0, 6, true).then((nextIndex) => {
+      setEventsShown(nextIndex);
+      setIsInitialLoading(false);
+    });
+  }, [myEventsOnly, statusFilters, startDateFilter, endDateFilter, sortBy]);
+
+  // Derive the render list from whatever is currently loaded.
+  useEffect(() => {
+    setFilteredConversations(sortConversations(applyFilters(loadedConversations)));
+  }, [loadedConversations]);
 
   return (
     <>
@@ -750,42 +748,121 @@ function EventScreen({ authType }: { authType: AuthType }) {
           <Typography color="error">{errorMessage}</Typography>
         ) : (
           <div className="w-3/4 space-y-6">
-            <div className="flex flex-wrap justify-end items-center gap-2">
-              <div className="flex items-center bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-3 py-1">
-                <Select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortOptions)}
-                  variant="standard"
-                  disableUnderline
-                  sx={{
-                    fontSize: '0.75rem',
-                    color: 'text.secondary',
-                    maxWidth: 160,
-                    '& .MuiSelect-select': { overflow: 'hidden', textOverflow: 'ellipsis' },
-                    '& .MuiSelect-icon': { color: 'text.secondary' },
-                  }}
-                >
-                  <MenuItem value={SortOptions.StartTimeDesc}>Start Date (newest)</MenuItem>
-                  <MenuItem value={SortOptions.StartTime}>Start Date (oldest)</MenuItem>
-                  <MenuItem value={SortOptions.CreatedAtDesc}>Created Date (newest)</MenuItem>
-                  <MenuItem value={SortOptions.CreatedAt}>Created Date (oldest)</MenuItem>
-                  <MenuItem value={SortOptions.Status}>Status</MenuItem>
-                </Select>
-              </div>
-              <label className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-3 py-1 cursor-pointer">
-                <span className="text-xs text-gray-500 select-none">My events only</span>
-                <Switch
-                  checked={myEventsOnly}
-                  onChange={(e) => handleMyEventsToggle(e.target.checked)}
-                  size="small"
-                  sx={{ m: 0 }}
-                />
-              </label>
-              <label className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full px-3 py-1 cursor-pointer">
-                <span className="text-xs text-gray-500 select-none">Include past events</span>
-                <Switch checked={includePast} onChange={(e) => handleToggle(e.target.checked)} size="small" sx={{ m: 0 }} />
-              </label>
+            <div className="flex justify-end">
+              <Button startIcon={<FilterListSharp />} onClick={() => setFiltersOpen(true)}>
+                Filters
+              </Button>
             </div>
+
+            <Drawer
+              anchor="right"
+              open={filtersOpen}
+              onClose={() => setFiltersOpen(false)}
+              slotProps={{ paper: { sx: { width: 360 } } }}
+            >
+              <div className="flex flex-col gap-6 p-6">
+                <div className="flex justify-between items-center">
+                  <Typography variant="h6">Filters & Sorting</Typography>
+                  <IconButton aria-label="close-filters" onClick={() => setFiltersOpen(false)} size="small">
+                    <CloseSharp />
+                  </IconButton>
+                </div>
+
+                <FormControl fullWidth>
+                  <InputLabel id="sort-by-label">Sort By</InputLabel>
+                  <Select
+                    labelId="sort-by-label"
+                    value={sortBy}
+                    label="Sort By"
+                    onChange={(e) => setSortBy(e.target.value as SortOptions)}
+                  >
+                    <MenuItem value={SortOptions.StartTimeDesc}>Start Date (newest)</MenuItem>
+                    <MenuItem value={SortOptions.StartTime}>Start Date (oldest)</MenuItem>
+                    <MenuItem value={SortOptions.CreatedAtDesc}>Created Date (newest)</MenuItem>
+                    <MenuItem value={SortOptions.CreatedAt}>Created Date (oldest)</MenuItem>
+                    <MenuItem value={SortOptions.Status}>Status</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth>
+                  <InputLabel id="status-filter-label">Status</InputLabel>
+                  <Select
+                    labelId="status-filter-label"
+                    multiple
+                    value={statusFilters}
+                    onChange={(e) => setStatusFilters(e.target.value as string[])}
+                    label="Status"
+                    renderValue={(selected) => (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {(selected as string[]).map((value) => (
+                          <Chip
+                            key={value}
+                            label={value.charAt(0).toUpperCase() + value.slice(1)}
+                            size="medium"
+                            onDelete={() => setStatusFilters((prev) => prev.filter((s) => s !== value))}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            sx={{ borderRadius: '6px', '& .MuiChip-deleteIcon': { fontSize: '14px' } }}
+                          />
+                        ))}
+                      </Box>
+                    )}
+                  >
+                    {!statusFilters.includes('active') && <MenuItem value="active">Active</MenuItem>}
+                    {!statusFilters.includes('upcoming') && <MenuItem value="upcoming">Upcoming</MenuItem>}
+                    {!statusFilters.includes('past') && <MenuItem value="past">Past</MenuItem>}
+                    {!statusFilters.includes('missed') && <MenuItem value="missed">Missed</MenuItem>}
+                  </Select>
+                </FormControl>
+
+                <div>
+                  <Typography variant="caption" className="text-gray-500">
+                    Date Range
+                  </Typography>
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <div className="flex gap-2 mt-1">
+                      <DateTimePicker
+                        label="From"
+                        value={startDateDisplay}
+                        onChange={(date) => {
+                          setStartDateDisplay(date);
+                          if (!date) setStartDateFilter(null);
+                        }}
+                        onAccept={(date) => setStartDateFilter(date?.toDate() ?? null)}
+                        views={['year', 'month', 'day']}
+                        maxDate={endDateDisplay ?? undefined}
+                        slotProps={{ field: { clearable: true } }}
+                      />
+                      <DateTimePicker
+                        label="To"
+                        value={endDateDisplay}
+                        onChange={(date) => {
+                          setEndDateDisplay(date);
+                          if (!date) setEndDateFilter(null);
+                        }}
+                        onAccept={(date) => setEndDateFilter(date ? date.endOf('day').toDate() : null)}
+                        views={['year', 'month', 'day']}
+                        minDate={startDateDisplay ?? undefined}
+                        slotProps={{ field: { clearable: true } }}
+                      />
+                    </div>
+                  </LocalizationProvider>
+                </div>
+
+                <Divider />
+
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="text-sm text-gray-600">My events only</span>
+                  <Switch checked={myEventsOnly} onChange={(e) => setMyEventsOnly(e.target.checked)} size="small" />
+                </label>
+
+                <div className="flex justify-end">
+                  <Button variant="outlined" onClick={handleClearFilters}>
+                    Reset
+                  </Button>
+                </div>
+              </div>
+            </Drawer>
+
             {isInitialLoading ? (
               // Show 6 skeleton cards while loading
               <>
@@ -795,11 +872,11 @@ function EventScreen({ authType }: { authType: AuthType }) {
               </>
             ) : (
               <>
-                {loadedConversations.length === 0 && !isInitialLoading ? (
+                {filteredConversations.length === 0 ? (
                   <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 flex flex-col items-center gap-3">
                     <EventIcon className="text-gray-400" style={{ fontSize: '40px' }} />
                     <Typography variant="body1" className="text-gray-500">
-                      {includePast ? 'No events' : 'No upcoming events'}
+                      No events found. Create your first event, or adjust your filters to see more.
                     </Typography>
                     <Button variant="outlined" onClick={() => router.push('/admin/events/new')}>
                       Create an event
@@ -807,7 +884,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
                   </div>
                 ) : (
                   <>
-                    {loadedConversations.map(
+                    {filteredConversations.map(
                       (event) =>
                         event && (
                           <EventCard
@@ -820,7 +897,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
                         ),
                     )}
 
-                    {conversationsList && eventsShown < conversationsList.length && (
+                    {filteredRefCount > 0 && eventsShown < filteredRefCount && (
                       <div className="flex justify-center mt-6 mb-6">
                         <Button variant="outlined" onClick={handleLoadMore} disabled={isLoadingMore}>
                           {isLoadingMore ? <CircularProgress size={20} /> : 'Load More'}
