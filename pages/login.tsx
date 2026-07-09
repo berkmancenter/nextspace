@@ -1,9 +1,16 @@
 import React, { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Alert, Box, Button, IconButton, InputAdornment, Link, Paper, Snackbar, TextField, Typography } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { Api, Authenticate } from '../utils';
 import SessionManager from '../utils/SessionManager';
+
+// Only allow same-app relative paths (a single leading slash, not a
+// protocol-relative or backslash-prefixed URL, and no scheme like
+// `javascript:` or `https:` before the first slash), so an attacker-supplied
+// redirectTo can't send a just-authenticated user to an external origin or
+// trigger a javascript: URI via router.push's external-URL fallback.
+const isSafeRedirect = (redirectTo: string | null): redirectTo is string => !!redirectTo && /^\/(?!\/|\\)/.test(redirectTo);
 
 /**
  * Login Page
@@ -20,6 +27,7 @@ export default function LoginPage() {
   const formRef = useRef<HTMLFormElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const handleTogglePasswordVisibility = () => {
     const cursorPosition = passwordRef.current?.selectionStart || null;
@@ -108,8 +116,10 @@ export default function LoginPage() {
 
       setFormSuccess(true);
 
-      // Redirect to events page after successful login
-      router.push('/admin/events');
+      // Send the user back to wherever they were headed (e.g. a link from an
+      // email), falling back to the events page for a plain login.
+      const redirectTo = searchParams.get('redirectTo');
+      router.push(isSafeRedirect(redirectTo) ? redirectTo : '/admin/events');
     } catch (error: any) {
       console.error('Login failed:', error);
       setFormError('An unexpected error occurred. Please try again later.');

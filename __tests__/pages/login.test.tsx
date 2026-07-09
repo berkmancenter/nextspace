@@ -7,10 +7,12 @@ import SessionManager from '../../utils/SessionManager';
 
 // Mock next/navigation
 const mockPush = jest.fn();
+let mockSearchParams = new URLSearchParams();
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
   }),
+  useSearchParams: () => mockSearchParams,
 }));
 
 // Mock utils
@@ -44,6 +46,7 @@ describe('LoginPage', () => {
     mockPush.mockReset();
     mockMarkAuthenticated.mockReset();
     (global.fetch as jest.Mock).mockReset();
+    mockSearchParams = new URLSearchParams();
   });
 
   it('renders the login form with all fields', () => {
@@ -176,6 +179,89 @@ describe('LoginPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Login successful!')).toBeInTheDocument();
     });
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/admin/events');
+    });
+  });
+
+  it('redirects to the redirectTo query param after successful login when present', async () => {
+    mockSearchParams = new URLSearchParams('redirectTo=/admin/conversation/view/abc123');
+    const user = userEvent.setup();
+    const mockLoginResponse = {
+      user: {
+        id: 'user123',
+        username: 'testuser',
+        pseudonyms: [
+          {
+            pseudonym: 'Intuitive Lyra',
+            active: true,
+          },
+        ],
+      },
+      tokens: {
+        access: { token: 'access-token-123' },
+        refresh: { token: 'refresh-token-456' },
+      },
+    };
+
+    (Authenticate as jest.Mock).mockResolvedValue(mockLoginResponse);
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ message: 'Successfully set cookie!' }),
+    });
+
+    render(<LoginPage />);
+
+    await user.type(screen.getByLabelText(/Username/i), 'testuser');
+    await user.type(document.querySelector('input[name="password"]')!, 'password123');
+
+    const submitButton = screen.getByRole('button', { name: /Login/i });
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/admin/conversation/view/abc123');
+    });
+  });
+
+  it.each([
+    ['https://evil.com', 'absolute URL on a different origin'],
+    ['javascript:alert(document.cookie)', 'javascript: URI'],
+    ['//evil.com', 'protocol-relative URL'],
+    ['/\\evil.com', 'backslash-prefixed URL'],
+  ])('falls back to /admin/events when redirectTo is unsafe (%s: %s)', async (unsafeRedirectTo) => {
+    mockSearchParams = new URLSearchParams({ redirectTo: unsafeRedirectTo });
+    const user = userEvent.setup();
+    const mockLoginResponse = {
+      user: {
+        id: 'user123',
+        username: 'testuser',
+        pseudonyms: [
+          {
+            pseudonym: 'Intuitive Lyra',
+            active: true,
+          },
+        ],
+      },
+      tokens: {
+        access: { token: 'access-token-123' },
+        refresh: { token: 'refresh-token-456' },
+      },
+    };
+
+    (Authenticate as jest.Mock).mockResolvedValue(mockLoginResponse);
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ message: 'Successfully set cookie!' }),
+    });
+
+    render(<LoginPage />);
+
+    await user.type(screen.getByLabelText(/Username/i), 'testuser');
+    await user.type(document.querySelector('input[name="password"]')!, 'password123');
+
+    const submitButton = screen.getByRole('button', { name: /Login/i });
+    await user.click(submitButton);
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith('/admin/events');
