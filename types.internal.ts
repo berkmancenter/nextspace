@@ -39,6 +39,13 @@ export type Conversation = components['schemas']['Conversation'] & {
   type: components['schemas']['ConversationType'];
   eventUrls: EventUrls;
   platformTypes?: components['schemas']['PlatformConfig'][];
+  /**
+   * True until every field required to run this conversation as a scheduled event is
+   * present and valid (llm_engine's conversation.service). Not yet in the generated
+   * schema because the backend branch that adds it (cj/draft-status) hasn't merged —
+   * remove this manual addition once types.ts is regenerated against a main that has it.
+   */
+  draft?: boolean;
 };
 
 /**
