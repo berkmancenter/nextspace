@@ -164,11 +164,8 @@ describe('EventStatus (pending state)', () => {
     it('lists only the Series row when every schedule and platform detail is filled in', () => {
       renderStatus({
         scheduledEndTime: '2026-08-01T17:30:00Z',
-        eventUrls: {
-          ...baseConversationData.eventUrls,
-          zoom: { label: 'Zoom', url: 'https://zoom.us/j/123456789' },
-        },
-      });
+        properties: { zoomMeetingUrl: 'https://zoom.us/j/123456789' },
+      } as Partial<Conversation>);
       expect(screen.getByText('Series')).toBeInTheDocument();
       expect(screen.queryByText('End time')).not.toBeInTheDocument();
       expect(screen.queryByText('Start time')).not.toBeInTheDocument();
@@ -180,13 +177,13 @@ describe('EventStatus (pending state)', () => {
       expect(screen.getByText('Platform & meeting link')).toBeInTheDocument();
     });
 
-    it('hides the Platform & meeting link row when a meeting link is configured', () => {
-      renderStatus({
-        eventUrls: {
-          ...baseConversationData.eventUrls,
-          zoom: { label: 'Zoom', url: 'https://zoom.us/j/123456789' },
-        },
-      });
+    it('shows the Platform & meeting link row when the meeting link is a non-Zoom placeholder', () => {
+      renderStatus({ properties: { zoomMeetingUrl: 'https://example.com' } } as Partial<Conversation>);
+      expect(screen.getByText('Platform & meeting link')).toBeInTheDocument();
+    });
+
+    it('hides the Platform & meeting link row when a valid Zoom link is configured', () => {
+      renderStatus({ properties: { zoomMeetingUrl: 'https://zoom.us/j/123456789' } } as Partial<Conversation>);
       expect(screen.queryByText('Platform & meeting link')).not.toBeInTheDocument();
     });
 
@@ -218,5 +215,139 @@ describe('EventStatus (pending state)', () => {
       await user.click(within(seriesRow).getByRole('button', { name: /dismiss/i }));
       expect(screen.queryByText('Series')).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('EventStatus (missed state)', () => {
+  // `now` sits an hour past the scheduled start, so a draft conversation derives to `missed`:
+  // past the 6-minute edit lockout, no longer startable.
+  const now = new Date('2026-08-01T10:00:00Z');
+  const pastScheduledTime = '2026-08-01T09:00:00Z';
+
+  const missedConversation = {
+    id: 'conv-missed',
+    name: 'Missed Event',
+    active: false,
+    draft: true,
+    slug: 'missed-event',
+    scheduledTime: pastScheduledTime,
+    owner: 'current-user-id',
+    eventUrls: {
+      moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/mod' }],
+      participant: [{ label: 'Participant link', url: 'http://localhost:8080/part' }],
+    },
+    type: { name: 'eventAssistant', label: 'Event Assistant', description: '', platforms: [], properties: [] },
+  } as unknown as Conversation;
+
+  const renderMissed = (overrides: Partial<Conversation> = {}, onJumpToSection = jest.fn()) => {
+    render(
+      <EventStatus conversationData={{ ...missedConversation, ...overrides }} now={now} onJumpToSection={onJumpToSection} />,
+    );
+    return { onJumpToSection };
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('shows the red "Didn\'t start" status pill', () => {
+    renderMissed();
+    expect(screen.getByText("Didn't start")).toBeInTheDocument();
+  });
+
+  it('offers a "Create a new event" action instead of Edit, and navigates to the schedule page', async () => {
+    const user = userEvent.setup();
+    renderMissed();
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /create a new event/i }));
+    expect(mockPush).toHaveBeenCalledWith('/admin/events/new');
+  });
+
+  it('shows a hint pointing the organizer to reschedule', () => {
+    renderMissed();
+    expect(screen.getByText(/was missed/i)).toBeInTheDocument();
+  });
+
+  it('renders the "did not start" overlay explaining the start passed', () => {
+    renderMissed();
+    expect(screen.getByText(/did not start/i)).toBeInTheDocument();
+    expect(screen.getByText(/can no longer be started/i)).toBeInTheDocument();
+  });
+
+  it('lists the required details that were never confirmed with their status', () => {
+    renderMissed();
+    expect(screen.getByText(/never confirmed/i)).toBeInTheDocument();
+    expect(screen.getByText('End time')).toBeInTheDocument();
+    expect(screen.getByText('Platform & meeting link')).toBeInTheDocument();
+    expect(screen.getByText('Not connected')).toBeInTheDocument();
+  });
+
+  it('does not list assistant configuration, which never blocks auto-start', () => {
+    renderMissed();
+    expect(screen.queryByText('Assistant configuration')).not.toBeInTheDocument();
+    expect(screen.queryByText('Using defaults')).not.toBeInTheDocument();
+  });
+
+  it('flags a present-but-invalid meeting link as needing review rather than connected', () => {
+    renderMissed({ properties: { zoomMeetingUrl: 'https://example.com' } } as Partial<Conversation>);
+    expect(screen.getByText('Platform & meeting link')).toBeInTheDocument();
+    expect(screen.getByText('Needs review')).toBeInTheDocument();
+  });
+
+  it('treats a valid Zoom link as confirmed, dropping it from the never-confirmed list', () => {
+    renderMissed({ properties: { zoomMeetingUrl: 'https://harvard.zoom.us/j/81244556677' } } as Partial<Conversation>);
+    expect(screen.queryByText('Platform & meeting link')).not.toBeInTheDocument();
+  });
+
+  it('drops a resolved detail from the never-confirmed list', () => {
+    renderMissed({ scheduledEndTime: '2026-08-01T09:30:00Z' } as Partial<Conversation>);
+    expect(screen.queryByText('End time')).not.toBeInTheDocument();
+  });
+
+  it('hides the never-confirmed banner entirely once every required detail is satisfied', () => {
+    renderMissed({
+      scheduledEndTime: '2026-08-01T09:30:00Z',
+      properties: { zoomMeetingUrl: 'https://zoom.us/j/123456789' },
+    } as Partial<Conversation>);
+    expect(screen.queryByText(/never confirmed/i)).not.toBeInTheDocument();
+    // The red "did not start" overlay still shows — only the checklist banner is conditional.
+    expect(screen.getByText(/did not start/i)).toBeInTheDocument();
+  });
+
+  it('jumps to the platform card when the flagged meeting-link row is clicked', async () => {
+    const user = userEvent.setup();
+    const { onJumpToSection } = renderMissed();
+    await user.click(screen.getByText('Platform & meeting link'));
+    expect(onJumpToSection).toHaveBeenCalledWith('plat-1a');
+  });
+
+  it('jumps to the schedule card when the flagged end-time row is clicked', async () => {
+    const user = userEvent.setup();
+    const { onJumpToSection } = renderMissed();
+    await user.click(screen.getByText('End time'));
+    expect(onJumpToSection).toHaveBeenCalledWith('sched-1a');
+  });
+
+  it('has no Dismiss action on the never-confirmed rows', () => {
+    renderMissed();
+    expect(screen.queryByRole('button', { name: /dismiss/i })).not.toBeInTheDocument();
+  });
+
+  it('does not render the pending "Almost ready" readiness banner', () => {
+    renderMissed();
+    expect(screen.queryByText(/almost ready/i)).not.toBeInTheDocument();
+  });
+
+  it('hides the moderator, participant, and zoom link chips, which point at a session that never happened', () => {
+    renderMissed({
+      eventUrls: {
+        moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/mod' }],
+        participant: [{ label: 'Participant link', url: 'http://localhost:8080/part' }],
+        zoom: { label: 'Zoom', url: 'https://zoom.us/j/1' },
+      },
+    } as Partial<Conversation>);
+    expect(screen.queryByRole('button', { name: /moderator link/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /participant link/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /zoom/i })).not.toBeInTheDocument();
   });
 });

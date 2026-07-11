@@ -1,12 +1,30 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
-import { ChevronRight, ContentCopyOutlined, OpenInNewOutlined, WarningAmberOutlined } from '@mui/icons-material';
+import {
+  AddOutlined,
+  ChevronRight,
+  ContentCopyOutlined,
+  OpenInNewOutlined,
+  WarningAmberOutlined,
+} from '@mui/icons-material';
 import { Conversation } from '../../types.internal';
-import { deriveEventState } from '../../utils/eventState';
+import { deriveEventState, isValidZoomUrl } from '../../utils/eventState';
 import SessionManager from '../../utils/SessionManager';
 
 const formatTime = (isoString?: string) =>
   isoString ? new Date(isoString).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+
+// Short date-time without seconds, e.g. "10/23/2025, 4:00 PM". Matches Details.tsx's format.
+const formatDateTime = (isoString?: string) =>
+  isoString
+    ? new Date(isoString).toLocaleString([], {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : '';
 
 /** Status pill styling per lifecycle state. `dot` renders a filled circle; `pulse` animates it (live). */
 const PILL_CONFIG = {
@@ -119,6 +137,7 @@ export const EventStatus: React.FC<{
 
   const state = deriveEventState(conversationData, now);
   const unconfirmed = state === 'pending' || state === 'missed';
+  const isMissed = state === 'missed';
   const pill = PILL_CONFIG[state];
 
   const userId = SessionManager.get().getSessionInfo()?.userId;
@@ -129,18 +148,41 @@ export const EventStatus: React.FC<{
   const participantUrl = conversationData.eventUrls.participant[0]?.url;
   const zoomUrl = conversationData.eventUrls.zoom?.url;
 
+  // The meeting link only counts as confirmed when it's a valid Zoom URL, matching the backend's
+  // draft check (llm_engine isConversationDraft). A placeholder like "example.com" is present but
+  // invalid, so it still blocks auto-start and must read as needs-review, not connected.
+  const meetingUrl = (conversationData.properties as any)?.zoomMeetingUrl as string | undefined;
+  const hasValidMeetingUrl = isValidZoomUrl(meetingUrl);
+
   const startTime = formatTime(conversationData.scheduledTime);
 
-  // Readiness rows for the pending banner: the Series (always, until dismissed) plus any actually
-  // missing detail. A field that's already filled in never appears here.
+  // Readiness rows for the pending banner: the Series (always, until dismissed) plus any detail that
+  // actually blocks auto-start. These mirror the backend's required fields (end time, valid meeting
+  // link); a field that's already valid never appears. Assistant configuration is intentionally
+  // absent: defaults are valid and never block auto-start.
   const checklistItems = [
     { key: 'series', label: 'Series', target: 'details-1a', dismissable: true, show: !seriesDismissed },
     { key: 'startTime', label: 'Start time', target: 'sched-1a', show: !conversationData.scheduledTime },
     { key: 'endTime', label: 'End time', target: 'sched-1a', show: !conversationData.scheduledEndTime },
-    { key: 'platform', label: 'Platform & meeting link', target: 'plat-1a', show: !zoomUrl },
+    { key: 'platform', label: 'Platform & meeting link', target: 'plat-1a', show: !hasValidMeetingUrl },
+  ].filter((item) => item.show);
+
+  // Retrospective list for the missed banner: the required details that were never satisfied before
+  // the start passed. Same rules as the pending checklist, so assistant defaults never appear here.
+  // A present-but-invalid meeting link reads as "Needs review"; an absent one as "Not connected".
+  const neverConfirmedItems = [
+    { key: 'endTime', label: 'End time', target: 'sched-1a', status: 'Not set', show: !conversationData.scheduledEndTime },
+    {
+      key: 'platform',
+      label: 'Platform & meeting link',
+      target: 'plat-1a',
+      status: meetingUrl ? 'Needs review' : 'Not connected',
+      show: !hasValidMeetingUrl,
+    },
   ].filter((item) => item.show);
 
   const handleEdit = () => router.push(`/admin/${conversationData.type.name}/edit/${conversationData.id}`);
+  const handleCreateNew = () => router.push('/admin/events/new');
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
@@ -156,10 +198,12 @@ export const EventStatus: React.FC<{
           {pill.label}
         </span>
 
-        <span className="h-[26px] w-px bg-[#EAE8F0]" />
+        {/* The links point at the live session, so they're pointless once an event is missed: hide
+            them (and their divider) rather than show dead, greyed-out chips. */}
+        {!isMissed && <span className="h-[26px] w-px bg-[#EAE8F0]" />}
 
         <div className="flex flex-1 flex-wrap items-center gap-2">
-          {moderatorUrl && (
+          {!isMissed && moderatorUrl && (
             <LinkChip
               label="Moderator link"
               url={moderatorUrl}
@@ -168,7 +212,7 @@ export const EventStatus: React.FC<{
               disabled={unconfirmed}
             />
           )}
-          {participantUrl && (
+          {!isMissed && participantUrl && (
             <LinkChip
               label="Participant link"
               url={participantUrl}
@@ -177,7 +221,7 @@ export const EventStatus: React.FC<{
               disabled={unconfirmed}
             />
           )}
-          {zoomUrl && (
+          {!isMissed && zoomUrl && (
             <LinkChip
               label="Zoom"
               url={zoomUrl}
@@ -188,16 +232,83 @@ export const EventStatus: React.FC<{
           )}
         </div>
 
-        {isOwner && (
-          <button
-            type="button"
-            onClick={handleEdit}
-            className="rounded-lg bg-[#4845D2] px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-[#3a37bf]"
-          >
-            Edit
-          </button>
-        )}
+        {isOwner &&
+          (state === 'missed' ? (
+            <button
+              type="button"
+              onClick={handleCreateNew}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#4845D2] px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-[#3a37bf]"
+            >
+              <AddOutlined fontSize="inherit" />
+              Create a new event
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleEdit}
+              className="rounded-lg bg-[#4845D2] px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-[#3a37bf]"
+            >
+              Edit
+            </button>
+          ))}
       </div>
+
+      {state === 'missed' && (
+        <>
+          <p className="flex items-center justify-end gap-1 text-[11.5px] text-[#7E6017]">
+            <WarningAmberOutlined fontSize="inherit" />
+            This event was missed. Create a new event to reschedule.
+          </p>
+
+          <div className="flex items-start gap-3 rounded-xl border border-[#EBB0B0] bg-[#FCEEEE] px-4 py-[15px]">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F7D9D9] text-[#B81E30]">
+              <WarningAmberOutlined fontSize="small" />
+            </span>
+            <div>
+              <p className="text-[14px] font-semibold text-[#0B0D0E]">This event did not start</p>
+              <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#7A4A4A]">
+                Its scheduled start ({formatDateTime(conversationData.scheduledTime)}) has passed with details still
+                unconfirmed, so it can no longer be started.
+              </p>
+            </div>
+          </div>
+
+          {neverConfirmedItems.length > 0 && (
+            <div className="rounded-[10px] border border-[#EAD9A6] bg-[#FDFAF0] p-[18px]">
+              <div className="flex items-start gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#FBF0D3] text-[#7E6017]">
+                  <WarningAmberOutlined fontSize="small" />
+                </span>
+                <div>
+                  <p className="text-[14px] font-semibold text-[#0B0D0E]">These details were never confirmed</p>
+                  <p className="mt-0.5 text-[12.5px] text-[#7E6017]">These carry over if you create a new event.</p>
+                </div>
+              </div>
+
+              <div className="mt-3">
+                {neverConfirmedItems.map((item) => (
+                  <button
+                    type="button"
+                    key={item.key}
+                    data-testid="never-confirmed-row"
+                    onClick={() => onJumpToSection?.(item.target)}
+                    className="flex w-full items-center justify-between gap-3 border-t border-[#EAD9A6] py-2.5 text-left first:border-t-0 hover:bg-[#FBF3DE]"
+                  >
+                    <span className="flex items-center gap-2">
+                      <WarningAmberOutlined fontSize="small" className="text-[#B8860B]" />
+                      <span className="text-[13.5px] font-semibold text-[#7E6017]">{item.label}</span>
+                    </span>
+                    <span className="flex items-center gap-1 text-[12px] font-medium text-[#8A8F99]">
+                      {item.status}
+                      <ChevronRight fontSize="small" />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       {state === 'pending' && (
         <>
