@@ -37,10 +37,9 @@ import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import dayjs from 'dayjs';
 import { useRouter } from 'next/router';
 import { Request } from '../utils';
-import { EventStatus } from './';
 import { components } from '../types';
 import { Conversation } from '../types.internal';
-import { createConversationFromData, Api, SendData, updateConversation } from '../utils/Helpers';
+import { Api, SendData, updateConversation } from '../utils/Helpers';
 import SessionManager from '../utils/SessionManager';
 import { NewTopicForm, NewTopicFormValues } from './NewTopicForm';
 
@@ -98,12 +97,9 @@ export const EventCreationForm: React.FC<{
   );
 
   const [dynamicPropertyValues, setDynamicPropertyValues] = useState<Record<string, any>>({});
-  const [formSubmitted, setFormSubmitted] = useState(false);
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [pdfUploadWarnings, setPdfUploadWarnings] = useState<string[]>([]);
-  const [conversationData, setConversationData] = useState<Conversation | null>(null);
 
   const [formGroupsErrors, setFormGroupsErrors] = useState({
     platforms: false,
@@ -199,6 +195,18 @@ export const EventCreationForm: React.FC<{
   };
 
   const navigateToEventsList = () => router.push('/admin/events');
+
+  /**
+   * Hand PDF-upload failures off to the view page we're about to redirect to. Stored in
+   * sessionStorage (not a query param) so filenames don't land in the URL; the view page reads
+   * and clears it on mount. Both create and edit redirect away, so there's no inline place to
+   * surface these otherwise.
+   */
+  const stashPdfWarnings = (failures: string[]) => {
+    if (failures.length > 0) {
+      sessionStorage.setItem('pdfUploadWarnings', JSON.stringify(failures));
+    }
+  };
 
   /* Converts a date string to UTC ISO so both sides of a dirty-check compare
      in the same format. The API may return dates with a timezone offset (e.g.
@@ -1120,7 +1128,10 @@ export const EventCreationForm: React.FC<{
        Matches local resources to response resources by title to get the resource ID,
        then POSTs each PDF to the resource endpoint. Collects any upload failures so
        they can be shown to the user without blocking navigation. */
-    const uploadPdfs = async (conversationId: string, responseResources: components['schemas']['Resource'][]) => {
+    const uploadPdfs = async (
+      conversationId: string,
+      responseResources: components['schemas']['Resource'][],
+    ): Promise<string[]> => {
       const resourcesWithPdf = resources
         .filter((r) => r.title.trim() !== '' && r.pdf)
         .flatMap((r) => {
@@ -1128,7 +1139,7 @@ export const EventCreationForm: React.FC<{
           return match?.id ? [{ pdf: r.pdf as File, resourceId: match.id }] : [];
         });
 
-      if (resourcesWithPdf.length === 0) return;
+      if (resourcesWithPdf.length === 0) return [];
 
       const uploadResults = await Promise.allSettled(
         resourcesWithPdf.map(({ pdf, resourceId }) => {
@@ -1141,14 +1152,10 @@ export const EventCreationForm: React.FC<{
         }),
       );
 
-      const failures = uploadResults
+      return uploadResults
         .map((result, i) => ({ result, name: resourcesWithPdf[i].pdf.name }))
         .filter(({ result }) => result.status === 'rejected' || (result.status === 'fulfilled' && result.value?.error))
         .map(({ name }) => name);
-
-      if (failures.length > 0) {
-        setPdfUploadWarnings(failures);
-      }
     };
 
     if (mode === 'edit' && initialEvent) {
@@ -1163,7 +1170,8 @@ export const EventCreationForm: React.FC<{
           const hasPdfs = resources.some((r) => r.title.trim() !== '' && r.pdf);
           if (hasPdfs) setSaveStatus('Uploading PDF...');
           // Upload PDFs for any resources with a file attached, same as create mode.
-          await uploadPdfs(data.id as string, (data as any).resources ?? []);
+          const failures = await uploadPdfs(data.id as string, (data as any).resources ?? []);
+          stashPdfWarnings(failures);
           navigateToView();
         })
         .catch((error: Error) => {
@@ -1195,13 +1203,13 @@ export const EventCreationForm: React.FC<{
         const hasPdfs = resources.some((r) => r.title.trim() !== '' && r.pdf);
         if (hasPdfs) setSaveStatus('Uploading PDF...');
         // Upload PDFs for any resources with a file attached.
-        await uploadPdfs(conversationId, responseResources);
+        const failures = await uploadPdfs(conversationId, responseResources);
+        stashPdfWarnings(failures);
 
         setSaveStatus(null);
-        createConversationFromData(data).then((conversation) => {
-          setConversationData(conversation);
-          setFormSubmitted(true);
-        });
+        // Land on the full event view page, the same destination as an edit save.
+        const typeName = (data as any).type?.name ?? (data as any).conversationType ?? selectedConvType;
+        router.push(`/admin/${typeName}/view/${conversationId}`);
       })
       .catch((error) => {
         console.error('Error sending data:', error);
@@ -1210,20 +1218,6 @@ export const EventCreationForm: React.FC<{
         setFormError(`Failed to send data. (${error.message})`);
       });
   };
-
-  if (formSubmitted && conversationData) {
-    return (
-      <>
-        {pdfUploadWarnings.length > 0 && (
-          <Alert severity="warning" sx={{ maxWidth: 800, mx: 'auto', mt: 4 }}>
-            The following PDFs could not be uploaded and will not be available as AI context:{' '}
-            <strong>{pdfUploadWarnings.join(', ')}</strong>. You can retry by editing the event.
-          </Alert>
-        )}
-        <EventStatus conversationData={conversationData} />
-      </>
-    );
-  }
 
   return (
     <>
