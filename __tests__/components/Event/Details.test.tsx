@@ -205,7 +205,7 @@ describe('EventDetails', () => {
       const header = screen.getByRole('button', { name: /Platform & format/ });
       expect(within(header).getByText('Needs attention')).toBeInTheDocument();
       expandSection('Platform & format');
-      expect(screen.getByText(/needs review/i)).toBeInTheDocument();
+      expect(screen.getByText(/not a valid zoom link/i)).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: /example\.com/ })).not.toBeInTheDocument();
     });
   });
