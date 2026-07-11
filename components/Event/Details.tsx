@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CloseOutlined, PublicOutlined, VisibilityOffOutlined, WarningAmberOutlined } from '@mui/icons-material';
 import { Conversation } from '../../types.internal';
-import { deriveEventState } from '../../utils/eventState';
+import { deriveEventState, isValidZoomUrl } from '../../utils/eventState';
 import { SectionCard } from './SectionCard';
 
 // Short date-time without seconds, e.g. "7/15/2026, 4:00 PM".
@@ -167,6 +167,9 @@ export const EventDetails: React.FC<{
   const properties = conversationData.properties ?? {};
   const zoomMeetingUrl =
     typeof (properties as any).zoomMeetingUrl === 'string' ? (properties as any).zoomMeetingUrl : undefined;
+  // A meeting link only counts as confirmed when it's a valid Zoom URL (same rule as the backend's
+  // draft check). A present-but-invalid value like "example.com" reads as needs-review, not a link.
+  const hasValidMeetingUrl = isValidZoomUrl(zoomMeetingUrl);
   const botName = typeof (properties as any).botName === 'string' ? (properties as any).botName : undefined;
   const llmModel = (properties as any).llmModel as { llmPlatform?: string; llmModel?: string } | undefined;
 
@@ -248,7 +251,7 @@ export const EventDetails: React.FC<{
         title="Platform & format"
         expanded={expanded['plat-1a']}
         onToggle={setSection('plat-1a')}
-        headerChip={!zoomMeetingUrl && !isLive && <NeedsAttentionChip />}
+        headerChip={!hasValidMeetingUrl && !isLive && <NeedsAttentionChip />}
       >
         <div className="grid grid-cols-3 gap-4">
           <div>
@@ -261,7 +264,7 @@ export const EventDetails: React.FC<{
           </div>
           <div>
             <FieldLabel>Meeting link</FieldLabel>
-            {zoomMeetingUrl ? (
+            {hasValidMeetingUrl ? (
               <a
                 href={zoomMeetingUrl}
                 target="_blank"
@@ -270,6 +273,8 @@ export const EventDetails: React.FC<{
               >
                 {stripProtocol(zoomMeetingUrl)}
               </a>
+            ) : zoomMeetingUrl ? (
+              <MissingValue>Not a valid Zoom link</MissingValue>
             ) : (
               <MissingValue>No meeting link yet</MissingValue>
             )}

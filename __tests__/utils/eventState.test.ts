@@ -1,4 +1,4 @@
-import { deriveEventState, EDIT_LOCKOUT_MS } from '../../utils/eventState';
+import { deriveEventState, EDIT_LOCKOUT_MS, isValidZoomUrl } from '../../utils/eventState';
 
 describe('deriveEventState', () => {
   const scheduledTime = new Date('2026-08-01T16:00:00Z');
@@ -40,5 +40,27 @@ describe('deriveEventState', () => {
   it('falls back to pending for a draft conversation with no scheduledTime', () => {
     const now = new Date('2026-08-01T15:00:00Z');
     expect(deriveEventState({ active: false, draft: true, scheduledTime: undefined }, now)).toBe('pending');
+  });
+});
+
+describe('isValidZoomUrl', () => {
+  it('accepts a zoom.us URL and its vanity subdomains', () => {
+    expect(isValidZoomUrl('https://zoom.us/j/123456789')).toBe(true);
+    expect(isValidZoomUrl('https://harvard.zoom.us/j/81244556677')).toBe(true);
+  });
+
+  it('rejects a well-formed URL on a non-Zoom host', () => {
+    expect(isValidZoomUrl('https://example.com')).toBe(false);
+  });
+
+  it('rejects a host that only ends in the literal "zoom.us" without a dot boundary', () => {
+    expect(isValidZoomUrl('https://notzoom.us/j/1')).toBe(false);
+  });
+
+  it('rejects an unparseable string, an empty string, and non-strings', () => {
+    expect(isValidZoomUrl('zoom.us/j/123')).toBe(false); // no scheme, new URL throws
+    expect(isValidZoomUrl('')).toBe(false);
+    expect(isValidZoomUrl(undefined)).toBe(false);
+    expect(isValidZoomUrl(null)).toBe(false);
   });
 });

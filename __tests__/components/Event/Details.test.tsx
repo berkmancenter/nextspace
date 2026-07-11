@@ -199,6 +199,15 @@ describe('EventDetails', () => {
       expandSection('Platform & format');
       expect(screen.getByText('No meeting link yet')).toBeInTheDocument();
     });
+
+    it('flags a present-but-invalid meeting link as needing review, with the Needs attention chip', () => {
+      renderAt({ ...baseConversationData, properties: { zoomMeetingUrl: 'https://example.com' } });
+      const header = screen.getByRole('button', { name: /Platform & format/ });
+      expect(within(header).getByText('Needs attention')).toBeInTheDocument();
+      expandSection('Platform & format');
+      expect(screen.getByText(/needs review/i)).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /example\.com/ })).not.toBeInTheDocument();
+    });
   });
 
   describe('Assistant configuration section', () => {
