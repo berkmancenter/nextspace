@@ -1,6 +1,8 @@
 export { Event } from './Event';
 export { EventCreationForm } from './EventCreationForm';
 export { EventStatus } from './Event/Status';
+export { EventDetails } from './Event/Details';
+export { SectionCard } from './Event/SectionCard';
 export { Header } from './Header';
 export { Layout } from './Layout';
 export { Logo } from './Logo';

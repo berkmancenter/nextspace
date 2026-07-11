@@ -37,6 +37,7 @@
   --color-neutral-900: #0b0d0e;
   --color-light-blue: #a5b4fc;
   --animate-slide-in: slideIn 0.5s ease-out forwards;
+  --animate-card-flash: cardFlash 1.3s ease-out;
 
   @keyframes rotate-bg {
     from {
@@ -44,6 +45,15 @@
     }
     to {
       transform: rotate(360deg);
+    }
+  }
+
+  @keyframes cardFlash {
+    0% {
+      background-color: #fbf3de;
+    }
+    100% {
+      background-color: #ffffff;
     }
   }
 
