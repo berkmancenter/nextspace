@@ -1,5 +1,14 @@
 @import 'tailwindcss';
 
+/* Tailwind v4's reset drops the browser default of cursor:pointer on buttons; restore it for enabled
+   buttons (disabled and aria-disabled ones keep the default arrow). In `base` so any cursor-* utility
+   still wins. */
+@layer base {
+  button:not(:disabled):not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+}
+
 /* Markdown content styling */
 .markdown-content {
   color: inherit;
