@@ -40,11 +40,22 @@ const PILL_CONFIG = {
   scheduled: { label: 'Scheduled', bg: '#EDE7F6', color: '#4845D2', dot: true },
 } as const;
 
+// Shared pill styling for operations-bar chips. Disabled chips dim and drop their hover affordance.
+const chipClassName = (disabled: boolean) =>
+  `inline-flex items-center gap-2 rounded-full border border-[#ECECEF] px-3 py-1 text-[12.5px] text-[#1F2937] ${
+    disabled ? 'cursor-default opacity-55' : 'hover:bg-[#F5F5F7]'
+  }`;
+
+// Status dot on a chip: neutral gray while unconfirmed, brand color once the event is confirmed.
+const ChipDot: React.FC<{ disabled: boolean; color: string }> = ({ disabled, color }) => (
+  <span data-testid="chip-dot" className="h-2 w-2 rounded-full" style={{ backgroundColor: disabled ? '#B0B0B8' : color }} />
+);
+
 /**
- * A copy-to-clipboard link chip in the operations bar. Disabled while the event is unconfirmed, since
- * its links aren't ready to share yet: the chip dims and its status dot goes neutral gray, only taking
- * on its brand color once the event is confirmed. Kept focusable via aria-disabled rather than the
- * native `disabled` attribute so assistive tech still announces the link exists.
+ * A copy-to-clipboard chip in the operations bar (moderator and participant links, which the
+ * organizer shares). Disabled while the event is unconfirmed, since its links aren't ready to share
+ * yet. Kept focusable via aria-disabled rather than the native `disabled` attribute so assistive
+ * tech still announces the link exists.
  */
 const LinkChip: React.FC<{
   label: string;
@@ -67,24 +78,41 @@ const LinkChip: React.FC<{
   };
 
   return (
-    <button
-      type="button"
-      aria-disabled={disabled}
-      onClick={handleCopy}
-      className={`inline-flex items-center gap-2 rounded-full border border-[#ECECEF] px-3 py-1 text-[12.5px] text-[#1F2937] ${
-        disabled ? 'cursor-default opacity-55' : 'hover:bg-[#F5F5F7]'
-      }`}
-    >
-      <span
-        data-testid="chip-dot"
-        className="h-2 w-2 rounded-full"
-        style={{ backgroundColor: disabled ? '#B0B0B8' : dotColor }}
-      />
+    <button type="button" aria-disabled={disabled} onClick={handleCopy} className={chipClassName(disabled)}>
+      <ChipDot disabled={disabled} color={dotColor} />
       {label}
       <span className="text-[#8A8F99]">{copied ? <span className="text-[11px]">Copied</span> : icon}</span>
     </button>
   );
 };
+
+/**
+ * A chip that opens a URL in a new tab, used for the Zoom meeting link so it launches the meeting
+ * rather than copying the URL. An anchor (not a button) so it's a real link for keyboard and
+ * assistive tech. While the event is unconfirmed it's inert: dimmed, aria-disabled, out of the tab
+ * order, and clicks suppressed, matching the copy chips' disabled treatment.
+ */
+const LaunchChip: React.FC<{
+  label: string;
+  url: string;
+  dotColor: string;
+  icon: React.ReactNode;
+  disabled: boolean;
+}> = ({ label, url, dotColor, icon, disabled }) => (
+  <a
+    href={url}
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-disabled={disabled}
+    tabIndex={disabled ? -1 : undefined}
+    onClick={disabled ? (event) => event.preventDefault() : undefined}
+    className={chipClassName(disabled)}
+  >
+    <ChipDot disabled={disabled} color={dotColor} />
+    {label}
+    <span className="text-[#8A8F99]">{icon}</span>
+  </a>
+);
 
 /**
  * A single readiness-checklist row in the pending banner. Clicking "Review" asks the parent page to
@@ -161,7 +189,7 @@ export const EventStatus: React.FC<{
   const hasValidMeetingUrl = isValidZoomUrl(meetingUrl);
 
   const startTime = formatTime(conversationData.scheduledTime);
-  const liveStartTime = formatTimeWithZone(conversationData.scheduledTime);
+  const startTimeWithZone = formatTimeWithZone(conversationData.scheduledTime);
 
   // The live banner and hint name the assistant. Reads the same botName as Details.tsx so the two
   // stay in sync, and uses "Berkie" when the conversation has no bot name set.
@@ -236,7 +264,7 @@ export const EventStatus: React.FC<{
             />
           )}
           {!isMissed && zoomUrl && (
-            <LinkChip
+            <LaunchChip
               label="Zoom"
               url={zoomUrl}
               dotColor="#0B6BCB"
@@ -363,7 +391,7 @@ export const EventStatus: React.FC<{
         <>
           <p className="flex items-center justify-end gap-1 text-[11.5px] text-[#0F7A4E]">
             <AccessTimeOutlined fontSize="inherit" />
-            Live since {liveStartTime}. {botName} is active.
+            Live since {startTimeWithZone}. {botName} is active.
           </p>
 
           <div className="flex items-start gap-3 rounded-[10px] border border-[#B7E4CD] bg-[#F1FBF6] p-[18px]">
@@ -373,8 +401,29 @@ export const EventStatus: React.FC<{
             <div>
               <p className="text-[14px] font-semibold text-[#0B0D0E]">This event is live</p>
               <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#3F6B54]">
-                All details were confirmed and the event started at {liveStartTime}. {botName} is active and answering
+                All details were confirmed and the event started at {startTimeWithZone}. {botName} is active and answering
                 audience questions.
+              </p>
+            </div>
+          </div>
+        </>
+      )}
+
+      {state === 'scheduled' && (
+        <>
+          <p className="flex items-center justify-end gap-1 text-[11.5px] text-[#0F7A4E]">
+            <CheckOutlined fontSize="inherit" />
+            All details confirmed. Starts {startTimeWithZone}.
+          </p>
+
+          <div className="flex items-start gap-3 rounded-[10px] border border-[#B7E4CD] bg-[#F1FBF6] p-[18px]">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#D9F2E5] text-[#0F7A4E]">
+              <CheckOutlined fontSize="small" />
+            </span>
+            <div>
+              <p className="text-[14px] font-semibold text-[#0B0D0E]">Ready to start, all details confirmed</p>
+              <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#3F6B54]">
+                Nothing left to fill in. This event starts {formatDateTime(conversationData.scheduledTime)}.
               </p>
             </div>
           </div>

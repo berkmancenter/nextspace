@@ -94,7 +94,7 @@ describe('EventStatus (pending state)', () => {
       });
       expect(screen.getByRole('button', { name: /moderator link/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /participant link/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /zoom/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /zoom/i })).toBeInTheDocument();
     });
 
     it('disables the link chips in the pending state', () => {
@@ -348,7 +348,7 @@ describe('EventStatus (missed state)', () => {
     } as Partial<Conversation>);
     expect(screen.queryByRole('button', { name: /moderator link/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /participant link/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /zoom/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /zoom/i })).not.toBeInTheDocument();
   });
 });
 
@@ -391,7 +391,15 @@ describe('EventStatus (live state)', () => {
     renderLive();
     expect(screen.getByRole('button', { name: /moderator link/i })).toHaveAttribute('aria-disabled', 'false');
     expect(screen.getByRole('button', { name: /participant link/i })).toHaveAttribute('aria-disabled', 'false');
-    expect(screen.getByRole('button', { name: /zoom/i })).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByRole('link', { name: /zoom/i })).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('opens the Zoom meeting in a new tab rather than copying it', () => {
+    renderLive();
+    const zoom = screen.getByRole('link', { name: /zoom/i });
+    expect(zoom).toHaveAttribute('href', 'https://harvard.zoom.us/j/81244556677');
+    expect(zoom).toHaveAttribute('target', '_blank');
+    expect(zoom).toHaveAttribute('rel', expect.stringContaining('noopener'));
   });
 
   it('uses brand-colored link-chip dots now that the event is confirmed', () => {
@@ -453,6 +461,89 @@ describe('EventStatus (live state)', () => {
 
   it('does not render the missed "did not start" content', () => {
     renderLive();
+    expect(screen.queryByText(/did not start/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/never confirmed/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('EventStatus (scheduled state)', () => {
+  // draft: false derives to `scheduled` (confirmed, upcoming) regardless of the clock.
+  const now = new Date('2026-08-01T10:00:00Z');
+  const scheduledTime = '2026-08-01T16:00:00Z';
+
+  const scheduledConversation = {
+    id: 'conv-scheduled',
+    name: 'Scheduled Event',
+    active: false,
+    draft: false,
+    slug: 'scheduled-event',
+    scheduledTime,
+    scheduledEndTime: '2026-08-01T17:30:00Z',
+    owner: 'current-user-id',
+    properties: { zoomMeetingUrl: 'https://harvard.zoom.us/j/81244556677' },
+    eventUrls: {
+      moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/mod' }],
+      participant: [{ label: 'Participant link', url: 'http://localhost:8080/part' }],
+      zoom: { label: 'Zoom', url: 'https://harvard.zoom.us/j/81244556677' },
+    },
+    type: { name: 'eventAssistant', label: 'Event Assistant', description: '', platforms: [], properties: [] },
+  } as unknown as Conversation;
+
+  const renderScheduled = (overrides: Partial<Conversation> = {}) => {
+    render(<EventStatus conversationData={{ ...scheduledConversation, ...overrides }} now={now} />);
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('shows the "Scheduled" status pill', () => {
+    renderScheduled();
+    expect(screen.getByText('Scheduled')).toBeInTheDocument();
+  });
+
+  it('renders the link chips as active', () => {
+    renderScheduled();
+    expect(screen.getByRole('button', { name: /moderator link/i })).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByRole('link', { name: /zoom/i })).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('uses brand-colored link-chip dots', () => {
+    renderScheduled();
+    const moderatorChip = screen.getByRole('button', { name: /moderator link/i });
+    expect(within(moderatorChip).getByTestId('chip-dot')).toHaveStyle({ backgroundColor: '#4845D2' });
+  });
+
+  it('offers an "Edit" action rather than "Create a new event"', () => {
+    renderScheduled();
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /create a new event/i })).not.toBeInTheDocument();
+  });
+
+  it('shows an all-details-confirmed hint with the local start time and zone', () => {
+    renderScheduled();
+    // Derive the expected zone abbreviation from the same instant in the test's own environment.
+    const tzLabel = new Intl.DateTimeFormat([], { timeZoneName: 'short' })
+      .formatToParts(new Date(scheduledTime))
+      .find((part) => part.type === 'timeZoneName')!.value;
+    // The heading also says "all details confirmed"; the hint is the one carrying the start time+zone.
+    const hint = screen.getAllByText(/all details confirmed/i).find((el) => el.textContent!.includes(tzLabel));
+    expect(hint).toBeDefined();
+  });
+
+  it('renders the "Ready to start" readiness banner', () => {
+    renderScheduled();
+    expect(screen.getByText(/ready to start/i)).toBeInTheDocument();
+    expect(screen.getByText(/nothing left to fill in/i)).toBeInTheDocument();
+  });
+
+  it('does not render the pending "Almost ready" readiness banner', () => {
+    renderScheduled();
+    expect(screen.queryByText(/almost ready/i)).not.toBeInTheDocument();
+  });
+
+  it('does not render the missed "did not start" content', () => {
+    renderScheduled();
     expect(screen.queryByText(/did not start/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/never confirmed/i)).not.toBeInTheDocument();
   });
