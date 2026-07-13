@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import {
+  AccessTimeOutlined,
   AddOutlined,
+  CheckOutlined,
   ChevronRight,
   ContentCopyOutlined,
   OpenInNewOutlined,
@@ -155,6 +157,13 @@ export const EventStatus: React.FC<{
   const hasValidMeetingUrl = isValidZoomUrl(meetingUrl);
 
   const startTime = formatTime(conversationData.scheduledTime);
+
+  // The live banner and hint name the assistant. Reads the same botName as Details.tsx so the two
+  // stay in sync, and uses "Berkie" when the conversation has no bot name set.
+  const botName =
+    typeof (conversationData.properties as any)?.botName === 'string'
+      ? (conversationData.properties as any).botName
+      : 'Berkie';
 
   // Readiness rows for the pending banner: the Series (always, until dismissed) plus any detail that
   // actually blocks auto-start. These mirror the backend's required fields (end time, valid meeting
@@ -340,6 +349,28 @@ export const EventStatus: React.FC<{
                   onDismiss={item.dismissable ? () => setSeriesDismissed(true) : undefined}
                 />
               ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {state === 'live' && (
+        <>
+          <p className="flex items-center justify-end gap-1 text-[11.5px] text-[#0F7A4E]">
+            <AccessTimeOutlined fontSize="inherit" />
+            Live since {startTime}. {botName} is active.
+          </p>
+
+          <div className="flex items-start gap-3 rounded-[10px] border border-[#B7E4CD] bg-[#F1FBF6] p-[18px]">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#D9F2E5] text-[#0F7A4E]">
+              <CheckOutlined fontSize="small" />
+            </span>
+            <div>
+              <p className="text-[14px] font-semibold text-[#0B0D0E]">This event is live</p>
+              <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#3F6B54]">
+                All details were confirmed and the event started at {startTime}. {botName} is active and answering audience
+                questions.
+              </p>
             </div>
           </div>
         </>

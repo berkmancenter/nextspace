@@ -351,3 +351,98 @@ describe('EventStatus (missed state)', () => {
     expect(screen.queryByRole('button', { name: /zoom/i })).not.toBeInTheDocument();
   });
 });
+
+describe('EventStatus (live state)', () => {
+  // `active: true` derives to `live` regardless of draft/schedule. scheduledTime is kept so the
+  // banner can report when the event started.
+  const now = new Date('2026-08-01T16:30:00Z');
+  const scheduledTime = '2026-08-01T16:00:00Z';
+
+  const liveConversation = {
+    id: 'conv-live',
+    name: 'Live Event',
+    active: true,
+    draft: false,
+    slug: 'live-event',
+    scheduledTime,
+    owner: 'current-user-id',
+    eventUrls: {
+      moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/mod' }],
+      participant: [{ label: 'Participant link', url: 'http://localhost:8080/part' }],
+      zoom: { label: 'Zoom', url: 'https://harvard.zoom.us/j/81244556677' },
+    },
+    type: { name: 'eventAssistant', label: 'Event Assistant', description: '', platforms: [], properties: [] },
+  } as unknown as Conversation;
+
+  const renderLive = (overrides: Partial<Conversation> = {}) => {
+    render(<EventStatus conversationData={{ ...liveConversation, ...overrides }} now={now} />);
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('shows the green "Live now" status pill', () => {
+    renderLive();
+    expect(screen.getByText('Live now')).toBeInTheDocument();
+  });
+
+  it('renders the moderator, participant, and zoom link chips as active', () => {
+    renderLive();
+    expect(screen.getByRole('button', { name: /moderator link/i })).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByRole('button', { name: /participant link/i })).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByRole('button', { name: /zoom/i })).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('uses brand-colored link-chip dots now that the event is confirmed', () => {
+    renderLive();
+    const moderatorChip = screen.getByRole('button', { name: /moderator link/i });
+    expect(within(moderatorChip).getByTestId('chip-dot')).toHaveStyle({ backgroundColor: '#4845D2' });
+  });
+
+  it('confirms with a "Copied" state when an active chip is clicked', async () => {
+    const user = userEvent.setup();
+    renderLive();
+    await user.click(screen.getByRole('button', { name: /moderator link/i }));
+    expect(await screen.findByText(/copied/i)).toBeInTheDocument();
+  });
+
+  it('offers an "Edit" action rather than "Create a new event"', () => {
+    renderLive();
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /create a new event/i })).not.toBeInTheDocument();
+  });
+
+  it('shows a live hint noting the assistant is active', () => {
+    renderLive();
+    expect(screen.getByText(/live since/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/is active/i).length).toBeGreaterThan(0);
+  });
+
+  it('renders the "This event is live" readiness banner', () => {
+    renderLive();
+    expect(screen.getByText(/this event is live/i)).toBeInTheDocument();
+    expect(screen.getByText(/answering audience questions/i)).toBeInTheDocument();
+  });
+
+  it('names the configured assistant in the live copy', () => {
+    renderLive({ properties: { botName: 'Athena' } } as Partial<Conversation>);
+    expect(screen.getAllByText(/athena/i).length).toBeGreaterThan(0);
+  });
+
+  it('falls back to "Berkie" when no bot name is configured', () => {
+    renderLive();
+    expect(screen.getAllByText(/berkie/i).length).toBeGreaterThan(0);
+  });
+
+  it('does not render the pending "Almost ready" readiness banner', () => {
+    renderLive();
+    expect(screen.queryByText(/almost ready/i)).not.toBeInTheDocument();
+  });
+
+  it('does not render the missed "did not start" content', () => {
+    renderLive();
+    expect(screen.queryByText(/did not start/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/never confirmed/i)).not.toBeInTheDocument();
+  });
+});
