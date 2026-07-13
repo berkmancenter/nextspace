@@ -42,3 +42,6 @@ types.ts
 
 # Local claude configs
 .claude/*
+
+# Sentry Config File
+.env.sentry-build-plugin
