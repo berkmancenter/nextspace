@@ -280,7 +280,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       socket.off('conversation:ending', conversationEndingHandler);
       socket.off('choice:new', pollChoiceHandler);
     };
-  }, [socket, resourcesNavBadgeDismissed, resources.length]);
+  }, [socket, socket?.connected, resourcesNavBadgeDismissed, resources.length]);
 
   // Keep activeTabRef in sync with activeTab state
   useEffect(() => {
