@@ -198,6 +198,8 @@ export const EventCreationForm: React.FC<{
     router.push(`/admin/${typeName}/view/${initialEvent?.id}`);
   };
 
+  const navigateToEventsList = () => router.push('/admin/events');
+
   /* Converts a date string to UTC ISO so both sides of a dirty-check compare
      in the same format. The API may return dates with a timezone offset (e.g.
      "+00:00") rather than "Z". Without this, a date the user didn't touch
@@ -232,7 +234,7 @@ export const EventCreationForm: React.FC<{
     if (hasNewPdf || serializeFormState() !== cleanSnapshot.current) {
       setCancelDialogOpen(true);
     } else {
-      navigateToView();
+      navigateToEventsList();
     }
   };
 
@@ -2215,7 +2217,7 @@ export const EventCreationForm: React.FC<{
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCancelDialogOpen(false)}>Keep editing</Button>
-          <Button onClick={navigateToView} color="error">
+          <Button onClick={navigateToEventsList} color="error">
             Discard
           </Button>
         </DialogActions>
