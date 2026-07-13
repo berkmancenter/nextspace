@@ -16,6 +16,10 @@ import SessionManager from '../../utils/SessionManager';
 const formatTime = (isoString?: string) =>
   isoString ? new Date(isoString).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
 
+// Same as formatTime but appends the viewer's local time-zone abbreviation, e.g. "4:00 PM EDT".
+const formatTimeWithZone = (isoString?: string) =>
+  isoString ? new Date(isoString).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }) : '';
+
 // Short date-time without seconds, e.g. "10/23/2025, 4:00 PM". Matches Details.tsx's format.
 const formatDateTime = (isoString?: string) =>
   isoString
@@ -157,6 +161,7 @@ export const EventStatus: React.FC<{
   const hasValidMeetingUrl = isValidZoomUrl(meetingUrl);
 
   const startTime = formatTime(conversationData.scheduledTime);
+  const liveStartTime = formatTimeWithZone(conversationData.scheduledTime);
 
   // The live banner and hint name the assistant. Reads the same botName as Details.tsx so the two
   // stay in sync, and uses "Berkie" when the conversation has no bot name set.
@@ -358,7 +363,7 @@ export const EventStatus: React.FC<{
         <>
           <p className="flex items-center justify-end gap-1 text-[11.5px] text-[#0F7A4E]">
             <AccessTimeOutlined fontSize="inherit" />
-            Live since {startTime}. {botName} is active.
+            Live since {liveStartTime}. {botName} is active.
           </p>
 
           <div className="flex items-start gap-3 rounded-[10px] border border-[#B7E4CD] bg-[#F1FBF6] p-[18px]">
@@ -368,8 +373,8 @@ export const EventStatus: React.FC<{
             <div>
               <p className="text-[14px] font-semibold text-[#0B0D0E]">This event is live</p>
               <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#3F6B54]">
-                All details were confirmed and the event started at {startTime}. {botName} is active and answering audience
-                questions.
+                All details were confirmed and the event started at {liveStartTime}. {botName} is active and answering
+                audience questions.
               </p>
             </div>
           </div>

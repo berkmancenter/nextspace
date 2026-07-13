@@ -419,6 +419,17 @@ describe('EventStatus (live state)', () => {
     expect(screen.getAllByText(/is active/i).length).toBeGreaterThan(0);
   });
 
+  it('includes the local time zone in the live hint and banner start time', () => {
+    renderLive();
+    // Derive the expected zone abbreviation from the same instant in the test's own environment,
+    // so the assertion holds regardless of the machine's time zone.
+    const tzLabel = new Intl.DateTimeFormat([], { timeZoneName: 'short' })
+      .formatToParts(new Date(scheduledTime))
+      .find((part) => part.type === 'timeZoneName')!.value;
+    expect(screen.getByText(/live since/i).textContent).toContain(tzLabel);
+    expect(screen.getByText(/answering audience questions/i).textContent).toContain(tzLabel);
+  });
+
   it('renders the "This event is live" readiness banner', () => {
     renderLive();
     expect(screen.getByText(/this event is live/i)).toBeInTheDocument();

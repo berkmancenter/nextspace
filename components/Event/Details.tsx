@@ -93,14 +93,16 @@ const DefaultChip = () => (
   </span>
 );
 
+// Label for a field value (Series, Starts, Bot name, ...). #6B7280 on white clears WCAG AA at this
+// size (4.83:1); the lighter #8A8F99 it replaced did not (3.25:1).
 const FieldLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <p className="text-[11.5px] font-medium text-[#8A8F99]">{children}</p>
+  <p className="text-[11.5px] font-medium text-[#6B7280]">{children}</p>
 );
 
-// A small uppercase section label within a card (Features, Moderator, Presenters). Matches the
-// design's `.subhead` so it reads as a label instead of competing with the 14px field values.
+// A section label within a card (Description, Features, Moderator, Presenters). Same type and color
+// as FieldLabel so every label on the page reads uniformly; the margins give it room as a header.
 const Subhead: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <p className={`mb-2.5 text-[11px] font-bold uppercase tracking-wider text-[#9AA0AA] ${className}`}>{children}</p>
+  <p className={`mb-2.5 text-[11.5px] font-medium text-[#6B7280] ${className}`}>{children}</p>
 );
 
 const FieldValue: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -217,7 +219,7 @@ export const EventDetails: React.FC<{
         {conversationData.description && (
           <>
             <Subhead className="mt-4">Description</Subhead>
-            <p className="mt-1">{conversationData.description}</p>
+            <FieldValue>{conversationData.description}</FieldValue>
           </>
         )}
       </SectionCard>
@@ -268,14 +270,14 @@ export const EventDetails: React.FC<{
             <FieldLabel>Platform</FieldLabel>
             <FieldValue>Nextspace, Zoom</FieldValue>
           </div>
-          <div>
+          <div className="min-w-0">
             <FieldLabel>Meeting link</FieldLabel>
             {hasValidMeetingUrl ? (
               <a
                 href={zoomMeetingUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-1 block font-mono text-[14px] text-medium-slate-blue"
+                className="mt-1 block break-all font-mono text-[14px] text-medium-slate-blue"
               >
                 {stripProtocol(zoomMeetingUrl)}
               </a>
@@ -351,7 +353,7 @@ export const EventDetails: React.FC<{
             </div>
           ))
         ) : (
-          <p className="mt-1 rounded-lg border border-dashed border-[#D6D3E0] p-2 text-[13px] text-[#8A8F99]">
+          <p className="mt-1 rounded-lg border border-dashed border-[#D6D3E0] p-2 text-[13px] text-[#6B7280]">
             No moderator assigned yet.
           </p>
         )}
@@ -365,7 +367,7 @@ export const EventDetails: React.FC<{
             </div>
           ))
         ) : (
-          <p className="mt-1 rounded-lg border border-dashed border-[#D6D3E0] p-2 text-[13px] text-[#8A8F99]">
+          <p className="mt-1 rounded-lg border border-dashed border-[#D6D3E0] p-2 text-[13px] text-[#6B7280]">
             No presenters added yet (optional).
           </p>
         )}
@@ -409,7 +411,7 @@ export const EventDetails: React.FC<{
             </div>
           ))
         ) : (
-          <p className="rounded-lg border border-dashed border-[#D6D3E0] p-2 text-[13px] text-[#8A8F99]">
+          <p className="rounded-lg border border-dashed border-[#D6D3E0] p-2 text-[13px] text-[#6B7280]">
             No reading or resources added yet.
           </p>
         )}
