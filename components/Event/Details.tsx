@@ -97,6 +97,12 @@ const FieldLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <p className="text-[11.5px] font-medium text-[#8A8F99]">{children}</p>
 );
 
+// A small uppercase section label within a card (Features, Moderator, Presenters). Matches the
+// design's `.subhead` so it reads as a label instead of competing with the 14px field values.
+const Subhead: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
+  <p className={`mb-2.5 text-[11px] font-bold uppercase tracking-wider text-[#9AA0AA] ${className}`}>{children}</p>
+);
+
 const FieldValue: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <p className="mt-1 text-[14px] text-[#1F2937]">{children}</p>
 );
@@ -210,7 +216,7 @@ export const EventDetails: React.FC<{
 
         {conversationData.description && (
           <>
-            <p className="mt-4 font-bold">Description</p>
+            <Subhead className="mt-4">Description</Subhead>
             <p className="mt-1">{conversationData.description}</p>
           </>
         )}
@@ -307,7 +313,7 @@ export const EventDetails: React.FC<{
           </div>
         </div>
 
-        <p className="mt-4 font-bold">Features</p>
+        <Subhead className="mt-4">Features</Subhead>
         {ORGANIZER_FEATURES.map(({ name, label, defaultEnabled }) => {
           const conversationFeature = conversationData.features?.find((f) => f.name === name);
           const enabled = conversationFeature ? (conversationFeature.enabled ?? true) : defaultEnabled;
@@ -336,7 +342,7 @@ export const EventDetails: React.FC<{
         expanded={expanded['people-1a']}
         onToggle={setSection('people-1a')}
       >
-        <p className="font-bold">Moderator</p>
+        <Subhead>Moderator</Subhead>
         {conversationData.moderators && conversationData.moderators.length > 0 ? (
           conversationData.moderators.map((moderator, index) => (
             <div key={index} className="mt-1">
@@ -350,7 +356,7 @@ export const EventDetails: React.FC<{
           </p>
         )}
 
-        <p className="mt-4 font-bold">Presenters</p>
+        <Subhead className="mt-4">Presenters</Subhead>
         {conversationData.presenters && conversationData.presenters.length > 0 ? (
           conversationData.presenters.map((presenter, index) => (
             <div key={index} className="mt-1">
