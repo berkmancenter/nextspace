@@ -151,6 +151,12 @@ describe('EventDetails', () => {
       expect(within(header).queryByText('Needs attention')).not.toBeInTheDocument();
     });
 
+    it('does not show a Needs attention chip once the event has ended, even with a missing time', () => {
+      renderAt({ ...baseConversationData, endTime: '2026-08-01T17:30:00Z' });
+      const header = screen.getByRole('button', { name: /Schedule/ });
+      expect(within(header).queryByText('Needs attention')).not.toBeInTheDocument();
+    });
+
     it('shows the formatted start and end time without seconds when scheduledEndTime is present', () => {
       renderAt({ ...baseConversationData, scheduledEndTime: '2026-08-01T17:30:00Z' });
       expandSection('Schedule');
@@ -170,6 +176,38 @@ describe('EventDetails', () => {
       const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       expect(screen.getByText('Time zone')).toBeInTheDocument();
       expect(screen.getByText(zone, { exact: false })).toBeInTheDocument();
+    });
+
+    it('labels the times "Started"/"Ended" and shows the actual run times for a past event', () => {
+      renderAt({
+        ...baseConversationData,
+        draft: false,
+        scheduledTime: farFutureScheduledTime,
+        scheduledEndTime: '2026-08-01T17:30:00Z',
+        startTime: '2026-08-01T16:03:00Z',
+        endTime: '2026-08-01T17:45:00Z',
+      });
+      expandSection('Schedule');
+      expect(screen.getByText('Started')).toBeInTheDocument();
+      expect(screen.getByText('Ended')).toBeInTheDocument();
+      expect(screen.queryByText('Starts')).not.toBeInTheDocument();
+      expect(screen.queryByText('Ends')).not.toBeInTheDocument();
+      // The actual run times, not the planned ones.
+      expect(screen.getByText(shortDateTime('2026-08-01T16:03:00Z'), { exact: false })).toBeInTheDocument();
+      expect(screen.getByText(shortDateTime('2026-08-01T17:45:00Z'), { exact: false })).toBeInTheDocument();
+    });
+
+    it('falls back to the scheduled times when a past event has no stamped run times', () => {
+      renderAt({
+        ...baseConversationData,
+        draft: false,
+        scheduledTime: farFutureScheduledTime,
+        scheduledEndTime: '2026-08-01T17:30:00Z',
+        endTime: '2026-08-01T17:45:00Z', // marks it past, but no startTime stamped
+      });
+      expandSection('Schedule');
+      // startTime missing, so "Started" falls back to the scheduled start.
+      expect(screen.getByText(shortDateTime(farFutureScheduledTime), { exact: false })).toBeInTheDocument();
     });
   });
 
@@ -207,6 +245,12 @@ describe('EventDetails', () => {
       expandSection('Platform & format');
       expect(screen.getByText(/not a valid zoom link/i)).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: /example\.com/ })).not.toBeInTheDocument();
+    });
+
+    it('does not show a Needs attention chip once the event has ended, even without a meeting link', () => {
+      renderAt({ ...baseConversationData, endTime: '2026-08-01T17:30:00Z' });
+      const header = screen.getByRole('button', { name: /Platform & format/ });
+      expect(within(header).queryByText('Needs attention')).not.toBeInTheDocument();
     });
   });
 

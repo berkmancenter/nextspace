@@ -548,3 +548,95 @@ describe('EventStatus (scheduled state)', () => {
     expect(screen.queryByText(/never confirmed/i)).not.toBeInTheDocument();
   });
 });
+
+describe('EventStatus (past state)', () => {
+  // A confirmed, no-longer-active conversation with an endTime stamped derives to `past`.
+  const now = new Date('2026-08-02T00:00:00Z');
+  const scheduledTime = '2026-08-01T16:00:00Z';
+  const endTime = '2026-08-01T17:30:00Z';
+
+  const pastConversation = {
+    id: 'conv-past',
+    name: 'Past Event',
+    active: false,
+    draft: false,
+    slug: 'past-event',
+    scheduledTime,
+    scheduledEndTime: '2026-08-01T17:30:00Z',
+    endTime,
+    owner: 'current-user-id',
+    properties: { zoomMeetingUrl: 'https://harvard.zoom.us/j/81244556677' },
+    eventUrls: {
+      moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/mod' }],
+      participant: [{ label: 'Participant link', url: 'http://localhost:8080/part' }],
+      zoom: { label: 'Zoom', url: 'https://harvard.zoom.us/j/81244556677' },
+    },
+    type: { name: 'eventAssistant', label: 'Event Assistant', description: '', platforms: [], properties: [] },
+  } as unknown as Conversation;
+
+  const renderPast = (overrides: Partial<Conversation> = {}) => {
+    render(<EventStatus conversationData={{ ...pastConversation, ...overrides }} now={now} />);
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('shows the "Past" status pill', () => {
+    renderPast();
+    expect(screen.getByText('Past')).toBeInTheDocument();
+  });
+
+  it('keeps the moderator, participant, and zoom link chips, active, since the session did run', () => {
+    renderPast();
+    expect(screen.getByRole('button', { name: /moderator link/i })).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByRole('button', { name: /participant link/i })).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByRole('link', { name: /zoom/i })).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('uses brand-colored link-chip dots, matching other confirmed states', () => {
+    renderPast();
+    const moderatorChip = screen.getByRole('button', { name: /moderator link/i });
+    expect(within(moderatorChip).getByTestId('chip-dot')).toHaveStyle({ backgroundColor: '#4845D2' });
+  });
+
+  it('offers no primary action, since a concluded event cannot be edited or restarted', () => {
+    renderPast();
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /create a new event/i })).not.toBeInTheDocument();
+  });
+
+  it('shows an "Ended" hint carrying the local end time and zone', () => {
+    renderPast();
+    // Derive the expected zone abbreviation from the same instant in the test's own environment.
+    const tzLabel = new Intl.DateTimeFormat([], { timeZoneName: 'short' })
+      .formatToParts(new Date(endTime))
+      .find((part) => part.type === 'timeZoneName')!.value;
+    const hint = screen.getByText(/^ended/i);
+    expect(hint.textContent).toContain(tzLabel);
+  });
+
+  it('renders the "This event has ended" banner', () => {
+    renderPast();
+    expect(screen.getByText(/this event has ended/i)).toBeInTheDocument();
+    expect(screen.getByText(/no longer answering questions/i)).toBeInTheDocument();
+  });
+
+  it('names the configured assistant in the concluded copy', () => {
+    renderPast({ properties: { botName: 'Athena' } } as Partial<Conversation>);
+    expect(screen.getAllByText(/athena/i).length).toBeGreaterThan(0);
+  });
+
+  it('falls back to "Berkie" when no bot name is configured', () => {
+    renderPast({ properties: {} } as Partial<Conversation>);
+    expect(screen.getAllByText(/berkie/i).length).toBeGreaterThan(0);
+  });
+
+  it('does not render the live, scheduled, pending, or missed banners', () => {
+    renderPast();
+    expect(screen.queryByText(/this event is live/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/ready to start/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/almost ready/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/did not start/i)).not.toBeInTheDocument();
+  });
+});

@@ -160,14 +160,26 @@ export const EventDetails: React.FC<{
   const state = deriveEventState(conversationData, now);
   const unconfirmed = state === 'pending' || state === 'missed';
   const isLive = state === 'live';
+  const isPast = state === 'past';
 
-  const scheduledStart = formatDateTime(conversationData.scheduledTime);
-  const scheduledEnd = formatDateTime(conversationData.scheduledEndTime);
-  const timeZone = formatTimeZone(conversationData.scheduledTime);
+  // A concluded event shows when it actually ran (startTime/endTime, stamped by the backend), not
+  // when it was planned, since the scheduled times may be blank for an ad-hoc event. Every other
+  // state shows the planned schedule. Fall back to the scheduled value if a run time is missing.
+  const startIso = isPast ? (conversationData.startTime ?? conversationData.scheduledTime) : conversationData.scheduledTime;
+  const endIso = isPast
+    ? (conversationData.endTime ?? conversationData.scheduledEndTime)
+    : conversationData.scheduledEndTime;
+  const startLabel = isPast ? 'Started' : 'Starts';
+  const endLabel = isPast ? 'Ended' : 'Ends';
+
+  const displayStart = formatDateTime(startIso);
+  const displayEnd = formatDateTime(endIso);
+  const timeZone = formatTimeZone(startIso);
 
   // "Needs attention" flags the card only when a field is actually missing, not just because the
-  // event is unconfirmed. A pending event with both times filled has nothing to fix here.
-  const scheduleNeedsAttention = !isLive && (!scheduledStart || !scheduledEnd);
+  // event is unconfirmed. A pending event with both times filled has nothing to fix here, and once
+  // the event is live or over there's nothing left to fix at all.
+  const scheduleNeedsAttention = !isLive && !isPast && (!displayStart || !displayEnd);
 
   const topic = typeof conversationData.topic === 'object' ? conversationData.topic : undefined;
   const isPublicSeries = topic ? !topic.private : undefined;
@@ -233,12 +245,12 @@ export const EventDetails: React.FC<{
       >
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <FieldLabel>Starts</FieldLabel>
-            {scheduledStart ? <FieldValue>{scheduledStart}</FieldValue> : <MissingValue>Not set yet</MissingValue>}
+            <FieldLabel>{startLabel}</FieldLabel>
+            {displayStart ? <FieldValue>{displayStart}</FieldValue> : <MissingValue>Not set yet</MissingValue>}
           </div>
           <div>
-            <FieldLabel>Ends</FieldLabel>
-            {scheduledEnd ? <FieldValue>{scheduledEnd}</FieldValue> : <MissingValue>Not set yet</MissingValue>}
+            <FieldLabel>{endLabel}</FieldLabel>
+            {displayEnd ? <FieldValue>{displayEnd}</FieldValue> : <MissingValue>Not set yet</MissingValue>}
           </div>
           <div>
             <FieldLabel>Time zone</FieldLabel>
@@ -259,7 +271,7 @@ export const EventDetails: React.FC<{
         title="Platform & format"
         expanded={expanded['plat-1a']}
         onToggle={setSection('plat-1a')}
-        headerChip={!hasValidMeetingUrl && !isLive && <NeedsAttentionChip />}
+        headerChip={!hasValidMeetingUrl && !isLive && !isPast && <NeedsAttentionChip />}
       >
         <div className="grid grid-cols-3 gap-4">
           <div>

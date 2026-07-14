@@ -38,6 +38,7 @@ const PILL_CONFIG = {
   pending: { label: 'Not started', bg: '#EDE7F6', color: '#4845D2', dot: true },
   live: { label: 'Live now', bg: '#E7F5EE', color: '#0F7A4E', dot: true, pulse: true },
   scheduled: { label: 'Scheduled', bg: '#EDE7F6', color: '#4845D2', dot: true },
+  past: { label: 'Past', bg: '#F3F4F6', color: '#4B5563', dot: false },
 } as const;
 
 // Shared pill styling for operations-bar chips. Disabled chips dim and drop their hover affordance.
@@ -172,6 +173,7 @@ export const EventStatus: React.FC<{
   const state = deriveEventState(conversationData, now);
   const unconfirmed = state === 'pending' || state === 'missed';
   const isMissed = state === 'missed';
+  const isPast = state === 'past';
   const pill = PILL_CONFIG[state];
 
   const userId = SessionManager.get().getSessionInfo()?.userId;
@@ -190,6 +192,7 @@ export const EventStatus: React.FC<{
 
   const startTime = formatTime(conversationData.scheduledTime);
   const startTimeWithZone = formatTimeWithZone(conversationData.scheduledTime);
+  const endTimeWithZone = formatTimeWithZone(conversationData.endTime);
 
   // The live banner and hint name the assistant. Reads the same botName as Details.tsx so the two
   // stay in sync, and uses "Berkie" when the conversation has no bot name set.
@@ -240,8 +243,9 @@ export const EventStatus: React.FC<{
           {pill.label}
         </span>
 
-        {/* The links point at the live session, so they're pointless once an event is missed: hide
-            them (and their divider) rather than show dead, greyed-out chips. */}
+        {/* A missed event never happened, so its links point at a session that doesn't exist: hide
+            them (and their divider) rather than show dead, greyed-out chips. Past events keep the
+            links, since the session did run and the organizer may still want them. */}
         {!isMissed && <span className="h-[26px] w-px bg-[#EAE8F0]" />}
 
         <div className="flex flex-1 flex-wrap items-center gap-2">
@@ -275,6 +279,7 @@ export const EventStatus: React.FC<{
         </div>
 
         {isOwner &&
+          !isPast &&
           (state === 'missed' ? (
             <button
               type="button"
@@ -424,6 +429,27 @@ export const EventStatus: React.FC<{
               <p className="text-[14px] font-semibold text-[#0B0D0E]">Ready to start, all details confirmed</p>
               <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#3F6B54]">
                 Nothing left to fill in. This event starts {formatDateTime(conversationData.scheduledTime)}.
+              </p>
+            </div>
+          </div>
+        </>
+      )}
+
+      {state === 'past' && (
+        <>
+          <p className="flex items-center justify-end gap-1 text-[11.5px] text-[#6B7280]">
+            <AccessTimeOutlined fontSize="inherit" />
+            Ended {endTimeWithZone}.
+          </p>
+
+          <div className="flex items-start gap-3 rounded-[10px] border border-[#E5E7EB] bg-[#F9FAFB] p-[18px]">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563]">
+              <CheckOutlined fontSize="small" />
+            </span>
+            <div>
+              <p className="text-[14px] font-semibold text-[#0B0D0E]">This event has ended</p>
+              <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#4B5563]">
+                It concluded on {formatDateTime(conversationData.endTime)}. {botName} is no longer answering questions.
               </p>
             </div>
           </div>
