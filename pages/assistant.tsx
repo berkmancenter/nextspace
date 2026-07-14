@@ -150,8 +150,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const [assistantMessagesWithUnreadReplies, setAssistantMessagesWithUnreadReplies] = useState<Set<string>>(new Set());
 
   const [eventStatusLoaded, setEventStatusLoaded] = useState<boolean>(false);
-  const [eventHasEnded, setEventHasEnded] = useState<boolean>(false);
-  const [showEndedDialog, setShowEndedDialog] = useState<boolean>(false);
+  const [eventStatus, setEventStatus] = useState<'active' | 'future' | 'ended'>('active');
+  const [showEventStatusDialog, setShowEventStatusDialog] = useState<boolean>(false);
 
   // Ref to track active tab for socket handler
   const activeTabRef = useRef<NavTab>('assistant');
@@ -167,7 +167,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     isConnected,
     errorMessage: sessionError,
     lastReconnectTime,
-  } = useSessionJoin(eventStatusLoaded && !eventHasEnded);
+  } = useSessionJoin(eventStatusLoaded && eventStatus !== 'ended');
 
   const [pseudonymFunFact, setPseudonymFunFact] = useState<string | undefined>(undefined);
 
@@ -384,11 +384,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         const ids = conversation.agents.map((agent: components['schemas']['Agent']) => agent.id!);
         setAgentIds(ids);
 
-        // Check if the event has ended
+        // Check if the event is not active, and if it's not begun (no endTime)
         if (conversation.active === false) {
-          setEventHasEnded(true);
-          setShowEndedDialog(true);
+          setEventStatus(conversation.endTime ? 'ended' : 'future');
+          setShowEventStatusDialog(true);
         }
+
         setEventStatusLoaded(true);
       } catch (error) {
         console.error('Error fetching conversation data:', error);
@@ -659,19 +660,19 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   // are already in state before DB messages are prepended).
   // Also fetch once if event has ended (no join will occur, but messages may still be available).
   useEffect(() => {
-    const hasNoArchivedMessages = chatMessages.length === 0 && eventHasEnded;
+    const hasNoArchivedMessages = chatMessages.length === 0 && eventStatus === 'ended';
     if (!chatPasscode || !router.query.conversationId || (!initialJoinComplete && !hasNoArchivedMessages)) return;
 
     fetchChatMessages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatPasscode, router.query.conversationId, initialJoinComplete, eventHasEnded]);
+  }, [chatPasscode, router.query.conversationId, initialJoinComplete, eventStatus]);
 
   // Load initial assistant messages after the conversation:join completes (so
   // intros are already in state before DB messages are prepended).
   useEffect(() => {
-    if (!initialJoinComplete && !eventHasEnded) return;
+    if (!initialJoinComplete && eventStatus !== 'ended') return;
     fetchAllAssistantMessages();
-  }, [fetchAllAssistantMessages, initialJoinComplete, eventHasEnded]);
+  }, [fetchAllAssistantMessages, initialJoinComplete, eventStatus]);
 
   // Re-fetch all message history when the socket reconnects after a significant
   // gap (user was on another tab/app for a while). Fills any messages missed
@@ -882,12 +883,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           <Errors generalError={generalError} sessionError={sessionError} setGeneralError={setGeneralError} />
         )}
 
-        {/* Dialog for when the event has ended */}
+        {/* Dialog for when the event has ended or has not started yet; if in future, this is non-dismissable */}
         <Dialog
-          open={showEndedDialog}
-          onClose={() => setShowEndedDialog(false)}
-          aria-labelledby="ended-dialog-title"
-          aria-describedby="ended-dialog-description"
+          open={showEventStatusDialog}
+          onClose={eventStatus === 'ended' ? () => setShowEventStatusDialog(false) : () => {}}
+          aria-labelledby="event-status-dialog-title"
+          aria-describedby="event-status-dialog-description"
           slotProps={{
             paper: {
               sx: {
@@ -900,18 +901,29 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           }}
         >
           <div className="flex flex-col items-center gap-4">
-            <h2 id="ended-dialog-title" className="text-2xl font-bold text-gray-900 flex items-center justify-center">
-              <Info className="inline-block mr-2" /> <span>Event Has Ended</span>
+            <h2 id="event-status-dialog-title" className="text-2xl font-bold text-gray-900 flex items-center justify-center">
+              <Info className="inline-block mr-2" />
+              {eventStatus === 'ended' ? 'Event Has Ended' : 'Event Not Started'}
             </h2>
-            <p id="ended-dialog-description" className="text-gray-600 text-base leading-relaxed">
-              This event has ended and the assistant is no longer available. You can still view the transcript and resources,
-              but you will not be able to send new messages.
+            <p id="event-status-dialog-description" className="text-gray-600 text-base leading-relaxed">
+              {eventStatus === 'ended' ? (
+                <span>
+                  This event has ended and the assistant is no longer available. You can still view the transcript and
+                  resources, but you will not be able to send new messages.
+                </span>
+              ) : (
+                <span>
+                  This event has not started yet. You will be able to interact with the assistant once the event begins.
+                </span>
+              )}
             </p>
-            <div className="flex flex-col gap-3 w-full mt-2">
-              <Button aria-label="Close event has ended dialog" onClick={() => setShowEndedDialog(false)}>
-                Ok
-              </Button>
-            </div>
+            {eventStatus === 'ended' && (
+              <div className="flex flex-col gap-3 w-full mt-2">
+                <Button aria-label="Close event has ended dialog" onClick={() => setShowEventStatusDialog(false)}>
+                  Ok
+                </Button>
+              </div>
+            )}
           </div>
         </Dialog>
 
@@ -984,7 +996,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                     )}
                     {router.query.view === 'preferences' ? (
                       <PreferencesPanel botName={botName} />
-                    ) : isConnected || eventHasEnded ? (
+                    ) : isConnected || eventStatus === 'ended' ? (
                       activeTab === 'chat' ? (
                         <GroupChatPanel
                           messages={chatMessages}
@@ -1014,7 +1026,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                             });
                           }}
                           pollCounts={pollCounts}
-                          inactive={eventHasEnded}
+                          inactive={eventStatus === 'ended'}
                         />
                       ) : activeTab === 'resources' ? (
                         <ResourcesPanel
@@ -1047,7 +1059,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                           onPromptSelect={handlePromptSelect}
                           userId={userId}
                           feedbackConfig={assistantFeedbackConfig}
-                          inactive={!agentActive || eventHasEnded}
+                          inactive={!agentActive || eventStatus === 'ended'}
                           messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
                           onMarkAsRead={(messageId) => {
                             setAssistantMessagesWithUnreadReplies((prev) => {
