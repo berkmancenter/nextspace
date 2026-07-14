@@ -2815,39 +2815,8 @@ describe('EventAssistantRoom', () => {
     });
   });
 
-  describe('Event has ended dialog', () => {
-    it('displays the event has ended dialog when the conversation is not active', async () => {
-      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
-        if (path.startsWith('conversations/')) {
-          return Promise.resolve({
-            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-            active: false, // Simulate conversation not active
-          });
-        }
-        return Promise.resolve([]);
-      });
-
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
-        type: { name: 'eventAssistant' },
-        active: false,
-      });
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText('Event Has Ended')).toBeInTheDocument();
-        expect(
-          screen.getByText(
-            'This event has ended and the assistant is no longer available. You can still view the transcript and resources, but you will not be able to send new messages.',
-          ),
-        ).toBeInTheDocument();
-      });
-    });
-
-    it('shows "This event has ended" below group chat panel', async () => {
+  describe('Event not started dialog', () => {
+    it('displays the event not started dialog when the conversation is not active and in future (has startTime)', async () => {
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
         if (path.startsWith('conversations/')) {
           return Promise.resolve({
@@ -2868,6 +2837,104 @@ describe('EventAssistantRoom', () => {
         render(<EventAssistantRoom authType={'guest'} />);
       });
 
+      await waitFor(() => {
+        expect(screen.getByText('Event Not Started')).toBeInTheDocument();
+        expect(
+          screen.getByText(
+            'This event has not started yet. You will be able to interact with the assistant once the event begins.',
+          ),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('shows "This event is not active" below group chat panel for events that have not started', async () => {
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({
+            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+            active: false,
+          });
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        active: false,
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      // Close button is not present for the "event not started"
+      const closeButton = screen.queryByRole('button', { name: /close event not started dialog/i });
+      expect(closeButton).not.toBeInTheDocument();
+
+      await waitFor(() => {
+        expect(screen.getByText('This event is not active.')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Event has ended dialog', () => {
+    it('displays the event has ended dialog when the conversation is not active and in past (has endTime)', async () => {
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({
+            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+            active: false, // Simulate conversation not active
+            endTime: '2024-06-01T12:00:00Z', // Simulate conversation has ended
+          });
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        active: false,
+        endTime: '2024-06-01T12:00:00Z', // Simulate conversation has ended
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Event Has Ended')).toBeInTheDocument();
+        expect(
+          screen.getByText(
+            'This event has ended and the assistant is no longer available. You can still view the transcript and resources, but you will not be able to send new messages.',
+          ),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('shows "This event is not active" below group chat panel for events that have ended', async () => {
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({
+            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+            active: false,
+            endTime: '2024-06-01T12:00:00Z', // Simulate conversation has ended
+          });
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        active: false,
+        endTime: '2024-06-01T12:00:00Z', // Simulate conversation has ended
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
       // Dismiss the dialog to see the group chat panel
       const closeButton = screen.getByRole('button', { name: /close event has ended dialog/i });
       await act(async () => {
@@ -2875,7 +2942,7 @@ describe('EventAssistantRoom', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText('This event has ended.')).toBeInTheDocument();
+        expect(screen.getByText('This event is not active.')).toBeInTheDocument();
       });
     });
   });
