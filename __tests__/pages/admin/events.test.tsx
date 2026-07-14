@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import EventsPage from '../../../pages/admin/events';
 import { Request } from '../../../utils';
 import { getConversation, SendData } from '../../../utils/Helpers';
-import { useSessionJoin } from '../../../utils/useSessionJoin';
+import { useSessionJoin } from '../../../hooks/useSessionJoin';
 import {
   generateAndDownloadUserMetricsReport,
   generateAndDownloadDirectMessageResponsesReport,
@@ -1271,9 +1271,7 @@ describe('Events Page - Event Ownership', () => {
           await userEvent.keyboard('{Delete}');
         }
       }
-      await waitFor(() =>
-        expect(within(drawer).queryAllByRole('button', { name: /^Active$|^Upcoming$/i })).toHaveLength(0),
-      );
+      await waitFor(() => expect(within(drawer).queryAllByRole('button', { name: /^Active$|^Upcoming$/i })).toHaveLength(0));
       // Wait for the filter=[] re-fetch to complete (event becomes visible when status filter is empty)
       await waitFor(() => expect(screen.getByText('Test Event 1')).toBeInTheDocument());
       const statusSelect = within(drawer).getByLabelText('Status');

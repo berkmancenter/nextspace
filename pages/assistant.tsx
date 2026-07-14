@@ -14,7 +14,7 @@ import { useConversationType, useSetBotName, useSetConversationType } from '../c
 import { AuthType } from '../types.internal';
 import { trackConversationEvent, setUserId } from '../utils/analytics';
 import { Errors, ParamErrors, Transcript } from '../components/';
-import { useSessionJoin } from '../utils/useSessionJoin';
+import { useSessionJoin } from '../hooks/useSessionJoin';
 import { NavigationBar, NavTab } from '../components/NavigationBar';
 import { PreferencesPanel } from '../components/PreferencesPanel';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
