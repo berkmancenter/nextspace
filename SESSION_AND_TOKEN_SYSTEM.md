@@ -31,10 +31,10 @@
 
 Nextspace supports two kinds of users:
 
-| Kind | How they get in | Token source |
-|---|---|---|
-| **Guest** | Auto-registered on first visit; `authType = "guest"` in session cookie | API `/auth/register` after `/auth/newPseudonym` |
-| **Authenticated** | Explicit login via `/login` page; `authType = "user"` or `"admin"` | API `/auth/login` |
+| Kind              | How they get in                                                        | Token source                                    |
+| ----------------- | ---------------------------------------------------------------------- | ----------------------------------------------- |
+| **Guest**         | Auto-registered on first visit; `authType = "guest"` in session cookie | API `/auth/register` after `/auth/newPseudonym` |
+| **Authenticated** | Explicit login via `/login` page; `authType = "user"` or `"admin"`     | API `/auth/login`                               |
 
 Both kinds receive a standard **JWT access token + refresh token pair** from the backend API. These tokens are:
 
@@ -49,7 +49,7 @@ The entire refresh subsystem funnels through a single class — **`TokenManager`
 │                       Browser Process                       │
 │                                                             │
 │  ┌─────────────┐    ┌─────────────────────────────────────┐│
-│  │SessionManager│    │           TokenManager              ││
+│  │SessionManager│   │           TokenManager              ││
 │  │  (identity) │◄──►│  tokens + expiry + refresh timer    ││
 │  └─────────────┘    │  dedup • BroadcastChannel           ││
 │                     └──────────┬──────────────────────────┘│
@@ -72,25 +72,26 @@ The entire refresh subsystem funnels through a single class — **`TokenManager`
 
 ## 2. Key Files at a Glance
 
-| File | Role |
-|---|---|
-| `utils/TokenManager.ts` | **Single source of truth.** Stores tokens + expiry, deduplicated refresh, proactive timer, BroadcastChannel, subscriber notifications. |
-| `utils/SessionManager.ts` | Manages session *identity* (guest vs authenticated, userId/username). Calls `TokenManager` indirectly via `Api.get().SetTokens()`. |
-| `utils/Helpers.ts` — `Api` class | Thin compatibility wrapper. `SetTokens`/`GetTokens`/`ClearTokens` all delegate to `TokenManager`. |
-| `utils/tokenRefresh.ts` | Thin wrappers: `ensureFreshToken()`, `refreshAccessToken()`, `emitWithTokenRefresh()`. |
-| `utils/useSessionJoin.ts` | React hook that creates the Socket.io connection and handles token-aware reconnection. |
-| `utils/Api.ts` | `fetchWithTokenRefresh()` — wraps `fetch()` with 401 retry. `Request()` — server-side proxy caller. |
-| `pages/api/session.ts` | Next.js API route. POST = create cookie; PATCH = update tokens in existing cookie. |
-| `pages/api/cookie.ts` | Next.js API route. GET = decrypt cookie and return tokens + user info + expiry timestamps. |
-| `pages/api/request.ts` | Server-side proxy: forwards requests to the backend API using cookie credentials. Adds `X-Tokens-Refreshed: true` header if it had to refresh. |
-| `pages/_app.tsx` | Calls `SessionManager.get().restoreSession()` once on app mount. |
-| `pages/login.tsx` | Calls `Api.get().SetTokens(access, refresh, accessExpires, refreshExpires, userId)` after login. |
+| File                             | Role                                                                                                                                           |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `utils/TokenManager.ts`          | **Single source of truth.** Stores tokens + expiry, deduplicated refresh, proactive timer, BroadcastChannel, subscriber notifications.         |
+| `utils/SessionManager.ts`        | Manages session _identity_ (guest vs authenticated, userId/username). Calls `TokenManager` indirectly via `Api.get().SetTokens()`.             |
+| `utils/Helpers.ts` — `Api` class | Thin compatibility wrapper. `SetTokens`/`GetTokens`/`ClearTokens` all delegate to `TokenManager`.                                              |
+| `utils/tokenRefresh.ts`          | Thin wrappers: `ensureFreshToken()`, `refreshAccessToken()`, `emitWithTokenRefresh()`.                                                         |
+| `hooks/useSessionJoin.ts`        | React hook that creates the Socket.io connection and handles token-aware reconnection.                                                         |
+| `utils/Api.ts`                   | `fetchWithTokenRefresh()` — wraps `fetch()` with 401 retry. `Request()` — server-side proxy caller.                                            |
+| `pages/api/session.ts`           | Next.js API route. POST = create cookie; PATCH = update tokens in existing cookie.                                                             |
+| `pages/api/cookie.ts`            | Next.js API route. GET = decrypt cookie and return tokens + user info + expiry timestamps.                                                     |
+| `pages/api/request.ts`           | Server-side proxy: forwards requests to the backend API using cookie credentials. Adds `X-Tokens-Refreshed: true` header if it had to refresh. |
+| `pages/_app.tsx`                 | Calls `SessionManager.get().restoreSession()` once on app mount.                                                                               |
+| `pages/login.tsx`                | Calls `Api.get().SetTokens(access, refresh, accessExpires, refreshExpires, userId)` after login.                                               |
 
 ---
 
 ## 3. The Session Cookie
 
 The cookie is named **`nextspace-session`** and is:
+
 - **HttpOnly** (no JavaScript access — must go through `/api/cookie` to read it)
 - **Encrypted** with JWE (Jose `EncryptJWT` / `jwtDecrypt`) using `SESSION_SECRET`
 - **SameSite=Strict** — not sent on cross-origin requests
@@ -99,14 +100,14 @@ The cookie is named **`nextspace-session`** and is:
 
 ```ts
 {
-  sub: string;           // username (Subject)
+  sub: string; // username (Subject)
   userId: string;
-  access: string;        // access token string
-  refresh: string;       // refresh token string
+  access: string; // access token string
+  refresh: string; // refresh token string
   accessExpires: string; // ISO-8601, e.g. "2026-03-17T21:12:00Z"
   refreshExpires: string;
-  authType: "guest" | "authenticated";
-  version: number;       // CURRENT_COOKIE_VERSION for schema validation
+  authType: 'guest' | 'authenticated';
+  version: number; // CURRENT_COOKIE_VERSION for schema validation
 }
 ```
 
@@ -114,18 +115,18 @@ The `accessExpires` / `refreshExpires` fields are critical — they let the clie
 
 ### Cookie API Routes
 
-| Route | Method | Purpose |
-|---|---|---|
-| `/api/cookie` | GET | Decrypt the cookie, validate its schema, return tokens + expiry + user info |
-| `/api/session` | POST | Create a new cookie (initial session or after login) |
-| `/api/session` | PATCH | Update tokens in an existing cookie (after a client-side refresh) |
-| `/api/logout` | POST | Clear the cookie |
+| Route          | Method | Purpose                                                                     |
+| -------------- | ------ | --------------------------------------------------------------------------- |
+| `/api/cookie`  | GET    | Decrypt the cookie, validate its schema, return tokens + expiry + user info |
+| `/api/session` | POST   | Create a new cookie (initial session or after login)                        |
+| `/api/session` | PATCH  | Update tokens in an existing cookie (after a client-side refresh)           |
+| `/api/logout`  | POST   | Clear the cookie                                                            |
 
 ---
 
 ## 4. SessionManager — App Startup & Identity
 
-`SessionManager` is a **process singleton** (`SessionManager.get()`). It owns the user's *identity* state.
+`SessionManager` is a **process singleton** (`SessionManager.get()`). It owns the user's _identity_ state.
 
 ### State Machine
 
@@ -175,16 +176,16 @@ Called on logout. Sets state to `cleared`, nulls `currentSession`, calls `Api.ge
 `utils/TokenManager.ts` is the heart of the system. It is a **process singleton** accessed via:
 
 ```ts
-import TokenManagerDefault from "./TokenManager";      // the singleton instance
-import { TokenManager } from "./TokenManager";         // the class (for tests)
+import TokenManagerDefault from './TokenManager'; // the singleton instance
+import { TokenManager } from './TokenManager'; // the class (for tests)
 ```
 
 ### What It Stores
 
 ```ts
 type TokenPair = {
-  token: string;    // the raw token string
-  expires: string;  // ISO-8601 expiry
+  token: string; // the raw token string
+  expires: string; // ISO-8601 expiry
 };
 
 type TokenSet = {
@@ -195,18 +196,18 @@ type TokenSet = {
 
 ### Core API
 
-| Method | Purpose |
-|---|---|
-| `setTokens(tokens, opts?)` | Store full token set. `opts` is `{ broadcast?: boolean; userId?: string }`. Triggers timer + notifies listeners + (by default) broadcasts to other tabs. Passing `userId` (an authoritative local write) (re)establishes the token owner |
-| `setTokensFromStrings(access, refresh, accessExpires?, refreshExpires?, userId?)` | Convenience for callers that have strings. Synthesises expiry if not provided. Forwards `userId` to set the token owner |
-| `getAccessToken()` | Returns current access token string or `""` |
-| `getTokens()` | Returns `{ access: string\|null, refresh: string\|null }` (backward-compat shape) |
-| `getFullTokens()` | Returns the full `TokenSet` including expires fields, or `null` |
-| `isAccessTokenFresh()` | `true` if token expires > 2 minutes from now |
-| `getValidToken()` | Returns fresh token immediately, or triggers refresh first. Use this in WS callers |
-| `refresh()` | Explicit refresh. Deduplicated: concurrent callers share one Promise |
-| `clearTokens()` | Clear everything and cancel the proactive timer |
-| `onTokensChanged(listener)` | Subscribe to token updates. Called immediately if tokens exist. Returns unsubscribe fn |
+| Method                                                                            | Purpose                                                                                                                                                                                                                                  |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `setTokens(tokens, opts?)`                                                        | Store full token set. `opts` is `{ broadcast?: boolean; userId?: string }`. Triggers timer + notifies listeners + (by default) broadcasts to other tabs. Passing `userId` (an authoritative local write) (re)establishes the token owner |
+| `setTokensFromStrings(access, refresh, accessExpires?, refreshExpires?, userId?)` | Convenience for callers that have strings. Synthesises expiry if not provided. Forwards `userId` to set the token owner                                                                                                                  |
+| `getAccessToken()`                                                                | Returns current access token string or `""`                                                                                                                                                                                              |
+| `getTokens()`                                                                     | Returns `{ access: string\|null, refresh: string\|null }` (backward-compat shape)                                                                                                                                                        |
+| `getFullTokens()`                                                                 | Returns the full `TokenSet` including expires fields, or `null`                                                                                                                                                                          |
+| `isAccessTokenFresh()`                                                            | `true` if token expires > 2 minutes from now                                                                                                                                                                                             |
+| `getValidToken()`                                                                 | Returns fresh token immediately, or triggers refresh first. Use this in WS callers                                                                                                                                                       |
+| `refresh()`                                                                       | Explicit refresh. Deduplicated: concurrent callers share one Promise                                                                                                                                                                     |
+| `clearTokens()`                                                                   | Clear everything and cancel the proactive timer                                                                                                                                                                                          |
+| `onTokensChanged(listener)`                                                       | Subscribe to token updates. Called immediately if tokens exist. Returns unsubscribe fn                                                                                                                                                   |
 
 ### Refresh Flow (inside `_doRefresh()`)
 
@@ -237,7 +238,7 @@ type TokenSet = {
 
 ```ts
 if (this._inflightRefresh) {
-  return this._inflightRefresh;  // all concurrent callers get the same promise
+  return this._inflightRefresh; // all concurrent callers get the same promise
 }
 this._inflightRefresh = this._doRefresh();
 // ... await, then set to null
@@ -327,11 +328,12 @@ A convenience wrapper around `fetchWithTokenRefresh()` that prepends `NEXT_PUBLI
 
 ## 8. WebSocket — Token Refresh on Auth Errors
 
-### `useSessionJoin` hook (utils/useSessionJoin.ts)
+### `useSessionJoin` hook (hooks/useSessionJoin.ts)
 
 This is the entry point for all WebSocket-connected pages (assistant, moderator, backchannel).
 
 **Initialization (runs once):**
+
 ```
 1. SessionManager.get().getSessionInfo() → { userId, username }
 2. Api.get().GetTokens().access → initial token
@@ -340,6 +342,7 @@ This is the entry point for all WebSocket-connected pages (assistant, moderator,
 ```
 
 **`connect_error` handler:**
+
 ```
 socket.on("connect_error", async (error) => {
   if (error is auth-related) {
@@ -350,6 +353,7 @@ socket.on("connect_error", async (error) => {
 ```
 
 **`onTokensChanged` handler (proactive refresh arrives):**
+
 ```
 TokenManagerDefault.onTokensChanged((tokens) => {
   socket.auth = { token: tokens.access.token }  // always update auth
@@ -361,6 +365,7 @@ TokenManagerDefault.onTokensChanged((tokens) => {
 ```
 
 **Tab visibility handler:**
+
 ```
 document.addEventListener("visibilitychange", async () => {
   if (document.visibilityState === "visible") {
@@ -376,6 +381,7 @@ If the socket was disconnected for ≥ 10 seconds before reconnecting, `lastReco
 ### `emitWithTokenRefresh()` (utils/tokenRefresh.ts)
 
 For socket events that need guaranteed fresh tokens:
+
 ```
 1. ensureFreshToken() → getValidToken() → token or null
 2. If null → call onError
@@ -410,10 +416,10 @@ When multiple tabs are open they all share the same cookie but each has its own 
 
 ### Message Types
 
-| Message | Sent when | Received action |
-|---|---|---|
+| Message            | Sent when                                                                                                                                    | Received action                                                                                                                                                                                          |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TOKENS_REFRESHED` | Any tab calls `setTokens` with `broadcast` enabled (refresh, and currently also identity-establishing writes). Carries the sender's `userId` | Other tabs call `setTokens(tokens, { broadcast: false })` to adopt the new tokens **only if** `message.userId` matches their own `_ownerUserId` (no echo). Mismatched/owner-less tabs ignore the message |
-| `REFRESH_STARTING` | A tab is about to call the refresh API | Other tabs log "standing by" — their proactive timer will simply not fire because by the time it does, `TOKENS_REFRESHED` will have arrived and `isAccessTokenFresh()` will return `true` |
+| `REFRESH_STARTING` | A tab is about to call the refresh API                                                                                                       | Other tabs log "standing by" — their proactive timer will simply not fire because by the time it does, `TOKENS_REFRESHED` will have arrived and `isAccessTokenFresh()` will return `true`                |
 
 ### Multi-Tab Refresh Race Prevention
 
@@ -437,12 +443,15 @@ Even if Tab B's timer fires between Tab A's refresh and the `TOKENS_REFRESHED` b
 ## 11. Page Navigation Scenarios
 
 ### Guest → same page refresh
+
 `_app.tsx` calls `SessionManager.restoreSession()` → `/api/cookie` returns valid tokens → `TokenManager` is populated with expiry → proactive timer scheduled. The user sees no disruption.
 
 ### Guest → different page (e.g. assistant → moderator)
+
 `SessionManager` is a singleton — it's already `"guest"` or `"authenticated"`. The second page's `_app.tsx` call returns immediately (`sessionState !== "uninitialized"`). Tokens are still in `TokenManager`.
 
 ### Admin login → participant page
+
 1. `/login` page calls the backend `/auth/login`
 2. On success: `Api.get().SetTokens(access, refresh, accessExpires, refreshExpires, userId)` — expiry stored in `TokenManager`, token owner set to the admin `userId`, proactive timer starts
 3. `/api/session` POST — cookie updated with new tokens and expiry
@@ -450,12 +459,14 @@ Even if Tab B's timer fires between Tab A's refresh and the `TOKENS_REFRESHED` b
 5. Navigate to `/assistant` — `SessionManager` already initialized, `TokenManager` has tokens → `useSessionJoin` uses them immediately
 
 ### Two tabs open simultaneously
+
 - Both tabs call `restoreSession()` → both read from `/api/cookie` → both get same tokens
 - Each tab's `TokenManager` is independent but has the same state (and the same `_ownerUserId`)
 - When Tab A's proactive timer fires, Tab B gets `TOKENS_REFRESHED` broadcast and skips its own refresh
-- **No cookie yet (cold start):** if both tabs run `_createGuestSession()` at once they register *distinct* guests and broadcast each other's tokens. Each tab's owner guard rejects the other's `TOKENS_REFRESHED`, so a tab never authenticates as the other guest while building channels for its own — preventing the intermittent `"User is not a participant"` error
+- **No cookie yet (cold start):** if both tabs run `_createGuestSession()` at once they register _distinct_ guests and broadcast each other's tokens. Each tab's owner guard rejects the other's `TOKENS_REFRESHED`, so a tab never authenticates as the other guest while building channels for its own — preventing the intermittent `"User is not a participant"` error
 
 ### Tab hidden (phone locks / browser minimized)
+
 - Token may expire while tab is hidden
 - On `visibilitychange` → `visible`: `getValidToken()` is called → detects stale token → `refresh()` → new token in `TokenManager` → `onTokensChanged` fires → `socket.auth` updated → if socket was disconnected, `socket.connect()` called
 
@@ -548,12 +559,13 @@ Page component
 ### "Admin login tokens don't work on participant page"
 
 `TokenManager` is a **process singleton** — it persists as long as the JavaScript process is alive. If a Next.js page navigation causes a **full page reload**, the singleton is destroyed. Ensure that:
+
 - Navigation between admin and participant pages uses `router.push()` (client-side navigation) not `window.location.href = ...`
 - The cookie always has valid tokens as the source of truth — `SessionManager.restoreSession()` will reload them from the cookie on the next page
 
 ### "Channel access denied / User is not a participant in direct channel"
 
-This means the tab is calling the API with an access token for one user while building the channel name `direct-${userId}-${agentId}` for a *different* user. `TokenManager` now guards against this: tokens arriving via `TOKENS_REFRESHED` broadcast or `_syncFromCookie` are only adopted if their `userId` matches `_ownerUserId`. If you see this error, check the console for `TokenManager: ignoring broadcast/cookie tokens for a different user (...)` — that means the guard fired and rejected a cross-user token. A stale build without the owner guard, or a `SetTokens` call missing its `userId`, can re-introduce the divergence. On the write side, `PATCH /api/session` derives the cookie's `userId` from the access token's `sub` claim, so the cookie's recorded user always matches the tokens stored beside it — preventing a stale cookie `userId` from later mis-firing the cookie-sync guard.
+This means the tab is calling the API with an access token for one user while building the channel name `direct-${userId}-${agentId}` for a _different_ user. `TokenManager` now guards against this: tokens arriving via `TOKENS_REFRESHED` broadcast or `_syncFromCookie` are only adopted if their `userId` matches `_ownerUserId`. If you see this error, check the console for `TokenManager: ignoring broadcast/cookie tokens for a different user (...)` — that means the guard fired and rejected a cross-user token. A stale build without the owner guard, or a `SetTokens` call missing its `userId`, can re-introduce the divergence. On the write side, `PATCH /api/session` derives the cookie's `userId` from the access token's `sub` claim, so the cookie's recorded user always matches the tokens stored beside it — preventing a stale cookie `userId` from later mis-firing the cookie-sync guard.
 
 ### "Socket disconnects when token refreshes"
 
@@ -565,19 +577,19 @@ Check that the backend's clock and the client's clock are roughly in sync. `REFR
 
 ### Useful Console Logs
 
-| Log message | Meaning |
-|---|---|
-| `TokenManager: proactive refresh scheduled in Xs` | Expiry correctly parsed, timer set |
-| `TokenManager: tokens already refreshed (cookie sync)` | Multi-tab safety worked; skipped network call |
-| `TokenManager: received refreshed tokens from another tab` | BroadcastChannel delivered tokens for the same user (adopted) |
-| `TokenManager: ignoring broadcast tokens for a different user (...)` | Owner guard rejected a cross-user `TOKENS_REFRESHED` (expected when distinct guests are open in multiple tabs) |
-| `TokenManager: ignoring cookie tokens for a different user (...)` | Owner guard rejected cookie tokens during `_syncFromCookie`; the tab refreshes its own session instead |
-| `TokenManager: another tab is refreshing — standing by` | Received REFRESH_STARTING |
-| `TokenManager: token refresh successful` | Full refresh cycle completed |
-| `TokenManager: refresh token expired, logging out` | Both tokens expired; user will be redirected |
-| `Socket auth error detected, refreshing token via TokenManager…` | WS connect_error with 401 |
-| `Reconnected after Xs gap — signalling history re-fetch` | Gap-reconnect detected; page should re-fetch history |
-| `Server-side token refresh detected — syncing TokenManager from cookie…` | Admin-route proxy refreshed server-side |
+| Log message                                                              | Meaning                                                                                                        |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `TokenManager: proactive refresh scheduled in Xs`                        | Expiry correctly parsed, timer set                                                                             |
+| `TokenManager: tokens already refreshed (cookie sync)`                   | Multi-tab safety worked; skipped network call                                                                  |
+| `TokenManager: received refreshed tokens from another tab`               | BroadcastChannel delivered tokens for the same user (adopted)                                                  |
+| `TokenManager: ignoring broadcast tokens for a different user (...)`     | Owner guard rejected a cross-user `TOKENS_REFRESHED` (expected when distinct guests are open in multiple tabs) |
+| `TokenManager: ignoring cookie tokens for a different user (...)`        | Owner guard rejected cookie tokens during `_syncFromCookie`; the tab refreshes its own session instead         |
+| `TokenManager: another tab is refreshing — standing by`                  | Received REFRESH_STARTING                                                                                      |
+| `TokenManager: token refresh successful`                                 | Full refresh cycle completed                                                                                   |
+| `TokenManager: refresh token expired, logging out`                       | Both tokens expired; user will be redirected                                                                   |
+| `Socket auth error detected, refreshing token via TokenManager…`         | WS connect_error with 401                                                                                      |
+| `Reconnected after Xs gap — signalling history re-fetch`                 | Gap-reconnect detected; page should re-fetch history                                                           |
+| `Server-side token refresh detected — syncing TokenManager from cookie…` | Admin-route proxy refreshed server-side                                                                        |
 
 ---
 
@@ -585,22 +597,24 @@ Check that the backend's clock and the client's clock are roughly in sync. `REFR
 
 All tests live in `__tests__/utils/` and `__tests__/integration/`.
 
-| Test File | What It Covers |
-|---|---|
-| `TokenManager.test.ts` | Token storage/retrieval, `isAccessTokenFresh`, `getValidToken`, refresh deduplication, rate-limiting, cookie sync (multi-tab), cookie PATCH + retry, proactive scheduling, `onTokensChanged` (single + multiple listeners), BroadcastChannel (broadcast, receive, timer reschedule, REFRESH_STARTING), token identity ownership (reject cross-user broadcast, ignore broadcast with no owner, `_syncFromCookie` cross-user rejection, authoritative owner update guest→admin), edge cases (no tokens, empty response, 401→logout) |
-| `tokenRefresh.test.ts` | `ensureFreshToken` delegate, `refreshAccessToken` delegate, `emitWithTokenRefresh` (no token, emit, retry on 401, retry fail, non-auth error) |
-| `useSessionJoin.test.ts` | Init, session info, socket creation, connect/disconnect state, connect_error (auth + non-auth), visibility change (disconnected → reconnect, connected → no reconnect), onTokensChanged (subscribe, update auth, connected → no connect(), unsubscribe), gap-reconnect detection |
-| `SessionManager.test.ts` | Singleton, session restore from cookie, guest detection, new guest creation, dedup on concurrent calls, auth/guest state transitions, `skipCreation` option, error handling |
-| `Api.test.ts` | `fetchWithTokenRefresh` (success, stored tokens, 401+retry, no refresh token, refresh fails), `RetrieveData`, `RefreshToken` (success, 401→logout, network error), `Request()` X-Tokens-Refreshed header |
-| `SessionFlow.test.tsx` | End-to-end flow scenarios: new visitor, guest create/restore, rapid navigation dedup, guest→authenticated, restore authenticated, logout, admin→participant token continuity |
+| Test File                | What It Covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TokenManager.test.ts`   | Token storage/retrieval, `isAccessTokenFresh`, `getValidToken`, refresh deduplication, rate-limiting, cookie sync (multi-tab), cookie PATCH + retry, proactive scheduling, `onTokensChanged` (single + multiple listeners), BroadcastChannel (broadcast, receive, timer reschedule, REFRESH_STARTING), token identity ownership (reject cross-user broadcast, ignore broadcast with no owner, `_syncFromCookie` cross-user rejection, authoritative owner update guest→admin), edge cases (no tokens, empty response, 401→logout) |
+| `tokenRefresh.test.ts`   | `ensureFreshToken` delegate, `refreshAccessToken` delegate, `emitWithTokenRefresh` (no token, emit, retry on 401, retry fail, non-auth error)                                                                                                                                                                                                                                                                                                                                                                                     |
+| `useSessionJoin.test.ts` | Init, session info, socket creation, connect/disconnect state, connect_error (auth + non-auth), visibility change (disconnected → reconnect, connected → no reconnect), onTokensChanged (subscribe, update auth, connected → no connect(), unsubscribe), gap-reconnect detection                                                                                                                                                                                                                                                  |
+| `SessionManager.test.ts` | Singleton, session restore from cookie, guest detection, new guest creation, dedup on concurrent calls, auth/guest state transitions, `skipCreation` option, error handling                                                                                                                                                                                                                                                                                                                                                       |
+| `Api.test.ts`            | `fetchWithTokenRefresh` (success, stored tokens, 401+retry, no refresh token, refresh fails), `RetrieveData`, `RefreshToken` (success, 401→logout, network error), `Request()` X-Tokens-Refreshed header                                                                                                                                                                                                                                                                                                                          |
+| `SessionFlow.test.tsx`   | End-to-end flow scenarios: new visitor, guest create/restore, rapid navigation dedup, guest→authenticated, restore authenticated, logout, admin→participant token continuity                                                                                                                                                                                                                                                                                                                                                      |
 
 **Run all tests:**
+
 ```bash
 npx jest --no-coverage
 # Expected: 42 suites, 768 tests, all green
 ```
 
 **Run a specific file:**
+
 ```bash
 npx jest --no-coverage --testPathPattern="TokenManager"
 ```

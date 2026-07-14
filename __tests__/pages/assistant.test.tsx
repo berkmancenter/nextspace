@@ -117,7 +117,7 @@ jest.mock('../../utils', () => ({
 
 // Mock useSessionJoin hook
 const mockUseSessionJoin = jest.fn();
-jest.mock('../../utils/useSessionJoin', () => ({
+jest.mock('../../hooks/useSessionJoin', () => ({
   useSessionJoin: (...args: any[]) => mockUseSessionJoin(...args),
 }));
 

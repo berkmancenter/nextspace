@@ -88,7 +88,7 @@ jest.mock('../../../utils/eventReportGenerator', () => ({
   generateAndDownloadDirectMessageResponsesReport: jest.fn(),
 }));
 
-jest.mock('../../../utils/useSessionJoin', () => ({
+jest.mock('../../../hooks/useSessionJoin', () => ({
   useSessionJoin: jest.fn(),
 }));
 
