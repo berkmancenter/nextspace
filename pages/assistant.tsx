@@ -919,7 +919,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
             </p>
             {eventStatus === 'ended' && (
               <div className="flex flex-col gap-3 w-full mt-2">
-                <Button aria-label="Close event has ended dialog" onClick={() => setShowEventStatusDialog(false)}>
+                <Button
+                  aria-label={`Close event ${eventStatus === 'ended' ? 'has ended' : 'not started'} dialog`}
+                  onClick={() => setShowEventStatusDialog(false)}
+                >
                   Ok
                 </Button>
               </div>
@@ -1026,7 +1029,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                             });
                           }}
                           pollCounts={pollCounts}
-                          inactive={eventStatus === 'ended'}
+                          inactive={eventStatus !== 'active'}
                         />
                       ) : activeTab === 'resources' ? (
                         <ResourcesPanel
@@ -1059,7 +1062,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                           onPromptSelect={handlePromptSelect}
                           userId={userId}
                           feedbackConfig={assistantFeedbackConfig}
-                          inactive={!agentActive || eventStatus === 'ended'}
+                          inactive={!agentActive || eventStatus !== 'active'}
                           messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
                           onMarkAsRead={(messageId) => {
                             setAssistantMessagesWithUnreadReplies((prev) => {

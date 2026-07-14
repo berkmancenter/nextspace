@@ -381,7 +381,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
         {/* MessageInput*/}
         {inactive ? (
           <div className="px-4 py-3 text-sm text-gray-500 italic text-center border-t border-gray-200">
-            This event has ended.
+            This event is not active.
           </div>
         ) : (
           <div ref={messageInputRef} className="flex-shrink-0">
