@@ -41,6 +41,23 @@ describe('deriveEventState', () => {
     const now = new Date('2026-08-01T15:00:00Z');
     expect(deriveEventState({ active: false, draft: true, scheduledTime: undefined }, now)).toBe('pending');
   });
+
+  it('returns past once the conversation has ended (endTime set), not scheduled', () => {
+    // Before endTime existed, a confirmed, inactive event derived to `scheduled` even after it was over.
+    const now = new Date('2026-08-02T00:00:00Z');
+    const endTime = new Date('2026-08-01T17:30:00Z').toISOString();
+    expect(deriveEventState({ active: false, draft: false, scheduledTime: scheduledTime.toISOString(), endTime }, now)).toBe(
+      'past',
+    );
+  });
+
+  it('still returns live for an active conversation even if an endTime is present', () => {
+    const now = new Date('2026-08-01T16:05:00Z');
+    const endTime = new Date('2026-08-01T17:30:00Z').toISOString();
+    expect(deriveEventState({ active: true, draft: false, scheduledTime: scheduledTime.toISOString(), endTime }, now)).toBe(
+      'live',
+    );
+  });
 });
 
 describe('isValidZoomUrl', () => {

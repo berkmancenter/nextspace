@@ -1,6 +1,6 @@
 import { Conversation } from '../types.internal';
 
-export type EventState = 'missed' | 'pending' | 'live' | 'scheduled';
+export type EventState = 'missed' | 'pending' | 'live' | 'scheduled' | 'past';
 
 /**
  * Whether a meeting URL is a valid Zoom link. Mirrors llm_engine's `isZoomUrl`, used by
@@ -30,13 +30,15 @@ export const EDIT_LOCKOUT_MS = 6 * 60 * 1000;
  * Derives the event lifecycle state shown on the event view page. A conversation is
  * confirmed once the backend clears its `draft` flag (all required fields filled in);
  * confirmed events are either live or scheduled, unconfirmed ones are either still
- * fixable (pending) or past the point where an edit could save them (missed).
+ * fixable (pending) or past the point where an edit could save them (missed). The backend
+ * stamps `endTime` when an event ends, which outranks every confirmed state below.
  */
 export function deriveEventState(
-  conversation: Pick<Conversation, 'active' | 'draft' | 'scheduledTime'>,
+  conversation: Pick<Conversation, 'active' | 'draft' | 'scheduledTime' | 'endTime'>,
   now: Date = new Date(),
 ): EventState {
   if (conversation.active) return 'live';
+  if (conversation.endTime) return 'past';
   if (!conversation.draft) return 'scheduled';
   if (!conversation.scheduledTime) return 'pending';
 
