@@ -31,7 +31,8 @@ import { useSessionJoin } from '../utils/useSessionJoin';
 import { NavigationBar, NavTab } from '../components/NavigationBar';
 import { PreferencesPanel } from '../components/PreferencesPanel';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
-import { Button } from '@mui/material';
+import { Button, Dialog } from '@mui/material';
+import { Info } from '@mui/icons-material';
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -148,6 +149,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   // Track assistant messages with unread replies separately
   const [assistantMessagesWithUnreadReplies, setAssistantMessagesWithUnreadReplies] = useState<Set<string>>(new Set());
 
+  const [eventStatusLoaded, setEventStatusLoaded] = useState<boolean>(false);
+  const [eventStatus, setEventStatus] = useState<'active' | 'future' | 'ended'>('active');
+  const [showEventStatusDialog, setShowEventStatusDialog] = useState<boolean>(false);
+
   // Ref to track active tab for socket handler
   const activeTabRef = useRef<NavTab>('assistant');
 
@@ -155,7 +160,14 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   const resourcesRef = useRef<Resource[]>(resources);
 
   // Use custom hook for session joining
-  const { socket, pseudonym, userId, isConnected, errorMessage: sessionError, lastReconnectTime } = useSessionJoin();
+  const {
+    socket,
+    pseudonym,
+    userId,
+    isConnected,
+    errorMessage: sessionError,
+    lastReconnectTime,
+  } = useSessionJoin(eventStatusLoaded && eventStatus !== 'ended');
 
   const [pseudonymFunFact, setPseudonymFunFact] = useState<string | undefined>(undefined);
 
@@ -185,8 +197,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   // Set up message listener
   useEffect(() => {
-    if (!socket) return;
-
     const messageHandler = (data: PseudonymousMessage) => {
       if (process.env.NODE_ENV !== 'production') console.log('New message:', data);
 
@@ -255,6 +265,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       setPollCounts((prev) => ({ ...prev, [data.pollId]: data.counts }));
     };
 
+    if (!socket || !socket.connected) return;
+
     socket.on('message:new', messageHandler);
     socket.on('resources:updated', resourcesUpdatedHandler);
     socket.on('conversation:ending', conversationEndingHandler);
@@ -268,7 +280,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       socket.off('conversation:ending', conversationEndingHandler);
       socket.off('choice:new', pollChoiceHandler);
     };
-  }, [socket, resourcesNavBadgeDismissed, resources.length]);
+  }, [socket, socket?.connected, resourcesNavBadgeDismissed, resources.length]);
 
   // Keep activeTabRef in sync with activeTab state
   useEffect(() => {
@@ -371,6 +383,14 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
         const ids = conversation.agents.map((agent: components['schemas']['Agent']) => agent.id!);
         setAgentIds(ids);
+
+        // Check if the event is not active, and if it's not begun (no endTime)
+        if (conversation.active === false) {
+          setEventStatus(conversation.endTime ? 'ended' : 'future');
+          setShowEventStatusDialog(true);
+        }
+
+        setEventStatusLoaded(true);
       } catch (error) {
         console.error('Error fetching conversation data:', error);
         setGeneralError('Failed to fetch conversation data.');
@@ -638,18 +658,21 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   // Load initial chat messages after the conversation:join completes (so intros
   // are already in state before DB messages are prepended).
+  // Also fetch once if event has ended (no join will occur, but messages may still be available).
   useEffect(() => {
-    if (!chatPasscode || !router.query.conversationId || !initialJoinComplete) return;
+    const hasNoArchivedMessages = chatMessages.length === 0 && eventStatus === 'ended';
+    if (!chatPasscode || !router.query.conversationId || (!initialJoinComplete && !hasNoArchivedMessages)) return;
 
     fetchChatMessages();
-  }, [chatPasscode, router.query.conversationId, initialJoinComplete]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatPasscode, router.query.conversationId, initialJoinComplete, eventStatus]);
 
   // Load initial assistant messages after the conversation:join completes (so
   // intros are already in state before DB messages are prepended).
   useEffect(() => {
-    if (!initialJoinComplete) return;
+    if (!initialJoinComplete && eventStatus !== 'ended') return;
     fetchAllAssistantMessages();
-  }, [fetchAllAssistantMessages, initialJoinComplete]);
+  }, [fetchAllAssistantMessages, initialJoinComplete, eventStatus]);
 
   // Re-fetch all message history when the socket reconnects after a significant
   // gap (user was on another tab/app for a while). Fills any messages missed
@@ -681,7 +704,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     messageSource: 'message' | 'promptResponse' = 'message',
     promptQuestionId?: string,
   ) {
-    if (!Api.get().GetTokens() || !message) return false;
+    if (!Api.get().GetTokens() || !message || !initialJoinComplete) return false;
 
     // Use different channel based on active tab
     // When in transcript view, default to assistant channel for sending
@@ -860,6 +883,53 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           <Errors generalError={generalError} sessionError={sessionError} setGeneralError={setGeneralError} />
         )}
 
+        {/* Dialog for when the event has ended or has not started yet; if in future, this is non-dismissable */}
+        <Dialog
+          open={showEventStatusDialog}
+          onClose={eventStatus === 'ended' ? () => setShowEventStatusDialog(false) : () => {}}
+          aria-labelledby="event-status-dialog-title"
+          aria-describedby="event-status-dialog-description"
+          slotProps={{
+            paper: {
+              sx: {
+                borderRadius: '16px',
+                padding: '32px 24px',
+                maxWidth: '440px',
+                textAlign: 'center',
+              },
+            },
+          }}
+        >
+          <div className="flex flex-col items-center gap-4">
+            <h2 id="event-status-dialog-title" className="text-2xl font-bold text-gray-900 flex items-center justify-center">
+              <Info className="inline-block mr-2" />
+              {eventStatus === 'ended' ? 'Event Has Ended' : 'Event Not Started'}
+            </h2>
+            <p id="event-status-dialog-description" className="text-gray-600 text-base leading-relaxed">
+              {eventStatus === 'ended' ? (
+                <span>
+                  This event has ended and the assistant is no longer available. You can still view the transcript and
+                  resources, but you will not be able to send new messages.
+                </span>
+              ) : (
+                <span>
+                  This event has not started yet. You will be able to interact with the assistant once the event begins.
+                </span>
+              )}
+            </p>
+            {eventStatus === 'ended' && (
+              <div className="flex flex-col gap-3 w-full mt-2">
+                <Button
+                  aria-label={`Close event ${eventStatus === 'ended' ? 'has ended' : 'not started'} dialog`}
+                  onClick={() => setShowEventStatusDialog(false)}
+                >
+                  Ok
+                </Button>
+              </div>
+            )}
+          </div>
+        </Dialog>
+
         {/* Display parameter errors if present */}
         {paramsError ? (
           <ParamErrors paramsError={paramsError} />
@@ -929,7 +999,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                     )}
                     {router.query.view === 'preferences' ? (
                       <PreferencesPanel botName={botName} />
-                    ) : isConnected ? (
+                    ) : isConnected || eventStatus === 'ended' ? (
                       activeTab === 'chat' ? (
                         <GroupChatPanel
                           messages={chatMessages}
@@ -959,6 +1029,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                             });
                           }}
                           pollCounts={pollCounts}
+                          inactive={eventStatus !== 'active'}
                         />
                       ) : activeTab === 'resources' ? (
                         <ResourcesPanel
@@ -991,7 +1062,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                           onPromptSelect={handlePromptSelect}
                           userId={userId}
                           feedbackConfig={assistantFeedbackConfig}
-                          inactive={!agentActive}
+                          inactive={!agentActive || eventStatus !== 'active'}
                           messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
                           onMarkAsRead={(messageId) => {
                             setAssistantMessagesWithUnreadReplies((prev) => {
