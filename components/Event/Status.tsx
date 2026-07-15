@@ -191,7 +191,10 @@ export const EventStatus: React.FC<{
   const hasValidMeetingUrl = isValidZoomUrl(meetingUrl);
 
   const startTime = formatTime(conversationData.scheduledTime);
-  const startTimeWithZone = formatTimeWithZone(conversationData.scheduledTime);
+  const scheduledStartWithZone = formatTimeWithZone(conversationData.scheduledTime);
+  // A live event reports when it actually started: the backend stamps startTime on start, and an
+  // event started ad hoc has no scheduledTime at all, which would otherwise render an empty time.
+  const liveSinceWithZone = formatTimeWithZone(conversationData.startTime ?? conversationData.scheduledTime);
   const endTimeWithZone = formatTimeWithZone(conversationData.endTime);
 
   // The live banner and hint name the assistant. Reads the same botName as Details.tsx so the two
@@ -396,7 +399,7 @@ export const EventStatus: React.FC<{
         <>
           <p className="flex items-center justify-end gap-1 text-[11.5px] text-[#0F7A4E]">
             <AccessTimeOutlined fontSize="inherit" />
-            Live since {startTimeWithZone}. {botName} is active.
+            Live since {liveSinceWithZone}. {botName} is active.
           </p>
 
           <div className="flex items-start gap-3 rounded-[10px] border border-[#B7E4CD] bg-[#F1FBF6] p-[18px]">
@@ -406,7 +409,7 @@ export const EventStatus: React.FC<{
             <div>
               <p className="text-[14px] font-semibold text-[#0B0D0E]">This event is live</p>
               <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#3F6B54]">
-                All details were confirmed and the event started at {startTimeWithZone}. {botName} is active and answering
+                All details were confirmed and the event started at {liveSinceWithZone}. {botName} is active and answering
                 audience questions.
               </p>
             </div>
@@ -418,7 +421,7 @@ export const EventStatus: React.FC<{
         <>
           <p className="flex items-center justify-end gap-1 text-[11.5px] text-[#0F7A4E]">
             <CheckOutlined fontSize="inherit" />
-            All details confirmed. Starts {startTimeWithZone}.
+            All details confirmed. Starts {scheduledStartWithZone}.
           </p>
 
           <div className="flex items-start gap-3 rounded-[10px] border border-[#B7E4CD] bg-[#F1FBF6] p-[18px]">

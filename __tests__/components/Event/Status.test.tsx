@@ -21,6 +21,10 @@ jest.mock('../../../utils/SessionManager', () => ({
 const writeText = jest.fn();
 Object.assign(navigator, { clipboard: { writeText } });
 
+// Mirrors Status.tsx's formatTimeWithZone so assertions hold in any machine time zone.
+const timeWithZone = (iso: string) =>
+  new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+
 describe('EventStatus (pending state)', () => {
   // `now` sits well before the scheduled start, so a draft event derives to `pending`
   // (unconfirmed, but not yet within the 6-minute edit-lockout that flips it to `missed`).
@@ -442,6 +446,22 @@ describe('EventStatus (live state)', () => {
     renderLive();
     expect(screen.getByText(/this event is live/i)).toBeInTheDocument();
     expect(screen.getByText(/answering audience questions/i)).toBeInTheDocument();
+  });
+
+  it('reports when the event actually started, not when it was planned to', () => {
+    // The backend stamps startTime on start, so a late start must report the real time.
+    const actualStart = '2026-08-01T16:07:00Z';
+    renderLive({ startTime: actualStart } as Partial<Conversation>);
+    expect(screen.getByText(/live since/i).textContent).toContain(timeWithZone(actualStart));
+    expect(screen.getByText(/answering audience questions/i).textContent).toContain(timeWithZone(actualStart));
+  });
+
+  it('still reports a start time for a live event that has no scheduled time', () => {
+    // An event started ad hoc has no scheduledTime, which used to render "Live since ." with no time.
+    const actualStart = '2026-08-01T16:07:00Z';
+    renderLive({ scheduledTime: undefined, startTime: actualStart } as Partial<Conversation>);
+    expect(screen.getByText(/live since/i).textContent).toContain(timeWithZone(actualStart));
+    expect(screen.getByText(/live since/i).textContent).not.toMatch(/live since \./i);
   });
 
   it('names the configured assistant in the live copy', () => {
