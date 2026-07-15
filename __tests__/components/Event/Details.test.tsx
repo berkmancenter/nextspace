@@ -100,6 +100,12 @@ describe('EventDetails', () => {
       expect(screen.queryByText(/leave it as-is/)).not.toBeInTheDocument();
     });
 
+    it('hides the needs-attention callout for a missed event, which has no Edit action', () => {
+      renderAt({ ...baseConversationData, scheduledTime: '2026-08-01T09:00:00Z' });
+      expandSection('Event Details');
+      expect(screen.queryByText(/leave it as-is/)).not.toBeInTheDocument();
+    });
+
     it('shows the series name and a PUBLIC badge when the topic is public', () => {
       renderAt({ ...baseConversationData, topic: { ...(baseConversationData.topic as any), private: false } });
       expandSection('Event Details');
@@ -268,6 +274,12 @@ describe('EventDetails', () => {
       expandSection('Assistant configuration');
       expect(screen.getByText(/still on calendar-invite defaults/)).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: /dismiss/i }));
+      expect(screen.queryByText(/still on calendar-invite defaults/)).not.toBeInTheDocument();
+    });
+
+    it('hides the calendar-invite-defaults note for a missed event, which cannot be reviewed before the event', () => {
+      renderAt({ ...baseConversationData, scheduledTime: '2026-08-01T09:00:00Z' });
+      expandSection('Assistant configuration');
       expect(screen.queryByText(/still on calendar-invite defaults/)).not.toBeInTheDocument();
     });
 

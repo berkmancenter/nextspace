@@ -164,6 +164,9 @@ export const EventDetails: React.FC<{
   // Notes about how an event starts out only make sense before it runs, and only these two states
   // offer the Edit action such a note points at (missed offers "Create a new event"; past offers none).
   const isUpcoming = state === 'pending' || state === 'scheduled';
+  // Review nudges belong only on an event still awaiting confirmation. A missed event is also
+  // unconfirmed but offers no Edit action, and its Status banner already lists what went unfilled.
+  const isPending = state === 'pending';
 
   // A concluded event shows when it actually ran (startTime/endTime, stamped by the backend), not
   // when it was planned, since the scheduled times may be blank for an ad-hoc event. Every other
@@ -204,7 +207,7 @@ export const EventDetails: React.FC<{
         expanded={expanded['details-1a']}
         onToggle={setSection('details-1a')}
       >
-        {unconfirmed && !isLive && (
+        {isPending && (
           <Callout>
             If this series matches your expected topic, leave it as-is. Otherwise, click the Edit button above to change it.
           </Callout>
@@ -312,9 +315,7 @@ export const EventDetails: React.FC<{
         onToggle={setSection('cfg-1a')}
         headerChip={unconfirmed && <DefaultChip />}
       >
-        {unconfirmed && (
-          <Callout>Model and features are still on calendar-invite defaults. Review before the event.</Callout>
-        )}
+        {isPending && <Callout>Model and features are still on calendar-invite defaults. Review before the event.</Callout>}
         <div className="grid grid-cols-3 gap-4">
           <div>
             <FieldLabel>Bot name</FieldLabel>
