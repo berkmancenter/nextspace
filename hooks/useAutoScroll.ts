@@ -3,6 +3,8 @@ import { useRef, useEffect, useState } from 'react';
 /**
  * Custom hook to handle automatic scrolling to bottom of messages
  * Used by chat components to keep the latest message visible
+ * @param messages The array of messages to monitor for changes
+ * @returns An object containing refs and functions for managing auto-scroll behavior
  */
 export function useAutoScroll<T extends any[]>(messages: T) {
   const messagesEndRef = useRef<HTMLDivElement>(null);

@@ -3,6 +3,7 @@ import { components } from '../types';
 
 type Resource = components['schemas']['Resource'];
 
+// Interface for the return type of the useResources hook, defining the state and functions it provides
 export interface UseResourcesReturn {
   resources: Resource[];
   setResources: React.Dispatch<React.SetStateAction<Resource[]>>;
@@ -18,6 +19,13 @@ export interface UseResourcesReturn {
   onClearResources: () => void;
 }
 
+/**
+ * Custom hook to manage resources within the application.
+ * It provides state and functions to track resources, new resource IDs, unseen resources count,
+ * navigation badge dismissal, and reminder activation. It also handles updates to resources,
+ * marking readings as seen, conversation ending, and clearing resources.
+ * @returns An object containing the state and functions for managing resources.
+ */
 export function useResources(): UseResourcesReturn {
   const [resources, setResources] = useState<Resource[]>([]);
   const [newResourceIds, setNewResourceIds] = useState<Set<string>>(new Set());

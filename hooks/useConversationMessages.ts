@@ -3,6 +3,55 @@ import { PseudonymousMessage } from '../types.internal';
 import { Api, RetrieveData, getPollResponseCounts, inspectPoll } from '../utils';
 import { parseMessageBody } from '../utils/Helpers';
 
+/**
+ * Parameters required for the useConversationMessages hook.
+ */
+export interface UseConversationMessagesParams {
+  /** The ID of the current user participating in the conversation. */
+  userId: string | null;
+  /** The pseudonym of the current user, used to filter messages and replies. */
+  pseudonym: string | null;
+  /** The ID of the agent associated with the conversation, used to fetch assistant messages. */
+  agentId: string | null;
+  /** An array of agent IDs associated with the conversation, used to fetch all assistant messages. */
+  agentIds: string[];
+  /** The passcode for accessing chat messages in the conversation. */
+  chatPasscode: string;
+  /** Whether the user has completed the initial join process for the conversation. */
+  initialJoinComplete: boolean;
+  /** A mutable reference to an array of introductory chat messages, used to prepend to fetched chat messages. */
+  chatIntroRef: React.MutableRefObject<PseudonymousMessage[]>;
+  /** A mutable reference to an array of introductory assistant messages, used to prepend to fetched assistant messages. */
+  assistantIntroRef: React.MutableRefObject<PseudonymousMessage[]>;
+  /** The unique identifier for the current conversation, used to fetch messages. */
+  conversationId: string | undefined;
+}
+
+/**
+ * Return type for the useConversationMessages hook.
+ * Contains the state and functions for managing assistant and chat messages, poll counts, unread reply counts, and fetching messages.
+ */
+export interface UseConversationMessagesReturn {
+  assistantMessages: PseudonymousMessage[];
+  setAssistantMessages: React.Dispatch<React.SetStateAction<PseudonymousMessage[]>>;
+  chatMessages: PseudonymousMessage[];
+  setChatMessages: React.Dispatch<React.SetStateAction<PseudonymousMessage[]>>;
+  pollCounts: Record<string, Record<string, number>>;
+  setPollCounts: React.Dispatch<React.SetStateAction<Record<string, Record<string, number>>>>;
+  unreadChatReplyCount: number;
+  unreadAssistantReplyCount: number;
+  messagesWithUnreadReplies: Set<string>;
+  setMessagesWithUnreadReplies: React.Dispatch<React.SetStateAction<Set<string>>>;
+  assistantMessagesWithUnreadReplies: Set<string>;
+  setAssistantMessagesWithUnreadReplies: React.Dispatch<React.SetStateAction<Set<string>>>;
+  fetchAllAssistantMessages: () => Promise<void>;
+  fetchChatMessages: () => Promise<void>;
+}
+/**
+ * Fetches replies for the given pseudonymous messages and inserts them into the message array, maintaining chronological order.
+ * @param messages The array of pseudonymous messages for which to fetch and insert replies.
+ * @returns A promise that resolves to an array of pseudonymous messages including the original messages and their fetched replies, sorted by creation date.
+ */
 async function fetchAndInsertReplies(messages: PseudonymousMessage[]): Promise<PseudonymousMessage[]> {
   const messagesWithReplies = messages.filter((msg) => msg.replyCount && msg.replyCount > 0);
 
@@ -36,35 +85,11 @@ async function fetchAndInsertReplies(messages: PseudonymousMessage[]): Promise<P
   return combinedMessages;
 }
 
-interface UseConversationMessagesParams {
-  userId: string | null;
-  pseudonym: string | null;
-  agentId: string | null;
-  agentIds: string[];
-  chatPasscode: string;
-  initialJoinComplete: boolean;
-  chatIntroRef: React.MutableRefObject<PseudonymousMessage[]>;
-  assistantIntroRef: React.MutableRefObject<PseudonymousMessage[]>;
-  conversationId: string | undefined;
-}
-
-export interface UseConversationMessagesReturn {
-  assistantMessages: PseudonymousMessage[];
-  setAssistantMessages: React.Dispatch<React.SetStateAction<PseudonymousMessage[]>>;
-  chatMessages: PseudonymousMessage[];
-  setChatMessages: React.Dispatch<React.SetStateAction<PseudonymousMessage[]>>;
-  pollCounts: Record<string, Record<string, number>>;
-  setPollCounts: React.Dispatch<React.SetStateAction<Record<string, Record<string, number>>>>;
-  unreadChatReplyCount: number;
-  unreadAssistantReplyCount: number;
-  messagesWithUnreadReplies: Set<string>;
-  setMessagesWithUnreadReplies: React.Dispatch<React.SetStateAction<Set<string>>>;
-  assistantMessagesWithUnreadReplies: Set<string>;
-  setAssistantMessagesWithUnreadReplies: React.Dispatch<React.SetStateAction<Set<string>>>;
-  fetchAllAssistantMessages: () => Promise<void>;
-  fetchChatMessages: () => Promise<void>;
-}
-
+/**
+ * Custom hook to manage conversation messages, including assistant and chat messages, poll counts, and unread reply counts.
+ * See {@link UseConversationMessagesParams} for parameter details.
+ * @returns An object containing state and functions for managing messages and their related data.
+ */
 export function useConversationMessages({
   userId,
   pseudonym,

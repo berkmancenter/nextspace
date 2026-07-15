@@ -9,7 +9,8 @@ import type { ConversationType } from '../context/ConversationTypeContext';
 
 type Resource = components['schemas']['Resource'];
 
-interface UseConversationSetupParams {
+// Interface for the parameters passed to the useConversationSetup hook
+export interface UseConversationSetupParams {
   socket: Socket | null;
   userId: string | null;
   router: NextRouter;
@@ -18,6 +19,7 @@ interface UseConversationSetupParams {
   setResources: React.Dispatch<React.SetStateAction<Resource[]>>;
 }
 
+// Return type for the useConversationSetup hook, defining the state and functions it provides
 export interface UseConversationSetupReturn {
   generalError: string | null;
   setGeneralError: React.Dispatch<React.SetStateAction<string | null>>;
@@ -41,6 +43,12 @@ export interface UseConversationSetupReturn {
   hasJoinedConvRef: React.MutableRefObject<boolean>;
 }
 
+/**
+ * Custom hook to set up conversation context and state based on the provided parameters.
+ * It fetches conversation data, manages state for event details, bot name, agent information, and more.
+ * See {@link UseConversationSetupParams} for parameter details.
+ * @returns An object containing the state and functions for managing the conversation setup, including errors, event details, bot and agent information, conversation features, passcodes, and refs for chat and assistant intros.
+ */
 export function useConversationSetup({
   socket,
   userId,
