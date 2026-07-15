@@ -342,20 +342,47 @@ describe('EventDetails', () => {
         ],
       });
       expandSection('Reading & resources');
-      expect(screen.getByText(/default to optional and hidden from participants/)).toBeInTheDocument();
+      expect(screen.getByText(/start out optional and hidden from participants/)).toBeInTheDocument();
       const link = screen.getByRole('link', { name: 'Intro to Robotics' });
       expect(link).toHaveAttribute('href', 'https://example.com/paper.pdf');
       expect(screen.getByText(/A. Author/)).toBeInTheDocument();
-      expect(screen.getByText('Optional')).toBeInTheDocument();
+      expect(screen.getByText('Required')).toBeInTheDocument();
       expect(screen.getByText('Not visible to participants')).toBeInTheDocument();
+    });
+
+    it('does not tag a suggested resource as required', () => {
+      renderAt({
+        ...baseConversationData,
+        resources: [{ source: 'speaker', category: 'suggested', title: 'Further Reading', participantVisible: true }],
+      });
+      expandSection('Reading & resources');
+      expect(screen.queryByText('Required')).not.toBeInTheDocument();
     });
 
     it('hides the resources-default callout when its dismiss button is clicked', () => {
       renderAt(baseConversationData);
       expandSection('Reading & resources');
-      expect(screen.getByText(/default to optional and hidden from participants/)).toBeInTheDocument();
+      expect(screen.getByText(/start out optional and hidden from participants/)).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: /dismiss/i }));
-      expect(screen.queryByText(/default to optional and hidden from participants/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/start out optional and hidden from participants/)).not.toBeInTheDocument();
+    });
+
+    it('still shows the creation-defaults callout once the event is scheduled', () => {
+      renderAt({ ...baseConversationData, draft: false, scheduledEndTime: '2026-08-01T17:30:00Z' });
+      expandSection('Reading & resources');
+      expect(screen.getByText(/start out optional and hidden from participants/)).toBeInTheDocument();
+    });
+
+    it('hides the creation-defaults callout once the event has ended, where there is no Edit action', () => {
+      renderAt({ ...baseConversationData, draft: false, endTime: '2026-08-01T17:30:00Z' });
+      expandSection('Reading & resources');
+      expect(screen.queryByText(/start out optional and hidden from participants/)).not.toBeInTheDocument();
+    });
+
+    it('hides the creation-defaults callout for a missed event, where the action is Create a new event', () => {
+      renderAt({ ...baseConversationData, scheduledTime: '2026-08-01T09:00:00Z' });
+      expandSection('Reading & resources');
+      expect(screen.queryByText(/start out optional and hidden from participants/)).not.toBeInTheDocument();
     });
   });
 

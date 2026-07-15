@@ -161,6 +161,9 @@ export const EventDetails: React.FC<{
   const unconfirmed = state === 'pending' || state === 'missed';
   const isLive = state === 'live';
   const isPast = state === 'past';
+  // Notes about how an event starts out only make sense before it runs, and only these two states
+  // offer the Edit action such a note points at (missed offers "Create a new event"; past offers none).
+  const isUpcoming = state === 'pending' || state === 'scheduled';
 
   // A concluded event shows when it actually ran (startTime/endTime, stamped by the backend), not
   // when it was planned, since the scheduled times may be blank for an ad-hoc event. Every other
@@ -391,9 +394,12 @@ export const EventDetails: React.FC<{
         expanded={expanded['resources-1a']}
         onToggle={setSection('resources-1a')}
       >
-        <Callout>
-          Resources default to optional and hidden from participants. Click the Edit button at the top to change.
-        </Callout>
+        {isUpcoming && (
+          <Callout>
+            Resources from a calendar invite start out optional and hidden from participants. Click Edit above to change
+            that.
+          </Callout>
+        )}
         {conversationData.resources && conversationData.resources.length > 0 ? (
           conversationData.resources.map((resource, index) => (
             <div key={index} className="mt-3 first:mt-0">
@@ -413,7 +419,7 @@ export const EventDetails: React.FC<{
               )}
               {resource.description && <p className="mt-1 text-[13px] text-[#4B5563]">{resource.description}</p>}
               <div className="mt-1 flex flex-wrap gap-1">
-                {resource.category === 'required' && <Tag>Optional</Tag>}
+                {resource.category === 'required' && <Tag>Required</Tag>}
                 {!resource.participantVisible && (
                   <Tag icon={<VisibilityOffOutlined fontSize="inherit" />}>Not visible to participants</Tag>
                 )}
