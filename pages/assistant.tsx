@@ -601,7 +601,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                     )}
                     {router.query.view === 'preferences' ? (
                       <PreferencesPanel botName={botName} />
-                    ) : isConnected || eventStatus == 'active' ? (
+                    ) : isConnected || eventStatus == 'ended' ? (
                       activeTab === 'chat' ? (
                         <GroupChatPanel
                           messages={chatMessages}
