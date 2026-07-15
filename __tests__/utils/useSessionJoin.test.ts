@@ -128,7 +128,7 @@ describe('useSessionJoin', () => {
   });
 
   it('should initialize with correct default state', async () => {
-    const { result } = renderHook(() => useSessionJoin(false));
+    const { result } = renderHook(() => useSessionJoin(true, false));
 
     // Initially socket and user info should be set after mount
     await waitFor(() => {
@@ -140,26 +140,40 @@ describe('useSessionJoin', () => {
     });
   });
 
-  it('should get session info from SessionManager on mount', async () => {
-    renderHook(() => useSessionJoin(false));
+  it('should return userId and pseudonym only if socket is not enabled', async () => {
+    const { result } = renderHook(() => useSessionJoin(false, false));
 
     await waitFor(() => {
-      expect(mockGetSessionInfo).toHaveBeenCalledTimes(1);
+      expect(result.current.pseudonym).toBe('test-pseudonym');
+      expect(result.current.userId).toBe('test-user');
+      expect(result.current.socket).toBeNull();
+      expect(result.current.isConnected).toBe(false);
+      expect(result.current.errorMessage).toBeNull();
+    });
+
+    expect(mockGetSessionInfo).toHaveBeenCalledTimes(1);
+  });
+
+  it('should get session info from SessionManager on mount', async () => {
+    renderHook(() => useSessionJoin(true, false));
+
+    await waitFor(() => {
+      expect(mockGetSessionInfo).toHaveBeenCalledTimes(2);
     });
   });
 
   it('should only initialize once (prevents infinite loop)', async () => {
-    const { rerender } = renderHook(() => useSessionJoin(false));
+    const { rerender } = renderHook(() => useSessionJoin(true, false));
 
     await waitFor(() => {
-      expect(mockGetSessionInfo).toHaveBeenCalledTimes(1);
+      expect(mockGetSessionInfo).toHaveBeenCalledTimes(2);
     });
 
     // Rerender should not trigger another initialization
     rerender();
 
     await waitFor(() => {
-      expect(mockGetSessionInfo).toHaveBeenCalledTimes(1);
+      expect(mockGetSessionInfo).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -169,7 +183,7 @@ describe('useSessionJoin', () => {
       username: 'TestPseudonym',
     });
 
-    const { result } = renderHook(() => useSessionJoin(false));
+    const { result } = renderHook(() => useSessionJoin(true, false));
 
     await waitFor(() => {
       expect(result.current.pseudonym).toBe('TestPseudonym');
@@ -178,7 +192,7 @@ describe('useSessionJoin', () => {
   });
 
   it('should create socket with session info', async () => {
-    const { result } = renderHook(() => useSessionJoin(false));
+    const { result } = renderHook(() => useSessionJoin(true, false));
 
     await waitFor(() => {
       expect(mockIo).toHaveBeenCalledWith(
@@ -194,7 +208,7 @@ describe('useSessionJoin', () => {
   it('should set error message when no session info available', async () => {
     mockGetSessionInfo.mockReturnValue(null);
 
-    const { result } = renderHook(() => useSessionJoin(false));
+    const { result } = renderHook(() => useSessionJoin(true, false));
 
     await waitFor(() => {
       expect(result.current.errorMessage).toBe('No session available');
@@ -204,7 +218,7 @@ describe('useSessionJoin', () => {
   it('should set error message when no access token available', async () => {
     mockGetTokens.mockReturnValue({ access: null, refresh: null });
 
-    const { result } = renderHook(() => useSessionJoin(false));
+    const { result } = renderHook(() => useSessionJoin(true, false));
 
     await waitFor(() => {
       expect(result.current.errorMessage).toBe('No access token available');
@@ -212,7 +226,7 @@ describe('useSessionJoin', () => {
   });
 
   it('should register socket event handlers including connect_error', async () => {
-    renderHook(() => useSessionJoin(false));
+    renderHook(() => useSessionJoin(true, false));
 
     await waitFor(() => {
       expect(mockSocket.on).toHaveBeenCalledWith('error', expect.any(Function));
@@ -230,7 +244,7 @@ describe('useSessionJoin', () => {
       }
     });
 
-    const { result } = renderHook(() => useSessionJoin(false));
+    const { result } = renderHook(() => useSessionJoin(true, false));
 
     await waitFor(() => {
       expect(mockSocket.on).toHaveBeenCalledWith('connect', expect.any(Function));
@@ -254,7 +268,7 @@ describe('useSessionJoin', () => {
       }
     });
 
-    const { result } = renderHook(() => useSessionJoin(false));
+    const { result } = renderHook(() => useSessionJoin(true, false));
 
     await waitFor(() => {
       expect(mockSocket.on).toHaveBeenCalledWith('disconnect', expect.any(Function));
@@ -273,7 +287,7 @@ describe('useSessionJoin', () => {
   it('should call optional success callback', async () => {
     const onSuccess = jest.fn();
 
-    renderHook(() => useSessionJoin(false, onSuccess));
+    renderHook(() => useSessionJoin(true, false, onSuccess));
 
     await waitFor(() => {
       expect(onSuccess).toHaveBeenCalledWith({
@@ -287,7 +301,7 @@ describe('useSessionJoin', () => {
     const onError = jest.fn();
     mockGetSessionInfo.mockReturnValue(null);
 
-    renderHook(() => useSessionJoin(false, undefined, onError));
+    renderHook(() => useSessionJoin(true, false, undefined, onError));
 
     await waitFor(() => {
       expect(onError).toHaveBeenCalledWith('No session available');
@@ -295,7 +309,7 @@ describe('useSessionJoin', () => {
   });
 
   it('should disconnect socket on unmount (prevents orphaned connections)', async () => {
-    const { unmount } = renderHook(() => useSessionJoin(false));
+    const { unmount } = renderHook(() => useSessionJoin(true, false));
 
     await waitFor(() => {
       expect(mockIo).toHaveBeenCalled();
@@ -307,7 +321,7 @@ describe('useSessionJoin', () => {
   });
 
   it('should cleanup socket event listeners on unmount', async () => {
-    const { unmount } = renderHook(() => useSessionJoin(false));
+    const { unmount } = renderHook(() => useSessionJoin(true, false));
 
     await waitFor(() => {
       expect(mockSocket.on).toHaveBeenCalled();
@@ -331,7 +345,7 @@ describe('useSessionJoin', () => {
       }
     });
 
-    renderHook(() => useSessionJoin(false));
+    renderHook(() => useSessionJoin(true, false));
 
     await waitFor(() => {
       expect(mockSocket.on).toHaveBeenCalledWith('error', expect.any(Function));
@@ -358,7 +372,7 @@ describe('useSessionJoin', () => {
   });
 
   it('should expose lastReconnectTime, starting as null', async () => {
-    const { result } = renderHook(() => useSessionJoin(false));
+    const { result } = renderHook(() => useSessionJoin(true, false));
 
     await waitFor(() => {
       expect(result.current.socket).toBe(mockSocket);
@@ -377,7 +391,7 @@ describe('useSessionJoin', () => {
         if (event === 'disconnect') disconnectHandler = handler;
       });
 
-      const { result } = renderHook(() => useSessionJoin(false));
+      const { result } = renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(mockSocket.on).toHaveBeenCalledWith('connect', expect.any(Function));
@@ -412,7 +426,7 @@ describe('useSessionJoin', () => {
         if (event === 'disconnect') disconnectHandler = handler;
       });
 
-      const { result } = renderHook(() => useSessionJoin(false));
+      const { result } = renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(mockSocket.on).toHaveBeenCalledWith('connect', expect.any(Function));
@@ -447,7 +461,7 @@ describe('useSessionJoin', () => {
         if (event === 'connect') connectHandler = handler;
       });
 
-      const { result } = renderHook(() => useSessionJoin(false));
+      const { result } = renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(mockSocket.on).toHaveBeenCalledWith('connect', expect.any(Function));
@@ -475,7 +489,7 @@ describe('useSessionJoin', () => {
         if (event === 'disconnect') disconnectHandler = handler;
       });
 
-      const { result } = renderHook(() => useSessionJoin(false));
+      const { result } = renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(mockSocket.on).toHaveBeenCalledWith('connect', expect.any(Function));
@@ -523,7 +537,7 @@ describe('useSessionJoin', () => {
         }
       });
 
-      renderHook(() => useSessionJoin(false));
+      renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(mockSocket.on).toHaveBeenCalledWith('connect_error', expect.any(Function));
@@ -550,7 +564,7 @@ describe('useSessionJoin', () => {
         }
       });
 
-      renderHook(() => useSessionJoin(false));
+      renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(mockSocket.on).toHaveBeenCalledWith('connect_error', expect.any(Function));
@@ -572,7 +586,7 @@ describe('useSessionJoin', () => {
         }
       });
 
-      renderHook(() => useSessionJoin(false));
+      renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(mockSocket.on).toHaveBeenCalledWith('connect_error', expect.any(Function));
@@ -597,7 +611,7 @@ describe('useSessionJoin', () => {
         }
       });
 
-      renderHook(() => useSessionJoin(false));
+      renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(mockSocket.on).toHaveBeenCalledWith('connect_error', expect.any(Function));
@@ -615,7 +629,7 @@ describe('useSessionJoin', () => {
 
   describe('visibility change handling', () => {
     it('should register visibilitychange event listener', async () => {
-      renderHook(() => useSessionJoin(false));
+      renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(document.addEventListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
@@ -632,7 +646,7 @@ describe('useSessionJoin', () => {
         }
       });
 
-      renderHook(() => useSessionJoin(false));
+      renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(document.addEventListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
@@ -655,7 +669,7 @@ describe('useSessionJoin', () => {
     it('should reconnect disconnected socket when TokenManager issues a new token', async () => {
       mockSocket.connected = false; // Socket is disconnected
 
-      renderHook(() => useSessionJoin(false));
+      renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(mockTokenManagerOnTokensChanged).toHaveBeenCalled();
@@ -684,7 +698,7 @@ describe('useSessionJoin', () => {
         }
       });
 
-      renderHook(() => useSessionJoin(false));
+      renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(document.addEventListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
@@ -705,7 +719,7 @@ describe('useSessionJoin', () => {
     });
 
     it('should remove visibilitychange listener on unmount', async () => {
-      const { unmount } = renderHook(() => useSessionJoin(false));
+      const { unmount } = renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(document.addEventListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
@@ -719,7 +733,7 @@ describe('useSessionJoin', () => {
 
   describe('TokenManager token change subscription', () => {
     it('should subscribe to TokenManager token changes when socket is ready', async () => {
-      renderHook(() => useSessionJoin(false));
+      renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(mockTokenManagerOnTokensChanged).toHaveBeenCalled();
@@ -727,7 +741,7 @@ describe('useSessionJoin', () => {
     });
 
     it('should update socket.auth when TokenManager issues a new token', async () => {
-      renderHook(() => useSessionJoin(false));
+      renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(mockTokenManagerOnTokensChanged).toHaveBeenCalled();
@@ -746,7 +760,7 @@ describe('useSessionJoin', () => {
     it('should update socket.auth but NOT call socket.connect() when socket is already connected', async () => {
       mockSocket.connected = true; // Already connected — proactive refresh should NOT trigger reconnect
 
-      renderHook(() => useSessionJoin(false));
+      renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(mockTokenManagerOnTokensChanged).toHaveBeenCalled();
@@ -770,7 +784,7 @@ describe('useSessionJoin', () => {
       const mockUnsubscribe = jest.fn();
       mockTokenManagerOnTokensChanged.mockReturnValue(mockUnsubscribe);
 
-      const { unmount } = renderHook(() => useSessionJoin(false));
+      const { unmount } = renderHook(() => useSessionJoin(true, false));
 
       await waitFor(() => {
         expect(mockTokenManagerOnTokensChanged).toHaveBeenCalled();

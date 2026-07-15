@@ -37,6 +37,10 @@ export interface UseConversationSetupReturn {
   transcriptPasscode: string;
   chatPasscode: string;
   initialJoinComplete: boolean;
+  eventStatusLoaded: boolean;
+  eventStatus: 'active' | 'future' | 'ended';
+  showEventStatusDialog: boolean;
+  setShowEventStatusDialog: React.Dispatch<React.SetStateAction<boolean>>;
   setInitialJoinComplete: React.Dispatch<React.SetStateAction<boolean>>;
   chatIntroRef: React.MutableRefObject<PseudonymousMessage[]>;
   assistantIntroRef: React.MutableRefObject<PseudonymousMessage[]>;
@@ -72,6 +76,10 @@ export function useConversationSetup({
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>('');
   const [chatPasscode, setChatPasscode] = useState<string>('');
   const [initialJoinComplete, setInitialJoinComplete] = useState(false);
+
+  const [eventStatusLoaded, setEventStatusLoaded] = useState<boolean>(false);
+  const [eventStatus, setEventStatus] = useState<'active' | 'future' | 'ended'>('active');
+  const [showEventStatusDialog, setShowEventStatusDialog] = useState<boolean>(false);
 
   const chatIntroRef = useRef<PseudonymousMessage[]>([]);
   const assistantIntroRef = useRef<PseudonymousMessage[]>([]);
@@ -157,6 +165,14 @@ export function useConversationSetup({
 
         const ids = conversation.agents.map((agent: components['schemas']['Agent']) => agent.id!);
         setAgentIds(ids);
+
+        // Check if the event is not active, and if it's not begun (no endTime)
+        if (conversation.active === false) {
+          setEventStatus(conversation.endTime ? 'ended' : 'future');
+          setShowEventStatusDialog(true);
+        }
+
+        setEventStatusLoaded(true);
       } catch (error) {
         console.error('Error fetching conversation data:', error);
         setGeneralError('Failed to fetch conversation data.');
@@ -188,5 +204,9 @@ export function useConversationSetup({
     chatIntroRef,
     assistantIntroRef,
     hasJoinedConvRef,
+    eventStatusLoaded,
+    eventStatus,
+    showEventStatusDialog,
+    setShowEventStatusDialog,
   };
 }

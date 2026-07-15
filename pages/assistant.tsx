@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import CloseIcon from '@mui/icons-material/Close';
 
@@ -13,11 +13,12 @@ import { useConversationType, useSetBotName, useSetConversationType } from '../c
 import { AuthType } from '../types.internal';
 import { trackConversationEvent, setUserId } from '../utils/analytics';
 import { Errors, ParamErrors, Transcript } from '../components/';
-import { NavigationBar, NavTab } from '../components/NavigationBar';
+import { NavigationBar } from '../components/NavigationBar';
 import { PreferencesPanel } from '../components/PreferencesPanel';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
-import { Button } from '@mui/material';
 import { CheckAuthHeader } from '../utils/Helpers';
+import { Button, Dialog } from '@mui/material';
+import { Info } from '@mui/icons-material';
 import {
   useResources,
   useAnalytics,
@@ -71,7 +72,20 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     onClearResourcesBadge: () => setResourcesNavBadgeDismissed(true),
   });
 
-  const { socket, pseudonym, userId, isConnected, errorMessage: sessionError, lastReconnectTime } = useSessionJoin();
+  // useSessionJoin's socket connection is gated on the event being active, which
+  // useConversationSetup only knows after its own data fetch resolves. Neither hook
+  // can take the other's return value directly, so
+  // the gate is threaded through local state and synced once eventStatus is known.
+  const [enableSocket, setEnableSocket] = useState(false);
+
+  const {
+    socket,
+    pseudonym,
+    userId,
+    isConnected,
+    errorMessage: sessionError,
+    lastReconnectTime,
+  } = useSessionJoin(enableSocket);
 
   const {
     generalError,
@@ -94,7 +108,16 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     chatIntroRef,
     assistantIntroRef,
     hasJoinedConvRef,
+    eventStatus,
+    eventStatusLoaded,
+    showEventStatusDialog,
+    setShowEventStatusDialog,
   } = useConversationSetup({ socket, userId, router, setConversationType, setBotNameContext, setResources });
+
+  // Enable socket connection only when the event status is loaded and active
+  useEffect(() => {
+    setEnableSocket(eventStatusLoaded && eventStatus === 'active');
+  }, [eventStatusLoaded, eventStatus]);
 
   const {
     assistantMessages,
@@ -156,8 +179,6 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   // Socket event listeners — cross-cutting: messages + tab badges + loading state + resources
   useEffect(() => {
-    if (!socket) return;
-
     const messageHandler = (data: PseudonymousMessage) => {
       if (process.env.NODE_ENV !== 'production') console.log('New message:', data);
 
@@ -198,6 +219,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       setPollCounts((prev) => ({ ...prev, [data.pollId]: data.counts }));
     };
 
+    if (!socket || !socket.connected) return;
+
     socket.on('message:new', messageHandler);
     socket.on('resources:updated', resourcesUpdatedHandler);
     socket.on('conversation:ending', handleConversationEnding);
@@ -213,7 +236,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     };
     // activeTabRef is a ref; the remaining omitted values are stable state setters from hooks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, handleResourcesUpdated, handleConversationEnding]);
+  }, [socket, socket?.connected, handleResourcesUpdated, handleConversationEnding]);
 
   // Track user ID in analytics when pseudonym is available
   useEffect(() => {
@@ -352,7 +375,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     messageSource: 'message' | 'promptResponse' = 'message',
     promptQuestionId?: string,
   ) {
-    if (!Api.get().GetTokens() || !message) return false;
+    if (!Api.get().GetTokens() || !message || !initialJoinComplete) return false;
 
     const effectiveTab = activeTab === 'transcript' ? 'assistant' : activeTab;
 
@@ -462,6 +485,53 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           <Errors generalError={generalError} sessionError={sessionError} setGeneralError={setGeneralError} />
         )}
 
+        {/* Dialog for when the event has ended or has not started yet; if in future, this is non-dismissable */}
+        <Dialog
+          open={showEventStatusDialog}
+          onClose={eventStatus === 'ended' ? () => setShowEventStatusDialog(false) : () => {}}
+          aria-labelledby="event-status-dialog-title"
+          aria-describedby="event-status-dialog-description"
+          slotProps={{
+            paper: {
+              sx: {
+                borderRadius: '16px',
+                padding: '32px 24px',
+                maxWidth: '440px',
+                textAlign: 'center',
+              },
+            },
+          }}
+        >
+          <div className="flex flex-col items-center gap-4">
+            <h2 id="event-status-dialog-title" className="text-2xl font-bold text-gray-900 flex items-center justify-center">
+              <Info className="inline-block mr-2" />
+              {eventStatus === 'ended' ? 'Event Has Ended' : 'Event Not Started'}
+            </h2>
+            <p id="event-status-dialog-description" className="text-gray-600 text-base leading-relaxed">
+              {eventStatus === 'ended' ? (
+                <span>
+                  This event has ended and the assistant is no longer available. You can still view the transcript and
+                  resources, but you will not be able to send new messages.
+                </span>
+              ) : (
+                <span>
+                  This event has not started yet. You will be able to interact with the assistant once the event begins.
+                </span>
+              )}
+            </p>
+            {eventStatus === 'ended' && (
+              <div className="flex flex-col gap-3 w-full mt-2">
+                <Button
+                  aria-label={`Close event ${eventStatus === 'ended' ? 'has ended' : 'not started'} dialog`}
+                  onClick={() => setShowEventStatusDialog(false)}
+                >
+                  Ok
+                </Button>
+              </div>
+            )}
+          </div>
+        </Dialog>
+
         {/* Display parameter errors if present */}
         {paramsError ? (
           <ParamErrors paramsError={paramsError} />
@@ -531,7 +601,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                     )}
                     {router.query.view === 'preferences' ? (
                       <PreferencesPanel botName={botName} />
-                    ) : isConnected ? (
+                    ) : isConnected || eventStatus == 'active' ? (
                       activeTab === 'chat' ? (
                         <GroupChatPanel
                           messages={chatMessages}
@@ -559,6 +629,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                             });
                           }}
                           pollCounts={pollCounts}
+                          inactive={eventStatus !== 'active'}
                         />
                       ) : activeTab === 'resources' ? (
                         <ResourcesPanel
@@ -591,7 +662,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                           onPromptSelect={handlePromptSelect}
                           userId={userId}
                           feedbackConfig={assistantFeedbackConfig}
-                          inactive={!agentActive}
+                          inactive={!agentActive || eventStatus !== 'active'}
                           messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
                           onMarkAsRead={(messageId) => {
                             setAssistantMessagesWithUnreadReplies((prev) => {
