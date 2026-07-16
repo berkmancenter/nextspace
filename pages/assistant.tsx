@@ -334,8 +334,13 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   // Re-fetch all message history when the socket reconnects after a significant gap.
   // Cross-cutting: uses messages (fetchChatMessages, fetchAllAssistantMessages) + resources (setResources)
+  // Also fetch once if event has ended (no join will occur, but messages may still be available).
   useEffect(() => {
-    if (!lastReconnectTime || !router.query.conversationId) return;
+    const hasNoArchivedMessages = chatMessages.length === 0 && eventStatus === 'ended';
+    // Only check lastReconnectTime for active events; for ended events, we want to fetch messages once on load.
+    if (eventStatus === 'active' && (!lastReconnectTime || lastReconnectTime < Date.now() - 10000)) return;
+    if (!router.query.conversationId) return;
+    if (!initialJoinComplete && !hasNoArchivedMessages) return;
 
     console.log('Assistant re-fetching message history after gap-reconnect...');
 
@@ -353,7 +358,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     fetchChatMessages();
     // fetchAllAssistantMessages, fetchChatMessages, setResources are stable (useCallback / setState).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastReconnectTime, router.query.conversationId, chatPasscode]);
+  }, [lastReconnectTime, router.query.conversationId, chatPasscode, initialJoinComplete, eventStatus]);
 
   // Handle ESC key to exit controlled mode
   useEffect(() => {
