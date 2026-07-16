@@ -1,17 +1,8 @@
-import React, { act } from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { RetrieveData, SendData } from '../../../utils';
-import { EventStatus } from '../../../components';
-import { components } from '../../../types';
+import React from 'react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { EventStatus } from '../../../components';
 import { Conversation } from '../../../types.internal';
-import { platform } from 'os';
-
-// Mock the SendData utility
-jest.mock('../../../utils', () => ({
-  RetrieveData: jest.fn(),
-  SendData: jest.fn(),
-}));
 
 const mockPush = jest.fn();
 jest.mock('next/router', () => ({
@@ -27,25 +18,30 @@ jest.mock('../../../utils/SessionManager', () => ({
   },
 }));
 
-// Mock window.location
-const mockLocation = {
-  protocol: 'http:',
-  host: 'localhost:8080',
-};
-Object.defineProperty(window, 'location', {
-  value: mockLocation,
-  writable: true,
-});
+const writeText = jest.fn();
+Object.assign(navigator, { clipboard: { writeText } });
 
-describe('EventStatus', () => {
-  const mockConversationData: Conversation = {
+// Mirrors Status.tsx's formatTimeWithZone so assertions hold in any machine time zone.
+const timeWithZone = (iso: string) =>
+  new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+
+describe('EventStatus (pending state)', () => {
+  // `now` sits well before the scheduled start, so a draft event derives to `pending`
+  // (unconfirmed, but not yet within the 6-minute edit-lockout that flips it to `missed`).
+  const now = new Date('2026-08-01T10:00:00Z');
+  const farFutureScheduledTime = '2026-08-01T16:00:00Z';
+
+  const baseConversationData: Conversation = {
     id: 'conv-123',
     name: 'Test Event',
     active: false,
     locked: false,
     slug: 'test-event',
+    draft: true,
+    scheduledTime: farFutureScheduledTime,
+    owner: 'current-user-id',
     topic: {
-      name: 'Test Topic',
+      name: 'Legal Frontiers Seminar Series',
       conversations: [],
       votingAllowed: false,
       owner: { username: 'user1', password: 'foo', pseudonyms: [] },
@@ -54,20 +50,9 @@ describe('EventStatus', () => {
       archivable: false,
       followers: [],
     },
-    owner: { username: 'user1', password: 'foo', pseudonyms: [] },
     createdAt: '2025-10-17T00:00:00Z',
     channels: [{ name: 'transcript', passcode: 'trans-pass', direct: false }],
-    agents: [
-      {
-        agentType: 'eventAssistant',
-        name: 'Event Assistant',
-        description: 'Assists',
-        pseudonyms: [],
-        llmPlatform: 'openai',
-        llmModel: 'gpt-4',
-        conversation: 'conv-123',
-      },
-    ],
+    agents: [],
     followed: undefined,
     messageCount: 10,
     adapters: [],
@@ -76,18 +61,8 @@ describe('EventStatus', () => {
     enableDMs: [],
     experiments: [],
     eventUrls: {
-      moderator: [
-        {
-          label: 'Event Assistant Display',
-          url: 'http://localhost:8080/assistant/?conversationId=conv-123',
-        },
-      ],
-      participant: [
-        {
-          label: 'Fake Participant Link',
-          url: 'http://localhost:8080/fake/?conversationId=conv-123',
-        },
-      ],
+      moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/assistant/?conversationId=conv-123' }],
+      participant: [{ label: 'Participant link', url: 'http://localhost:8080/fake/?conversationId=conv-123' }],
     },
     type: {
       name: 'eventAssistant',
@@ -98,165 +73,590 @@ describe('EventStatus', () => {
     },
   };
 
-  const conversationTypes: components['schemas']['ConversationType'][] = [
-    {
-      name: 'backChannel',
-      label: 'Back Channel',
-      description: 'An agent to analyze participant comments',
-      platforms: [],
-      properties: [],
-    },
-    {
-      name: 'eventAssistant',
-      label: 'Event Assistant',
-      description: 'An assistant to answer questions about an event',
-      platforms: [],
-      properties: [],
-    },
-  ];
-  const mockConfig = {
-    conversationTypes,
+  const renderStatus = (overrides: Partial<Conversation> = {}, onJumpToSection = jest.fn()) => {
+    const data = { ...baseConversationData, ...overrides };
+    render(<EventStatus conversationData={data} now={now} onJumpToSection={onJumpToSection} />);
+    return { onJumpToSection };
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockPush.mockReset();
-    (SendData as jest.Mock).mockResolvedValue({ success: true });
-    (RetrieveData as jest.Mock).mockResolvedValue(mockConfig);
   });
 
-  it('renders the component with correct initial status and URLs', () => {
-    render(<EventStatus conversationData={mockConversationData} />);
-
-    expect(screen.getByText('Event Status')).toBeInTheDocument();
-    expect(screen.getByText(/Event 'Test Event' includes the Event Assistant/)).toBeInTheDocument();
-    expect(screen.getByText('The event is currently not started.')).toBeInTheDocument();
-
-    const moderatorLink = screen.getByRole('link', {
-      name: /http:\/\/localhost:8080\/assistant\/\?conversationId=conv-123/i,
-    });
-    expect(moderatorLink).toBeInTheDocument();
-    expect(moderatorLink).toHaveAttribute('href', 'http://localhost:8080/assistant/?conversationId=conv-123');
-    const participantLink = screen.getByRole('link', {
-      name: /http:\/\/localhost:8080\/fake\/\?conversationId=conv-123/i,
-    });
-    expect(participantLink).toBeInTheDocument();
-    expect(participantLink).toHaveAttribute('href', 'http://localhost:8080/fake/?conversationId=conv-123');
-  });
-
-  it('renders type labels correctly with platforms', () => {
-    const conversationWithPlatforms = {
-      ...mockConversationData,
-      platforms: ['production', 'staging'],
-      platformTypes: [
-        { name: 'production', label: 'Production' },
-        { name: 'staging', label: 'Staging' },
-      ],
-    };
-    render(<EventStatus conversationData={conversationWithPlatforms} />);
-
-    expect(
-      screen.getByText(/Event 'Test Event' includes the Event Assistant in Production and Staging/),
-    ).toBeInTheDocument();
-  });
-
-  it("shows 'Start Event' button when conditions are met", () => {
-    render(<EventStatus conversationData={mockConversationData} />);
-    expect(screen.getByRole('button', { name: 'Start Event' })).toBeInTheDocument();
-  });
-
-  it("does not show 'Start Event' button if event is already active", () => {
-    render(<EventStatus conversationData={{ ...mockConversationData, active: true }} />);
-    expect(screen.queryByRole('button', { name: 'Start Event' })).not.toBeInTheDocument();
-  });
-
-  it("calls SendData and updates status on 'Start Event' button click", async () => {
-    const user = userEvent.setup();
-    render(<EventStatus conversationData={mockConversationData} />);
-
-    const startButton = screen.getByRole('button', { name: 'Start Event' });
-
-    await user.click(startButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('The event is currently active.')).toBeInTheDocument();
-      expect(screen.getByText('The event has started!')).toBeInTheDocument();
-      expect(startButton).not.toBeInTheDocument();
-      expect(SendData).toHaveBeenCalledWith('conversations/conv-123/start', {});
-    });
-  });
-
-  it('handles API error when starting an event', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    (SendData as jest.Mock).mockRejectedValue(new Error('API Error'));
-
-    render(<EventStatus conversationData={mockConversationData} />);
-
-    const startButton = screen.getByRole('button', { name: 'Start Event' });
-    await act(async () => {
-      fireEvent.click(startButton);
+  describe('operations bar', () => {
+    it('shows a "Not started" status pill', () => {
+      renderStatus();
+      expect(screen.getByText('Not started')).toBeInTheDocument();
     });
 
-    await waitFor(() => {
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error sending data:', expect.any(Error));
-      expect(screen.getByText('The event is currently not started.')).toBeInTheDocument();
-      expect(screen.queryByText('The event has started!')).not.toBeInTheDocument();
+    it('renders moderator, participant, and zoom link chips', () => {
+      renderStatus({
+        eventUrls: {
+          ...baseConversationData.eventUrls,
+          zoom: { label: 'Zoom', url: 'https://zoom.us/j/123456789' },
+        },
+      });
+      expect(screen.getByRole('button', { name: /moderator link/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /participant link/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /zoom/i })).toBeInTheDocument();
     });
 
-    consoleErrorSpy.mockRestore();
-  });
-
-  it('displays active status if conversationData.active is true initially', () => {
-    render(<EventStatus conversationData={{ ...mockConversationData, active: true }} />);
-    expect(screen.getByText('The event is currently active.')).toBeInTheDocument();
-  });
-
-  describe('Edit Event button', () => {
-    it('shows Edit Event button for an inactive event owned by the current user', () => {
-      render(<EventStatus conversationData={{ ...mockConversationData, owner: 'current-user-id' }} />);
-      expect(screen.getByRole('button', { name: /edit event/i })).toBeInTheDocument();
+    it('disables the link chips in the pending state', () => {
+      renderStatus();
+      const moderatorChip = screen.getByRole('button', { name: /moderator link/i });
+      expect(moderatorChip).toHaveAttribute('aria-disabled', 'true');
     });
 
-    it('does not show Edit Event button when the current user is not the owner', () => {
-      render(<EventStatus conversationData={{ ...mockConversationData, owner: 'other-user-id' }} />);
-      expect(screen.queryByRole('button', { name: /edit event/i })).not.toBeInTheDocument();
-    });
-
-    it('does not show Edit Event button when the event is active', () => {
-      render(<EventStatus conversationData={{ ...mockConversationData, owner: 'current-user-id', active: true }} />);
-      expect(screen.queryByRole('button', { name: /edit event/i })).not.toBeInTheDocument();
-    });
-
-    it('navigates to the edit page when Edit Event button is clicked', async () => {
+    it('does not copy to the clipboard when a disabled chip is clicked', async () => {
       const user = userEvent.setup();
-      render(<EventStatus conversationData={{ ...mockConversationData, owner: 'current-user-id' }} />);
+      renderStatus();
+      await user.click(screen.getByRole('button', { name: /moderator link/i }));
+      expect(writeText).not.toHaveBeenCalled();
+    });
 
-      await user.click(screen.getByRole('button', { name: /edit event/i }));
+    it('renders neutral gray link-chip dots while the event is unconfirmed', () => {
+      renderStatus();
+      const moderatorChip = screen.getByRole('button', { name: /moderator link/i });
+      expect(within(moderatorChip).getByTestId('chip-dot')).toHaveStyle({ backgroundColor: '#B0B0B8' });
+    });
 
+    it('uses the brand-colored dot once the event is confirmed', () => {
+      // draft: false with a far-future start derives to `scheduled`, so the chips are live and colored.
+      renderStatus({ draft: false });
+      const moderatorChip = screen.getByRole('button', { name: /moderator link/i });
+      expect(within(moderatorChip).getByTestId('chip-dot')).toHaveStyle({ backgroundColor: '#4845D2' });
+    });
+
+    it('does not render a "Start Event" button', () => {
+      renderStatus();
+      expect(screen.queryByRole('button', { name: /start event/i })).not.toBeInTheDocument();
+    });
+
+    it('renders an "Edit" action that navigates to the edit page', async () => {
+      const user = userEvent.setup();
+      renderStatus();
+      const editButton = screen.getByRole('button', { name: /^edit$/i });
+      await user.click(editButton);
       expect(mockPush).toHaveBeenCalledWith('/admin/eventAssistant/edit/conv-123');
     });
+
+    it('shows a hint line noting details still need confirming', () => {
+      renderStatus();
+      expect(screen.getByText(/still need confirming/i)).toBeInTheDocument();
+    });
   });
 
-  it('renders zoom link when provided in eventUrls', () => {
-    const conversationWithZoom = {
-      ...mockConversationData,
-      eventUrls: {
-        ...mockConversationData.eventUrls,
-        zoom: {
-          label: 'Zoom Meeting',
-          url: 'https://zoom.us/j/123456789',
-        },
-      },
-    };
-
-    render(<EventStatus conversationData={conversationWithZoom} />);
-
-    expect(screen.getByText('Zoom Meeting:')).toBeInTheDocument();
-    const zoomLink = screen.getByRole('link', {
-      name: /https:\/\/zoom\.us\/j\/123456789/i,
+  describe('readiness banner', () => {
+    it('renders the "Almost ready" checklist heading', () => {
+      renderStatus();
+      expect(screen.getByText(/almost ready/i)).toBeInTheDocument();
     });
-    expect(zoomLink).toBeInTheDocument();
-    expect(zoomLink).toHaveAttribute('href', 'https://zoom.us/j/123456789');
-    expect(zoomLink).toHaveAttribute('target', '_blank');
+
+    it('lists the Series row and rows for missing details only', () => {
+      // baseConversationData has a start time but no end time and no meeting link.
+      renderStatus();
+      expect(screen.getByText('Series')).toBeInTheDocument();
+      expect(screen.getByText('End time')).toBeInTheDocument();
+      expect(screen.getByText('Platform & meeting link')).toBeInTheDocument();
+    });
+
+    it('does not list a row for Assistant configuration, which is never a missing field', () => {
+      renderStatus();
+      expect(screen.queryByText('Assistant configuration')).not.toBeInTheDocument();
+    });
+
+    it('lists only the Series row when every schedule and platform detail is filled in', () => {
+      renderStatus({
+        scheduledEndTime: '2026-08-01T17:30:00Z',
+        properties: { zoomMeetingUrl: 'https://zoom.us/j/123456789' },
+      } as Partial<Conversation>);
+      expect(screen.getByText('Series')).toBeInTheDocument();
+      expect(screen.queryByText('End time')).not.toBeInTheDocument();
+      expect(screen.queryByText('Start time')).not.toBeInTheDocument();
+      expect(screen.queryByText('Platform & meeting link')).not.toBeInTheDocument();
+    });
+
+    it('shows the Platform & meeting link row when no meeting link is configured', () => {
+      renderStatus();
+      expect(screen.getByText('Platform & meeting link')).toBeInTheDocument();
+    });
+
+    it('shows the Platform & meeting link row when the meeting link is a non-Zoom placeholder', () => {
+      renderStatus({ properties: { zoomMeetingUrl: 'https://example.com' } } as Partial<Conversation>);
+      expect(screen.getByText('Platform & meeting link')).toBeInTheDocument();
+    });
+
+    it('hides the Platform & meeting link row when a valid Zoom link is configured', () => {
+      renderStatus({ properties: { zoomMeetingUrl: 'https://zoom.us/j/123456789' } } as Partial<Conversation>);
+      expect(screen.queryByText('Platform & meeting link')).not.toBeInTheDocument();
+    });
+
+    it('hides the End time row when a scheduled end time is set', () => {
+      renderStatus({ scheduledEndTime: '2026-08-01T17:30:00Z' });
+      expect(screen.queryByText('End time')).not.toBeInTheDocument();
+    });
+
+    it('calls onJumpToSection with the target card id when a Review control is clicked', async () => {
+      const user = userEvent.setup();
+      const { onJumpToSection } = renderStatus();
+      const endTimeRow = screen.getByText('End time').closest('[data-testid="checklist-row"]') as HTMLElement;
+      await user.click(within(endTimeRow).getByRole('button', { name: /review/i }));
+      expect(onJumpToSection).toHaveBeenCalledWith('sched-1a');
+    });
+
+    it('jumps to the Event Details card from the Series row', async () => {
+      const user = userEvent.setup();
+      const { onJumpToSection } = renderStatus();
+      const seriesRow = screen.getByText('Series').closest('[data-testid="checklist-row"]') as HTMLElement;
+      await user.click(within(seriesRow).getByRole('button', { name: /review/i }));
+      expect(onJumpToSection).toHaveBeenCalledWith('details-1a');
+    });
+
+    it('hides the Series row after its Dismiss button is clicked', async () => {
+      const user = userEvent.setup();
+      renderStatus();
+      const seriesRow = screen.getByText('Series').closest('[data-testid="checklist-row"]') as HTMLElement;
+      await user.click(within(seriesRow).getByRole('button', { name: /dismiss/i }));
+      expect(screen.queryByText('Series')).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe('EventStatus (missed state)', () => {
+  // `now` sits an hour past the scheduled start, so a draft conversation derives to `missed`:
+  // past the 6-minute edit lockout, no longer startable.
+  const now = new Date('2026-08-01T10:00:00Z');
+  const pastScheduledTime = '2026-08-01T09:00:00Z';
+
+  const missedConversation = {
+    id: 'conv-missed',
+    name: 'Missed Event',
+    active: false,
+    draft: true,
+    slug: 'missed-event',
+    scheduledTime: pastScheduledTime,
+    owner: 'current-user-id',
+    eventUrls: {
+      moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/mod' }],
+      participant: [{ label: 'Participant link', url: 'http://localhost:8080/part' }],
+    },
+    type: { name: 'eventAssistant', label: 'Event Assistant', description: '', platforms: [], properties: [] },
+  } as unknown as Conversation;
+
+  const renderMissed = (overrides: Partial<Conversation> = {}, onJumpToSection = jest.fn()) => {
+    render(
+      <EventStatus conversationData={{ ...missedConversation, ...overrides }} now={now} onJumpToSection={onJumpToSection} />,
+    );
+    return { onJumpToSection };
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('shows the red "Didn\'t start" status pill', () => {
+    renderMissed();
+    expect(screen.getByText("Didn't start")).toBeInTheDocument();
+  });
+
+  it('offers a "Create a new event" action instead of Edit, and navigates to the schedule page', async () => {
+    const user = userEvent.setup();
+    renderMissed();
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /create a new event/i }));
+    expect(mockPush).toHaveBeenCalledWith('/admin/events/new');
+  });
+
+  it('shows a hint pointing the organizer to reschedule', () => {
+    renderMissed();
+    expect(screen.getByText(/was missed/i)).toBeInTheDocument();
+  });
+
+  it('renders the "did not start" overlay explaining the start passed', () => {
+    renderMissed();
+    expect(screen.getByText(/did not start/i)).toBeInTheDocument();
+    expect(screen.getByText(/can no longer be started/i)).toBeInTheDocument();
+  });
+
+  it('lists the required details that were never confirmed with their status', () => {
+    renderMissed();
+    expect(screen.getByText(/never confirmed/i)).toBeInTheDocument();
+    expect(screen.getByText('End time')).toBeInTheDocument();
+    expect(screen.getByText('Platform & meeting link')).toBeInTheDocument();
+    expect(screen.getByText('Not connected')).toBeInTheDocument();
+  });
+
+  it('does not list assistant configuration, which never blocks auto-start', () => {
+    renderMissed();
+    expect(screen.queryByText('Assistant configuration')).not.toBeInTheDocument();
+    expect(screen.queryByText('Using defaults')).not.toBeInTheDocument();
+  });
+
+  it('flags a present-but-invalid meeting link as needing review rather than connected', () => {
+    renderMissed({ properties: { zoomMeetingUrl: 'https://example.com' } } as Partial<Conversation>);
+    expect(screen.getByText('Platform & meeting link')).toBeInTheDocument();
+    expect(screen.getByText('Needs review')).toBeInTheDocument();
+  });
+
+  it('treats a valid Zoom link as confirmed, dropping it from the never-confirmed list', () => {
+    renderMissed({ properties: { zoomMeetingUrl: 'https://harvard.zoom.us/j/81244556677' } } as Partial<Conversation>);
+    expect(screen.queryByText('Platform & meeting link')).not.toBeInTheDocument();
+  });
+
+  it('drops a resolved detail from the never-confirmed list', () => {
+    renderMissed({ scheduledEndTime: '2026-08-01T09:30:00Z' } as Partial<Conversation>);
+    expect(screen.queryByText('End time')).not.toBeInTheDocument();
+  });
+
+  it('hides the never-confirmed banner entirely once every required detail is satisfied', () => {
+    renderMissed({
+      scheduledEndTime: '2026-08-01T09:30:00Z',
+      properties: { zoomMeetingUrl: 'https://zoom.us/j/123456789' },
+    } as Partial<Conversation>);
+    expect(screen.queryByText(/never confirmed/i)).not.toBeInTheDocument();
+    // The red "did not start" overlay still shows — only the checklist banner is conditional.
+    expect(screen.getByText(/did not start/i)).toBeInTheDocument();
+  });
+
+  it('jumps to the platform card when the flagged meeting-link row is clicked', async () => {
+    const user = userEvent.setup();
+    const { onJumpToSection } = renderMissed();
+    await user.click(screen.getByText('Platform & meeting link'));
+    expect(onJumpToSection).toHaveBeenCalledWith('plat-1a');
+  });
+
+  it('jumps to the schedule card when the flagged end-time row is clicked', async () => {
+    const user = userEvent.setup();
+    const { onJumpToSection } = renderMissed();
+    await user.click(screen.getByText('End time'));
+    expect(onJumpToSection).toHaveBeenCalledWith('sched-1a');
+  });
+
+  it('has no Dismiss action on the never-confirmed rows', () => {
+    renderMissed();
+    expect(screen.queryByRole('button', { name: /dismiss/i })).not.toBeInTheDocument();
+  });
+
+  it('does not render the pending "Almost ready" readiness banner', () => {
+    renderMissed();
+    expect(screen.queryByText(/almost ready/i)).not.toBeInTheDocument();
+  });
+
+  it('hides the moderator, participant, and zoom link chips, which point at a session that never happened', () => {
+    renderMissed({
+      eventUrls: {
+        moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/mod' }],
+        participant: [{ label: 'Participant link', url: 'http://localhost:8080/part' }],
+        zoom: { label: 'Zoom', url: 'https://zoom.us/j/1' },
+      },
+    } as Partial<Conversation>);
+    expect(screen.queryByRole('button', { name: /moderator link/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /participant link/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /zoom/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('EventStatus (live state)', () => {
+  // `active: true` derives to `live` regardless of draft/schedule. scheduledTime is kept so the
+  // banner can report when the event started.
+  const now = new Date('2026-08-01T16:30:00Z');
+  const scheduledTime = '2026-08-01T16:00:00Z';
+
+  const liveConversation = {
+    id: 'conv-live',
+    name: 'Live Event',
+    active: true,
+    draft: false,
+    slug: 'live-event',
+    scheduledTime,
+    owner: 'current-user-id',
+    eventUrls: {
+      moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/mod' }],
+      participant: [{ label: 'Participant link', url: 'http://localhost:8080/part' }],
+      zoom: { label: 'Zoom', url: 'https://harvard.zoom.us/j/81244556677' },
+    },
+    type: { name: 'eventAssistant', label: 'Event Assistant', description: '', platforms: [], properties: [] },
+  } as unknown as Conversation;
+
+  const renderLive = (overrides: Partial<Conversation> = {}) => {
+    render(<EventStatus conversationData={{ ...liveConversation, ...overrides }} now={now} />);
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('shows the green "Live now" status pill', () => {
+    renderLive();
+    expect(screen.getByText('Live now')).toBeInTheDocument();
+  });
+
+  it('renders the moderator, participant, and zoom link chips as active', () => {
+    renderLive();
+    expect(screen.getByRole('button', { name: /moderator link/i })).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByRole('button', { name: /participant link/i })).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByRole('link', { name: /zoom/i })).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('opens the Zoom meeting in a new tab rather than copying it', () => {
+    renderLive();
+    const zoom = screen.getByRole('link', { name: /zoom/i });
+    expect(zoom).toHaveAttribute('href', 'https://harvard.zoom.us/j/81244556677');
+    expect(zoom).toHaveAttribute('target', '_blank');
+    expect(zoom).toHaveAttribute('rel', expect.stringContaining('noopener'));
+  });
+
+  it('uses brand-colored link-chip dots now that the event is confirmed', () => {
+    renderLive();
+    const moderatorChip = screen.getByRole('button', { name: /moderator link/i });
+    expect(within(moderatorChip).getByTestId('chip-dot')).toHaveStyle({ backgroundColor: '#4845D2' });
+  });
+
+  it('confirms with a "Copied" state when an active chip is clicked', async () => {
+    const user = userEvent.setup();
+    renderLive();
+    await user.click(screen.getByRole('button', { name: /moderator link/i }));
+    expect(await screen.findByText(/copied/i)).toBeInTheDocument();
+  });
+
+  it('offers an "Edit" action rather than "Create a new event"', () => {
+    renderLive();
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /create a new event/i })).not.toBeInTheDocument();
+  });
+
+  it('shows a live hint noting the assistant is active', () => {
+    renderLive();
+    expect(screen.getByText(/live since/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/is active/i).length).toBeGreaterThan(0);
+  });
+
+  it('includes the local time zone in the live hint and banner start time', () => {
+    renderLive();
+    // Derive the expected zone abbreviation from the same instant in the test's own environment,
+    // so the assertion holds regardless of the machine's time zone.
+    const tzLabel = new Intl.DateTimeFormat([], { timeZoneName: 'short' })
+      .formatToParts(new Date(scheduledTime))
+      .find((part) => part.type === 'timeZoneName')!.value;
+    expect(screen.getByText(/live since/i).textContent).toContain(tzLabel);
+    expect(screen.getByText(/answering audience questions/i).textContent).toContain(tzLabel);
+  });
+
+  it('renders the "This event is live" readiness banner', () => {
+    renderLive();
+    expect(screen.getByText(/this event is live/i)).toBeInTheDocument();
+    expect(screen.getByText(/answering audience questions/i)).toBeInTheDocument();
+  });
+
+  it('reports when the event actually started, not when it was planned to', () => {
+    // The backend stamps startTime on start, so a late start must report the real time.
+    const actualStart = '2026-08-01T16:07:00Z';
+    renderLive({ startTime: actualStart } as Partial<Conversation>);
+    expect(screen.getByText(/live since/i).textContent).toContain(timeWithZone(actualStart));
+    expect(screen.getByText(/answering audience questions/i).textContent).toContain(timeWithZone(actualStart));
+  });
+
+  it('still reports a start time for a live event that has no scheduled time', () => {
+    // An event started ad hoc has no scheduledTime, which used to render "Live since ." with no time.
+    const actualStart = '2026-08-01T16:07:00Z';
+    renderLive({ scheduledTime: undefined, startTime: actualStart } as Partial<Conversation>);
+    expect(screen.getByText(/live since/i).textContent).toContain(timeWithZone(actualStart));
+    expect(screen.getByText(/live since/i).textContent).not.toMatch(/live since \./i);
+  });
+
+  it('names the configured assistant in the live copy', () => {
+    renderLive({ properties: { botName: 'Athena' } } as Partial<Conversation>);
+    expect(screen.getAllByText(/athena/i).length).toBeGreaterThan(0);
+  });
+
+  it('falls back to "Berkie" when no bot name is configured', () => {
+    renderLive();
+    expect(screen.getAllByText(/berkie/i).length).toBeGreaterThan(0);
+  });
+
+  it('does not render the pending "Almost ready" readiness banner', () => {
+    renderLive();
+    expect(screen.queryByText(/almost ready/i)).not.toBeInTheDocument();
+  });
+
+  it('does not render the missed "did not start" content', () => {
+    renderLive();
+    expect(screen.queryByText(/did not start/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/never confirmed/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('EventStatus (scheduled state)', () => {
+  // draft: false derives to `scheduled` (confirmed, upcoming) regardless of the clock.
+  const now = new Date('2026-08-01T10:00:00Z');
+  const scheduledTime = '2026-08-01T16:00:00Z';
+
+  const scheduledConversation = {
+    id: 'conv-scheduled',
+    name: 'Scheduled Event',
+    active: false,
+    draft: false,
+    slug: 'scheduled-event',
+    scheduledTime,
+    scheduledEndTime: '2026-08-01T17:30:00Z',
+    owner: 'current-user-id',
+    properties: { zoomMeetingUrl: 'https://harvard.zoom.us/j/81244556677' },
+    eventUrls: {
+      moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/mod' }],
+      participant: [{ label: 'Participant link', url: 'http://localhost:8080/part' }],
+      zoom: { label: 'Zoom', url: 'https://harvard.zoom.us/j/81244556677' },
+    },
+    type: { name: 'eventAssistant', label: 'Event Assistant', description: '', platforms: [], properties: [] },
+  } as unknown as Conversation;
+
+  const renderScheduled = (overrides: Partial<Conversation> = {}) => {
+    render(<EventStatus conversationData={{ ...scheduledConversation, ...overrides }} now={now} />);
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('shows the "Scheduled" status pill', () => {
+    renderScheduled();
+    expect(screen.getByText('Scheduled')).toBeInTheDocument();
+  });
+
+  it('renders the link chips as active', () => {
+    renderScheduled();
+    expect(screen.getByRole('button', { name: /moderator link/i })).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByRole('link', { name: /zoom/i })).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('uses brand-colored link-chip dots', () => {
+    renderScheduled();
+    const moderatorChip = screen.getByRole('button', { name: /moderator link/i });
+    expect(within(moderatorChip).getByTestId('chip-dot')).toHaveStyle({ backgroundColor: '#4845D2' });
+  });
+
+  it('offers an "Edit" action rather than "Create a new event"', () => {
+    renderScheduled();
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /create a new event/i })).not.toBeInTheDocument();
+  });
+
+  it('shows an all-details-confirmed hint with the local start time and zone', () => {
+    renderScheduled();
+    // Derive the expected zone abbreviation from the same instant in the test's own environment.
+    const tzLabel = new Intl.DateTimeFormat([], { timeZoneName: 'short' })
+      .formatToParts(new Date(scheduledTime))
+      .find((part) => part.type === 'timeZoneName')!.value;
+    // The heading also says "all details confirmed"; the hint is the one carrying the start time+zone.
+    const hint = screen.getAllByText(/all details confirmed/i).find((el) => el.textContent!.includes(tzLabel));
+    expect(hint).toBeDefined();
+  });
+
+  it('renders the "Ready to start" readiness banner', () => {
+    renderScheduled();
+    expect(screen.getByText(/ready to start/i)).toBeInTheDocument();
+    expect(screen.getByText(/nothing left to fill in/i)).toBeInTheDocument();
+  });
+
+  it('does not render the pending "Almost ready" readiness banner', () => {
+    renderScheduled();
+    expect(screen.queryByText(/almost ready/i)).not.toBeInTheDocument();
+  });
+
+  it('does not render the missed "did not start" content', () => {
+    renderScheduled();
+    expect(screen.queryByText(/did not start/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/never confirmed/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('EventStatus (past state)', () => {
+  // A confirmed, no-longer-active conversation with an endTime stamped derives to `past`.
+  const now = new Date('2026-08-02T00:00:00Z');
+  const scheduledTime = '2026-08-01T16:00:00Z';
+  const endTime = '2026-08-01T17:30:00Z';
+
+  const pastConversation = {
+    id: 'conv-past',
+    name: 'Past Event',
+    active: false,
+    draft: false,
+    slug: 'past-event',
+    scheduledTime,
+    scheduledEndTime: '2026-08-01T17:30:00Z',
+    endTime,
+    owner: 'current-user-id',
+    properties: { zoomMeetingUrl: 'https://harvard.zoom.us/j/81244556677' },
+    eventUrls: {
+      moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/mod' }],
+      participant: [{ label: 'Participant link', url: 'http://localhost:8080/part' }],
+      zoom: { label: 'Zoom', url: 'https://harvard.zoom.us/j/81244556677' },
+    },
+    type: { name: 'eventAssistant', label: 'Event Assistant', description: '', platforms: [], properties: [] },
+  } as unknown as Conversation;
+
+  const renderPast = (overrides: Partial<Conversation> = {}) => {
+    render(<EventStatus conversationData={{ ...pastConversation, ...overrides }} now={now} />);
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('shows the "Past" status pill', () => {
+    renderPast();
+    expect(screen.getByText('Past')).toBeInTheDocument();
+  });
+
+  it('keeps the moderator, participant, and zoom link chips, active, since the session did run', () => {
+    renderPast();
+    expect(screen.getByRole('button', { name: /moderator link/i })).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByRole('button', { name: /participant link/i })).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByRole('link', { name: /zoom/i })).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('uses brand-colored link-chip dots, matching other confirmed states', () => {
+    renderPast();
+    const moderatorChip = screen.getByRole('button', { name: /moderator link/i });
+    expect(within(moderatorChip).getByTestId('chip-dot')).toHaveStyle({ backgroundColor: '#4845D2' });
+  });
+
+  it('offers no primary action, since a concluded event cannot be edited or restarted', () => {
+    renderPast();
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /create a new event/i })).not.toBeInTheDocument();
+  });
+
+  it('shows an "Ended" hint carrying the local end time and zone', () => {
+    renderPast();
+    // Derive the expected zone abbreviation from the same instant in the test's own environment.
+    const tzLabel = new Intl.DateTimeFormat([], { timeZoneName: 'short' })
+      .formatToParts(new Date(endTime))
+      .find((part) => part.type === 'timeZoneName')!.value;
+    const hint = screen.getByText(/^ended/i);
+    expect(hint.textContent).toContain(tzLabel);
+  });
+
+  it('renders the "This event has ended" banner', () => {
+    renderPast();
+    expect(screen.getByText(/this event has ended/i)).toBeInTheDocument();
+    expect(screen.getByText(/no longer answering questions/i)).toBeInTheDocument();
+  });
+
+  it('names the configured assistant in the concluded copy', () => {
+    renderPast({ properties: { botName: 'Athena' } } as Partial<Conversation>);
+    expect(screen.getAllByText(/athena/i).length).toBeGreaterThan(0);
+  });
+
+  it('falls back to "Berkie" when no bot name is configured', () => {
+    renderPast({ properties: {} } as Partial<Conversation>);
+    expect(screen.getAllByText(/berkie/i).length).toBeGreaterThan(0);
+  });
+
+  it('does not render the live, scheduled, pending, or missed banners', () => {
+    renderPast();
+    expect(screen.queryByText(/this event is live/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/ready to start/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/almost ready/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/did not start/i)).not.toBeInTheDocument();
   });
 });

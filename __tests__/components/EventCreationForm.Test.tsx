@@ -407,6 +407,7 @@ describe('EventCreationForm Component', () => {
     Api.get().ClearConfigCache();
     jest.clearAllMocks();
     mockPush.mockReset();
+    sessionStorage.clear();
     (RetrieveData as jest.Mock).mockResolvedValue(mockConfig);
     (Request as jest.Mock).mockImplementation(makeRequestMock());
   });
@@ -1180,7 +1181,7 @@ describe('EventCreationForm Component', () => {
     });
   });
 
-  it('displays event status after successful conversation creation', async () => {
+  it('redirects to the view page after successful conversation creation', async () => {
     const user = userEvent.setup();
     const mockConversationData = {
       id: 'new-conv-redirect',
@@ -1218,10 +1219,8 @@ describe('EventCreationForm Component', () => {
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Event Status')).toBeInTheDocument();
+      expect(mockPush).toHaveBeenCalledWith('/admin/eventAssistant/view/new-conv-redirect');
     });
-
-    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('fetches configuration from backend on mount', async () => {
@@ -2286,7 +2285,7 @@ describe('EventCreationForm Component', () => {
       });
     });
 
-    it('shows a warning when PDF upload fails but still shows EventStatus', async () => {
+    it('stashes a PDF-upload warning and redirects when the upload fails', async () => {
       const user = userEvent.setup();
       const convWithResources = {
         ...mockConversationData,
@@ -2313,9 +2312,10 @@ describe('EventCreationForm Component', () => {
       await user.click(screen.getByRole('button', { name: /create conversation/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/fail\.pdf/i)).toBeInTheDocument();
-        expect(screen.getByText('Event Status')).toBeInTheDocument();
+        expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-resources');
       });
+      // The warning is carried to the view page via sessionStorage rather than shown inline.
+      expect(JSON.parse(sessionStorage.getItem('pdfUploadWarnings') ?? '[]')).toContain('fail.pdf');
     });
 
     it('does not call SendData when resource has no PDF attached', async () => {
@@ -2336,7 +2336,7 @@ describe('EventCreationForm Component', () => {
       await user.type(screen.getByLabelText(/^Title/i), 'No PDF Paper');
       await user.click(screen.getByRole('button', { name: /create conversation/i }));
 
-      await waitFor(() => screen.getByText('Event Status'));
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/admin/backChannel/view/conv-resources'));
       expect(SendData).not.toHaveBeenCalled();
     });
   });
@@ -2968,7 +2968,9 @@ describe('EventCreationForm Component', () => {
           expect(updateConversation).toHaveBeenCalledWith(
             'conv-edit-123',
             expect.objectContaining({
-              features: expect.arrayContaining([{ name: 'catalyst', enabled: true, config: { minContributionInterval: 7 } }]),
+              features: expect.arrayContaining([
+                { name: 'catalyst', enabled: true, config: { minContributionInterval: 7 } },
+              ]),
             }),
           );
         });

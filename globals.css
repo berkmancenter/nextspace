@@ -1,5 +1,14 @@
 @import 'tailwindcss';
 
+/* Tailwind v4's reset drops the browser default of cursor:pointer on buttons; restore it for enabled
+   buttons (disabled and aria-disabled ones keep the default arrow). In `base` so any cursor-* utility
+   still wins. */
+@layer base {
+  button:not(:disabled):not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+}
+
 /* Markdown content styling */
 .markdown-content {
   color: inherit;
@@ -37,6 +46,7 @@
   --color-neutral-900: #0b0d0e;
   --color-light-blue: #a5b4fc;
   --animate-slide-in: slideIn 0.5s ease-out forwards;
+  --animate-card-flash: cardFlash 1.3s ease-out;
 
   @keyframes rotate-bg {
     from {
@@ -44,6 +54,15 @@
     }
     to {
       transform: rotate(360deg);
+    }
+  }
+
+  @keyframes cardFlash {
+    0% {
+      background-color: #fbf3de;
+    }
+    100% {
+      background-color: #ffffff;
     }
   }
 
