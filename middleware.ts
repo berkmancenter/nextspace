@@ -82,3 +82,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url, { headers: response.headers });
   }
 }
+
+export const config = {
+  // Run auth on all routes except static assets and the Sentry tunnel (/monitoring).
+  // Without the /monitoring exclusion, an expired-cookie redirect would drop client error reports.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|monitoring).*)'],
+};
