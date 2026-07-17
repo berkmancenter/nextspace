@@ -349,6 +349,41 @@ describe('useConversationMessages', () => {
         expect(result.current.unreadChatReplyCount).toBe(0);
       });
     });
+
+    it('drops the unread count when a thread is removed from the set (mark as read)', async () => {
+      const { result } = renderMessages();
+
+      act(() => {
+        result.current.setChatMessages([
+          makeMessage({ id: 'parent-1', parentMessage: undefined }),
+          makeMessage({ id: 'reply-1', parentMessage: 'parent-1', pseudonym: 'other' }),
+        ] as any);
+      });
+      await waitFor(() => expect(result.current.unreadChatReplyCount).toBe(0));
+
+      act(() => {
+        result.current.setChatMessages([
+          makeMessage({ id: 'parent-1', parentMessage: undefined }),
+          makeMessage({ id: 'reply-1', parentMessage: 'parent-1', pseudonym: 'other' }),
+          makeMessage({ id: 'reply-2', parentMessage: 'parent-1', pseudonym: 'other-2' }),
+        ] as any);
+      });
+      await waitFor(() => expect(result.current.unreadChatReplyCount).toBe(1));
+
+      // The mark-as-read handler on the page can only mutate the set, so the count
+      // has to stay derived from it rather than tracked separately.
+      act(() => {
+        result.current.setMessagesWithUnreadReplies((prev) => {
+          const next = new Set(prev);
+          next.delete('parent-1');
+          return next;
+        });
+      });
+
+      await waitFor(() => {
+        expect(result.current.unreadChatReplyCount).toBe(0);
+      });
+    });
   });
 
   describe('unread reply tracking (assistant)', () => {
@@ -397,6 +432,39 @@ describe('useConversationMessages', () => {
           makeMessage({ id: 'reply-1', parentMessage: 'parent-1', fromAgent: false }),
           makeMessage({ id: 'reply-2', parentMessage: 'parent-1', fromAgent: false }),
         ] as any);
+      });
+
+      await waitFor(() => {
+        expect(result.current.unreadAssistantReplyCount).toBe(0);
+      });
+    });
+
+    it('drops the unread count when a thread is removed from the set (mark as read)', async () => {
+      const { result } = renderMessages();
+
+      act(() => {
+        result.current.setAssistantMessages([
+          makeMessage({ id: 'parent-1', parentMessage: undefined }),
+          makeMessage({ id: 'reply-1', parentMessage: 'parent-1', fromAgent: true }),
+        ] as any);
+      });
+      await waitFor(() => expect(result.current.unreadAssistantReplyCount).toBe(0));
+
+      act(() => {
+        result.current.setAssistantMessages([
+          makeMessage({ id: 'parent-1', parentMessage: undefined }),
+          makeMessage({ id: 'reply-1', parentMessage: 'parent-1', fromAgent: true }),
+          makeMessage({ id: 'reply-2', parentMessage: 'parent-1', fromAgent: true }),
+        ] as any);
+      });
+      await waitFor(() => expect(result.current.unreadAssistantReplyCount).toBe(1));
+
+      act(() => {
+        result.current.setAssistantMessagesWithUnreadReplies((prev) => {
+          const next = new Set(prev);
+          next.delete('parent-1');
+          return next;
+        });
       });
 
       await waitFor(() => {

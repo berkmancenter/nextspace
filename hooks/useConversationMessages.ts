@@ -108,8 +108,6 @@ export function useConversationMessages({
   const [assistantPreviousReplyCounts, setAssistantPreviousReplyCounts] = useState<Map<string, number>>(new Map());
   const [messagesWithUnreadReplies, setMessagesWithUnreadReplies] = useState<Set<string>>(new Set());
   const [assistantMessagesWithUnreadReplies, setAssistantMessagesWithUnreadReplies] = useState<Set<string>>(new Set());
-  const [unreadChatReplyCount, setUnreadChatReplyCount] = useState<number>(0);
-  const [unreadAssistantReplyCount, setUnreadAssistantReplyCount] = useState<number>(0);
 
   const trackReplyCountChanges = (
     messages: PseudonymousMessage[],
@@ -218,7 +216,6 @@ export function useConversationMessages({
 
     setChatPreviousReplyCounts(newReplyCounts);
     setMessagesWithUnreadReplies(updatedUnreadSet);
-    setUnreadChatReplyCount(updatedUnreadSet.size);
     // chatPreviousReplyCounts and messagesWithUnreadReplies are intentionally omitted:
     // adding them would cause an infinite loop since this effect updates both.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -234,7 +231,6 @@ export function useConversationMessages({
 
     setAssistantPreviousReplyCounts(newReplyCounts);
     setAssistantMessagesWithUnreadReplies(updatedUnreadSet);
-    setUnreadAssistantReplyCount(updatedUnreadSet.size);
     // assistantPreviousReplyCounts and assistantMessagesWithUnreadReplies are intentionally
     // omitted: adding them would cause an infinite loop since this effect updates both.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -257,8 +253,8 @@ export function useConversationMessages({
     setChatMessages,
     pollCounts,
     setPollCounts,
-    unreadChatReplyCount,
-    unreadAssistantReplyCount,
+    unreadChatReplyCount: messagesWithUnreadReplies.size,
+    unreadAssistantReplyCount: assistantMessagesWithUnreadReplies.size,
     messagesWithUnreadReplies,
     setMessagesWithUnreadReplies,
     assistantMessagesWithUnreadReplies,
