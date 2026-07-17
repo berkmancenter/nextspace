@@ -9,7 +9,7 @@ import { Api, GetChannelPasscode, QueryParamsError, SendData, emitWithTokenRefre
 import { components } from '../types';
 import { BackchannelMessage } from '../components/messages/BackchannelMessage';
 import { CheckAuthHeader } from '../utils/Helpers';
-import { useSessionJoin } from '../utils/useSessionJoin';
+import { useSessionJoin } from '../hooks/useSessionJoin';
 import { AuthType } from '../types.internal';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { trackConversationEvent } from '../utils/analytics';

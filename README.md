@@ -52,6 +52,7 @@ Nextspace uses a hybrid authentication model that supports both anonymous partic
 ### Documentation
 
 - 📖 **[SESSION_AND_TOKEN_SYSTEM.md](./SESSION_AND_TOKEN_SYSTEM.md)** - Complete developer guide covering the full token lifecycle: `SessionManager`, `TokenManager`, proactive refresh scheduling, 401 recovery, multi-tab coordination via `BroadcastChannel`, WebSocket reconnection, and debugging tips
+- 🛠️ **Detailed code documentation** is [here](https://berkmancenter.github.io/nextspace/).
 
 ## App views overview
 

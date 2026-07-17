@@ -11,7 +11,7 @@ import {
 } from '../utils/analytics';
 import { useVisibilityAwareDuration } from './useVisibilityAwareDuration';
 
-interface UseAnalyticsOptions {
+export interface UseAnalyticsOptions {
   pageName?: string;
   pageType?: string;
 }
@@ -40,6 +40,7 @@ const PARTICIPANT_EVENT_PAGE_TYPES = ['assistant', 'backchannel'];
  *
  * Note: Heartbeat tracking is handled by Matomo's built-in enableHeartBeatTimer
  * feature, which should be configured in your Matomo Tag Manager container.
+ * @param options The options for configuring analytics tracking, including page name and page type.
  */
 export function useAnalytics(options: UseAnalyticsOptions = {}) {
   const { pageName, pageType } = options;
@@ -174,4 +175,3 @@ async function detectUserLocation() {
     trackUserLocation('remote', 'default');
   }
 }
-// Track the location

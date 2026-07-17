@@ -117,7 +117,7 @@ jest.mock('../../utils', () => ({
 
 // Mock useSessionJoin hook
 const mockUseSessionJoin = jest.fn();
-jest.mock('../../utils/useSessionJoin', () => ({
+jest.mock('../../hooks/useSessionJoin', () => ({
   useSessionJoin: (...args: any[]) => mockUseSessionJoin(...args),
 }));
 
@@ -2943,6 +2943,73 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(screen.getByText('This event is not active.')).toBeInTheDocument();
+      });
+    });
+
+    it('successfully fetches chat messages for an ended event even though the join never completes', async () => {
+      // An ended event never opens a socket, so force the real path: no socket, no join.
+      // The default mock returns a live socket, which would let messages load via the join instead.
+      mockUseSessionJoin.mockReturnValue({
+        socket: null,
+        pseudonym: 'test-pseudonym',
+        userId: 'user-123',
+        isConnected: false,
+        errorMessage: null,
+      });
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({
+            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+            active: false,
+            endTime: '2024-06-01T12:00:00Z',
+          });
+        }
+        if (path.includes('?channel=chat')) {
+          // Return existing messages even though join won't complete
+          return Promise.resolve([
+            {
+              id: 'msg-1',
+              body: 'Previous message',
+              pseudonym: 'User',
+              fromAgent: false,
+              channels: ['chat'],
+              createdAt: '2024-06-01T11:00:00Z',
+            },
+            {
+              id: 'msg-2',
+              body: 'Another message',
+              pseudonym: 'User',
+              fromAgent: false,
+              channels: ['chat'],
+              createdAt: '2024-06-01T11:30:00Z',
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        active: false,
+        endTime: '2024-06-01T12:00:00Z',
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      // Dismiss the dialog to see the messages
+      const closeButton = screen.getByRole('button', { name: /close event has ended dialog/i });
+      await act(async () => {
+        await userEvent.click(closeButton);
+      });
+
+      // Verify chat messages are available
+      await waitFor(() => {
+        expect(screen.getByText('Previous message')).toBeInTheDocument();
+        expect(screen.getByText('Another message')).toBeInTheDocument();
       });
     });
   });

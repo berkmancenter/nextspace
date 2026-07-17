@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { getUserTimezone } from '../../utils';
 import { CheckAuthHeader, getConversation } from '../../utils/Helpers';
-import { useSessionJoin } from '../../utils/useSessionJoin';
+import { useSessionJoin } from '../../hooks/useSessionJoin';
 
 import React from 'react';
 import {

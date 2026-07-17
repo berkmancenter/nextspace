@@ -6,7 +6,7 @@ import { Api, GetChannelPasscode, RetrieveData, QueryParamsError, emitWithTokenR
 
 import { Errors, ParamErrors, Transcript } from '../components/';
 import { CheckAuthHeader, createConversationFromData } from '../utils/Helpers';
-import { useSessionJoin } from '../utils/useSessionJoin';
+import { useSessionJoin } from '../hooks/useSessionJoin';
 import { AuthType } from '../types.internal';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useSetConversationType } from '../context/ConversationTypeContext';

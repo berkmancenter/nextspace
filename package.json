@@ -12,7 +12,7 @@
     "commit": "cz",
     "build": "next build",
     "dev": "next dev -p 8080",
-    "docs": "typedoc --plugin typedoc-material-theme --themeColor '#cb9820' --out ./docs ./types.ts ./components/index.ts ./utils/index.ts",
+    "docs": "typedoc --plugin typedoc-material-theme --themeColor '#4845d2' --out ./docs ./types.ts ./components/index.ts ./hooks/index.ts ./utils/index.ts",
     "lint": "next lint",
     "prettier": "prettier --check \"**/*.{ts,tsx,js,mjs}\" --ignore-path .gitignore",
     "prettier:fix": "prettier --write \"**/*.{ts,tsx,js,mjs}\" --ignore-path .gitignore",

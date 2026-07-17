@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { Api } from './';
-import SessionManager from './SessionManager';
-import TokenManagerDefault from './TokenManager';
+import { Api } from '../utils';
+import SessionManager from '../utils/SessionManager';
+import TokenManagerDefault from '../utils/TokenManager';
 
 // Disconnections shorter than this are treated as transient network blips that
 // Socket.io's own reconnect loop handles cleanly. Longer gaps mean the client

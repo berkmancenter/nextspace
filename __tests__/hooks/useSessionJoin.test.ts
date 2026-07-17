@@ -62,7 +62,8 @@ jest.mock('../../utils/TokenManager', () => ({
 }));
 
 // Import after mocking
-import { useSessionJoin } from '../../utils/useSessionJoin';
+import { useSessionJoin } from '../../hooks/useSessionJoin';
+import SessionManager from '../../utils/SessionManager';
 import { Api } from '../../utils/Helpers';
 
 describe('useSessionJoin', () => {
