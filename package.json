@@ -33,6 +33,7 @@
     "@mui/material": "^7.1.2",
     "@mui/material-nextjs": "^7.0.2",
     "@mui/x-date-pickers": "^8.9.0",
+    "@sentry/nextjs": "^10.65.0",
     "@types/react-scroll": "^1.8.10",
     "dayjs": "^1.11.13",
     "dotenv": "17.2.3",
