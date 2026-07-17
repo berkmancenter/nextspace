@@ -2947,6 +2947,16 @@ describe('EventAssistantRoom', () => {
     });
 
     it('successfully fetches chat messages for an ended event even though the join never completes', async () => {
+      // An ended event never opens a socket, so force the real path: no socket, no join.
+      // The default mock returns a live socket, which would let messages load via the join instead.
+      mockUseSessionJoin.mockReturnValue({
+        socket: null,
+        pseudonym: 'test-pseudonym',
+        userId: 'user-123',
+        isConnected: false,
+        errorMessage: null,
+      });
+
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
         if (path.startsWith('conversations/')) {
           return Promise.resolve({
