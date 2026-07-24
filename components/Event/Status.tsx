@@ -9,7 +9,7 @@ import {
   OpenInNewOutlined,
   WarningAmberOutlined,
 } from '@mui/icons-material';
-import { Conversation } from '../../types.internal';
+import { AuthType, Conversation } from '../../types.internal';
 import { deriveEventState, isValidZoomUrl } from '../../utils/eventState';
 import SessionManager from '../../utils/SessionManager';
 
@@ -161,12 +161,14 @@ const ChecklistRow: React.FC<{
  * @param conversationData - The conversation data object containing details about the event.
  * @param now - Injectable current time used to derive the lifecycle state; defaults to `new Date()`.
  * @param onJumpToSection - Called with a Details card id when a checklist row's "Review" is clicked.
+ * @param authType - The current user's auth type; an admin can edit an event they don't own.
  */
 export const EventStatus: React.FC<{
   conversationData: Conversation;
   now?: Date;
   onJumpToSection?: (cardId: string) => void;
-}> = ({ conversationData, now, onJumpToSection }) => {
+  authType?: AuthType;
+}> = ({ conversationData, now, onJumpToSection, authType }) => {
   const router = useRouter();
   const [seriesDismissed, setSeriesDismissed] = useState(false);
 
@@ -179,6 +181,8 @@ export const EventStatus: React.FC<{
   const userId = SessionManager.get().getSessionInfo()?.userId;
   const ownerId = typeof conversationData.owner === 'string' ? conversationData.owner : (conversationData.owner as any)?.id;
   const isOwner = !!userId && userId === ownerId;
+  // Mirrors the backend's admin bypass on updateConversation: an admin can edit any event.
+  const isAdmin = authType === 'admin';
 
   const moderatorUrl = conversationData.eventUrls.moderator[0]?.url;
   const participantUrl = conversationData.eventUrls.participant[0]?.url;
@@ -281,7 +285,7 @@ export const EventStatus: React.FC<{
           )}
         </div>
 
-        {isOwner &&
+        {(isOwner || isAdmin) &&
           !isPast &&
           (state === 'missed' ? (
             <button

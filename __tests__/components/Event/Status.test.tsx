@@ -140,6 +140,18 @@ describe('EventStatus (pending state)', () => {
       expect(mockPush).toHaveBeenCalledWith('/admin/eventAssistant/edit/conv-123');
     });
 
+    it('renders an "Edit" action for an admin who does not own the event', () => {
+      const data = { ...baseConversationData, owner: 'someone-elses-id' };
+      render(<EventStatus conversationData={data} now={now} authType="admin" />);
+      expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument();
+    });
+
+    it('does not render an "Edit" action for a non-owner who is not an admin', () => {
+      const data = { ...baseConversationData, owner: 'someone-elses-id' };
+      render(<EventStatus conversationData={data} now={now} authType="user" />);
+      expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument();
+    });
+
     it('shows a hint line noting details still need confirming', () => {
       renderStatus();
       expect(screen.getByText(/still need confirming/i)).toBeInTheDocument();
