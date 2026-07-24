@@ -189,6 +189,7 @@ export const EventDetails: React.FC<{
 
   const topic = typeof conversationData.topic === 'object' ? conversationData.topic : undefined;
   const isPublicSeries = topic ? !topic.private : undefined;
+  const seriesNeedsAttention = !isLive && !isPast && !topic;
 
   const properties = conversationData.properties ?? {};
   const zoomMeetingUrl =
@@ -206,6 +207,7 @@ export const EventDetails: React.FC<{
         title="Event Details"
         expanded={expanded['details-1a']}
         onToggle={setSection('details-1a')}
+        headerChip={seriesNeedsAttention && <NeedsAttentionChip />}
       >
         {isPending && (
           <Callout>
@@ -213,25 +215,23 @@ export const EventDetails: React.FC<{
           </Callout>
         )}
 
-        {topic && (
-          <>
-            <FieldLabel>Series</FieldLabel>
-            <p className="mt-1 flex items-center gap-2 text-[14px] text-[#1F2937]">
-              {topic.name}
-              {isPublicSeries && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#E7F5EE] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0F7A4E]">
-                  <PublicOutlined fontSize="inherit" />
-                  PUBLIC
-                </span>
-              )}
-            </p>
-            <p className="mt-2 flex items-center gap-1 text-[11.5px] text-[#0F7A4E]">
+        <FieldLabel>Series</FieldLabel>
+        <p className="mt-1 flex items-center gap-2 text-[14px] text-[#1F2937]">
+          {topic ? topic.name : 'None'}
+          {isPublicSeries && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#E7F5EE] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0F7A4E]">
               <PublicOutlined fontSize="inherit" />
-              {isPublicSeries
-                ? 'Public series: event transcripts and group chats are retained in memory for Berkie and other bots to reference in the future.'
-                : 'Private series: event transcripts and group chats are not retained.'}
-            </p>
-          </>
+              PUBLIC
+            </span>
+          )}
+        </p>
+        {topic && (
+          <p className="mt-2 flex items-center gap-1 text-[11.5px] text-[#0F7A4E]">
+            <PublicOutlined fontSize="inherit" />
+            {isPublicSeries
+              ? 'Public series: event transcripts and group chats are retained in memory for Berkie and other bots to reference in the future.'
+              : 'Private series: event transcripts and group chats are not retained.'}
+          </p>
         )}
 
         {conversationData.description && (

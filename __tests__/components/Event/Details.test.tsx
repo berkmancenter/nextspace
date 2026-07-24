@@ -121,6 +121,31 @@ describe('EventDetails', () => {
       expect(screen.getByText(/not retained/)).toBeInTheDocument();
     });
 
+    it('still shows the Series label with a "None" value when no topic is set', () => {
+      renderAt({ ...baseConversationData, topic: undefined });
+      expandSection('Event Details');
+      expect(screen.getByText('Series')).toBeInTheDocument();
+      expect(screen.getByText('None')).toBeInTheDocument();
+    });
+
+    it('shows a Needs attention chip in the header when no series is set', () => {
+      renderAt({ ...baseConversationData, topic: undefined });
+      const header = screen.getByRole('button', { name: /Event Details/ });
+      expect(within(header).getByText('Needs attention')).toBeInTheDocument();
+    });
+
+    it('does not show a Needs attention chip in the header when a series is set', () => {
+      renderAt(baseConversationData);
+      const header = screen.getByRole('button', { name: /Event Details/ });
+      expect(within(header).queryByText('Needs attention')).not.toBeInTheDocument();
+    });
+
+    it('does not show a Needs attention chip once the event has ended, even without a series', () => {
+      renderAt({ ...baseConversationData, topic: undefined, endTime: '2026-08-01T17:30:00Z' });
+      const header = screen.getByRole('button', { name: /Event Details/ });
+      expect(within(header).queryByText('Needs attention')).not.toBeInTheDocument();
+    });
+
     it('renders the description when present and omits it when absent', () => {
       const { rerender } = renderAt({ ...baseConversationData, description: 'A talk about robots.' });
       expandSection('Event Details');
