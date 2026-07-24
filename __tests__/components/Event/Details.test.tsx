@@ -128,6 +128,13 @@ describe('EventDetails', () => {
       expect(screen.getByText('None')).toBeInTheDocument();
     });
 
+    it('shows required-field callout text when the event is pending and no series is set', () => {
+      renderAt({ ...baseConversationData, topic: undefined });
+      expandSection('Event Details');
+      expect(screen.getByText(/Series is required and currently blank/)).toBeInTheDocument();
+      expect(screen.queryByText(/leave it as-is/)).not.toBeInTheDocument();
+    });
+
     it('shows a Needs attention chip in the header when no series is set', () => {
       renderAt({ ...baseConversationData, topic: undefined });
       const header = screen.getByRole('button', { name: /Event Details/ });

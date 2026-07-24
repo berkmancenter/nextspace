@@ -211,7 +211,9 @@ export const EventDetails: React.FC<{
       >
         {isPending && (
           <Callout>
-            If this series matches your expected topic, leave it as-is. Otherwise, click the Edit button above to change it.
+            {topic
+              ? 'If this series matches your expected topic, leave it as-is. Otherwise, click the Edit button above to change it.'
+              : 'Series is required and currently blank. Click the Edit button above to set it.'}
           </Callout>
         )}
 
