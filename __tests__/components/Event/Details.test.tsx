@@ -114,11 +114,12 @@ describe('EventDetails', () => {
       expect(screen.getByText(/retained in memory for Berkie/)).toBeInTheDocument();
     });
 
-    it('does not show a PUBLIC badge and shows private retention copy when the topic is private', () => {
+    it('shows a PRIVATE badge and private retention copy when the topic is private', () => {
       renderAt({ ...baseConversationData, topic: { ...(baseConversationData.topic as any), private: true } });
       expandSection('Event Details');
       expect(screen.queryByText('PUBLIC')).not.toBeInTheDocument();
-      expect(screen.getByText(/not retained/)).toBeInTheDocument();
+      expect(screen.getByText('PRIVATE')).toBeInTheDocument();
+      expect(screen.getByText(/not retained, so Berkie and other bots won't reference this event/)).toBeInTheDocument();
     });
 
     it('still shows the Series label with a "None" value when no topic is set', () => {
