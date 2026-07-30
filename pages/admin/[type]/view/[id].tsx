@@ -87,7 +87,7 @@ function EventScreen({ authType }: { authType: AuthType }) {
         </Alert>
       )}
 
-      <EventStatus conversationData={conversationData} onJumpToSection={handleJumpToSection} />
+      <EventStatus conversationData={conversationData} onJumpToSection={handleJumpToSection} authType={authType} />
       <EventDetails conversationData={conversationData} openSectionRequest={openSectionRequest} />
     </div>
   );

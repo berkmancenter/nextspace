@@ -114,11 +114,44 @@ describe('EventDetails', () => {
       expect(screen.getByText(/retained in memory for Berkie/)).toBeInTheDocument();
     });
 
-    it('does not show a PUBLIC badge and shows private retention copy when the topic is private', () => {
+    it('shows a PRIVATE badge and private retention copy when the topic is private', () => {
       renderAt({ ...baseConversationData, topic: { ...(baseConversationData.topic as any), private: true } });
       expandSection('Event Details');
       expect(screen.queryByText('PUBLIC')).not.toBeInTheDocument();
-      expect(screen.getByText(/not retained/)).toBeInTheDocument();
+      expect(screen.getByText('PRIVATE')).toBeInTheDocument();
+      expect(screen.getByText(/not retained, so Berkie and other bots won't reference this event/)).toBeInTheDocument();
+    });
+
+    it('still shows the Series label with a "None" value when no topic is set', () => {
+      renderAt({ ...baseConversationData, topic: undefined });
+      expandSection('Event Details');
+      expect(screen.getByText('Series')).toBeInTheDocument();
+      expect(screen.getByText('None')).toBeInTheDocument();
+    });
+
+    it('shows required-field callout text when the event is pending and no series is set', () => {
+      renderAt({ ...baseConversationData, topic: undefined });
+      expandSection('Event Details');
+      expect(screen.getByText(/Series is required and currently blank/)).toBeInTheDocument();
+      expect(screen.queryByText(/leave it as-is/)).not.toBeInTheDocument();
+    });
+
+    it('shows a Needs attention chip in the header when no series is set', () => {
+      renderAt({ ...baseConversationData, topic: undefined });
+      const header = screen.getByRole('button', { name: /Event Details/ });
+      expect(within(header).getByText('Needs attention')).toBeInTheDocument();
+    });
+
+    it('does not show a Needs attention chip in the header when a series is set', () => {
+      renderAt(baseConversationData);
+      const header = screen.getByRole('button', { name: /Event Details/ });
+      expect(within(header).queryByText('Needs attention')).not.toBeInTheDocument();
+    });
+
+    it('does not show a Needs attention chip once the event has ended, even without a series', () => {
+      renderAt({ ...baseConversationData, topic: undefined, endTime: '2026-08-01T17:30:00Z' });
+      const header = screen.getByRole('button', { name: /Event Details/ });
+      expect(within(header).queryByText('Needs attention')).not.toBeInTheDocument();
     });
 
     it('renders the description when present and omits it when absent', () => {

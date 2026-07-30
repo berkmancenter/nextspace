@@ -1,5 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { CloseOutlined, PublicOutlined, VisibilityOffOutlined, WarningAmberOutlined } from '@mui/icons-material';
+import {
+  CloseOutlined,
+  LockOutlined,
+  PublicOutlined,
+  VisibilityOffOutlined,
+  WarningAmberOutlined,
+} from '@mui/icons-material';
 import { Conversation } from '../../types.internal';
 import { deriveEventState, isValidZoomUrl } from '../../utils/eventState';
 import { SectionCard } from './SectionCard';
@@ -189,6 +195,7 @@ export const EventDetails: React.FC<{
 
   const topic = typeof conversationData.topic === 'object' ? conversationData.topic : undefined;
   const isPublicSeries = topic ? !topic.private : undefined;
+  const seriesNeedsAttention = !isLive && !isPast && !topic;
 
   const properties = conversationData.properties ?? {};
   const zoomMeetingUrl =
@@ -206,32 +213,41 @@ export const EventDetails: React.FC<{
         title="Event Details"
         expanded={expanded['details-1a']}
         onToggle={setSection('details-1a')}
+        headerChip={seriesNeedsAttention && <NeedsAttentionChip />}
       >
         {isPending && (
           <Callout>
-            If this series matches your expected topic, leave it as-is. Otherwise, click the Edit button above to change it.
+            {topic
+              ? 'If this series matches your expected topic, leave it as-is. Otherwise, click the Edit button above to change it.'
+              : 'Series is required and currently blank. Click the Edit button above to set it.'}
           </Callout>
         )}
 
+        <FieldLabel>Series</FieldLabel>
+        <p className="mt-1 flex items-center gap-2 text-[14px] text-[#1F2937]">
+          {topic ? topic.name : 'None'}
+          {topic &&
+            (isPublicSeries ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#E7F5EE] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0F7A4E]">
+                <PublicOutlined fontSize="inherit" />
+                PUBLIC
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#E5E7EB] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#374151]">
+                <LockOutlined fontSize="inherit" />
+                PRIVATE
+              </span>
+            ))}
+        </p>
         {topic && (
-          <>
-            <FieldLabel>Series</FieldLabel>
-            <p className="mt-1 flex items-center gap-2 text-[14px] text-[#1F2937]">
-              {topic.name}
-              {isPublicSeries && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#E7F5EE] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0F7A4E]">
-                  <PublicOutlined fontSize="inherit" />
-                  PUBLIC
-                </span>
-              )}
-            </p>
-            <p className="mt-2 flex items-center gap-1 text-[11.5px] text-[#0F7A4E]">
-              <PublicOutlined fontSize="inherit" />
-              {isPublicSeries
-                ? 'Public series: event transcripts and group chats are retained in memory for Berkie and other bots to reference in the future.'
-                : 'Private series: event transcripts and group chats are not retained.'}
-            </p>
-          </>
+          <p
+            className={`mt-2 flex items-center gap-1 text-[11.5px] ${isPublicSeries ? 'text-[#0F7A4E]' : 'text-[#374151]'}`}
+          >
+            {isPublicSeries ? <PublicOutlined fontSize="inherit" /> : <LockOutlined fontSize="inherit" />}
+            {isPublicSeries
+              ? 'Public series: event transcripts and group chats are retained in memory for Berkie and other bots to reference in the future.'
+              : "Private series: event transcripts and group chats are not retained, so Berkie and other bots won't reference this event in the future."}
+          </p>
         )}
 
         {conversationData.description && (
