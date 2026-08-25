@@ -356,6 +356,11 @@ function generateEventUrls(conversationData: Conversation, botName: string): Eve
         url: modUrl,
       });
     }
+  } else if (convType && convType.name === 'communityRoom') {
+    participant.push({
+      label: botName,
+      url: `${urlPrefix}/room/${conversationData.id}`,
+    });
   }
 
   return {
