@@ -520,7 +520,14 @@ export default function GuidePage() {
         }
         return res.json() as Promise<GuideData>;
       })
-      .then(setGuide)
+      .then((data) => {
+        // Community rooms don't have a Quick Guide; a room id pasted into
+        // this URL should read as not-found rather than render nonsense.
+        if (data.conversationType === 'communityRoom') {
+          throw new Error('Conversation not found.');
+        }
+        setGuide(data);
+      })
       .catch((err: Error) => setError(err.message));
   }, [conversationId]);
 
