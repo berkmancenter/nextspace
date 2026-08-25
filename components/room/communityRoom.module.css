@@ -1,0 +1,467 @@
+/*
+ * Solar Signal (light) / Night Archive (dark) design tokens for the community
+ * room. Scoped under .root so nothing here reaches the rest of the app —
+ * globals.css's shared @theme block is untouched. The design treats dark mode
+ * as a single toggle over the whole palette with no dedicated in-app control,
+ * so [data-theme='dark'] is supported for a future explicit toggle, but today
+ * the room follows the system's prefers-color-scheme only.
+ */
+
+.root {
+  --room-canvas: #f6f5f1;
+  --room-chrome-bg: #ffffff;
+  --room-chrome-border: rgba(17, 22, 28, 0.12);
+  --room-text-primary: #12161c;
+  --room-text-muted: #5e6874;
+  --room-text-body: #2a3039;
+
+  --room-you-bg: #4845d2;
+  --room-you-text: #fff3ee;
+  --room-you-bubble-bg: rgba(72, 69, 210, 0.08);
+  --room-you-bubble-border: rgba(72, 69, 210, 0.32);
+
+  --room-other-avatar-bg: #e3e0d8;
+  --room-other-avatar-text: #3f4650;
+  --room-other-bubble-bg: #ffffff;
+  --room-other-bubble-border: rgba(17, 22, 28, 0.12);
+
+  --room-berkie-accent: #0f7d6b;
+  --room-berkie-avatar-bg: #ddf3ee;
+  --room-berkie-bubble-bg: rgba(15, 125, 107, 0.06);
+  --room-berkie-bubble-border: rgba(15, 125, 107, 0.26);
+  --room-berkie-pill-bg: #efede7;
+  --room-berkie-pill-border: #dedbd3;
+
+  --room-nav-bg: #efede7;
+  --room-nav-border: #dedbd3;
+  --room-nav-active-bg: #ffffff;
+
+  --room-composer-bg: #ffffff;
+  --room-composer-border: rgba(17, 22, 28, 0.16);
+  --room-composer-border-focus: #4845d2;
+
+  --room-badge-border: rgba(17, 22, 28, 0.16);
+  --room-live-border: rgba(15, 125, 107, 0.34);
+
+  background: var(--room-canvas);
+  color: var(--room-text-primary);
+}
+
+@media (prefers-color-scheme: dark) {
+  .root:not([data-theme='light']) {
+    --room-canvas: #111214;
+    --room-chrome-bg: #17181b;
+    --room-chrome-border: rgba(255, 255, 255, 0.12);
+    --room-text-primary: #f2f0e9;
+    --room-text-muted: #96aec6;
+    --room-text-body: #f2f0e9;
+
+    --room-you-text: #f2f0e9;
+
+    --room-other-avatar-bg: #1f2530;
+    --room-other-avatar-text: #e7e9ec;
+    --room-other-bubble-bg: #17181b;
+    --room-other-bubble-border: rgba(255, 255, 255, 0.12);
+
+    --room-berkie-accent: #96aec6;
+    --room-berkie-avatar-bg: rgba(150, 174, 198, 0.14);
+    --room-berkie-pill-bg: #17181b;
+    --room-berkie-pill-border: rgba(255, 255, 255, 0.13);
+
+    --room-nav-bg: #17181b;
+    --room-nav-border: rgba(255, 255, 255, 0.12);
+    --room-nav-active-bg: rgba(255, 255, 255, 0.07);
+
+    --room-composer-bg: #17181b;
+    --room-composer-border: rgba(255, 255, 255, 0.16);
+    --room-composer-border-focus: #96aec6;
+
+    --room-badge-border: rgba(255, 255, 255, 0.16);
+  }
+}
+
+.root[data-theme='dark'] {
+  --room-canvas: #111214;
+  --room-chrome-bg: #17181b;
+  --room-chrome-border: rgba(255, 255, 255, 0.12);
+  --room-text-primary: #f2f0e9;
+  --room-text-muted: #96aec6;
+  --room-text-body: #f2f0e9;
+
+  --room-you-text: #f2f0e9;
+
+  --room-other-avatar-bg: #1f2530;
+  --room-other-avatar-text: #e7e9ec;
+  --room-other-bubble-bg: #17181b;
+  --room-other-bubble-border: rgba(255, 255, 255, 0.12);
+
+  --room-berkie-accent: #96aec6;
+  --room-berkie-avatar-bg: rgba(150, 174, 198, 0.14);
+  --room-berkie-pill-bg: #17181b;
+  --room-berkie-pill-border: rgba(255, 255, 255, 0.13);
+
+  --room-nav-bg: #17181b;
+  --room-nav-border: rgba(255, 255, 255, 0.12);
+  --room-nav-active-bg: rgba(255, 255, 255, 0.07);
+
+  --room-composer-bg: #17181b;
+  --room-composer-border: rgba(255, 255, 255, 0.16);
+  --room-composer-border-focus: #96aec6;
+
+  --room-badge-border: rgba(255, 255, 255, 0.16);
+}
+
+/* Threading UI (ThreadedMessage/ThreadPanel) is reused unmodified per its own
+   accessibility behavior, but its static Tailwind gray-400/gray-600 text
+   doesn't adapt to Night Archive — gray-600 in particular fails contrast on
+   a dark canvas. Re-tint just those text colors within the room, without
+   touching the shared component. */
+.root[data-theme='dark'] :global(.text-gray-400) {
+  color: #96aec6 !important;
+}
+.root[data-theme='dark'] :global(.text-gray-600) {
+  color: #c9c5bb !important;
+}
+@media (prefers-color-scheme: dark) {
+  .root:not([data-theme='light']) :global(.text-gray-400) {
+    color: #96aec6 !important;
+  }
+  .root:not([data-theme='light']) :global(.text-gray-600) {
+    color: #c9c5bb !important;
+  }
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: 999px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.badge {
+  flex: none;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 500;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  border: 1px solid var(--room-badge-border);
+  border-radius: 2px;
+  padding: 3px 5px;
+  text-transform: uppercase;
+}
+
+.nav {
+  flex: none;
+  display: flex;
+  height: 60px;
+  background: var(--room-nav-bg);
+  border-top: 1px solid var(--room-nav-border);
+}
+
+.navButton {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: transparent;
+  border: 0;
+  border-top: 3px solid transparent;
+  margin-top: -1px;
+  cursor: pointer;
+}
+
+.navButtonActive {
+  background: var(--room-nav-active-bg);
+}
+
+.navButtonUnread {
+  border-top-color: var(--room-you-bg);
+}
+
+.navIconWithDot {
+  position: relative;
+  display: flex;
+}
+
+.unreadDot {
+  position: absolute;
+  top: -1px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--room-you-bg);
+}
+
+.navLabelIdle,
+.navLabelActive {
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.navLabelIdle {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-weight: 400;
+  color: var(--room-text-muted);
+}
+
+.navLabelActive {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  color: var(--room-text-primary);
+}
+
+@media (min-width: 1024px) {
+  .navButton {
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .navLabelIdle,
+  .navLabelActive {
+    font-size: 11px;
+  }
+}
+
+.composerWrap {
+  flex: none;
+  background: var(--room-chrome-bg);
+  border-top: 1px solid var(--room-chrome-border);
+  padding: 10px 12px;
+}
+
+.composerBox {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--room-composer-bg);
+  border: 1px solid var(--room-composer-border);
+  border-radius: 16px;
+  padding: 6px 6px 6px 12px;
+}
+
+.composerBox:focus-within {
+  border-color: var(--room-composer-border-focus);
+}
+
+.composerTextarea {
+  flex: 1;
+  min-height: 28px;
+  max-height: 120px;
+  resize: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--room-text-body);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+  padding: 6px 0;
+}
+
+.composerTextarea::placeholder {
+  color: var(--room-text-muted);
+}
+
+.composerButtonRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.composerButtonGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mentionButton,
+.askBerkieButton,
+.sendButton {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 999px;
+}
+
+.mentionButton {
+  color: var(--room-text-muted);
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+}
+
+.askBerkieButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  padding: 0 10px;
+  color: var(--room-berkie-accent);
+  background: var(--room-berkie-pill-bg);
+  border: 1px solid var(--room-berkie-pill-border);
+}
+
+.askBerkieLabel {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.sendButton {
+  background: var(--room-you-bg) !important;
+}
+
+.sendButtonInner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.disclosure {
+  margin: 6px 2px 0;
+  color: var(--room-text-muted);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.introCardWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.introCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.introCardLabel {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--room-berkie-accent);
+}
+
+.introCardRule {
+  flex: 1;
+  height: 1px;
+  background: var(--room-chrome-border);
+}
+
+.introCardBody {
+  background: var(--room-chrome-bg);
+  border: 1px solid var(--room-chrome-border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.introCardTopRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.introCardName {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--room-text-primary);
+}
+
+.introCardRole {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 12px;
+  color: var(--room-text-muted);
+}
+
+.introCardBio {
+  margin: 11px 0 0;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--room-text-body);
+}
+
+.introCardProvenance {
+  margin: 10px 0 0;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--room-text-muted);
+}
+
+.jumpPill {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--room-chrome-bg);
+  color: var(--room-text-primary);
+  border: 1px solid var(--room-chrome-border);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(17, 22, 28, 0.15);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 52px;
+  padding: 0 14px;
+  background: var(--room-chrome-bg);
+  border-bottom: 1px solid var(--room-chrome-border);
+  box-shadow: 0 1px 2px rgba(17, 22, 28, 0.07);
+}
+
+.headerTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.headerTitle {
+  margin: 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--room-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.errorBanner {
+  flex: none;
+  padding: 8px 14px;
+  background: var(--room-chrome-bg);
+  border-top: 1px solid var(--room-chrome-border);
+  color: #b3261e;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 13px;
+}
