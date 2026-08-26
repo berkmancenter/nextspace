@@ -38,6 +38,8 @@ const mockEmitWithTokenRefresh = jest.fn((...args: any[]) => {
   onSuccess?.();
 });
 
+const mockRetrieveData = jest.fn();
+
 jest.mock('../../utils', () => ({
   Api: {
     get: jest.fn(() => ({
@@ -45,7 +47,7 @@ jest.mock('../../utils', () => ({
       getAccessToken: jest.fn(() => 'mock-access-token'),
     })),
   },
-  RetrieveData: jest.fn(),
+  RetrieveData: (...args: any[]) => mockRetrieveData(...args),
   SendData: (...args: any[]) => mockSendData(...args),
   emitWithTokenRefresh: (...args: any[]) => mockEmitWithTokenRefresh(...args),
   getPollResponseCounts: jest.fn(),
@@ -103,6 +105,7 @@ describe('RoomPage', () => {
     mockSocket.off.mockClear();
     setDefaultMocks();
     mockSendData.mockResolvedValue({ id: 'sent-message-1' });
+    mockRetrieveData.mockResolvedValue([]);
   });
 
   it('shows a loading spinner while the room is loading', () => {
@@ -199,6 +202,21 @@ describe('RoomPage', () => {
         expect.objectContaining({ body: 'hello Berkie', channels: [{ name: 'direct-user-1-agent-1' }] }),
       ),
     );
+  });
+
+  it('stops fetching once history has loaded instead of refetching in a loop', async () => {
+    mockRetrieveData.mockResolvedValue([
+      { id: 'm1', body: 'hello room', createdAt: '2026-08-26T00:00:00.000Z', channels: ['chat'] },
+    ]);
+
+    render(<RoomPage authType="guest" />);
+
+    await waitFor(() => expect(mockRetrieveData).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const callsAfterSettling = mockRetrieveData.mock.calls.length;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(mockRetrieveData.mock.calls.length).toBe(callsAfterSettling);
   });
 
   it('has no accessibility violations once loaded', async () => {

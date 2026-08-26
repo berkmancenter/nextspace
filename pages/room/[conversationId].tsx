@@ -33,6 +33,13 @@ export default function RoomPage({ authType: _authType }: { authType: AuthType }
   const [waitingForChatResponse, setWaitingForChatResponse] = useState(false);
   const [waitingForAssistantResponse, setWaitingForAssistantResponse] = useState(false);
 
+  // useConversationMessages rebuilds its fetchers whenever these change, and re-fetches
+  // whenever the fetchers change. A fresh array or object literal here would therefore
+  // start a fetch on every render, which never settles.
+  const agentIds = useMemo(() => (agentId ? [agentId] : []), [agentId]);
+  const chatIntroRef = useMemo(() => ({ current: [] as PseudonymousMessage[] }), []);
+  const assistantIntroRef = useMemo(() => ({ current: [] as PseudonymousMessage[] }), []);
+
   const {
     assistantMessages,
     setAssistantMessages,
@@ -46,11 +53,11 @@ export default function RoomPage({ authType: _authType }: { authType: AuthType }
     userId,
     pseudonym: realName,
     agentId,
-    agentIds: agentId ? [agentId] : [],
+    agentIds,
     chatPasscode: '',
     initialJoinComplete,
-    chatIntroRef: useMemo(() => ({ current: [] as PseudonymousMessage[] }), []),
-    assistantIntroRef: useMemo(() => ({ current: [] as PseudonymousMessage[] }), []),
+    chatIntroRef,
+    assistantIntroRef,
     conversationId,
   });
 
@@ -100,14 +107,13 @@ export default function RoomPage({ authType: _authType }: { authType: AuthType }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, userId, conversationId, agentId]);
 
-  // Fetch chat history once joined. useConversationMessages' own auto-fetch effect
-  // gates on chatPasscode being truthy, which a room's channel never is by design,
-  // so history is fetched here instead.
+  // Only chat history is fetched here: useConversationMessages already auto-fetches
+  // assistant messages, but it gates its chat fetch on a truthy chatPasscode, which a
+  // room's channel never has by design.
   useEffect(() => {
     if (!initialJoinComplete) return;
     fetchChatMessages().catch((err) => console.error('Error fetching chat messages:', err));
-    fetchAllAssistantMessages();
-  }, [initialJoinComplete, fetchChatMessages, fetchAllAssistantMessages]);
+  }, [initialJoinComplete, fetchChatMessages]);
 
   // Re-fetch history after a reconnect gap, same rationale as the initial fetch above.
   useEffect(() => {
