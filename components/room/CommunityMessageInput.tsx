@@ -166,7 +166,9 @@ export function CommunityMessageInput({
                   onClick={() => insertAtCursor('@')}
                   className={styles.mentionButton}
                 >
-                  @
+                  <span aria-hidden="true" className={styles.mentionButtonInner}>
+                    @
+                  </span>
                 </IconButton>
                 <IconButton
                   aria-label="Ask Berkie"
@@ -187,8 +189,11 @@ export function CommunityMessageInput({
             onClick={handleSend}
             className={styles.sendButton}
           >
-            <span className={styles.sendButtonInner} style={{ opacity: value.trim() ? 1 : 0.5 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff" style={{ transform: 'rotate(-45deg)' }}>
+            <span
+              aria-hidden="true"
+              className={`${styles.sendButtonInner}${value.trim() ? '' : ` ${styles.sendButtonIdle}`}`}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff" style={{ transform: 'rotate(-45deg)' }}>
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
               </svg>
             </span>

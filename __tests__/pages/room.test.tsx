@@ -144,10 +144,17 @@ describe('RoomPage', () => {
     expect(screen.queryByTestId('assistant-panel')).not.toBeInTheDocument();
   });
 
-  it('shows the room name and a LIVE badge in the header on the group tab', () => {
+  it('shows the room name with no status badge in the header on the group tab', () => {
     render(<RoomPage authType="guest" />);
     expect(screen.getByText('BKC Community Room')).toBeInTheDocument();
-    expect(screen.getByText('LIVE')).toBeInTheDocument();
+    expect(screen.queryByText('LIVE')).not.toBeInTheDocument();
+  });
+
+  it('shows an account control carrying the signed-in member initials', () => {
+    render(<RoomPage authType="guest" />);
+    const account = screen.getByRole('button', { name: 'Your account, Priya Raghunathan' });
+    expect(account).toBeInTheDocument();
+    expect(account).toHaveTextContent('PR');
   });
 
   it('switches to the assistant panel when the Berkie tab is clicked', async () => {
@@ -163,6 +170,7 @@ describe('RoomPage', () => {
     render(<RoomPage authType="guest" />);
     await user.click(screen.getByRole('button', { name: 'Berkie' }));
     expect(screen.getByText('PRIVATE')).toBeInTheDocument();
+    expect(screen.getByText('Private to you')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Berkie' })).toBeInTheDocument();
   });
 

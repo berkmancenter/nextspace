@@ -272,30 +272,48 @@
   color: var(--room-text-muted);
 }
 
+/* space-between is what keeps @ and Ask Berkie on the left edge with send pinned
+   right; without it the three controls bunch together. */
 .composerButtonRow {
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: space-between;
+  padding: 0 4px 2px;
 }
 
 .composerButtonGroup {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
+/* The buttons stay 44px for the WCAG 2.5.5 tap target while their visible
+   circles are 32px, so the artwork matches the design without shrinking the
+   target. */
 .mentionButton,
-.askBerkieButton,
 .sendButton {
+  width: 44px;
+  height: 44px;
   min-width: 44px;
   min-height: 44px;
+  padding: 0;
+  background: none !important;
   border-radius: 999px;
 }
 
-.mentionButton {
-  color: var(--room-text-muted);
+.mentionButtonInner {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--room-berkie-pill-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--room-font-mono), monospace;
-  font-weight: 600;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--room-text-muted);
 }
 
 .askBerkieButton {
@@ -303,27 +321,37 @@
   align-items: center;
   gap: 6px;
   width: auto;
-  padding: 0 10px;
+  height: 44px;
+  padding: 0 12px 0 8px;
+  background: none;
+  border: 0;
   color: var(--room-berkie-accent);
-  background: var(--room-berkie-pill-bg);
-  border: 1px solid var(--room-berkie-pill-border);
 }
 
 .askBerkieLabel {
-  font-family: var(--room-font-body), sans-serif;
-  font-size: 13px;
-  font-weight: 500;
+  font-family: var(--room-font-mono), monospace;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
   white-space: nowrap;
 }
 
-.sendButton {
-  background: var(--room-you-bg) !important;
-}
-
 .sendButtonInner {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--room-you-bg);
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Dims the whole circle, not just the arrow inside it. Dimming only the arrow
+   leaves a full-strength button carrying a 2.9:1 glyph, which reads as active
+   and fails WCAG 1.4.11; fading the circle keeps the control legible as the
+   inactive state its aria-disabled already reports. */
+.sendButtonIdle {
+  opacity: 0.5;
 }
 
 .disclosure {
@@ -429,11 +457,17 @@
   flex: none;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   height: 52px;
-  padding: 0 14px;
+  padding: 0 8px 0 14px;
   background: var(--room-chrome-bg);
   border-bottom: 1px solid var(--room-chrome-border);
   box-shadow: 0 1px 2px rgba(17, 22, 28, 0.07);
+}
+
+.headerLead {
+  min-width: 0;
 }
 
 .headerTitleGroup {
@@ -441,6 +475,52 @@
   align-items: center;
   gap: 9px;
   min-width: 0;
+}
+
+.headerIcon {
+  display: flex;
+  flex: none;
+}
+
+.headerSubtitle {
+  margin-top: 1px;
+  font-family: var(--room-font-body), sans-serif;
+  font-weight: 400;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--room-text-muted);
+}
+
+/* 44px keeps the tap target at the WCAG 2.5.5 enhanced size while the visible
+   circle stays 32px, matching the design. */
+.accountButton {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 0;
+  padding: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.accountAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--room-you-bg);
+  color: var(--room-you-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--room-font-mono), monospace;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.01em;
 }
 
 .headerTitle {

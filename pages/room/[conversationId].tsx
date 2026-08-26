@@ -9,6 +9,8 @@ import { useConversationMessages, useRoomSetup, useSessionJoin, useTabNavigation
 import { CommunityNavigationBar, CommunityNavTab } from '../../components/room/CommunityNavigationBar';
 import { CommunityGroupChatPanel } from '../../components/room/CommunityGroupChatPanel';
 import { CommunityAssistantPanel } from '../../components/room/CommunityAssistantPanel';
+import { BotIcon } from '../../components/BotIcon';
+import { getRoomInitials } from '../../utils/roomAvatarUtils';
 import styles from '../../components/room/communityRoom.module.css';
 
 const displayFont = Space_Grotesk({ subsets: ['latin'], weight: ['600', '700'] });
@@ -20,6 +22,20 @@ const roomFontVariables = {
   '--room-font-body': bodyFont.style.fontFamily,
   '--room-font-mono': monoFont.style.fontFamily,
 } as CSSProperties;
+
+function RoomMarkIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 1.9 21 7.05v9.9L12 22.1 3 16.95v-9.9Z"
+        stroke="var(--room-you-bg)"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path d="M12 7.4 16.4 9.9v5L12 17.4 7.6 14.9v-5Z" fill="var(--room-you-bg)" />
+    </svg>
+  );
+}
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -213,10 +229,23 @@ export default function RoomPage({ authType: _authType }: { authType: AuthType }
   return (
     <div className={styles.root} style={{ display: 'flex', flexDirection: 'column', height: '100vh', ...roomFontVariables }}>
       <header className={styles.header}>
-        <div className={styles.headerTitleGroup}>
-          <h1 className={styles.headerTitle}>{activeTab === 'assistant' ? botName : roomName || 'BKC Community Room'}</h1>
-          <span className={styles.badge}>{activeTab === 'assistant' ? 'PRIVATE' : 'LIVE'}</span>
+        <div className={styles.headerLead}>
+          <div className={styles.headerTitleGroup}>
+            <span aria-hidden="true" className={styles.headerIcon}>
+              {activeTab === 'assistant' ? <BotIcon size={18} color="var(--room-berkie-accent)" /> : <RoomMarkIcon />}
+            </span>
+            <h1 className={styles.headerTitle}>{activeTab === 'assistant' ? botName : roomName || 'BKC Community Room'}</h1>
+            {activeTab === 'assistant' && <span className={styles.badge}>PRIVATE</span>}
+          </div>
+          {activeTab === 'assistant' && <div className={styles.headerSubtitle}>Private to you</div>}
         </div>
+        {realName && (
+          <button type="button" aria-label={`Your account, ${realName}`} className={styles.accountButton}>
+            <span aria-hidden="true" className={styles.accountAvatar}>
+              {getRoomInitials(realName)}
+            </span>
+          </button>
+        )}
       </header>
 
       <div style={{ flex: 1, minHeight: 0 }}>
