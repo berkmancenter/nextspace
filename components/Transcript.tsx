@@ -16,6 +16,12 @@ interface TranscriptProps {
   conversationId: string;
   /** The passcode for accessing the transcript */
   transcriptPasscode?: string;
+  /**
+   * The moderator channel's passcode, taken from the moderator link. The four controls are
+   * authorized against it, so a page that renders them without it can only refuse. Leave it
+   * unset wherever `showControls` is off: participants have no moderator passcode to send.
+   */
+  moderatorPasscode?: string;
   /** The category of messages to display */
   category?: string;
   /** Whether to show the transcript controls */
@@ -173,14 +179,38 @@ export function Transcript(props: TranscriptProps) {
     />
   );
 
+  /*
+   * Query string that authorizes a transcript control. The moderator channel's passcode is
+   * what the backend checks, since a moderator holds no admin rights; the transcript
+   * passcode rides in every participant's link and grants nothing here. Empty when the page
+   * has no moderator passcode, so a page without one sends a bare request.
+   */
+  const controlQuery = (): string => (props.moderatorPasscode ? `?channel=moderator,${props.moderatorPasscode}` : '');
+
+  /*
+   * Turns a refused control into something a moderator can act on. A 403 means the moderator
+   * passcode was missing or wrong, so the message points at the link that carries it rather
+   * than repeating the server's wording, which talks about channels and passcodes.
+   */
+  const describeFailure = (response: { status?: number; message?: unknown }, fallback: string): string => {
+    if (response?.status === 403) {
+      return 'You need a valid moderator link to control this recording. Ask the event organizer for the moderator link and open this page from it.';
+    }
+    return typeof response?.message === 'string' ? response.message : fallback;
+  };
+
   // Handler for pausing transcript
   const handlePause = async () => {
     setShowPauseResumeConfirm(false);
     setError(null);
     try {
-      const response = await SendData(`transcript/${props.conversationId}/pause`, {}, Api.get().getAccessToken());
+      const response = await SendData(
+        `transcript/${props.conversationId}/pause${controlQuery()}`,
+        {},
+        Api.get().getAccessToken(),
+      );
       if (response && response.error) {
-        setError(response.message || 'Failed to pause transcript');
+        setError(describeFailure(response, 'Failed to pause transcript'));
       }
     } catch (error) {
       console.error('Error pausing transcript:', error);
@@ -193,9 +223,13 @@ export function Transcript(props: TranscriptProps) {
     setShowPauseResumeConfirm(false);
     setError(null);
     try {
-      const response = await SendData(`transcript/${props.conversationId}/resume`, {}, Api.get().getAccessToken());
+      const response = await SendData(
+        `transcript/${props.conversationId}/resume${controlQuery()}`,
+        {},
+        Api.get().getAccessToken(),
+      );
       if (response && response.error) {
-        setError(response.message || 'Failed to resume transcript');
+        setError(describeFailure(response, 'Failed to resume transcript'));
       }
     } catch (error) {
       console.error('Error resuming transcript:', error);
@@ -208,11 +242,16 @@ export function Transcript(props: TranscriptProps) {
     setShowDeleteConfirm(false);
     setError(null);
     try {
-      const response = await SendData(`transcript/${props.conversationId}`, {}, Api.get().getAccessToken(), {
-        method: 'DELETE',
-      });
+      const response = await SendData(
+        `transcript/${props.conversationId}${controlQuery()}`,
+        {},
+        Api.get().getAccessToken(),
+        {
+          method: 'DELETE',
+        },
+      );
       if (response && response.error) {
-        setError(response.message || 'Failed to delete transcript');
+        setError(describeFailure(response, 'Failed to delete transcript'));
       }
     } catch (error) {
       console.error('Error deleting transcript:', error);
@@ -225,7 +264,17 @@ export function Transcript(props: TranscriptProps) {
     setError(null);
     try {
       // Fetch the formatted transcript text
-      const textContent = await RetrieveData(`transcript/${props.conversationId}`, Api.get().getAccessToken(), 'text');
+      const textContent = await RetrieveData(
+        `transcript/${props.conversationId}${controlQuery()}`,
+        Api.get().getAccessToken(),
+        'text',
+      );
+
+      // A refusal comes back as an error object rather than the transcript body.
+      if (textContent && typeof textContent === 'object' && 'error' in textContent) {
+        setError(describeFailure(textContent, 'Failed to fetch transcript for download'));
+        return;
+      }
 
       if (!textContent || typeof textContent !== 'string') {
         setError('Failed to fetch transcript for download');
@@ -580,7 +629,7 @@ export function Transcript(props: TranscriptProps) {
                   </button>
                 </div>
                 {error && (
-                  <div className="mt-3 p-3 bg-red-500/20 border border-red-500/50 rounded-lg">
+                  <div role="alert" className="mt-3 p-3 bg-red-500/20 border border-red-500/50 rounded-lg">
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm text-red-200">{error}</p>
                       <button

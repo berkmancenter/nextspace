@@ -1090,6 +1090,189 @@ describe('Transcript', () => {
       });
     });
 
+    /* A moderator's link carries the moderator channel's passcode, and the throwaway account
+       it creates is an ordinary participant holding no admin rights. That passcode is what
+       the four controls are authorized against, so every one of them has to send it. */
+    describe('moderator passcode', () => {
+      const moderatorProps = {
+        ...controlsProps,
+        moderatorPasscode: 'mod-passcode',
+      };
+      const moderatorChannel = 'channel=moderator,mod-passcode';
+
+      const mockPausedConversation = () => {
+        (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+          if (url.startsWith('conversations/')) {
+            return Promise.resolve({
+              name: 'Test Conversation',
+              transcript: { status: 'paused' },
+            });
+          } else if (url.startsWith('messages/')) {
+            return Promise.resolve(transcriptMessages);
+          } else if (url.startsWith('transcript/')) {
+            return Promise.resolve('Test transcript content');
+          }
+          return Promise.resolve(null);
+        });
+      };
+
+      const confirmControl = async (user: ReturnType<typeof setupUser>, buttonLabel: string, confirmLabel: string) => {
+        await waitFor(() => {
+          expect(screen.getByLabelText(buttonLabel)).toBeInTheDocument();
+        });
+        await user.click(screen.getByLabelText(buttonLabel));
+        await waitFor(() => {
+          expect(screen.getByText(confirmLabel)).toBeInTheDocument();
+        });
+        await user.click(screen.getByText(confirmLabel));
+      };
+
+      it('sends the moderator passcode when pausing', async () => {
+        const user = setupUser();
+        (SendData as jest.Mock).mockResolvedValue({ success: true });
+
+        render(<Transcript {...moderatorProps} />);
+        await confirmControl(user, 'Pause recording', 'Yes, Pause');
+
+        await waitFor(() => {
+          expect(SendData).toHaveBeenCalledWith(
+            `transcript/${baseProps.conversationId}/pause?${moderatorChannel}`,
+            {},
+            'token',
+          );
+        });
+      });
+
+      it('sends the moderator passcode when resuming', async () => {
+        const user = setupUser();
+        (SendData as jest.Mock).mockResolvedValue({ success: true });
+        mockPausedConversation();
+
+        render(<Transcript {...moderatorProps} />);
+        await confirmControl(user, 'Resume recording', 'Yes, Resume');
+
+        await waitFor(() => {
+          expect(SendData).toHaveBeenCalledWith(
+            `transcript/${baseProps.conversationId}/resume?${moderatorChannel}`,
+            {},
+            'token',
+          );
+        });
+      });
+
+      it('sends the moderator passcode when deleting', async () => {
+        const user = setupUser();
+        (SendData as jest.Mock).mockResolvedValue({ success: true });
+        mockPausedConversation();
+
+        render(<Transcript {...moderatorProps} />);
+        await confirmControl(user, 'Delete transcript', 'Yes, Delete');
+
+        await waitFor(() => {
+          expect(SendData).toHaveBeenCalledWith(`transcript/${baseProps.conversationId}?${moderatorChannel}`, {}, 'token', {
+            method: 'DELETE',
+          });
+        });
+      });
+
+      it('sends the moderator passcode when downloading', async () => {
+        const user = setupUser();
+        mockPausedConversation();
+        global.URL.createObjectURL = jest.fn(() => 'blob:mock-url');
+        global.URL.revokeObjectURL = jest.fn();
+        const originalClick = HTMLAnchorElement.prototype.click;
+        HTMLAnchorElement.prototype.click = jest.fn();
+
+        render(<Transcript {...moderatorProps} />);
+        await waitFor(() => {
+          expect(screen.getByLabelText('Download transcript')).toBeInTheDocument();
+        });
+        await user.click(screen.getByLabelText('Download transcript'));
+
+        await waitFor(() => {
+          expect(RetrieveData).toHaveBeenCalledWith(
+            `transcript/${baseProps.conversationId}?${moderatorChannel}`,
+            'token',
+            'text',
+          );
+        });
+
+        HTMLAnchorElement.prototype.click = originalClick;
+      });
+
+      /* The event assistant page renders this component without controls and without a
+         moderator passcode, so a participant's requests must carry no channel parameter. */
+      it('sends no channel parameter when there is no moderator passcode', async () => {
+        const user = setupUser();
+        (SendData as jest.Mock).mockResolvedValue({ success: true });
+
+        render(<Transcript {...controlsProps} />);
+        await confirmControl(user, 'Pause recording', 'Yes, Pause');
+
+        await waitFor(() => {
+          expect(SendData).toHaveBeenCalledWith(`transcript/${baseProps.conversationId}/pause`, {}, 'token');
+        });
+      });
+
+      it('explains that a moderator link is required when a control is refused', async () => {
+        const user = setupUser();
+        // SendData reports non-400 failures as bare HTTP status text.
+        (SendData as jest.Mock).mockResolvedValue({ error: true, status: 403, message: 'Forbidden' });
+
+        render(<Transcript {...controlsProps} />);
+        await confirmControl(user, 'Pause recording', 'Yes, Pause');
+
+        await waitFor(() => {
+          expect(screen.getByText(/moderator link/i)).toBeInTheDocument();
+        });
+      });
+
+      /* Nothing else on screen marks the click as failed, so a screen reader has to announce
+         the refusal rather than leave someone to discover it. */
+      it('announces the refusal to assistive technology', async () => {
+        const user = setupUser();
+        (SendData as jest.Mock).mockResolvedValue({ error: true, status: 403, message: 'Forbidden' });
+
+        render(<Transcript {...controlsProps} />);
+        await confirmControl(user, 'Pause recording', 'Yes, Pause');
+
+        await waitFor(() => {
+          expect(screen.getByRole('alert')).toHaveTextContent(/moderator link/i);
+        });
+      });
+
+      it('explains that a moderator link is required when a download is refused', async () => {
+        const user = setupUser();
+        (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+          if (url.startsWith('conversations/')) {
+            return Promise.resolve({
+              name: 'Test Conversation',
+              transcript: { status: 'active' },
+            });
+          } else if (url.startsWith('messages/')) {
+            return Promise.resolve(transcriptMessages);
+          } else if (url.startsWith('transcript/')) {
+            return Promise.resolve({
+              error: true,
+              status: 403,
+              message: { code: 403, message: 'Incorrect or missing passcode for channel: moderator' },
+            });
+          }
+          return Promise.resolve(null);
+        });
+
+        render(<Transcript {...moderatorProps} />);
+        await waitFor(() => {
+          expect(screen.getByLabelText('Download transcript')).toBeInTheDocument();
+        });
+        await user.click(screen.getByLabelText('Download transcript'));
+
+        await waitFor(() => {
+          expect(screen.getByText(/moderator link/i)).toBeInTheDocument();
+        });
+      });
+    });
+
     it('updates transcript status when socket receives transcript:status event', async () => {
       render(<Transcript {...controlsProps} />);
 

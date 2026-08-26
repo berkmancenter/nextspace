@@ -4,6 +4,7 @@ import { act } from 'react';
 import { useRouter } from 'next/router';
 import { io } from 'socket.io-client';
 import ModeratorScreen from '../../pages/moderator';
+import { Transcript } from '../../components/Transcript';
 import { GetChannelPasscode, RetrieveData } from '../../utils';
 import { channel } from 'diagnostics_channel';
 
@@ -226,6 +227,38 @@ describe('ModeratorScreen', () => {
     });
 
     expect(screen.getByTestId('transcript-component')).toBeInTheDocument();
+  });
+
+  /* The transcript controls are authorized against the moderator channel's passcode, so the
+     page has to hand the component the same passcode it uses for the back channel. */
+  describe('transcript passcodes', () => {
+    beforeEach(() => {
+      // Distinct values per channel, so the assertion catches the two being swapped.
+      (GetChannelPasscode as jest.Mock).mockImplementation((channelName: string) => `${channelName}-passcode`);
+    });
+
+    /* jest.clearAllMocks() leaves implementations in place, so put the shared single-value
+       mock back or every later test sees these per-channel passcodes. */
+    afterEach(() => {
+      (GetChannelPasscode as jest.Mock).mockImplementation(() => 'mock-passcode');
+    });
+
+    it('passes the moderator passcode to Transcript alongside the transcript passcode', async () => {
+      await act(async () => {
+        render(<ModeratorScreen authType={'user'} />);
+      });
+
+      await waitFor(() => {
+        expect(Transcript).toHaveBeenCalledWith(
+          expect.objectContaining({
+            moderatorPasscode: 'moderator-passcode',
+            transcriptPasscode: 'transcript-passcode',
+            showControls: true,
+          }),
+          undefined,
+        );
+      });
+    });
   });
 
   it('displays error when conversation is not found', async () => {
