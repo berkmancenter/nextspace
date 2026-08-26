@@ -33,7 +33,10 @@ jest.mock('../../hooks/useRoomSetup', () => ({
 }));
 
 const mockSendData = jest.fn();
-const mockEmitWithTokenRefresh = jest.fn((socket, event, data, onSuccess) => onSuccess());
+const mockEmitWithTokenRefresh = jest.fn((...args: any[]) => {
+  const onSuccess = args[3];
+  onSuccess?.();
+});
 
 jest.mock('../../utils', () => ({
   Api: {

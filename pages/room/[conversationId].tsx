@@ -134,7 +134,9 @@ export default function RoomPage({ authType: _authType }: { authType: AuthType }
     };
 
     socket.on('message:new', onMessage);
-    return () => socket.off('message:new', onMessage);
+    return () => {
+      socket.off('message:new', onMessage);
+    };
   }, [socket, setChatMessages, setAssistantMessages, activeTabRef, setUnseenAssistantCount]);
 
   const sendMessage = async (tab: CommunityNavTab, message: string, parentMessageId?: string): Promise<boolean> => {
