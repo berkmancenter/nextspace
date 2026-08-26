@@ -194,7 +194,7 @@ export function CommunityGroupChatPanel({
               <div className="flex flex-col justify-center h-full gap-3 px-1 py-6">
                 <h2
                   style={{
-                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontFamily: 'var(--room-font-display), sans-serif',
                     fontWeight: 600,
                     fontSize: 20,
                     color: 'var(--room-text-primary)',
@@ -202,18 +202,22 @@ export function CommunityGroupChatPanel({
                 >
                   A permanent room for the Berkman Klein community.
                 </h2>
-                <p style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 15, color: 'var(--room-text-body)' }}>
+                <p style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 15, color: 'var(--room-text-body)' }}>
                   {
                     "No schedule, no end. It sits between events and keeps whatever you leave in it, so it's worth writing the thing you'd otherwise email to four people."
                   }
                 </p>
                 <div style={{ height: 1, background: 'var(--room-chrome-border)' }} />
-                <p style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, color: 'var(--room-text-muted)' }}>
+                <p
+                  style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 13, color: 'var(--room-text-muted)' }}
+                >
                   {memberCount != null
                     ? `${memberCount} members have been invited. Nothing has been said yet — you're first.`
                     : "Nothing has been said yet — you're first."}
                 </p>
-                <p style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, color: 'var(--room-text-muted)' }}>
+                <p
+                  style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 13, color: 'var(--room-text-muted)' }}
+                >
                   {botName} is here too. It stays quiet unless you put{' '}
                   <span style={{ fontWeight: 600, color: 'var(--room-text-primary)' }}>@{botName}</span> in a message.
                 </p>

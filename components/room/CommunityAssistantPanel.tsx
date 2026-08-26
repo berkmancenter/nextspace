@@ -112,7 +112,7 @@ export function CommunityAssistantPanel({
               </div>
               <h2
                 style={{
-                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontFamily: 'var(--room-font-display), sans-serif',
                   fontWeight: 600,
                   fontSize: 18,
                   color: 'var(--room-text-primary)',
@@ -121,7 +121,7 @@ export function CommunityAssistantPanel({
                 {"I read the room, so you don't have to."}
               </h2>
             </div>
-            <p style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 14, color: 'var(--room-text-body)' }}>
+            <p style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 14, color: 'var(--room-text-body)' }}>
               Everything posted in Group Chat is what I know. Nothing you say here is visible to anyone else in the room.
             </p>
             <div className="flex flex-col gap-2">
@@ -137,7 +137,7 @@ export function CommunityAssistantPanel({
                     background: 'var(--room-chrome-bg)',
                     border: '1px solid var(--room-chrome-border)',
                     borderRadius: 999,
-                    fontFamily: "'IBM Plex Sans', sans-serif",
+                    fontFamily: 'var(--room-font-body), sans-serif',
                     fontSize: 14,
                     fontWeight: 500,
                     color: 'var(--room-text-primary)',
@@ -148,7 +148,7 @@ export function CommunityAssistantPanel({
                 </button>
               ))}
             </div>
-            <p style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: 'var(--room-text-muted)' }}>
+            <p style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 12, color: 'var(--room-text-muted)' }}>
               {
                 "I can be wrong, and I can't see anything outside this room — no email, no publications, no other Nextspace events."
               }
