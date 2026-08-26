@@ -204,6 +204,15 @@ describe('RoomPage', () => {
     );
   });
 
+  it('applies the room webfont families to the page root', () => {
+    const { container } = render(<RoomPage authType="guest" />);
+    const root = container.firstElementChild as HTMLElement;
+
+    expect(root.style.getPropertyValue('--room-font-display')).not.toBe('');
+    expect(root.style.getPropertyValue('--room-font-body')).not.toBe('');
+    expect(root.style.getPropertyValue('--room-font-mono')).not.toBe('');
+  });
+
   it('stops fetching once history has loaded instead of refetching in a loop', async () => {
     mockRetrieveData.mockResolvedValue([
       { id: 'm1', body: 'hello room', createdAt: '2026-08-26T00:00:00.000Z', channels: ['chat'] },

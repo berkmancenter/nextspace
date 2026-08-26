@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { CSSProperties, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
+import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from 'next/font/google';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { Api, SendData, emitWithTokenRefresh } from '../../utils';
 import { CheckAuthHeader } from '../../utils/Helpers';
@@ -9,6 +10,16 @@ import { CommunityNavigationBar, CommunityNavTab } from '../../components/room/C
 import { CommunityGroupChatPanel } from '../../components/room/CommunityGroupChatPanel';
 import { CommunityAssistantPanel } from '../../components/room/CommunityAssistantPanel';
 import styles from '../../components/room/communityRoom.module.css';
+
+const displayFont = Space_Grotesk({ subsets: ['latin'], weight: ['600', '700'] });
+const bodyFont = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500', '600'] });
+const monoFont = IBM_Plex_Mono({ subsets: ['latin'], weight: ['400', '500', '600'] });
+
+const roomFontVariables = {
+  '--room-font-display': displayFont.style.fontFamily,
+  '--room-font-body': bodyFont.style.fontFamily,
+  '--room-font-mono': monoFont.style.fontFamily,
+} as CSSProperties;
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -200,7 +211,7 @@ export default function RoomPage({ authType: _authType }: { authType: AuthType }
   }
 
   return (
-    <div className={styles.root} style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div className={styles.root} style={{ display: 'flex', flexDirection: 'column', height: '100vh', ...roomFontVariables }}>
       <header className={styles.header}>
         <div className={styles.headerTitleGroup}>
           <h1 className={styles.headerTitle}>{activeTab === 'assistant' ? botName : roomName || 'BKC Community Room'}</h1>
