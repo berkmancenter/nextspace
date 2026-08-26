@@ -53,6 +53,46 @@ describe('CommunityGroupChatPanel', () => {
     expect(screen.getByText(/Berkie is here too/)).toBeInTheDocument();
   });
 
+  it('renders a member introduction card for a memberIntro message from Berkie', () => {
+    const introMessage = {
+      id: 'intro-1',
+      fromAgent: true,
+      pseudonym: 'Berkie',
+      createdAt: '2026-08-26T00:00:00.000Z',
+      body: {
+        type: 'memberIntro',
+        text: 'Lucia Navarro Ibanez just joined.',
+        content: {
+          name: 'Lucia Navarro Ibanez',
+          role: 'Fellow, metaLAB',
+          joinedLabel: 'joined this week',
+          bio: 'Studies how museums decide what to digitise.',
+        },
+      },
+    };
+
+    render(<CommunityGroupChatPanel {...baseProps} messages={[introMessage as any]} />);
+
+    expect(screen.getByRole('group', { name: 'Introduction posted by Berkie' })).toBeInTheDocument();
+    expect(screen.getByText('Lucia Navarro Ibanez')).toBeInTheDocument();
+    expect(screen.getByText('Fellow, metaLAB · joined this week')).toBeInTheDocument();
+    expect(screen.getByText('Studies how museums decide what to digitise.')).toBeInTheDocument();
+  });
+
+  it('renders an ordinary message normally rather than as an introduction card', () => {
+    const plainMessage = {
+      id: 'plain-1',
+      pseudonym: 'Priya Raghunathan',
+      createdAt: '2026-08-26T00:00:00.000Z',
+      body: 'just a normal message',
+    };
+
+    render(<CommunityGroupChatPanel {...baseProps} messages={[plainMessage as any]} />);
+
+    expect(screen.queryByRole('group', { name: 'Introduction posted by Berkie' })).not.toBeInTheDocument();
+    expect(screen.getByText('just a normal message')).toBeInTheDocument();
+  });
+
   it('falls back to a countless empty-state line when the member count is unknown', () => {
     render(<CommunityGroupChatPanel {...baseProps} memberCount={undefined} />);
     expect(screen.getByText("Nothing has been said yet — you're first.")).toBeInTheDocument();

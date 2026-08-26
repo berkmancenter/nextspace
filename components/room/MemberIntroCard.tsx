@@ -10,9 +10,9 @@ interface MemberIntroCardProps {
 }
 
 /**
- * The one-time "Introduced by Berkie" card shown on a member's first
- * appearance in the room. Client-side heuristic pending ticket 18 — see
- * the room plan for why there's no backend signal yet to key this off.
+ * The one-time "Introduced by Berkie" card shown on a member's first appearance
+ * in the room. Rendered by the group feed for any message whose body type is
+ * `memberIntro`; the fields come from that body's `content` payload.
  */
 export function MemberIntroCard({ name, role, joinedLabel, bio }: MemberIntroCardProps) {
   const firstName = name.trim().split(/\s+/)[0];

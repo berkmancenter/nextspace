@@ -5,7 +5,8 @@ import { ThreadedMessage } from '../ThreadedMessage';
 import { ThreadPanel } from '../ThreadPanel';
 import { BotIcon } from '../BotIcon';
 import { CommunityMessageInput } from './CommunityMessageInput';
-import { PseudonymousMessage } from '../../types.internal';
+import { MemberIntroContent, PseudonymousMessage } from '../../types.internal';
+import { MemberIntroCard } from './MemberIntroCard';
 import { parseMessageBody } from '../../utils/Helpers';
 import { getRoomInitials } from '../../utils/roomAvatarUtils';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
@@ -225,6 +226,20 @@ export function CommunityGroupChatPanel({
             ) : (
               <div className="flex flex-col items-start gap-4 pb-2" aria-live="polite">
                 {parentMessages.map((message, i) => {
+                  const parsedBody = parseMessageBody(message.body);
+                  if (parsedBody.type === 'memberIntro' && parsedBody.content) {
+                    const intro = parsedBody.content as MemberIntroContent;
+                    return (
+                      <MemberIntroCard
+                        key={message.id || `msg-${i}`}
+                        name={intro.name}
+                        role={intro.role}
+                        joinedLabel={intro.joinedLabel}
+                        bio={intro.bio}
+                      />
+                    );
+                  }
+
                   const showTimestamp = (() => {
                     if (!message.createdAt) return false;
                     if (i === 0) return true;

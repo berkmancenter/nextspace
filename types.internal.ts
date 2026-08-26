@@ -191,3 +191,20 @@ export interface WhatsNewEntry {
   body: string;
   releasedAt: string;
 }
+
+/**
+ * Payload carried on the `content` field of a message whose body type is
+ * `memberIntro`. Berkie posts one of these the first time a member appears in a
+ * community room, and the room feed renders it as a MemberIntroCard instead of
+ * an ordinary message bubble.
+ * @property {string} name - The member's real name, as registered.
+ * @property {string} bio - The bio the member supplied when they joined.
+ * @property {string} [role] - Affiliation line, e.g. "Fellow, metaLAB".
+ * @property {string} [joinedLabel] - Human-readable join recency, e.g. "joined this week".
+ */
+export interface MemberIntroContent {
+  name: string;
+  bio: string;
+  role?: string;
+  joinedLabel?: string;
+}
