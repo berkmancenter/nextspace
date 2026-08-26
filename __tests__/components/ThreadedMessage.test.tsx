@@ -581,10 +581,25 @@ describe('ThreadedMessage Component', () => {
       expect(unreadIndicator).not.toBeInTheDocument();
     });
 
+    it('names the additional replies control as unread so it is not signalled by styling alone', () => {
+      render(<ThreadedMessage {...defaultProps} replies={mockReplies} hasUnreadReplies={true} isThreadOpen={false} />);
+      expect(screen.getByLabelText('View 1 more reply, unread')).toBeInTheDocument();
+    });
+
+    it('leaves the additional replies control name unchanged once the replies are read', () => {
+      render(<ThreadedMessage {...defaultProps} replies={mockReplies} hasUnreadReplies={false} isThreadOpen={false} />);
+      expect(screen.getByLabelText('View 1 more reply')).toBeInTheDocument();
+    });
+
+    it('drops the unread wording from the control name while the thread is open', () => {
+      render(<ThreadedMessage {...defaultProps} replies={mockReplies} hasUnreadReplies={true} isThreadOpen={true} />);
+      expect(screen.getByLabelText('View 1 more reply')).toBeInTheDocument();
+    });
+
     it('makes additional replies button bold when hasUnreadReplies is true', () => {
       render(<ThreadedMessage {...defaultProps} replies={mockReplies} hasUnreadReplies={true} isThreadOpen={false} />);
 
-      const moreRepliesButton = screen.getByLabelText('View 1 more reply');
+      const moreRepliesButton = screen.getByLabelText('View 1 more reply, unread');
       expect(moreRepliesButton.className).toContain('font-bold');
     });
 

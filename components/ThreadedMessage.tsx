@@ -289,7 +289,11 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                   onTouchStart={() => setIsReplyIndicatorPressed(true)}
                   onTouchEnd={() => setIsReplyIndicatorPressed(false)}
                   className={`mt-2 -ml-3 px-3 py-2 text-xs text-gray-600 hover:bg-white active:bg-white transition-colors cursor-pointer flex items-center justify-between w-[calc(100%+0.75rem)] group ${isReplyIndicatorPressed ? 'bg-white' : ''} ${hasUnreadReplies && !isThreadOpen ? 'font-bold' : 'font-medium'}`}
-                  aria-label={`View ${replyCount - 1} more ${replyCount - 1 === 1 ? 'reply' : 'replies'}`}
+                  // The unread dot and the bold weight are both visual-only, so the state
+                  // reaches nobody using a screen reader unless the name carries it.
+                  aria-label={`View ${replyCount - 1} more ${replyCount - 1 === 1 ? 'reply' : 'replies'}${
+                    hasUnreadReplies && !isThreadOpen ? ', unread' : ''
+                  }`}
                 >
                   <div className="flex items-center gap-1">
                     <ChatBubbleOutline sx={{ fontSize: 14 }} />
