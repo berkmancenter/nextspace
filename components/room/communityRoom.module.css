@@ -399,19 +399,27 @@
   width: 100%;
 }
 
-.introCardAuthor {
+.introCardHeader {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 2px;
 }
 
-.introCardAuthorName {
-  font-family: var(--room-font-display), sans-serif;
+.introCardLabel {
+  font-family: var(--room-font-mono), monospace;
   font-weight: 600;
-  font-size: 13px;
-  line-height: 1.3;
-  color: var(--room-text-primary);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--room-berkie-accent);
+  white-space: nowrap;
+}
+
+.introCardRule {
+  flex: 1;
+  height: 1px;
+  background: var(--room-chrome-border);
 }
 
 .agentBadge {

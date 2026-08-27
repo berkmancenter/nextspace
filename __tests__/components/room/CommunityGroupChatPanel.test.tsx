@@ -79,7 +79,7 @@ describe('CommunityGroupChatPanel', () => {
     expect(screen.getByText('Studies how museums decide what to digitise.')).toBeInTheDocument();
   });
 
-  it('posts the introduction card as Berkie, badged as a bot', () => {
+  it('heads the introduction card with its own Berkie label and the bot badge', () => {
     const introMessage = {
       id: 'intro-2',
       fromAgent: true,
@@ -100,7 +100,7 @@ describe('CommunityGroupChatPanel', () => {
     render(<CommunityGroupChatPanel {...baseProps} messages={[introMessage as any]} />);
 
     const card = screen.getByRole('group', { name: 'Introduction posted by Berkie' });
-    expect(within(card).getByText('Berkie')).toBeInTheDocument();
+    expect(within(card).getByText('Introduced by Berkie')).toBeInTheDocument();
     expect(within(card).getByText('AI Bot')).toBeInTheDocument();
   });
 

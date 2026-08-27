@@ -20,12 +20,11 @@ export function MemberIntroCard({ name, role, joinedLabel, bio }: MemberIntroCar
 
   return (
     <div role="group" aria-label="Introduction posted by Berkie" className={styles.introCardWrap}>
-      <div className={styles.introCardAuthor}>
-        <div className={styles.avatar} style={{ width: 32, height: 32, background: 'var(--room-berkie-avatar-bg)' }}>
-          <BotIcon size={22} color="var(--room-berkie-accent)" />
-        </div>
-        <span className={styles.introCardAuthorName}>Berkie</span>
+      <div className={styles.introCardHeader}>
+        <BotIcon size={18} color="var(--room-berkie-accent)" />
+        <span className={styles.introCardLabel}>Introduced by Berkie</span>
         <span className={styles.agentBadge}>AI Bot</span>
+        <span className={styles.introCardRule} />
       </div>
       <div className={styles.introCardBody}>
         <div className={styles.introCardTopRow}>
