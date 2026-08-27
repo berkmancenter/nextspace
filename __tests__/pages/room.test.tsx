@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import RoomPage from '../../pages/room/[conversationId]';
@@ -357,6 +357,24 @@ describe('RoomPage', () => {
 
       expect(mockSendData).not.toHaveBeenCalled();
       await waitFor(() => expect(screen.getByTestId('assistant-panel')).toHaveAttribute('data-pending', 'hello Berkie'));
+    });
+
+    it('escalates the notice once the connection has stayed down', () => {
+      jest.useFakeTimers();
+      try {
+        mockUseSessionJoin.mockReturnValue(disconnectedSession);
+        render(<RoomPage authType="guest" />);
+
+        expect(screen.getByRole('status')).toHaveTextContent('Reconnecting…');
+
+        act(() => {
+          jest.advanceTimersByTime(30_000);
+        });
+
+        expect(screen.getByRole('status')).toHaveTextContent('Still offline. Your message is saved on this device.');
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('has no accessibility violations with the reconnecting notice showing', async () => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import { CommunityGroupChatPanel } from '../../../components/room/CommunityGroupChatPanel';
@@ -262,6 +262,34 @@ describe('CommunityGroupChatPanel', () => {
 
     expect(screen.queryByText('A permanent room for the Berkman Klein community.')).not.toBeInTheDocument();
     expect(screen.getByText('First thing said here.')).toBeInTheDocument();
+  });
+
+  it('shows a queued reply as waiting to send inside the open thread', async () => {
+    const parent = {
+      id: 'parent-1',
+      pseudonym: 'Sofia Marchetti',
+      body: 'Both Aadhaar pieces are in the shared folder now.',
+      createdAt: '2026-08-26T09:00:00.000Z',
+    };
+
+    render(
+      <CommunityGroupChatPanel
+        {...baseProps}
+        messages={[parent as any]}
+        pendingMessages={[{ id: 'queued-3', body: 'Reading them tonight.', tab: 'chat', parentMessageId: 'parent-1' }]}
+      />,
+    );
+
+    expect(screen.queryByText('Reading them tonight.')).not.toBeInTheDocument();
+
+    // The reply control only appears on hover, and it is ThreadedMessage's own
+    // wrapper that carries the handler, three levels above the bubble text.
+    const bubble = screen.getByText('Both Aadhaar pieces are in the shared folder now.');
+    fireEvent.mouseEnter(bubble.parentElement!.parentElement!.parentElement!);
+    fireEvent.click(await screen.findByLabelText('Reply to Sofia Marchetti'));
+
+    expect(screen.getByText('Reading them tonight.')).toBeInTheDocument();
+    expect(screen.getByText('Waiting to send')).toBeInTheDocument();
   });
 
   it('has no accessibility violations in the empty state', async () => {

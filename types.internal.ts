@@ -81,6 +81,11 @@ export interface HeaderProps extends BaseComponentProps {
  */
 export type PseudonymousMessage = components['schemas']['Message'] & {
   body: any;
+  /**
+   * Set only on client-side placeholders for a message the server has not accepted
+   * yet. Never present on a message that came back from the API or the socket.
+   */
+  pending?: boolean;
 };
 
 /**

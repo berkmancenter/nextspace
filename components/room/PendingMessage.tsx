@@ -16,6 +16,23 @@ function ClockIcon() {
 }
 
 /**
+ * The bubble half of an undelivered message: dashed border, muted text, and the
+ * clock label. Used on its own inside a thread, where ThreadPanel already draws
+ * the avatar and name around whatever the bubble renderer returns.
+ */
+export function PendingBubble({ body }: { body: string }) {
+  return (
+    <div style={{ width: '85%' }}>
+      <div className={styles.pendingBubble}>{body}</div>
+      <div className={styles.pendingStatus}>
+        <ClockIcon />
+        <span>Waiting to send</span>
+      </div>
+    </div>
+  );
+}
+
+/**
  * A message the member has sent that the server has not accepted yet. It sits
  * in the feed where the delivered message will land, so sending while offline
  * looks like sending, and swaps for the real message once it is delivered.
@@ -34,11 +51,7 @@ export function PendingMessage({ body, realName }: PendingMessageProps) {
           {realName}
           <span className="text-gray-600 font-normal"> (You)</span>
         </div>
-        <div className={styles.pendingBubble}>{body}</div>
-        <div className={styles.pendingStatus}>
-          <ClockIcon />
-          <span>Waiting to send</span>
-        </div>
+        <PendingBubble body={body} />
       </div>
     </div>
   );

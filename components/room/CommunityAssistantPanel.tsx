@@ -17,6 +17,8 @@ interface CommunityAssistantPanelProps {
   botName: string;
   /** Messages typed here that the server has not accepted yet. */
   pendingMessages?: PendingRoomMessage[];
+  /** True while the socket is down, which greys out the composer shortcuts. */
+  offline?: boolean;
   waitingForResponse?: boolean;
   onSendMessage: (message: string) => Promise<boolean>;
 }
@@ -40,6 +42,7 @@ export function CommunityAssistantPanel({
   realName,
   botName,
   pendingMessages = [],
+  offline = false,
   waitingForResponse = false,
   onSendMessage,
 }: CommunityAssistantPanelProps) {
@@ -204,6 +207,7 @@ export function CommunityAssistantPanel({
           realName={realName}
           mentionTargets={[]}
           onSendMessage={onSendMessage}
+          offline={offline}
           waitingForResponse={waitingForResponse}
         />
       </div>

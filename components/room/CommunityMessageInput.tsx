@@ -14,6 +14,11 @@ interface CommunityMessageInputProps {
   isEmptyRoom?: boolean;
   waitingForResponse?: boolean;
   disabled?: boolean;
+  /**
+   * True while the socket is down. Typing and sending stay live, since sends are
+   * held and delivered on reconnect; only the shortcuts pause.
+   */
+  offline?: boolean;
 }
 
 const PLACEHOLDER: Record<string, string> = {
@@ -35,6 +40,7 @@ export function CommunityMessageInput({
   isEmptyRoom = false,
   waitingForResponse = false,
   disabled = false,
+  offline = false,
 }: CommunityMessageInputProps) {
   const [value, setValue] = useState('');
   const [activeEnhancer, setActiveEnhancer] = useState<ActiveEnhancerState<any> | null>(null);
@@ -162,9 +168,10 @@ export function CommunityMessageInput({
               <>
                 <IconButton
                   aria-label="Mention a member"
+                  aria-disabled={offline ? 'true' : undefined}
                   disabled={disabled}
-                  onClick={() => insertAtCursor('@')}
-                  className={styles.mentionButton}
+                  onClick={() => !offline && insertAtCursor('@')}
+                  className={`${styles.mentionButton}${offline ? ` ${styles.shortcutIdle}` : ''}`}
                 >
                   <span aria-hidden="true" className={styles.mentionButtonInner}>
                     @
@@ -172,9 +179,10 @@ export function CommunityMessageInput({
                 </IconButton>
                 <IconButton
                   aria-label="Ask Berkie"
+                  aria-disabled={offline ? 'true' : undefined}
                   disabled={disabled}
-                  onClick={() => insertAtCursor('@Berkie ')}
-                  className={styles.askBerkieButton}
+                  onClick={() => !offline && insertAtCursor('@Berkie ')}
+                  className={`${styles.askBerkieButton}${offline ? ` ${styles.shortcutIdle}` : ''}`}
                 >
                   <BotIcon size={20} color="var(--room-berkie-accent)" />
                   <span className={styles.askBerkieLabel}>Ask Berkie</span>

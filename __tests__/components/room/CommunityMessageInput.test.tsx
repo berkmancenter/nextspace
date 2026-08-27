@@ -89,6 +89,40 @@ describe('CommunityMessageInput', () => {
     await waitFor(() => expect(textarea).toHaveValue(''));
   });
 
+  it('keeps the shortcuts visible but unavailable while the connection is down', async () => {
+    const user = userEvent.setup();
+    render(
+      <CommunityMessageInput tab="chat" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={noop} offline />,
+    );
+
+    const askBerkie = screen.getByRole('button', { name: 'Ask Berkie' });
+    expect(askBerkie).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'Mention a member' })).toHaveAttribute('aria-disabled', 'true');
+
+    await user.click(askBerkie);
+
+    expect(screen.getByPlaceholderText('Message the room')).toHaveValue('');
+  });
+
+  it('still sends a message while the connection is down, since sends are held', async () => {
+    const user = userEvent.setup();
+    const onSendMessage = jest.fn().mockResolvedValue(true);
+    render(
+      <CommunityMessageInput
+        tab="chat"
+        realName="Priya Raghunathan"
+        mentionTargets={[]}
+        onSendMessage={onSendMessage}
+        offline
+      />,
+    );
+
+    await user.type(screen.getByPlaceholderText('Message the room'), 'held for later');
+    await user.click(screen.getByRole('button', { name: 'Send message' }));
+
+    await waitFor(() => expect(onSendMessage).toHaveBeenCalledWith('held for later'));
+  });
+
   it('has no accessibility violations on the group tab', async () => {
     const { container } = render(
       <CommunityMessageInput tab="chat" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={noop} />,

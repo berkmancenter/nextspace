@@ -366,6 +366,13 @@
   justify-content: center;
 }
 
+/* Matches the send button's idle dimming, so a paused shortcut reads the same
+   way as an inactive send. aria-disabled rather than disabled keeps them
+   focusable, so a keyboard user still finds them and the strip explains why. */
+.shortcutIdle {
+  opacity: 0.5;
+}
+
 /* Dims the whole circle, not just the arrow inside it. Dimming only the arrow
    leaves a full-strength button carrying a 2.9:1 glyph, which reads as active
    and fails WCAG 1.4.11; fading the circle keeps the control legible as the

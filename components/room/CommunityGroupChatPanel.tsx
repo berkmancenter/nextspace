@@ -7,7 +7,7 @@ import { BotIcon } from '../BotIcon';
 import { CommunityMessageInput } from './CommunityMessageInput';
 import { MemberIntroContent, PendingRoomMessage, PseudonymousMessage } from '../../types.internal';
 import { MemberIntroCard } from './MemberIntroCard';
-import { PendingMessage } from './PendingMessage';
+import { PendingBubble, PendingMessage } from './PendingMessage';
 import { parseMessageBody } from '../../utils/Helpers';
 import { getRoomInitials } from '../../utils/roomAvatarUtils';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
@@ -23,6 +23,8 @@ interface CommunityGroupChatPanelProps {
   mentionTargets: string[];
   /** Messages typed here that the server has not accepted yet. */
   pendingMessages?: PendingRoomMessage[];
+  /** True while the socket is down, which greys out the composer shortcuts. */
+  offline?: boolean;
   waitingForResponse?: boolean;
   messagesWithUnreadReplies?: Set<string>;
   onSendMessage: (message: string, parentMessageId?: string) => Promise<boolean>;
@@ -71,6 +73,7 @@ export function CommunityGroupChatPanel({
   memberCount,
   mentionTargets,
   pendingMessages = [],
+  offline = false,
   waitingForResponse = false,
   messagesWithUnreadReplies = new Set(),
   onSendMessage,
@@ -93,6 +96,16 @@ export function CommunityGroupChatPanel({
   }, [messages]);
 
   const isEmptyRoom = messages.length === 0 && pendingMessages.length === 0;
+
+  const pendingParents = pendingMessages.filter((m) => !m.parentMessageId);
+
+  // ThreadPanel draws each reply through renderMessageContent, so a queued reply
+  // reaches the open thread as a message carrying `pending` rather than through
+  // any change to that shared component.
+  const pendingRepliesAsMessages = (parentId: string): PseudonymousMessage[] =>
+    pendingMessages
+      .filter((m) => m.parentMessageId === parentId)
+      .map((m) => ({ id: m.id, pseudonym: realName, body: m.body, pending: true }) as PseudonymousMessage);
 
   const { messagesEndRef, messagesContainerRef, isAtBottom, scrollToBottom } = useAutoScroll(messages);
   const messageInputRef = useRef<HTMLDivElement>(null);
@@ -135,6 +148,8 @@ export function CommunityGroupChatPanel({
   };
 
   const renderMessageContent = (message: PseudonymousMessage) => {
+    if (message.pending) return <PendingBubble body={parseMessageBody(message.body).text} />;
+
     const isAssistant = message.fromAgent;
     const parsed = parseMessageBody(message.body);
 
@@ -184,7 +199,9 @@ export function CommunityGroupChatPanel({
   };
 
   const selectedThread = selectedThreadId ? parentMessages.find((m) => m.id === selectedThreadId) : null;
-  const selectedThreadReplies = selectedThreadId ? threadMap.get(selectedThreadId) || [] : [];
+  const selectedThreadReplies = selectedThreadId
+    ? [...(threadMap.get(selectedThreadId) || []), ...pendingRepliesAsMessages(selectedThreadId)]
+    : [];
 
   return (
     <div className="flex h-full w-full overflow-hidden">
@@ -270,7 +287,7 @@ export function CommunityGroupChatPanel({
                   );
                 })}
 
-                {pendingMessages.map((pending) => (
+                {pendingParents.map((pending) => (
                   <PendingMessage key={pending.id} body={pending.body} realName={realName} />
                 ))}
 
@@ -305,6 +322,7 @@ export function CommunityGroupChatPanel({
             mentionTargets={mentionTargets}
             onSendMessage={onSendMessage}
             isEmptyRoom={isEmptyRoom}
+            offline={offline}
             waitingForResponse={waitingForResponse && !waitingForThreadedReply}
           />
         </div>

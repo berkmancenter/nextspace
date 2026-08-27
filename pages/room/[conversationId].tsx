@@ -64,6 +64,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   const [waitingForChatResponse, setWaitingForChatResponse] = useState(false);
   const [waitingForAssistantResponse, setWaitingForAssistantResponse] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [offlineTooLong, setOfflineTooLong] = useState(false);
   const [queuedMessages, setQueuedMessages] = useState<PendingRoomMessage[]>([]);
   const queuedIdRef = useRef(0);
   const deliveringRef = useRef(false);
@@ -213,6 +214,18 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     [userId, agentId, botName, conversationId, setGeneralError],
   );
 
+  // After this long the strip stops promising an imminent reconnect and says the
+  // message is saved locally instead, per the design's escalation.
+  useEffect(() => {
+    if (isConnected) {
+      setOfflineTooLong(false);
+      return undefined;
+    }
+
+    const timer = setTimeout(() => setOfflineTooLong(true), 30_000); // 30 seconds
+    return () => clearTimeout(timer);
+  }, [isConnected]);
+
   // Every send goes through the queue rather than posting directly, so a message
   // typed while the socket is down waits here and leaves on the next connection
   // instead of being lost. A message that fails to post stays queued for the same
@@ -237,12 +250,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     return true;
   };
 
-  // Queued replies are left out: the thread they belong to is rendered by the
-  // shared ThreadPanel, which has no place to show an undelivered message.
-  const queuedChatMessages = useMemo(
-    () => queuedMessages.filter((m) => m.tab === 'chat' && !m.parentMessageId),
-    [queuedMessages],
-  );
+  const queuedChatMessages = useMemo(() => queuedMessages.filter((m) => m.tab === 'chat'), [queuedMessages]);
   const queuedAssistantMessages = useMemo(() => queuedMessages.filter((m) => m.tab === 'assistant'), [queuedMessages]);
 
   if (notFound) {
@@ -326,7 +334,11 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
       {!isConnected && (
         <div role="status" className={styles.reconnectBanner}>
           <span aria-hidden="true" className={styles.reconnectDot} />
-          <span>Reconnecting… messages you send will be held and sent automatically.</span>
+          <span>
+            {offlineTooLong
+              ? 'Still offline. Your message is saved on this device.'
+              : 'Reconnecting… messages you send will be held and sent automatically.'}
+          </span>
         </div>
       )}
 
@@ -337,6 +349,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
             realName={realName || ''}
             botName={botName}
             pendingMessages={queuedAssistantMessages}
+            offline={!isConnected}
             waitingForResponse={waitingForAssistantResponse}
             onSendMessage={(message) => sendMessage('assistant', message)}
           />
@@ -347,6 +360,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
             botName={botName}
             mentionTargets={mentionTargets}
             pendingMessages={queuedChatMessages}
+            offline={!isConnected}
             waitingForResponse={waitingForChatResponse}
             messagesWithUnreadReplies={messagesWithUnreadReplies}
             onSendMessage={(message, parentMessageId) => sendMessage('chat', message, parentMessageId)}
