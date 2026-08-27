@@ -208,3 +208,19 @@ export interface MemberIntroContent {
   role?: string;
   joinedLabel?: string;
 }
+
+/**
+ * A message a room member has sent that the server has not accepted yet, either
+ * because the socket is down or because its POST is still in flight. The room
+ * queues these and delivers them when the connection returns, so `id` is a
+ * client-side handle with no server meaning.
+ * @property {string} body - The text the member typed.
+ * @property {'chat' | 'assistant'} tab - Which room feed the message belongs to.
+ * @property {string} [parentMessageId] - Set when the message is a threaded reply.
+ */
+export interface PendingRoomMessage {
+  id: string;
+  body: string;
+  tab: 'chat' | 'assistant';
+  parentMessageId?: string;
+}

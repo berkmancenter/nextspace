@@ -168,6 +168,18 @@ describe('CommunityAssistantPanel', () => {
     expect(screen.getByText('thinking...')).toBeInTheDocument();
   });
 
+  it('marks a message that has not reached the server yet as waiting to send', () => {
+    render(
+      <CommunityAssistantPanel
+        {...baseProps}
+        pendingMessages={[{ id: 'queued-0', body: 'What did I miss this week?', tab: 'assistant' }]}
+      />,
+    );
+
+    expect(screen.getByText('What did I miss this week?')).toBeInTheDocument();
+    expect(screen.getByText('Waiting to send')).toBeInTheDocument();
+  });
+
   it('has no accessibility violations in the empty state', async () => {
     const { container } = render(<CommunityAssistantPanel {...baseProps} />);
     expect(await axe(container)).toHaveNoViolations();

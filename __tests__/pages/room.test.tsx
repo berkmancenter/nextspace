@@ -55,8 +55,12 @@ jest.mock('../../utils', () => ({
 }));
 
 jest.mock('../../components/room/CommunityGroupChatPanel', () => ({
-  CommunityGroupChatPanel: ({ messages, realName, onSendMessage }: any) => (
-    <div data-testid="group-chat-panel" data-real-name={realName}>
+  CommunityGroupChatPanel: ({ messages, realName, onSendMessage, pendingMessages = [] }: any) => (
+    <div
+      data-testid="group-chat-panel"
+      data-real-name={realName}
+      data-pending={pendingMessages.map((m: any) => m.body).join('|')}
+    >
       {messages.map((m: any) => (
         <div key={m.id}>{typeof m.body === 'string' ? m.body : m.body?.text}</div>
       ))}
@@ -66,8 +70,8 @@ jest.mock('../../components/room/CommunityGroupChatPanel', () => ({
 }));
 
 jest.mock('../../components/room/CommunityAssistantPanel', () => ({
-  CommunityAssistantPanel: ({ messages, onSendMessage }: any) => (
-    <div data-testid="assistant-panel">
+  CommunityAssistantPanel: ({ messages, onSendMessage, pendingMessages = [] }: any) => (
+    <div data-testid="assistant-panel" data-pending={pendingMessages.map((m: any) => m.body).join('|')}>
       {messages.map((m: any) => (
         <div key={m.id}>{typeof m.body === 'string' ? m.body : m.body?.text}</div>
       ))}
@@ -234,6 +238,80 @@ describe('RoomPage', () => {
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     expect(mockRetrieveData.mock.calls.length).toBe(callsAfterSettling);
+  });
+
+  describe('while the socket connection is down', () => {
+    const disconnectedSession = {
+      socket: mockSocket,
+      pseudonym: 'Priya Raghunathan',
+      userId: 'user-1',
+      isConnected: false,
+      errorMessage: null,
+      lastReconnectTime: null,
+    };
+
+    it('explains that messages will be held until the connection returns', () => {
+      mockUseSessionJoin.mockReturnValue(disconnectedSession);
+      render(<RoomPage authType="guest" />);
+
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Reconnecting… messages you send will be held and sent automatically.',
+      );
+    });
+
+    it('shows no reconnecting notice while the socket is connected', () => {
+      render(<RoomPage authType="guest" />);
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+
+    it('holds a message rather than posting it', async () => {
+      const user = userEvent.setup();
+      mockUseSessionJoin.mockReturnValue(disconnectedSession);
+      render(<RoomPage authType="guest" />);
+
+      await user.click(screen.getByText('Send group message'));
+
+      expect(mockSendData).not.toHaveBeenCalled();
+      await waitFor(() => expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-pending', 'hello room'));
+    });
+
+    it('posts the held message once the socket reconnects', async () => {
+      const user = userEvent.setup();
+      mockUseSessionJoin.mockReturnValue(disconnectedSession);
+      const { rerender } = render(<RoomPage authType="guest" />);
+
+      await user.click(screen.getByText('Send group message'));
+      expect(mockSendData).not.toHaveBeenCalled();
+
+      mockUseSessionJoin.mockReturnValue({ ...disconnectedSession, isConnected: true });
+      rerender(<RoomPage authType="guest" />);
+
+      await waitFor(() =>
+        expect(mockSendData).toHaveBeenCalledWith(
+          'messages',
+          expect.objectContaining({ body: 'hello room', channels: [{ name: 'chat' }] }),
+        ),
+      );
+      await waitFor(() => expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-pending', ''));
+    });
+
+    it('holds a Berkie message on the assistant tab too', async () => {
+      const user = userEvent.setup();
+      mockUseSessionJoin.mockReturnValue(disconnectedSession);
+      render(<RoomPage authType="guest" />);
+
+      await user.click(screen.getByRole('button', { name: 'Berkie' }));
+      await user.click(screen.getByText('Send assistant message'));
+
+      expect(mockSendData).not.toHaveBeenCalled();
+      await waitFor(() => expect(screen.getByTestId('assistant-panel')).toHaveAttribute('data-pending', 'hello Berkie'));
+    });
+
+    it('has no accessibility violations with the reconnecting notice showing', async () => {
+      mockUseSessionJoin.mockReturnValue(disconnectedSession);
+      const { container } = render(<RoomPage authType="guest" />);
+      expect(await axe(container)).toHaveNoViolations();
+    });
   });
 
   it('has no accessibility violations once loaded', async () => {

@@ -202,6 +202,43 @@ describe('CommunityGroupChatPanel', () => {
     expect(screen.getByTestId('community-message-input')).toHaveAttribute('data-tab', 'chat');
   });
 
+  it('marks a message that has not reached the server yet as waiting to send', () => {
+    render(
+      <CommunityGroupChatPanel
+        {...baseProps}
+        pendingMessages={[{ id: 'queued-0', body: "Perfect, I'll add both to the syllabus draft tonight.", tab: 'chat' }]}
+      />,
+    );
+
+    expect(screen.getByText("Perfect, I'll add both to the syllabus draft tonight.")).toBeInTheDocument();
+    expect(screen.getByText('Waiting to send')).toBeInTheDocument();
+  });
+
+  it('drops the waiting-to-send marker once the message has been delivered', () => {
+    const delivered = {
+      id: 'm-1',
+      pseudonym: 'Priya Raghunathan',
+      body: "Perfect, I'll add both to the syllabus draft tonight.",
+      createdAt: '2026-08-26T10:00:00.000Z',
+    };
+
+    render(<CommunityGroupChatPanel {...baseProps} messages={[delivered as any]} pendingMessages={[]} />);
+
+    expect(screen.queryByText('Waiting to send')).not.toBeInTheDocument();
+  });
+
+  it('shows a held first message instead of the empty-state hero', () => {
+    render(
+      <CommunityGroupChatPanel
+        {...baseProps}
+        pendingMessages={[{ id: 'queued-0', body: 'First thing said here.', tab: 'chat' }]}
+      />,
+    );
+
+    expect(screen.queryByText('A permanent room for the Berkman Klein community.')).not.toBeInTheDocument();
+    expect(screen.getByText('First thing said here.')).toBeInTheDocument();
+  });
+
   it('has no accessibility violations in the empty state', async () => {
     const { container } = render(<CommunityGroupChatPanel {...baseProps} />);
     expect(await axe(container)).toHaveNoViolations();

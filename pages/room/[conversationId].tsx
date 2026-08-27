@@ -1,10 +1,10 @@
-import { CSSProperties, useEffect, useMemo, useState } from 'react';
+import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from 'next/font/google';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { Api, SendData, emitWithTokenRefresh } from '../../utils';
 import { CheckAuthHeader } from '../../utils/Helpers';
-import { AuthType, PseudonymousMessage } from '../../types.internal';
+import { AuthType, PendingRoomMessage, PseudonymousMessage } from '../../types.internal';
 import { useConversationMessages, useRoomSetup, useSessionJoin, useTabNavigation } from '../../hooks';
 import { CommunityNavigationBar, CommunityNavTab } from '../../components/room/CommunityNavigationBar';
 import { CommunityGroupChatPanel } from '../../components/room/CommunityGroupChatPanel';
@@ -47,7 +47,7 @@ export default function RoomPage({ authType: _authType }: { authType: AuthType }
 
   const { loaded, notFound, generalError, setGeneralError, roomName, botName, agentId } = useRoomSetup({ router });
 
-  const { socket, pseudonym: realName, userId, lastReconnectTime } = useSessionJoin(true);
+  const { socket, pseudonym: realName, userId, isConnected, lastReconnectTime } = useSessionJoin(true);
 
   const { activeTab, activeTabRef, unseenAssistantCount, setUnseenAssistantCount, handleTabChange } = useTabNavigation({
     router,
@@ -59,6 +59,9 @@ export default function RoomPage({ authType: _authType }: { authType: AuthType }
   const [hasJoined, setHasJoined] = useState(false);
   const [waitingForChatResponse, setWaitingForChatResponse] = useState(false);
   const [waitingForAssistantResponse, setWaitingForAssistantResponse] = useState(false);
+  const [queuedMessages, setQueuedMessages] = useState<PendingRoomMessage[]>([]);
+  const queuedIdRef = useRef(0);
+  const deliveringRef = useRef(false);
 
   // useConversationMessages rebuilds its fetchers whenever these change, and re-fetches
   // whenever the fetchers change. A fresh array or object literal here would therefore
@@ -172,35 +175,70 @@ export default function RoomPage({ authType: _authType }: { authType: AuthType }
     };
   }, [socket, setChatMessages, setAssistantMessages, activeTabRef, setUnseenAssistantCount]);
 
+  const deliverMessage = useCallback(
+    async (queued: PendingRoomMessage) => {
+      const channels = queued.tab === 'chat' ? [{ name: 'chat' }] : [{ name: `direct-${userId}-${agentId}` }];
+
+      if (queued.tab === 'chat') setWaitingForChatResponse(queued.body.includes(`@${botName}`));
+      else setWaitingForAssistantResponse(true);
+
+      try {
+        const response = await SendData('messages', {
+          body: queued.body,
+          bodyType: 'text',
+          conversation: conversationId,
+          channels,
+          ...(queued.parentMessageId !== undefined && { parentMessage: queued.parentMessageId }),
+        });
+
+        if (response && 'error' in response) {
+          setGeneralError('Message could not be sent.');
+          setWaitingForChatResponse(false);
+          setWaitingForAssistantResponse(false);
+          return;
+        }
+
+        setQueuedMessages((prev) => prev.filter((m) => m.id !== queued.id));
+      } catch (error) {
+        console.error('Error sending message:', error);
+        setWaitingForChatResponse(false);
+        setWaitingForAssistantResponse(false);
+      }
+    },
+    [userId, agentId, botName, conversationId, setGeneralError],
+  );
+
+  // Every send goes through the queue rather than posting directly, so a message
+  // typed while the socket is down waits here and leaves on the next connection
+  // instead of being lost. A message that fails to post stays queued for the same
+  // reason, and is retried the next time this runs.
+  useEffect(() => {
+    if (!isConnected || queuedMessages.length === 0 || deliveringRef.current) return;
+
+    deliveringRef.current = true;
+    (async () => {
+      for (const queued of queuedMessages) {
+        await deliverMessage(queued);
+      }
+      deliveringRef.current = false;
+    })();
+  }, [isConnected, queuedMessages, deliverMessage]);
+
   const sendMessage = async (tab: CommunityNavTab, message: string, parentMessageId?: string): Promise<boolean> => {
     if (!Api.get().GetTokens() || !message || !conversationId) return false;
 
-    const channels = tab === 'chat' ? [{ name: 'chat' }] : [{ name: `direct-${userId}-${agentId}` }];
-
-    if (tab === 'chat') setWaitingForChatResponse(message.includes(`@${botName}`));
-    else setWaitingForAssistantResponse(true);
-
-    try {
-      const response = await SendData('messages', {
-        body: message,
-        bodyType: 'text',
-        conversation: conversationId,
-        channels,
-        ...(parentMessageId !== undefined && { parentMessage: parentMessageId }),
-      });
-
-      if (response && 'error' in response) {
-        setGeneralError('Message could not be sent.');
-        setWaitingForChatResponse(false);
-        setWaitingForAssistantResponse(false);
-        return false;
-      }
-      return true;
-    } catch (error) {
-      console.error('Error sending message:', error);
-      return false;
-    }
+    queuedIdRef.current += 1;
+    setQueuedMessages((prev) => [...prev, { id: `queued-${queuedIdRef.current}`, tab, body: message, parentMessageId }]);
+    return true;
   };
+
+  // Queued replies are left out: the thread they belong to is rendered by the
+  // shared ThreadPanel, which has no place to show an undelivered message.
+  const queuedChatMessages = useMemo(
+    () => queuedMessages.filter((m) => m.tab === 'chat' && !m.parentMessageId),
+    [queuedMessages],
+  );
+  const queuedAssistantMessages = useMemo(() => queuedMessages.filter((m) => m.tab === 'assistant'), [queuedMessages]);
 
   if (notFound) {
     return (
@@ -248,12 +286,20 @@ export default function RoomPage({ authType: _authType }: { authType: AuthType }
         )}
       </header>
 
+      {!isConnected && (
+        <div role="status" className={styles.reconnectBanner}>
+          <span aria-hidden="true" className={styles.reconnectDot} />
+          <span>Reconnecting… messages you send will be held and sent automatically.</span>
+        </div>
+      )}
+
       <div style={{ flex: 1, minHeight: 0 }}>
         {activeTab === 'assistant' ? (
           <CommunityAssistantPanel
             messages={assistantMessages}
             realName={realName || ''}
             botName={botName}
+            pendingMessages={queuedAssistantMessages}
             waitingForResponse={waitingForAssistantResponse}
             onSendMessage={(message) => sendMessage('assistant', message)}
           />
@@ -263,6 +309,7 @@ export default function RoomPage({ authType: _authType }: { authType: AuthType }
             realName={realName || ''}
             botName={botName}
             mentionTargets={mentionTargets}
+            pendingMessages={queuedChatMessages}
             waitingForResponse={waitingForChatResponse}
             messagesWithUnreadReplies={messagesWithUnreadReplies}
             onSendMessage={(message, parentMessageId) => sendMessage('chat', message, parentMessageId)}

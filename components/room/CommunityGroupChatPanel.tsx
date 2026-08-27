@@ -5,8 +5,9 @@ import { ThreadedMessage } from '../ThreadedMessage';
 import { ThreadPanel } from '../ThreadPanel';
 import { BotIcon } from '../BotIcon';
 import { CommunityMessageInput } from './CommunityMessageInput';
-import { MemberIntroContent, PseudonymousMessage } from '../../types.internal';
+import { MemberIntroContent, PendingRoomMessage, PseudonymousMessage } from '../../types.internal';
 import { MemberIntroCard } from './MemberIntroCard';
+import { PendingMessage } from './PendingMessage';
 import { parseMessageBody } from '../../utils/Helpers';
 import { getRoomInitials } from '../../utils/roomAvatarUtils';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
@@ -20,6 +21,8 @@ interface CommunityGroupChatPanelProps {
   memberCount?: number;
   /** Member real names, offered as @ mention targets in the composer. */
   mentionTargets: string[];
+  /** Messages typed here that the server has not accepted yet. */
+  pendingMessages?: PendingRoomMessage[];
   waitingForResponse?: boolean;
   messagesWithUnreadReplies?: Set<string>;
   onSendMessage: (message: string, parentMessageId?: string) => Promise<boolean>;
@@ -67,6 +70,7 @@ export function CommunityGroupChatPanel({
   botName,
   memberCount,
   mentionTargets,
+  pendingMessages = [],
   waitingForResponse = false,
   messagesWithUnreadReplies = new Set(),
   onSendMessage,
@@ -88,7 +92,7 @@ export function CommunityGroupChatPanel({
     return { parentMessages: parents, threadMap: map };
   }, [messages]);
 
-  const isEmptyRoom = messages.length === 0;
+  const isEmptyRoom = messages.length === 0 && pendingMessages.length === 0;
 
   const { messagesEndRef, messagesContainerRef, isAtBottom, scrollToBottom } = useAutoScroll(messages);
   const messageInputRef = useRef<HTMLDivElement>(null);
@@ -265,6 +269,10 @@ export function CommunityGroupChatPanel({
                     />
                   );
                 })}
+
+                {pendingMessages.map((pending) => (
+                  <PendingMessage key={pending.id} body={pending.body} realName={realName} />
+                ))}
 
                 {waitingForResponse && !waitingForThreadedReply && parentMessages.length > 0 && (
                   <div className="relative z-10 flex items-center gap-1 mt-2 mb-1">

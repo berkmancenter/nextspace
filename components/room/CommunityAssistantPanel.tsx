@@ -4,7 +4,8 @@ import remarkGfm from 'remark-gfm';
 import { ThreadedMessage } from '../ThreadedMessage';
 import { BotIcon } from '../BotIcon';
 import { CommunityMessageInput } from './CommunityMessageInput';
-import { PseudonymousMessage } from '../../types.internal';
+import { PendingMessage } from './PendingMessage';
+import { PendingRoomMessage, PseudonymousMessage } from '../../types.internal';
 import { parseMessageBody } from '../../utils/Helpers';
 import { getRoomInitials } from '../../utils/roomAvatarUtils';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
@@ -14,6 +15,8 @@ interface CommunityAssistantPanelProps {
   messages: PseudonymousMessage[];
   realName: string;
   botName: string;
+  /** Messages typed here that the server has not accepted yet. */
+  pendingMessages?: PendingRoomMessage[];
   waitingForResponse?: boolean;
   onSendMessage: (message: string) => Promise<boolean>;
 }
@@ -36,10 +39,11 @@ export function CommunityAssistantPanel({
   messages,
   realName,
   botName,
+  pendingMessages = [],
   waitingForResponse = false,
   onSendMessage,
 }: CommunityAssistantPanelProps) {
-  const isEmpty = messages.length === 0;
+  const isEmpty = messages.length === 0 && pendingMessages.length === 0;
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(messages);
 
   const parentMessages = useMemo(() => messages.filter((m) => !m.parentMessage), [messages]);
@@ -178,6 +182,10 @@ export function CommunityAssistantPanel({
                 />
               );
             })}
+
+            {pendingMessages.map((pending) => (
+              <PendingMessage key={pending.id} body={pending.body} realName={realName} />
+            ))}
 
             {waitingForResponse && (
               <div className="relative z-10 flex items-center gap-1 mt-2 mb-1">
