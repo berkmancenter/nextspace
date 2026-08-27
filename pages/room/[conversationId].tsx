@@ -65,6 +65,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   const [waitingForAssistantResponse, setWaitingForAssistantResponse] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [offlineTooLong, setOfflineTooLong] = useState(false);
+  const [browserOnline, setBrowserOnline] = useState(true);
   const [queuedMessages, setQueuedMessages] = useState<PendingRoomMessage[]>([]);
   const queuedIdRef = useRef(0);
   const deliveringRef = useRef(false);
@@ -206,7 +207,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
 
         setQueuedMessages((prev) => prev.filter((m) => m.id !== queued.id));
       } catch (error) {
-        console.error('Error sending message:', error);
+        console.warn('Message send failed, holding it in the queue until the connection returns:', error);
         setWaitingForChatResponse(false);
         setWaitingForAssistantResponse(false);
       }
@@ -214,24 +215,40 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     [userId, agentId, botName, conversationId, setGeneralError],
   );
 
+  // navigator.onLine flips the moment the machine loses its network, while the socket
+  // only notices after its own ping timeout. Reading both keeps the room from posting
+  // into a connection that is already gone during that gap.
+  useEffect(() => {
+    const sync = () => setBrowserOnline(window.navigator.onLine);
+    sync();
+    window.addEventListener('online', sync);
+    window.addEventListener('offline', sync);
+    return () => {
+      window.removeEventListener('online', sync);
+      window.removeEventListener('offline', sync);
+    };
+  }, []);
+
+  const isOffline = !isConnected || !browserOnline;
+
   // After this long the strip stops promising an imminent reconnect and says the
   // message is saved locally instead, per the design's escalation.
   useEffect(() => {
-    if (isConnected) {
+    if (!isOffline) {
       setOfflineTooLong(false);
       return undefined;
     }
 
     const timer = setTimeout(() => setOfflineTooLong(true), 30_000); // 30 seconds
     return () => clearTimeout(timer);
-  }, [isConnected]);
+  }, [isOffline]);
 
   // Every send goes through the queue rather than posting directly, so a message
   // typed while the socket is down waits here and leaves on the next connection
   // instead of being lost. A message that fails to post stays queued for the same
   // reason, and is retried the next time this runs.
   useEffect(() => {
-    if (!isConnected || queuedMessages.length === 0 || deliveringRef.current) return;
+    if (isOffline || queuedMessages.length === 0 || deliveringRef.current) return;
 
     deliveringRef.current = true;
     (async () => {
@@ -240,7 +257,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
       }
       deliveringRef.current = false;
     })();
-  }, [isConnected, queuedMessages, deliverMessage]);
+  }, [isOffline, queuedMessages, deliverMessage]);
 
   const sendMessage = async (tab: CommunityNavTab, message: string, parentMessageId?: string): Promise<boolean> => {
     if (!Api.get().GetTokens() || !message || !conversationId) return false;
@@ -331,7 +348,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
         </nav>
       </Drawer>
 
-      {!isConnected && (
+      {isOffline && (
         <div role="status" className={styles.reconnectBanner}>
           <span aria-hidden="true" className={styles.reconnectDot} />
           <span>
@@ -349,7 +366,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
             realName={realName || ''}
             botName={botName}
             pendingMessages={queuedAssistantMessages}
-            offline={!isConnected}
+            offline={isOffline}
             waitingForResponse={waitingForAssistantResponse}
             onSendMessage={(message) => sendMessage('assistant', message)}
           />
@@ -360,7 +377,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
             botName={botName}
             mentionTargets={mentionTargets}
             pendingMessages={queuedChatMessages}
-            offline={!isConnected}
+            offline={isOffline}
             waitingForResponse={waitingForChatResponse}
             messagesWithUnreadReplies={messagesWithUnreadReplies}
             onSendMessage={(message, parentMessageId) => sendMessage('chat', message, parentMessageId)}

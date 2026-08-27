@@ -292,6 +292,44 @@ describe('RoomPage', () => {
     });
   });
 
+  describe('while the browser reports no network', () => {
+    const setBrowserOnline = (online: boolean) => {
+      Object.defineProperty(window.navigator, 'onLine', { value: online, configurable: true });
+      window.dispatchEvent(new Event(online ? 'online' : 'offline'));
+    };
+
+    afterEach(() => {
+      Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+    });
+
+    it('holds a message rather than posting it, even while the socket still reports connected', async () => {
+      const user = userEvent.setup();
+      render(<RoomPage authType="guest" />);
+
+      act(() => setBrowserOnline(false));
+      await user.click(screen.getByText('Send group message'));
+
+      expect(mockSendData).not.toHaveBeenCalled();
+      expect(screen.getByRole('status')).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-pending', 'hello room'));
+    });
+
+    it('posts the held message once the network returns', async () => {
+      const user = userEvent.setup();
+      render(<RoomPage authType="guest" />);
+
+      act(() => setBrowserOnline(false));
+      await user.click(screen.getByText('Send group message'));
+      expect(mockSendData).not.toHaveBeenCalled();
+
+      act(() => setBrowserOnline(true));
+
+      await waitFor(() =>
+        expect(mockSendData).toHaveBeenCalledWith('messages', expect.objectContaining({ body: 'hello room' })),
+      );
+    });
+  });
+
   describe('while the socket connection is down', () => {
     const disconnectedSession = {
       socket: mockSocket,
@@ -375,6 +413,17 @@ describe('RoomPage', () => {
       } finally {
         jest.useRealTimers();
       }
+    });
+
+    it('keeps a message queued when the send itself fails', async () => {
+      const user = userEvent.setup();
+      mockSendData.mockRejectedValue(new TypeError('Failed to fetch'));
+      render(<RoomPage authType="guest" />);
+
+      await user.click(screen.getByText('Send group message'));
+
+      await waitFor(() => expect(mockSendData).toHaveBeenCalled());
+      expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-pending', 'hello room');
     });
 
     it('has no accessibility violations with the reconnecting notice showing', async () => {
