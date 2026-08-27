@@ -198,8 +198,11 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
           ...(queued.parentMessageId !== undefined && { parentMessage: queued.parentMessageId }),
         });
 
+        // Marked on the message itself rather than raised as a page-level error: the
+        // member needs to know which message was refused, and a refusal is final, so
+        // it stays visible instead of being retried on the next connection.
         if (response && 'error' in response) {
-          setGeneralError('Message could not be sent.');
+          setQueuedMessages((prev) => prev.map((m) => (m.id === queued.id ? { ...m, failed: true } : m)));
           setWaitingForChatResponse(false);
           setWaitingForAssistantResponse(false);
           return;
@@ -212,7 +215,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
         setWaitingForAssistantResponse(false);
       }
     },
-    [userId, agentId, botName, conversationId, setGeneralError],
+    [userId, agentId, botName, conversationId],
   );
 
   // navigator.onLine flips the moment the machine loses its network, while the socket
@@ -248,12 +251,13 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   // instead of being lost. A message that fails to post stays queued for the same
   // reason, and is retried the next time this runs.
   useEffect(() => {
-    if (isOffline || queuedMessages.length === 0 || deliveringRef.current) return;
+    if (isOffline || deliveringRef.current) return;
+    if (queuedMessages.every((m) => m.failed)) return;
 
     deliveringRef.current = true;
     (async () => {
       for (const queued of queuedMessages) {
-        await deliverMessage(queued);
+        if (!queued.failed) await deliverMessage(queued);
       }
       deliveringRef.current = false;
     })();

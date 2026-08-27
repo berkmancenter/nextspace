@@ -187,7 +187,7 @@ export function CommunityAssistantPanel({
             })}
 
             {pendingMessages.map((pending) => (
-              <PendingMessage key={pending.id} body={pending.body} realName={realName} />
+              <PendingMessage key={pending.id} body={pending.body} realName={realName} failed={pending.failed} />
             ))}
 
             {waitingForResponse && (

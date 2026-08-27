@@ -5,6 +5,15 @@ import styles from './communityRoom.module.css';
 interface PendingMessageProps {
   body: string;
   realName: string;
+  failed?: boolean;
+}
+
+function AlertIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+    </svg>
+  );
 }
 
 function ClockIcon() {
@@ -20,13 +29,13 @@ function ClockIcon() {
  * clock label. Used on its own inside a thread, where ThreadPanel already draws
  * the avatar and name around whatever the bubble renderer returns.
  */
-export function PendingBubble({ body }: { body: string }) {
+export function PendingBubble({ body, failed = false }: { body: string; failed?: boolean }) {
   return (
     <div style={{ width: '85%' }}>
-      <div className={styles.pendingBubble}>{body}</div>
-      <div className={styles.pendingStatus}>
-        <ClockIcon />
-        <span>Waiting to send</span>
+      <div className={`${styles.pendingBubble}${failed ? ` ${styles.pendingBubbleFailed}` : ''}`}>{body}</div>
+      <div className={`${styles.pendingStatus}${failed ? ` ${styles.pendingStatusFailed}` : ''}`}>
+        {failed ? <AlertIcon /> : <ClockIcon />}
+        <span>{failed ? 'Message could not be sent.' : 'Waiting to send'}</span>
       </div>
     </div>
   );
@@ -37,7 +46,7 @@ export function PendingBubble({ body }: { body: string }) {
  * in the feed where the delivered message will land, so sending while offline
  * looks like sending, and swaps for the real message once it is delivered.
  */
-export function PendingMessage({ body, realName }: PendingMessageProps) {
+export function PendingMessage({ body, realName, failed = false }: PendingMessageProps) {
   return (
     <div className={styles.pendingRow}>
       <div
@@ -51,7 +60,7 @@ export function PendingMessage({ body, realName }: PendingMessageProps) {
           {realName}
           <span className="text-gray-600 font-normal"> (You)</span>
         </div>
-        <PendingBubble body={body} />
+        <PendingBubble body={body} failed={failed} />
       </div>
     </div>
   );

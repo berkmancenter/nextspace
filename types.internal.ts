@@ -82,10 +82,11 @@ export interface HeaderProps extends BaseComponentProps {
 export type PseudonymousMessage = components['schemas']['Message'] & {
   body: any;
   /**
-   * Set only on client-side placeholders for a message the server has not accepted
-   * yet. Never present on a message that came back from the API or the socket.
+   * Set only on client-side placeholders for a message the server has not accepted:
+   * 'waiting' while it is queued for delivery, 'failed' once the server refused it.
+   * Never present on a message that came back from the API or the socket.
    */
-  pending?: boolean;
+  pending?: 'waiting' | 'failed';
 };
 
 /**
@@ -222,10 +223,13 @@ export interface MemberIntroContent {
  * @property {string} body - The text the member typed.
  * @property {'chat' | 'assistant'} tab - Which room feed the message belongs to.
  * @property {string} [parentMessageId] - Set when the message is a threaded reply.
+ * @property {boolean} [failed] - True once the server refused it.
  */
 export interface PendingRoomMessage {
   id: string;
   body: string;
   tab: 'chat' | 'assistant';
   parentMessageId?: string;
+  /** Set once the server has refused this message, which stops further delivery attempts. */
+  failed?: boolean;
 }

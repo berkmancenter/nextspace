@@ -105,7 +105,10 @@ export function CommunityGroupChatPanel({
   const pendingRepliesAsMessages = (parentId: string): PseudonymousMessage[] =>
     pendingMessages
       .filter((m) => m.parentMessageId === parentId)
-      .map((m) => ({ id: m.id, pseudonym: realName, body: m.body, pending: true }) as PseudonymousMessage);
+      .map(
+        (m) =>
+          ({ id: m.id, pseudonym: realName, body: m.body, pending: m.failed ? 'failed' : 'waiting' }) as PseudonymousMessage,
+      );
 
   const { messagesEndRef, messagesContainerRef, isAtBottom, scrollToBottom } = useAutoScroll(messages);
   const messageInputRef = useRef<HTMLDivElement>(null);
@@ -148,7 +151,8 @@ export function CommunityGroupChatPanel({
   };
 
   const renderMessageContent = (message: PseudonymousMessage) => {
-    if (message.pending) return <PendingBubble body={parseMessageBody(message.body).text} />;
+    if (message.pending)
+      return <PendingBubble body={parseMessageBody(message.body).text} failed={message.pending === 'failed'} />;
 
     const isAssistant = message.fromAgent;
     const parsed = parseMessageBody(message.body);
@@ -288,7 +292,7 @@ export function CommunityGroupChatPanel({
                 })}
 
                 {pendingParents.map((pending) => (
-                  <PendingMessage key={pending.id} body={pending.body} realName={realName} />
+                  <PendingMessage key={pending.id} body={pending.body} realName={realName} failed={pending.failed} />
                 ))}
 
                 {waitingForResponse && !waitingForThreadedReply && parentMessages.length > 0 && (

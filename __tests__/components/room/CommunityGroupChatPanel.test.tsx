@@ -252,6 +252,18 @@ describe('CommunityGroupChatPanel', () => {
     expect(screen.queryByText('Waiting to send')).not.toBeInTheDocument();
   });
 
+  it('replaces the waiting label with a failure when the server refused the message', () => {
+    render(
+      <CommunityGroupChatPanel
+        {...baseProps}
+        pendingMessages={[{ id: 'queued-0', body: 'foo', tab: 'chat', failed: true }]}
+      />,
+    );
+
+    expect(screen.getByText('Message could not be sent.')).toBeInTheDocument();
+    expect(screen.queryByText('Waiting to send')).not.toBeInTheDocument();
+  });
+
   it('shows a held first message instead of the empty-state hero', () => {
     render(
       <CommunityGroupChatPanel

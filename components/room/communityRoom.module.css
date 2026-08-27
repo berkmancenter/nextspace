@@ -44,6 +44,7 @@
   --room-live-border: rgba(15, 125, 107, 0.34);
   --room-pending-border: #87909c;
   --room-pending-text: #5e6874;
+  --room-error: #b3261e;
 
   background: var(--room-canvas);
   color: var(--room-text-primary);
@@ -82,6 +83,7 @@
 
     --room-pending-border: #b3aea3;
     --room-pending-text: #b3aea3;
+    --room-error: #ffb4ab;
   }
 }
 
@@ -117,6 +119,7 @@
 
   --room-pending-border: #b3aea3;
   --room-pending-text: #b3aea3;
+  --room-error: #ffb4ab;
 }
 
 /* Threading UI (ThreadedMessage/ThreadPanel) is reused unmodified per its own
@@ -579,7 +582,7 @@
   padding: 8px 14px;
   background: var(--room-chrome-bg);
   border-top: 1px solid var(--room-chrome-border);
-  color: #b3261e;
+  color: var(--room-error);
   font-family: var(--room-font-body), sans-serif;
   font-size: 13px;
 }
@@ -656,6 +659,15 @@
   font-size: 11.5px;
   line-height: 1.3;
   color: var(--room-pending-text);
+}
+
+.pendingBubbleFailed {
+  border-color: var(--room-error);
+  color: var(--room-error);
+}
+
+.pendingStatusFailed {
+  color: var(--room-error);
 }
 
 .headerActions {

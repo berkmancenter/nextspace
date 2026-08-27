@@ -60,6 +60,10 @@ jest.mock('../../components/room/CommunityGroupChatPanel', () => ({
       data-testid="group-chat-panel"
       data-real-name={realName}
       data-pending={pendingMessages.map((m: any) => m.body).join('|')}
+      data-pending-failed={pendingMessages
+        .filter((m: any) => m.failed)
+        .map((m: any) => m.body)
+        .join('|')}
     >
       {messages.map((m: any) => (
         <div key={m.id}>{typeof m.body === 'string' ? m.body : m.body?.text}</div>
@@ -289,6 +293,37 @@ describe('RoomPage', () => {
 
       expect(screen.getByRole('link', { name: 'Give Feedback' })).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: 'Log Out' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('when the server refuses a message', () => {
+    beforeEach(() => {
+      mockSendData.mockResolvedValue({ error: 'rejected' });
+    });
+
+    it('marks that message rather than raising a separate error banner', async () => {
+      const user = userEvent.setup();
+      render(<RoomPage authType="guest" />);
+
+      await user.click(screen.getByText('Send group message'));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-pending-failed', 'hello room'),
+      );
+      expect(screen.queryByText('Message could not be sent.')).not.toBeInTheDocument();
+    });
+
+    it('does not keep retrying a message the server already refused', async () => {
+      const user = userEvent.setup();
+      render(<RoomPage authType="guest" />);
+
+      await user.click(screen.getByText('Send group message'));
+      await waitFor(() => expect(mockSendData).toHaveBeenCalledTimes(1));
+
+      await user.click(screen.getByText('Send group message'));
+
+      await waitFor(() => expect(mockSendData).toHaveBeenCalledTimes(2));
+      expect(mockSendData).toHaveBeenCalledTimes(2);
     });
   });
 
