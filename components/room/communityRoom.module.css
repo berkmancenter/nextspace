@@ -36,8 +36,8 @@
   --room-nav-border: #dedbd3;
   --room-nav-active-bg: #ffffff;
 
-  --room-composer-bg: #ffffff;
-  --room-composer-border: rgba(17, 22, 28, 0.16);
+  --room-composer-bg: #f6f5f1;
+  --room-composer-border: #dedbd3;
   --room-composer-border-focus: #4845d2;
 
   --room-badge-border: rgba(17, 22, 28, 0.16);
@@ -74,8 +74,8 @@
     --room-nav-border: rgba(255, 255, 255, 0.12);
     --room-nav-active-bg: rgba(255, 255, 255, 0.07);
 
-    --room-composer-bg: #17181b;
-    --room-composer-border: rgba(255, 255, 255, 0.16);
+    --room-composer-bg: #111214;
+    --room-composer-border: rgba(255, 255, 255, 0.13);
     --room-composer-border-focus: #96aec6;
 
     --room-badge-border: rgba(255, 255, 255, 0.16);
@@ -109,8 +109,8 @@
   --room-nav-border: rgba(255, 255, 255, 0.12);
   --room-nav-active-bg: rgba(255, 255, 255, 0.07);
 
-  --room-composer-bg: #17181b;
-  --room-composer-border: rgba(255, 255, 255, 0.16);
+  --room-composer-bg: #111214;
+  --room-composer-border: rgba(255, 255, 255, 0.13);
   --room-composer-border-focus: #96aec6;
 
   --room-badge-border: rgba(255, 255, 255, 0.16);
@@ -243,18 +243,18 @@
 .composerWrap {
   flex: none;
   background: var(--room-chrome-bg);
-  border-top: 1px solid var(--room-chrome-border);
-  padding: 10px 12px;
+  border-top: 1px solid var(--room-nav-border);
+  padding: 8px 8px 6px;
 }
 
+/* Column, so the button row spans the full width below the text. As a row the
+   textarea's flex:1 pushed @ and Ask Berkie into the right edge beside Send. */
 .composerBox {
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  flex-direction: column;
   background: var(--room-composer-bg);
   border: 1px solid var(--room-composer-border);
-  border-radius: 16px;
-  padding: 6px 6px 6px 12px;
+  border-radius: 8px;
 }
 
 .composerBox:focus-within {
@@ -262,8 +262,8 @@
 }
 
 .composerTextarea {
-  flex: 1;
-  min-height: 28px;
+  width: 100%;
+  min-height: 24px;
   max-height: 120px;
   resize: none;
   border: 0;
@@ -271,9 +271,9 @@
   background: transparent;
   color: var(--room-text-body);
   font-family: var(--room-font-body), sans-serif;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.4;
-  padding: 6px 0;
+  padding: 10px 12px 2px;
 }
 
 .composerTextarea::placeholder {
@@ -333,6 +333,7 @@
   padding: 0 12px 0 8px;
   background: none;
   border: 0;
+  border-radius: 999px;
   color: var(--room-berkie-accent);
 }
 
@@ -363,10 +364,10 @@
 }
 
 .disclosure {
-  margin: 6px 2px 0;
+  margin: 7px 4px 0;
   color: var(--room-text-muted);
   font-family: var(--room-font-body), sans-serif;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
 }
 
