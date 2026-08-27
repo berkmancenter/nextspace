@@ -240,6 +240,58 @@ describe('RoomPage', () => {
     expect(mockRetrieveData.mock.calls.length).toBe(callsAfterSettling);
   });
 
+  describe('the app menu', () => {
+    it('sits to the right of the account control', () => {
+      render(<RoomPage authType="user" />);
+
+      const account = screen.getByRole('button', { name: 'Your account, Priya Raghunathan' });
+      const menu = screen.getByRole('button', { name: 'Menu' });
+
+      expect(account.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('offers feedback and log out to a signed-in member', async () => {
+      const user = userEvent.setup();
+      render(<RoomPage authType="user" />);
+
+      await user.click(screen.getByRole('button', { name: 'Menu' }));
+
+      expect(screen.getByRole('link', { name: 'Give Feedback' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Log Out' })).toBeInTheDocument();
+    });
+
+    it('names the menu panel and closes it from a labelled control', async () => {
+      const user = userEvent.setup();
+      render(<RoomPage authType="user" />);
+
+      await user.click(screen.getByRole('button', { name: 'Menu' }));
+      expect(screen.getByRole('dialog', { name: 'Room menu' })).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Close menu' }));
+
+      await waitFor(() => expect(screen.queryByRole('link', { name: 'Give Feedback' })).not.toBeInTheDocument());
+    });
+
+    it('has no accessibility violations with the menu open', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<RoomPage authType="user" />);
+
+      await user.click(screen.getByRole('button', { name: 'Menu' }));
+
+      expect(await axe(container)).toHaveNoViolations();
+    });
+
+    it('offers no log out to a guest', async () => {
+      const user = userEvent.setup();
+      render(<RoomPage authType="guest" />);
+
+      await user.click(screen.getByRole('button', { name: 'Menu' }));
+
+      expect(screen.getByRole('link', { name: 'Give Feedback' })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Log Out' })).not.toBeInTheDocument();
+    });
+  });
+
   describe('while the socket connection is down', () => {
     const disconnectedSession = {
       socket: mockSocket,

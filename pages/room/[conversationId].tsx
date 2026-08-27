@@ -1,9 +1,13 @@
 import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from 'next/font/google';
-import { Box, CircularProgress, Typography } from '@mui/material';
+import { Box, CircularProgress, Drawer, Typography } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import MenuIcon from '@mui/icons-material/Menu';
 import { Api, SendData, emitWithTokenRefresh } from '../../utils';
 import { CheckAuthHeader } from '../../utils/Helpers';
+import { GIVE_FEEDBACK_URL } from '../../components/Header';
 import { AuthType, PendingRoomMessage, PseudonymousMessage } from '../../types.internal';
 import { useConversationMessages, useRoomSetup, useSessionJoin, useTabNavigation } from '../../hooks';
 import { CommunityNavigationBar, CommunityNavTab } from '../../components/room/CommunityNavigationBar';
@@ -41,7 +45,7 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
-export default function RoomPage({ authType: _authType }: { authType: AuthType }) {
+export default function RoomPage({ authType }: { authType: AuthType }) {
   const router = useRouter();
   const conversationId = router.query.conversationId as string | undefined;
 
@@ -59,6 +63,7 @@ export default function RoomPage({ authType: _authType }: { authType: AuthType }
   const [hasJoined, setHasJoined] = useState(false);
   const [waitingForChatResponse, setWaitingForChatResponse] = useState(false);
   const [waitingForAssistantResponse, setWaitingForAssistantResponse] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [queuedMessages, setQueuedMessages] = useState<PendingRoomMessage[]>([]);
   const queuedIdRef = useRef(0);
   const deliveringRef = useRef(false);
@@ -277,14 +282,46 @@ export default function RoomPage({ authType: _authType }: { authType: AuthType }
           </div>
           {activeTab === 'assistant' && <div className={styles.headerSubtitle}>Private to you</div>}
         </div>
-        {realName && (
-          <button type="button" aria-label={`Your account, ${realName}`} className={styles.accountButton}>
-            <span aria-hidden="true" className={styles.accountAvatar}>
-              {getRoomInitials(realName)}
-            </span>
+        <div className={styles.headerActions}>
+          {realName && (
+            <button type="button" aria-label={`Your account, ${realName}`} className={styles.accountButton}>
+              <span aria-hidden="true" className={styles.accountAvatar}>
+                {getRoomInitials(realName)}
+              </span>
+            </button>
+          )}
+          <button
+            type="button"
+            aria-label="Menu"
+            aria-expanded={menuOpen}
+            className={styles.menuButton}
+            onClick={() => setMenuOpen(true)}
+          >
+            <MenuIcon />
           </button>
-        )}
+        </div>
       </header>
+
+      <Drawer
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        anchor="right"
+        slotProps={{ paper: { 'aria-label': 'Room menu' } }}
+      >
+        <nav aria-label="Room menu" className={styles.menuPanel}>
+          <button type="button" aria-label="Close menu" className={styles.menuClose} onClick={() => setMenuOpen(false)}>
+            <CloseIcon />
+          </button>
+          <Link href={GIVE_FEEDBACK_URL} target="_blank" rel="noopener noreferrer" className={styles.menuItem}>
+            Give Feedback
+          </Link>
+          {(authType === 'admin' || authType === 'user') && (
+            <Link href="/logout" className={styles.menuItem}>
+              Log Out
+            </Link>
+          )}
+        </nav>
+      </Drawer>
 
       {!isConnected && (
         <div role="status" className={styles.reconnectBanner}>
