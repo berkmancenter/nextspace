@@ -26,12 +26,12 @@ describe('CommunityMessageInput', () => {
 
   it('shows the group-chat disclosure line with the real name', () => {
     render(<CommunityMessageInput tab="chat" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={noop} />);
-    expect(screen.getByText("You're posting as Priya Raghunathan · Berkie reads every message")).toBeInTheDocument();
+    expect(screen.getByText("You're posting as Priya Raghunathan")).toBeInTheDocument();
   });
 
   it('shows the assistant-tab disclosure line', () => {
     render(<CommunityMessageInput tab="assistant" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={noop} />);
-    expect(screen.getByText('Only you can see this conversation · Berkie reads every message')).toBeInTheDocument();
+    expect(screen.getByText('Only you can see this conversation')).toBeInTheDocument();
   });
 
   it('shows the @ mention and Ask Berkie buttons on the group tab', () => {

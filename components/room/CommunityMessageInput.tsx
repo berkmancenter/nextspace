@@ -144,10 +144,7 @@ export function CommunityMessageInput({
   }, [activeEnhancer, handleEnhancerSelect]);
 
   const placeholder = tab === 'chat' ? (isEmptyRoom ? PLACEHOLDER.chatEmpty : PLACEHOLDER.chat) : PLACEHOLDER.assistant;
-  const disclosure =
-    tab === 'chat'
-      ? `You're posting as ${realName} · Berkie reads every message`
-      : 'Only you can see this conversation · Berkie reads every message';
+  const disclosure = tab === 'chat' ? `You're posting as ${realName}` : 'Only you can see this conversation';
 
   return (
     <div className={styles.composerWrap}>
