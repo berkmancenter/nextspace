@@ -32,7 +32,7 @@ const renderMarkdown = (text: string): React.ReactNode => (
 /**
  * The room's private 1:1 with Berkie. Forked from AssistantChatPanel for the
  * same reason as CommunityGroupChatPanel: Solar Signal's empty state,
- * avatar palette, and "AI agent" pill don't fit through the shared panel's
+ * avatar palette, and "AI Bot" pill don't fit through the shared panel's
  * existing props.
  */
 export function CommunityAssistantPanel({
@@ -72,8 +72,8 @@ export function CommunityAssistantPanel({
     if (message.fromAgent) {
       return (
         <div style={{ width: '85%' }}>
-          <div className={styles.badge} style={{ display: 'inline-block', marginBottom: 4 }}>
-            AI agent
+          <div className={styles.agentBadge} style={{ marginBottom: 4 }}>
+            AI Bot
           </div>
           <div
             className="rounded-2xl px-2 py-1"

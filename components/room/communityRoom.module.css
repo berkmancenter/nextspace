@@ -139,6 +139,17 @@
   }
 }
 
+/* ThreadedMessage and ThreadPanel print the sender name in Tailwind's bold
+   text-sm, which is the app's Inter at 14px. The room's design sets it in Space
+   Grotesk at 13px, and re-typing it here leaves those shared files untouched. */
+.root :global(.text-sm.font-bold) {
+  font-family: var(--room-font-display), sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--room-text-primary);
+}
+
 .avatar {
   display: flex;
   align-items: center;
@@ -378,31 +389,42 @@
   width: 100%;
 }
 
-.introCardHeader {
+.introCardAuthor {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 2px;
 }
 
-.introCardLabel {
+.introCardAuthorName {
+  font-family: var(--room-font-display), sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--room-text-primary);
+}
+
+.agentBadge {
+  display: inline-block;
+  flex: none;
   font-family: var(--room-font-mono), monospace;
   font-weight: 600;
-  font-size: 10px;
-  text-transform: uppercase;
+  font-size: 9px;
+  line-height: 1;
   letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--room-berkie-accent);
+  background: var(--room-berkie-pill-bg);
+  border: 1px solid var(--room-berkie-pill-border);
+  border-radius: 999px;
+  padding: 3px 6px;
 }
 
-.introCardRule {
-  flex: 1;
-  height: 1px;
-  background: var(--room-chrome-border);
-}
-
+/* Teal outline rather than the neutral chrome border, so the card reads as
+   Berkie's, matching the border on its message bubbles. */
 .introCardBody {
   background: var(--room-chrome-bg);
-  border: 1px solid var(--room-chrome-border);
+  border: 1px solid var(--room-berkie-bubble-border);
   border-radius: 12px;
   padding: 14px;
 }

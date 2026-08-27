@@ -10,8 +10,8 @@ interface MemberIntroCardProps {
 }
 
 /**
- * The one-time "Introduced by Berkie" card shown on a member's first appearance
- * in the room. Rendered by the group feed for any message whose body type is
+ * The one-time introduction Berkie posts on a member's first appearance in the
+ * room. Rendered by the group feed for any message whose body type is
  * `memberIntro`; the fields come from that body's `content` payload.
  */
 export function MemberIntroCard({ name, role, joinedLabel, bio }: MemberIntroCardProps) {
@@ -20,10 +20,12 @@ export function MemberIntroCard({ name, role, joinedLabel, bio }: MemberIntroCar
 
   return (
     <div role="group" aria-label="Introduction posted by Berkie" className={styles.introCardWrap}>
-      <div className={styles.introCardHeader}>
-        <BotIcon size={18} color="var(--room-berkie-accent)" />
-        <span className={styles.introCardLabel}>Introduced by Berkie</span>
-        <span className={styles.introCardRule} />
+      <div className={styles.introCardAuthor}>
+        <div className={styles.avatar} style={{ width: 32, height: 32, background: 'var(--room-berkie-avatar-bg)' }}>
+          <BotIcon size={22} color="var(--room-berkie-accent)" />
+        </div>
+        <span className={styles.introCardAuthorName}>Berkie</span>
+        <span className={styles.agentBadge}>AI Bot</span>
       </div>
       <div className={styles.introCardBody}>
         <div className={styles.introCardTopRow}>

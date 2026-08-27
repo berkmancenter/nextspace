@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import { CommunityGroupChatPanel } from '../../../components/room/CommunityGroupChatPanel';
@@ -77,6 +77,31 @@ describe('CommunityGroupChatPanel', () => {
     expect(screen.getByText('Lucia Navarro Ibanez')).toBeInTheDocument();
     expect(screen.getByText('Fellow, metaLAB · joined this week')).toBeInTheDocument();
     expect(screen.getByText('Studies how museums decide what to digitise.')).toBeInTheDocument();
+  });
+
+  it('posts the introduction card as Berkie, badged as a bot', () => {
+    const introMessage = {
+      id: 'intro-2',
+      fromAgent: true,
+      pseudonym: 'Berkie',
+      createdAt: '2026-08-26T00:00:00.000Z',
+      body: {
+        type: 'memberIntro',
+        text: 'Tomas Alvarez just joined.',
+        content: {
+          name: 'Tomas Alvarez',
+          role: 'Affiliate, Cyberlaw Clinic',
+          joinedLabel: 'joined yesterday',
+          bio: 'Works on platform liability.',
+        },
+      },
+    };
+
+    render(<CommunityGroupChatPanel {...baseProps} messages={[introMessage as any]} />);
+
+    const card = screen.getByRole('group', { name: 'Introduction posted by Berkie' });
+    expect(within(card).getByText('Berkie')).toBeInTheDocument();
+    expect(within(card).getByText('AI Bot')).toBeInTheDocument();
   });
 
   it('renders an ordinary message normally rather than as an introduction card', () => {
@@ -169,7 +194,7 @@ describe('CommunityGroupChatPanel', () => {
     expect(screen.getByText('(You)')).toBeInTheDocument();
   });
 
-  it('marks a Berkie message with the AI agent pill', () => {
+  it('marks a Berkie message with the AI bot pill', () => {
     const messages = [
       {
         id: '1',
@@ -187,7 +212,7 @@ describe('CommunityGroupChatPanel', () => {
       },
     ];
     render(<CommunityGroupChatPanel {...baseProps} messages={messages} />);
-    expect(screen.getByText('AI agent')).toBeInTheDocument();
+    expect(screen.getByText('AI Bot')).toBeInTheDocument();
   });
 
   it('sends a typed message through onSendMessage', async () => {

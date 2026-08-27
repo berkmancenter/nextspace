@@ -132,7 +132,7 @@ describe('CommunityAssistantPanel', () => {
     render(<CommunityAssistantPanel {...baseProps} messages={messages} />);
     expect(screen.getByText('What did I miss?')).toBeInTheDocument();
     expect(screen.getByText('Three new members joined this week.')).toBeInTheDocument();
-    expect(screen.getByText('AI agent')).toBeInTheDocument();
+    expect(screen.getByText('AI Bot')).toBeInTheDocument();
   });
 
   it('passes the assistant tab to the composer', () => {

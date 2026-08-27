@@ -61,7 +61,7 @@ const highlightMentions = (text: string, mentionNames: string[]): React.ReactNod
 /**
  * The room's group chat feed. Forked from GroupChatPanel because Solar
  * Signal needs a different empty state, avatar palette, and Berkie bubble
- * treatment (an "AI agent" pill, no reply feedback row) than the shared
+ * treatment (an "AI Bot" pill, no reply feedback row) than the shared
  * panel hardcodes.
  */
 export function CommunityGroupChatPanel({
@@ -141,8 +141,8 @@ export function CommunityGroupChatPanel({
     if (isAssistant) {
       return (
         <div style={{ width: '85%' }}>
-          <div className={styles.badge} style={{ display: 'inline-block', marginBottom: 4 }}>
-            AI agent
+          <div className={styles.agentBadge} style={{ marginBottom: 4 }}>
+            AI Bot
           </div>
           <div
             className="rounded-2xl px-2 py-1"
