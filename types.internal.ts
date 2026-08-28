@@ -246,4 +246,6 @@ export interface PendingRoomMessage {
   parentMessageId?: string;
   /** Set once the server has refused this message, which stops further delivery attempts. */
   failed?: boolean;
+  /** Why the server refused it, in words a member can act on. */
+  failureReason?: string;
 }

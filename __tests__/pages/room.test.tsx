@@ -39,11 +39,12 @@ const mockEmitWithTokenRefresh = jest.fn((...args: any[]) => {
 });
 
 const mockRetrieveData = jest.fn();
+const mockGetTokens = jest.fn();
 
 jest.mock('../../utils', () => ({
   Api: {
     get: jest.fn(() => ({
-      GetTokens: jest.fn(() => ({ access: 'mock-access-token' })),
+      GetTokens: (...args: any[]) => mockGetTokens(...args),
       getAccessToken: jest.fn(() => 'mock-access-token'),
     })),
   },
@@ -63,6 +64,10 @@ jest.mock('../../components/room/CommunityGroupChatPanel', () => ({
       data-pending-failed={pendingMessages
         .filter((m: any) => m.failed)
         .map((m: any) => m.body)
+        .join('|')}
+      data-pending-reason={pendingMessages
+        .filter((m: any) => m.failureReason)
+        .map((m: any) => m.failureReason)
         .join('|')}
     >
       {messages.map((m: any) => (
@@ -88,6 +93,7 @@ jest.mock('../../components/room/CommunityAssistantPanel', () => ({
 }));
 
 function setDefaultMocks() {
+  mockGetTokens.mockReturnValue({ access: 'mock-access-token' });
   mockUseRoomSetup.mockReturnValue({
     loaded: true,
     notFound: false,
@@ -299,6 +305,20 @@ describe('RoomPage', () => {
     });
   });
 
+  describe('when the session has no token', () => {
+    it('says the message was not sent instead of dropping it silently', async () => {
+      const user = userEvent.setup();
+      mockGetTokens.mockReturnValue(null);
+      render(<RoomPage authType="guest" />);
+
+      await user.click(screen.getByText('Send group message'));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/not sent/i);
+      expect(mockSendData).not.toHaveBeenCalled();
+      expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-pending', '');
+    });
+  });
+
   describe("the poster's name", () => {
     const accountWith = (conversations: string[]) => ({
       id: 'user-1',
@@ -347,6 +367,33 @@ describe('RoomPage', () => {
         expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-pending-failed', 'hello room'),
       );
       expect(screen.queryByText('Message could not be sent.')).not.toBeInTheDocument();
+    });
+
+    it('names the reason on the message when the server explains itself', async () => {
+      const user = userEvent.setup();
+      mockSendData.mockResolvedValue({ error: true, status: 403, message: 'Forbidden' });
+      render(<RoomPage authType="guest" />);
+
+      await user.click(screen.getByText('Send group message'));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('group-chat-panel')).toHaveAttribute(
+          'data-pending-reason',
+          'You are not registered for this room.',
+        ),
+      );
+    });
+
+    it('passes a bad-request message through as the server wrote it', async () => {
+      const user = userEvent.setup();
+      mockSendData.mockResolvedValue({ error: true, status: 400, message: 'That message is too long.' });
+      render(<RoomPage authType="guest" />);
+
+      await user.click(screen.getByText('Send group message'));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-pending-reason', 'That message is too long.'),
+      );
     });
 
     it('sends a refused message again when the member retries it', async () => {

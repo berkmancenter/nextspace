@@ -45,6 +45,18 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
+/**
+ * Turns a refused send into a line the member can act on. SendData only passes the
+ * server's own text through on a 400, so the rest are written here rather than
+ * shown as a bare status.
+ */
+function describeRefusal(response: { status?: number; message?: unknown }): string {
+  if (response.status === 403) return 'You are not registered for this room.';
+  if (response.status === 401) return 'Your session has expired. Sign in again to post.';
+  if (response.status === 400 && typeof response.message === 'string') return response.message;
+  return 'Message could not be sent.';
+}
+
 export default function RoomPage({ authType }: { authType: AuthType }) {
   const router = useRouter();
   const conversationId = router.query.conversationId as string | undefined;
@@ -54,6 +66,9 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   const { socket, pseudonym: sessionPseudonym, userId, isConnected, lastReconnectTime } = useSessionJoin(true);
 
   const [registeredName, setRegisteredName] = useState<string | null>(null);
+  // Kept apart from useRoomSetup's generalError, which doubles as the fatal
+  // "this room would not load" screen when the room never finished loading.
+  const [sendError, setSendError] = useState<string | null>(null);
 
   // The session carries the account's active pseudonym, but a room posts under the
   // real-name entry registered for that room, which is what the server stamps on the
@@ -136,8 +151,8 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
 
   // Join the room's chat channel plus a direct channel with its assistant, once
   // the socket and agent are known. Unlike an event, the room's chat channel
-  // has no passcode by design, so — unlike pages/assistant.tsx — the channel is
-  // always pushed rather than gated on a passcode being present.
+  // has no passcode by design. Unlike pages/assistant.tsx, the channel is always
+  // pushed rather than gated on a passcode being present.
   useEffect(() => {
     if (!socket || !userId || !conversationId || !agentId) return;
 
@@ -233,7 +248,8 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
         // member needs to know which message was refused, and a refusal is final, so
         // it stays visible instead of being retried on the next connection.
         if (response && 'error' in response) {
-          setQueuedMessages((prev) => prev.map((m) => (m.id === queued.id ? { ...m, failed: true } : m)));
+          const failureReason = describeRefusal(response);
+          setQueuedMessages((prev) => prev.map((m) => (m.id === queued.id ? { ...m, failed: true, failureReason } : m)));
           setWaitingForChatResponse(false);
           setWaitingForAssistantResponse(false);
           return;
@@ -295,8 +311,17 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   }, [isOffline, queuedMessages, deliverMessage]);
 
   const sendMessage = async (tab: CommunityNavTab, message: string, parentMessageId?: string): Promise<boolean> => {
-    if (!Api.get().GetTokens() || !message || !conversationId) return false;
+    if (!message) return false;
+    // Without a token or a conversation the send can't even be attempted, and the
+    // member gets nothing back unless this says so: the text stays in the composer,
+    // which on its own reads as a stuck button.
+    if (!Api.get().GetTokens() || !conversationId) {
+      console.warn('Room send skipped: no access token or conversation id available.');
+      setSendError('That message was not sent. Reload the page and sign in again.');
+      return false;
+    }
 
+    setSendError(null);
     queuedIdRef.current += 1;
     setQueuedMessages((prev) => [...prev, { id: `queued-${queuedIdRef.current}`, tab, body: message, parentMessageId }]);
     return true;
@@ -441,9 +466,9 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
         unreadAssistantCount={unseenAssistantCount}
       />
 
-      {generalError && (
+      {(generalError || sendError) && (
         <div role="alert" className={styles.errorBanner}>
-          {generalError}
+          {generalError ?? sendError}
         </div>
       )}
     </div>

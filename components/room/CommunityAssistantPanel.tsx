@@ -194,6 +194,7 @@ export function CommunityAssistantPanel({
                 body={pending.body}
                 realName={realName}
                 failed={pending.failed}
+                failureReason={pending.failureReason}
                 onRetry={onRetryPendingMessage && (() => onRetryPendingMessage(pending.id))}
               />
             ))}

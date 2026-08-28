@@ -6,6 +6,7 @@ interface PendingMessageProps {
   body: string;
   realName: string;
   failed?: boolean;
+  failureReason?: string;
   onRetry?: () => void;
 }
 
@@ -30,13 +31,23 @@ function ClockIcon() {
  * clock label. Used on its own inside a thread, where ThreadPanel already draws
  * the avatar and name around whatever the bubble renderer returns.
  */
-export function PendingBubble({ body, failed = false, onRetry }: { body: string; failed?: boolean; onRetry?: () => void }) {
+export function PendingBubble({
+  body,
+  failed = false,
+  failureReason,
+  onRetry,
+}: {
+  body: string;
+  failed?: boolean;
+  failureReason?: string;
+  onRetry?: () => void;
+}) {
   return (
     <div style={{ width: '85%' }}>
       <div className={`${styles.pendingBubble}${failed ? ` ${styles.pendingBubbleFailed}` : ''}`}>{body}</div>
       <div className={`${styles.pendingStatus}${failed ? ` ${styles.pendingStatusFailed}` : ''}`}>
         {failed ? <AlertIcon /> : <ClockIcon />}
-        <span>{failed ? 'Message could not be sent.' : 'Waiting to send'}</span>
+        <span>{failed ? (failureReason ?? 'Message could not be sent.') : 'Waiting to send'}</span>
         {failed && onRetry && (
           <button type="button" onClick={onRetry} className={styles.pendingRetry}>
             Try sending again
@@ -52,7 +63,7 @@ export function PendingBubble({ body, failed = false, onRetry }: { body: string;
  * in the feed where the delivered message will land, so sending while offline
  * looks like sending, and swaps for the real message once it is delivered.
  */
-export function PendingMessage({ body, realName, failed = false, onRetry }: PendingMessageProps) {
+export function PendingMessage({ body, realName, failed = false, failureReason, onRetry }: PendingMessageProps) {
   return (
     <div className={styles.pendingRow}>
       <div
@@ -66,7 +77,7 @@ export function PendingMessage({ body, realName, failed = false, onRetry }: Pend
           {realName}
           <span className="text-gray-600 font-normal"> (You)</span>
         </div>
-        <PendingBubble body={body} failed={failed} onRetry={onRetry} />
+        <PendingBubble body={body} failed={failed} failureReason={failureReason} onRetry={onRetry} />
       </div>
     </div>
   );
