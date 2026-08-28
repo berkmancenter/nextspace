@@ -299,6 +299,39 @@ describe('RoomPage', () => {
     });
   });
 
+  describe("the poster's name", () => {
+    const accountWith = (conversations: string[]) => ({
+      id: 'user-1',
+      pseudonyms: [
+        { pseudonym: 'Trendy Impala', active: true, isRealName: false, conversations: [] },
+        { pseudonym: 'Chelsea Johnson', active: false, isRealName: true, conversations },
+      ],
+    });
+
+    it('uses the real name registered for this room rather than the active pseudonym', async () => {
+      mockRetrieveData.mockImplementation((url: string) =>
+        Promise.resolve(url.startsWith('users/user/') ? accountWith(['test-room-id']) : []),
+      );
+
+      render(<RoomPage authType="guest" />);
+
+      await waitFor(() =>
+        expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-real-name', 'Chelsea Johnson'),
+      );
+    });
+
+    it('keeps the session pseudonym when the account has no real name for this room', async () => {
+      mockRetrieveData.mockImplementation((url: string) =>
+        Promise.resolve(url.startsWith('users/user/') ? accountWith(['some-other-room']) : []),
+      );
+
+      render(<RoomPage authType="guest" />);
+
+      await waitFor(() => expect(screen.getByTestId('group-chat-panel')).toBeInTheDocument());
+      expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-real-name', 'Priya Raghunathan');
+    });
+  });
+
   describe('when the server refuses a message', () => {
     beforeEach(() => {
       mockSendData.mockResolvedValue({ error: 'rejected' });

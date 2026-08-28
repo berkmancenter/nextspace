@@ -5,10 +5,10 @@ import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from 'next/font/google';
 import { Box, CircularProgress, Drawer, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import MenuIcon from '@mui/icons-material/Menu';
-import { Api, SendData, emitWithTokenRefresh } from '../../utils';
+import { Api, RetrieveData, SendData, emitWithTokenRefresh } from '../../utils';
 import { CheckAuthHeader } from '../../utils/Helpers';
 import { GIVE_FEEDBACK_URL } from '../../components/Header';
-import { AuthType, PendingRoomMessage, PseudonymousMessage } from '../../types.internal';
+import { AuthType, PendingRoomMessage, PseudonymousMessage, UserPseudonym } from '../../types.internal';
 import { useConversationMessages, useRoomSetup, useSessionJoin, useTabNavigation } from '../../hooks';
 import { CommunityNavigationBar, CommunityNavTab } from '../../components/room/CommunityNavigationBar';
 import { CommunityGroupChatPanel } from '../../components/room/CommunityGroupChatPanel';
@@ -51,7 +51,38 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
 
   const { loaded, notFound, generalError, setGeneralError, roomName, botName, agentId } = useRoomSetup({ router });
 
-  const { socket, pseudonym: realName, userId, isConnected, lastReconnectTime } = useSessionJoin(true);
+  const { socket, pseudonym: sessionPseudonym, userId, isConnected, lastReconnectTime } = useSessionJoin(true);
+
+  const [registeredName, setRegisteredName] = useState<string | null>(null);
+
+  // The session carries the account's active pseudonym, but a room posts under the
+  // real-name entry registered for that room, which is what the server stamps on the
+  // message (llm_engine resolveMessageName). Reading it here keeps the composer and
+  // the member's own messages agreeing with what everyone else sees.
+  useEffect(() => {
+    if (!conversationId || !userId || !Api.get().GetTokens()) return undefined;
+    let cancelled = false;
+
+    (async () => {
+      // The account's own record, not the pseudonyms endpoint: that one needs admin
+      // rights, which a room member never has.
+      const account = await RetrieveData(`users/user/${userId}`, Api.get().getAccessToken());
+      if (cancelled) return;
+      if (!account || account.error) {
+        console.warn('Could not read this account, so the room falls back to the session pseudonym:', account?.status);
+        return;
+      }
+      const pseudonyms: UserPseudonym[] = account.pseudonyms ?? [];
+      const registered = pseudonyms.find((p) => p.isRealName && p.conversations?.includes(conversationId));
+      if (registered) setRegisteredName(registered.pseudonym);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId, userId]);
+
+  const realName = registeredName ?? sessionPseudonym;
 
   const { activeTab, activeTabRef, unseenAssistantCount, setUnseenAssistantCount, handleTabChange } = useTabNavigation({
     router,

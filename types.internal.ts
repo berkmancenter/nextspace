@@ -216,6 +216,20 @@ export interface MemberIntroContent {
 }
 
 /**
+ * One entry from GET /v1/users/pseudonyms. A community room stamps messages with the
+ * entry registered for that room rather than the account's active pseudonym, so both
+ * flavors come back here and the caller picks.
+ * @property {boolean} [isRealName] - True on the real-name entry created at registration.
+ * @property {string[]} [conversations] - Conversation ids this entry is scoped to.
+ */
+export interface UserPseudonym {
+  pseudonym: string;
+  active?: boolean;
+  isRealName?: boolean;
+  conversations?: string[];
+}
+
+/**
  * A message a room member has sent that the server has not accepted yet, either
  * because the socket is down or because its POST is still in flight. The room
  * queues these and delivers them when the connection returns, so `id` is a
