@@ -265,6 +265,44 @@ describe('CommunityGroupChatPanel', () => {
     expect(screen.queryByText('Waiting to send')).not.toBeInTheDocument();
   });
 
+  describe('day dividers', () => {
+    const onDay = (id: string, iso: string) => ({
+      id,
+      pseudonym: 'Priya Raghunathan',
+      body: { text: id },
+      createdAt: iso,
+    });
+
+    it('heads each day of the feed with its date', () => {
+      render(
+        <CommunityGroupChatPanel
+          {...baseProps}
+          messages={[onDay('a', '2026-08-13T09:00:00.000Z'), onDay('b', '2026-08-14T09:00:00.000Z')] as any}
+        />,
+      );
+
+      expect(screen.getByText('Thursday, 13 August')).toBeInTheDocument();
+      expect(screen.getByText('Friday, 14 August')).toBeInTheDocument();
+    });
+
+    it('heads a day once however many messages it holds', () => {
+      render(
+        <CommunityGroupChatPanel
+          {...baseProps}
+          messages={
+            [
+              onDay('a', '2026-08-13T09:00:00.000Z'),
+              onDay('b', '2026-08-13T11:30:00.000Z'),
+              onDay('c', '2026-08-13T18:45:00.000Z'),
+            ] as any
+          }
+        />,
+      );
+
+      expect(screen.getAllByText('Thursday, 13 August')).toHaveLength(1);
+    });
+  });
+
   describe('the jump-to-latest pill', () => {
     const message = (id: string) => ({
       id,

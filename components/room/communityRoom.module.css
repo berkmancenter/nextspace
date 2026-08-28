@@ -1,6 +1,6 @@
 /*
  * Solar Signal (light) / Night Archive (dark) design tokens for the community
- * room. Scoped under .root so nothing here reaches the rest of the app —
+ * room. Scoped under .root so nothing here reaches the rest of the app:
  * globals.css's shared @theme block is untouched. The design treats dark mode
  * as a single toggle over the whole palette with no dedicated in-app control,
  * so [data-theme='dark'] is supported for a future explicit toggle, but today
@@ -124,7 +124,7 @@
 
 /* Threading UI (ThreadedMessage/ThreadPanel) is reused unmodified per its own
    accessibility behavior, but its static Tailwind gray-400/gray-600 text
-   doesn't adapt to Night Archive — gray-600 in particular fails contrast on
+   doesn't adapt to Night Archive, and gray-600 in particular fails contrast on
    a dark canvas. Re-tint just those text colors within the room, without
    touching the shared component. */
 .root[data-theme='dark'] :global(.text-gray-400) {
@@ -500,6 +500,24 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
+}
+
+.dayDivider {
+  position: sticky;
+  top: 2px;
+  z-index: 2;
+  align-self: center;
+  padding: 4px 12px;
+  border: 1px solid var(--room-nav-border);
+  border-radius: 999px;
+  background: var(--room-chrome-bg);
+  font-family: var(--room-font-mono), monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  color: var(--room-text-muted);
 }
 
 .jumpPillDot {

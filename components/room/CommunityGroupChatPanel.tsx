@@ -67,6 +67,18 @@ const highlightMentions = (text: string, mentionNames: string[]): React.ReactNod
  * treatment (an "AI Bot" pill, no reply feedback row) than the shared
  * panel hardcodes.
  */
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+/** "Thursday, 13 August". Assembled from parts because en-GB omits the comma. */
+function dayLabel(iso: string): string {
+  const date = new Date(iso);
+  const weekday = date.toLocaleDateString('en-GB', { weekday: 'long' });
+  const dayAndMonth = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+  return `${weekday}, ${dayAndMonth}`;
+}
+
 export function CommunityGroupChatPanel({
   messages,
   realName,
@@ -172,6 +184,7 @@ export function CommunityGroupChatPanel({
         <PendingBubble
           body={parseMessageBody(message.body).text}
           failed={message.pending === 'failed'}
+          failureReason={pendingMessages.find((m) => m.id === message.id)?.failureReason}
           onRetry={onRetryPendingMessage && (() => onRetryPendingMessage(message.id as string))}
         />
       );
@@ -273,17 +286,28 @@ export function CommunityGroupChatPanel({
             ) : (
               <div className="flex flex-col items-start gap-4 pb-2" aria-live="polite">
                 {parentMessages.map((message, i) => {
+                  const key = message.id || `msg-${i}`;
+                  const previousStamp = i > 0 ? parentMessages[i - 1].createdAt : undefined;
+                  const startsNewDay =
+                    !!message.createdAt &&
+                    (!previousStamp || !isSameDay(new Date(previousStamp), new Date(message.createdAt)));
+                  const dayDivider = startsNewDay ? (
+                    <div className={styles.dayDivider}>{dayLabel(message.createdAt!)}</div>
+                  ) : null;
+
                   const parsedBody = parseMessageBody(message.body);
                   if (parsedBody.type === 'memberIntro' && parsedBody.content) {
                     const intro = parsedBody.content as MemberIntroContent;
                     return (
-                      <MemberIntroCard
-                        key={message.id || `msg-${i}`}
-                        name={intro.name}
-                        role={intro.role}
-                        joinedLabel={intro.joinedLabel}
-                        bio={intro.bio}
-                      />
+                      <React.Fragment key={key}>
+                        {dayDivider}
+                        <MemberIntroCard
+                          name={intro.name}
+                          role={intro.role}
+                          joinedLabel={intro.joinedLabel}
+                          bio={intro.bio}
+                        />
+                      </React.Fragment>
                     );
                   }
 
@@ -296,20 +320,22 @@ export function CommunityGroupChatPanel({
                   })();
 
                   return (
-                    <ThreadedMessage
-                      key={message.id || `msg-${i}`}
-                      message={message}
-                      replies={threadMap.get(message.id!) || []}
-                      pseudonym={realName}
-                      onOpenThread={setSelectedThreadId}
-                      onMarkAsRead={handleMarkAsRead}
-                      botName={botName}
-                      renderAvatar={renderAvatar}
-                      renderMessageContent={renderMessageContent}
-                      showTimestamp={showTimestamp}
-                      isThreadOpen={selectedThreadId === message.id}
-                      hasUnreadReplies={message.id ? messagesWithUnreadReplies.has(message.id) : false}
-                    />
+                    <React.Fragment key={key}>
+                      {dayDivider}
+                      <ThreadedMessage
+                        message={message}
+                        replies={threadMap.get(message.id!) || []}
+                        pseudonym={realName}
+                        onOpenThread={setSelectedThreadId}
+                        onMarkAsRead={handleMarkAsRead}
+                        botName={botName}
+                        renderAvatar={renderAvatar}
+                        renderMessageContent={renderMessageContent}
+                        showTimestamp={showTimestamp}
+                        isThreadOpen={selectedThreadId === message.id}
+                        hasUnreadReplies={message.id ? messagesWithUnreadReplies.has(message.id) : false}
+                      />
+                    </React.Fragment>
                   );
                 })}
 
@@ -319,6 +345,7 @@ export function CommunityGroupChatPanel({
                     body={pending.body}
                     realName={realName}
                     failed={pending.failed}
+                    failureReason={pending.failureReason}
                     onRetry={onRetryPendingMessage && (() => onRetryPendingMessage(pending.id))}
                   />
                 ))}
