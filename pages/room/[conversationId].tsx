@@ -271,6 +271,12 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     return true;
   };
 
+  // Clearing the failed flag puts the message back in front of the delivery
+  // effect, which is what actually sends it again.
+  const retryQueuedMessage = useCallback((id: string) => {
+    setQueuedMessages((prev) => prev.map((m) => (m.id === id ? { ...m, failed: false } : m)));
+  }, []);
+
   const queuedChatMessages = useMemo(() => queuedMessages.filter((m) => m.tab === 'chat'), [queuedMessages]);
   const queuedAssistantMessages = useMemo(() => queuedMessages.filter((m) => m.tab === 'assistant'), [queuedMessages]);
 
@@ -370,6 +376,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
             realName={realName || ''}
             botName={botName}
             pendingMessages={queuedAssistantMessages}
+            onRetryPendingMessage={retryQueuedMessage}
             offline={isOffline}
             waitingForResponse={waitingForAssistantResponse}
             onSendMessage={(message) => sendMessage('assistant', message)}
@@ -381,6 +388,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
             botName={botName}
             mentionTargets={mentionTargets}
             pendingMessages={queuedChatMessages}
+            onRetryPendingMessage={retryQueuedMessage}
             offline={isOffline}
             waitingForResponse={waitingForChatResponse}
             messagesWithUnreadReplies={messagesWithUnreadReplies}

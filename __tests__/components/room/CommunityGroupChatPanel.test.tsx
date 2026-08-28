@@ -264,6 +264,35 @@ describe('CommunityGroupChatPanel', () => {
     expect(screen.queryByText('Waiting to send')).not.toBeInTheDocument();
   });
 
+  it('offers a retry on a refused message', async () => {
+    const user = userEvent.setup();
+    const onRetryPendingMessage = jest.fn();
+
+    render(
+      <CommunityGroupChatPanel
+        {...baseProps}
+        pendingMessages={[{ id: 'queued-0', body: 'foo', tab: 'chat', failed: true }]}
+        onRetryPendingMessage={onRetryPendingMessage}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Try sending again' }));
+
+    expect(onRetryPendingMessage).toHaveBeenCalledWith('queued-0');
+  });
+
+  it('offers no retry on a message that is still waiting', () => {
+    render(
+      <CommunityGroupChatPanel
+        {...baseProps}
+        pendingMessages={[{ id: 'queued-0', body: 'foo', tab: 'chat' }]}
+        onRetryPendingMessage={jest.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Try sending again' })).not.toBeInTheDocument();
+  });
+
   it('shows a held first message instead of the empty-state hero', () => {
     render(
       <CommunityGroupChatPanel

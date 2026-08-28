@@ -17,6 +17,7 @@ interface CommunityAssistantPanelProps {
   botName: string;
   /** Messages typed here that the server has not accepted yet. */
   pendingMessages?: PendingRoomMessage[];
+  onRetryPendingMessage?: (id: string) => void;
   /** True while the socket is down, which greys out the composer shortcuts. */
   offline?: boolean;
   waitingForResponse?: boolean;
@@ -42,6 +43,7 @@ export function CommunityAssistantPanel({
   realName,
   botName,
   pendingMessages = [],
+  onRetryPendingMessage,
   offline = false,
   waitingForResponse = false,
   onSendMessage,
@@ -187,7 +189,13 @@ export function CommunityAssistantPanel({
             })}
 
             {pendingMessages.map((pending) => (
-              <PendingMessage key={pending.id} body={pending.body} realName={realName} failed={pending.failed} />
+              <PendingMessage
+                key={pending.id}
+                body={pending.body}
+                realName={realName}
+                failed={pending.failed}
+                onRetry={onRetryPendingMessage && (() => onRetryPendingMessage(pending.id))}
+              />
             ))}
 
             {waitingForResponse && (

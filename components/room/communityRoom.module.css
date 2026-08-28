@@ -678,6 +678,25 @@
   color: var(--room-error);
 }
 
+.pendingRetry {
+  min-height: 44px;
+  padding: 0 4px;
+  font-family: inherit;
+  font-weight: inherit;
+  font-size: inherit;
+  color: var(--room-error);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.pendingRetry:focus-visible {
+  outline: 2px solid #4845d2;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 .headerActions {
   flex: none;
   display: flex;

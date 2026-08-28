@@ -23,6 +23,7 @@ interface CommunityGroupChatPanelProps {
   mentionTargets: string[];
   /** Messages typed here that the server has not accepted yet. */
   pendingMessages?: PendingRoomMessage[];
+  onRetryPendingMessage?: (id: string) => void;
   /** True while the socket is down, which greys out the composer shortcuts. */
   offline?: boolean;
   waitingForResponse?: boolean;
@@ -73,6 +74,7 @@ export function CommunityGroupChatPanel({
   memberCount,
   mentionTargets,
   pendingMessages = [],
+  onRetryPendingMessage,
   offline = false,
   waitingForResponse = false,
   messagesWithUnreadReplies = new Set(),
@@ -152,7 +154,13 @@ export function CommunityGroupChatPanel({
 
   const renderMessageContent = (message: PseudonymousMessage) => {
     if (message.pending)
-      return <PendingBubble body={parseMessageBody(message.body).text} failed={message.pending === 'failed'} />;
+      return (
+        <PendingBubble
+          body={parseMessageBody(message.body).text}
+          failed={message.pending === 'failed'}
+          onRetry={onRetryPendingMessage && (() => onRetryPendingMessage(message.id as string))}
+        />
+      );
 
     const isAssistant = message.fromAgent;
     const parsed = parseMessageBody(message.body);
@@ -292,7 +300,13 @@ export function CommunityGroupChatPanel({
                 })}
 
                 {pendingParents.map((pending) => (
-                  <PendingMessage key={pending.id} body={pending.body} realName={realName} failed={pending.failed} />
+                  <PendingMessage
+                    key={pending.id}
+                    body={pending.body}
+                    realName={realName}
+                    failed={pending.failed}
+                    onRetry={onRetryPendingMessage && (() => onRetryPendingMessage(pending.id))}
+                  />
                 ))}
 
                 {waitingForResponse && !waitingForThreadedReply && parentMessages.length > 0 && (

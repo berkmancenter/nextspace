@@ -55,7 +55,7 @@ jest.mock('../../utils', () => ({
 }));
 
 jest.mock('../../components/room/CommunityGroupChatPanel', () => ({
-  CommunityGroupChatPanel: ({ messages, realName, onSendMessage, pendingMessages = [] }: any) => (
+  CommunityGroupChatPanel: ({ messages, realName, onSendMessage, onRetryPendingMessage, pendingMessages = [] }: any) => (
     <div
       data-testid="group-chat-panel"
       data-real-name={realName}
@@ -69,6 +69,9 @@ jest.mock('../../components/room/CommunityGroupChatPanel', () => ({
         <div key={m.id}>{typeof m.body === 'string' ? m.body : m.body?.text}</div>
       ))}
       <button onClick={() => onSendMessage('hello room')}>Send group message</button>
+      <button onClick={() => onRetryPendingMessage?.(pendingMessages.find((m: any) => m.failed)?.id)}>
+        Retry group message
+      </button>
     </div>
   ),
 }));
@@ -311,6 +314,22 @@ describe('RoomPage', () => {
         expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-pending-failed', 'hello room'),
       );
       expect(screen.queryByText('Message could not be sent.')).not.toBeInTheDocument();
+    });
+
+    it('sends a refused message again when the member retries it', async () => {
+      const user = userEvent.setup();
+      render(<RoomPage authType="guest" />);
+
+      await user.click(screen.getByText('Send group message'));
+      await waitFor(() =>
+        expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-pending-failed', 'hello room'),
+      );
+
+      mockSendData.mockResolvedValue({ id: 'sent-message-1' });
+      await user.click(screen.getByText('Retry group message'));
+
+      await waitFor(() => expect(mockSendData).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-pending', ''));
     });
 
     it('does not keep retrying a message the server already refused', async () => {
