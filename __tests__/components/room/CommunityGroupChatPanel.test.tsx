@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import { CommunityGroupChatPanel } from '../../../components/room/CommunityGroupChatPanel';
+import { useAutoScroll } from '../../../hooks/useAutoScroll';
 
 jest.mock('../../../hooks/useAutoScroll', () => ({
   useAutoScroll: jest.fn().mockReturnValue({
@@ -262,6 +263,67 @@ describe('CommunityGroupChatPanel', () => {
 
     expect(screen.getByText('Message could not be sent.')).toBeInTheDocument();
     expect(screen.queryByText('Waiting to send')).not.toBeInTheDocument();
+  });
+
+  describe('the jump-to-latest pill', () => {
+    const message = (id: string) => ({
+      id,
+      pseudonym: 'Priya Raghunathan',
+      body: { text: id },
+      createdAt: '2026-08-26T00:00:00.000Z',
+    });
+
+    const scrollAway = () =>
+      (useAutoScroll as jest.Mock).mockReturnValue({
+        messagesContainerRef: { current: null },
+        messagesEndRef: { current: null },
+        scrollToBottom: jest.fn(),
+        isAtBottom: false,
+      });
+
+    const returnToBottom = () =>
+      (useAutoScroll as jest.Mock).mockReturnValue({
+        messagesContainerRef: { current: null },
+        messagesEndRef: { current: null },
+        scrollToBottom: jest.fn(),
+        isAtBottom: true,
+      });
+
+    afterEach(returnToBottom);
+
+    it('marks the pill once a message arrives while the member is scrolled away', () => {
+      scrollAway();
+      const { rerender } = render(<CommunityGroupChatPanel {...baseProps} messages={[message('a') as any]} />);
+
+      expect(screen.getByRole('button', { name: 'Jump to latest messages' })).toBeInTheDocument();
+
+      rerender(<CommunityGroupChatPanel {...baseProps} messages={[message('a'), message('b')] as any} />);
+
+      expect(screen.getByRole('button', { name: 'Jump to latest messages, new messages below' })).toBeInTheDocument();
+    });
+
+    it('never counts the new messages', () => {
+      scrollAway();
+      const { rerender } = render(<CommunityGroupChatPanel {...baseProps} messages={[message('a') as any]} />);
+      rerender(<CommunityGroupChatPanel {...baseProps} messages={[message('a'), message('b'), message('c')] as any} />);
+
+      expect(screen.queryByText(/\d+ new messages/)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /new messages below/ })).toHaveTextContent('Jump to latest');
+    });
+
+    it('drops the mark once the member has been back at the latest message', () => {
+      scrollAway();
+      const { rerender } = render(<CommunityGroupChatPanel {...baseProps} messages={[message('a') as any]} />);
+      rerender(<CommunityGroupChatPanel {...baseProps} messages={[message('a'), message('b')] as any} />);
+
+      returnToBottom();
+      rerender(<CommunityGroupChatPanel {...baseProps} messages={[message('a'), message('b')] as any} />);
+      expect(screen.queryByRole('button', { name: /Jump to latest/ })).not.toBeInTheDocument();
+
+      scrollAway();
+      rerender(<CommunityGroupChatPanel {...baseProps} messages={[message('a'), message('b')] as any} />);
+      expect(screen.getByRole('button', { name: 'Jump to latest messages' })).toBeInTheDocument();
+    });
   });
 
   it('offers a retry on a refused message', async () => {

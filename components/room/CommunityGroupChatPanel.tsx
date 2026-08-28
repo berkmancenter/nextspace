@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ThreadedMessage } from '../ThreadedMessage';
@@ -114,6 +114,20 @@ export function CommunityGroupChatPanel({
 
   const { messagesEndRef, messagesContainerRef, isAtBottom, scrollToBottom } = useAutoScroll(messages);
   const messageInputRef = useRef<HTMLDivElement>(null);
+
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+  const seenMessageCount = useRef(messages.length);
+
+  // The pill says only that something arrived while the member was reading
+  // further up, so the count is kept here and never shown.
+  useEffect(() => {
+    if (isAtBottom) {
+      seenMessageCount.current = messages.length;
+      setHasNewMessages(false);
+      return;
+    }
+    if (messages.length > seenMessageCount.current) setHasNewMessages(true);
+  }, [messages.length, isAtBottom]);
 
   const handleScrollToBottom = () => {
     scrollToBottom();
@@ -324,11 +338,10 @@ export function CommunityGroupChatPanel({
               type="button"
               onClick={handleScrollToBottom}
               className={styles.jumpPill}
-              aria-label={
-                messages.length > parentMessages.length ? `${messages.length} new messages` : 'Jump to latest messages'
-              }
+              aria-label={hasNewMessages ? 'Jump to latest messages, new messages below' : 'Jump to latest messages'}
             >
               Jump to latest
+              {hasNewMessages && <span aria-hidden="true" className={styles.jumpPillDot} />}
             </button>
           )}
         </div>
