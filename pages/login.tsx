@@ -117,9 +117,12 @@ export default function LoginPage() {
       setFormSuccess(true);
 
       // Send the user back to wherever they were headed (e.g. a link from an
-      // email), falling back to the events page for a plain login.
+      // email). Failing that, an admin starts on the events page and everyone
+      // else starts in the lounge. An account with no role is not an admin, so
+      // it lands in the lounge too.
       const redirectTo = searchParams.get('redirectTo');
-      router.push(isSafeRedirect(redirectTo) ? redirectTo : '/admin/events');
+      const home = response.user?.role === 'admin' ? '/admin/events' : '/lounge';
+      router.push(isSafeRedirect(redirectTo) ? redirectTo : home);
     } catch (error: any) {
       console.error('Login failed:', error);
       setFormError('An unexpected error occurred. Please try again later.');
