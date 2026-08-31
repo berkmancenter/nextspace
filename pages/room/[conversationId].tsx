@@ -15,6 +15,7 @@ import { CommunityGroupChatPanel } from '../../components/room/CommunityGroupCha
 import { CommunityAssistantPanel } from '../../components/room/CommunityAssistantPanel';
 import { BotIcon } from '../../components/BotIcon';
 import { getRoomInitials } from '../../utils/roomAvatarUtils';
+import { markRoomRead } from '../../utils/roomReadState';
 import styles from '../../components/room/communityRoom.module.css';
 
 const displayFont = Space_Grotesk({ subsets: ['latin'], weight: ['600', '700'] });
@@ -143,6 +144,16 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     assistantIntroRef,
     conversationId,
   });
+
+  // The lounge has no server-side read state to read, so being in the room is what
+  // marks it read: it records the newest message this device has now displayed.
+  useEffect(() => {
+    if (!conversationId || !chatMessages.length) return;
+    const newest = chatMessages.reduce((latest, message) =>
+      new Date(message.createdAt ?? 0) > new Date(latest.createdAt ?? 0) ? message : latest,
+    );
+    if (newest.createdAt) markRoomRead(conversationId, newest.createdAt);
+  }, [chatMessages, conversationId]);
 
   const mentionTargets = useMemo(
     () => Array.from(new Set(chatMessages.map((m) => m.pseudonym).filter((p): p is string => !!p && p !== realName))),
@@ -375,7 +386,13 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
         </div>
         <div className={styles.headerActions}>
           {realName && (
-            <button type="button" aria-label={`Your account, ${realName}`} className={styles.accountButton}>
+            <button
+              type="button"
+              aria-label={`Your account, ${realName}`}
+              aria-expanded={menuOpen}
+              className={styles.accountButton}
+              onClick={() => setMenuOpen(true)}
+            >
               <span aria-hidden="true" className={styles.accountAvatar}>
                 {getRoomInitials(realName)}
               </span>
@@ -403,6 +420,9 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
           <button type="button" aria-label="Close menu" className={styles.menuClose} onClick={() => setMenuOpen(false)}>
             <CloseIcon />
           </button>
+          <Link href="/lounge" className={styles.menuItem}>
+            Return to the lounge
+          </Link>
           <Link href={GIVE_FEEDBACK_URL} target="_blank" rel="noopener noreferrer" className={styles.menuItem}>
             Give Feedback
           </Link>

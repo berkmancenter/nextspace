@@ -303,6 +303,24 @@ describe('RoomPage', () => {
       expect(screen.getByRole('link', { name: 'Give Feedback' })).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: 'Log Out' })).not.toBeInTheDocument();
     });
+
+    it('opens from the account control too', async () => {
+      const user = userEvent.setup();
+      render(<RoomPage authType="user" />);
+
+      await user.click(screen.getByRole('button', { name: 'Your account, Priya Raghunathan' }));
+
+      expect(screen.getByRole('dialog', { name: 'Room menu' })).toBeInTheDocument();
+    });
+
+    it('offers a way back to the lounge', async () => {
+      const user = userEvent.setup();
+      render(<RoomPage authType="user" />);
+
+      await user.click(screen.getByRole('button', { name: 'Menu' }));
+
+      expect(screen.getByRole('link', { name: 'Return to the lounge' })).toHaveAttribute('href', '/lounge');
+    });
   });
 
   describe('when the session has no token', () => {
