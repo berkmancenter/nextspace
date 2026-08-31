@@ -336,7 +336,7 @@ describe('generateEventUrls (via createConversationFromData)', () => {
       channels: [{ name: 'chat', passcode: 'chat-pass' }],
     };
     const result = await createConversationFromData(data as any);
-    expect(result.eventUrls.participant).toEqual([{ label: 'Berkie', url: 'https://example.com/room/conv-123' }]);
+    expect(result.eventUrls.participant).toEqual([{ label: 'Community Room', url: 'https://example.com/room/conv-123' }]);
   });
 });
 
