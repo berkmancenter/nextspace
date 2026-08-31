@@ -97,11 +97,19 @@ describe('Lounge page', () => {
       expect(mockRouter.push).toHaveBeenCalledWith('/room/room-1');
     });
 
-    it('invites the member to join one when they have no rooms', async () => {
+    it('says so when the member has no rooms', async () => {
       mockUseLoungeRooms.mockReturnValue({ rooms: [], loaded: true, error: null });
       render(<LoungePage />);
 
-      expect(await screen.findByText(/You are not in any rooms yet/)).toBeInTheDocument();
+      expect(await screen.findByText('You are not in any rooms yet.')).toBeInTheDocument();
+    });
+
+    it('offers no way to browse or join a room, since rooms arrive by invitation', async () => {
+      render(<LoungePage />);
+
+      await screen.findByRole('button', { name: /BKC Community Room/ });
+      expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /invite code/ })).not.toBeInTheDocument();
     });
 
     it('shows a message when the rooms could not be loaded', async () => {
@@ -112,30 +120,12 @@ describe('Lounge page', () => {
     });
   });
 
-  describe('search', () => {
-    it('narrows the list to rooms matching what was typed', async () => {
-      render(<LoungePage />);
-
-      await userEvent.type(await screen.findByRole('searchbox', { name: /Search your rooms/ }), 'reading');
-
-      expect(screen.getByRole('button', { name: /Digital Rights Reading Group/ })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /BKC Community Room/ })).not.toBeInTheDocument();
-    });
-
-    it('says so when nothing matches', async () => {
-      render(<LoungePage />);
-
-      await userEvent.type(await screen.findByRole('searchbox', { name: /Search your rooms/ }), 'zzzz');
-
-      expect(screen.getByText(/No rooms match/)).toBeInTheDocument();
-    });
-  });
-
   describe('the header', () => {
-    it('titles the screen', async () => {
+    it('names the space, with the screen named below it', async () => {
       render(<LoungePage />);
 
-      expect(await screen.findByRole('heading', { name: 'Your rooms' })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: 'BKC Community Rooms' })).toBeInTheDocument();
+      expect(screen.getByText('Your rooms')).toBeInTheDocument();
     });
 
     it("shows the member's own initials", async () => {
@@ -150,15 +140,6 @@ describe('Lounge page', () => {
       render(<LoungePage />);
 
       expect(await screen.findByRole('button', { name: 'Your account, Trendy Impala' })).toBeInTheDocument();
-    });
-  });
-
-  describe('joining a room', () => {
-    it('offers an invite code as the only way in', async () => {
-      render(<LoungePage />);
-
-      const join = await screen.findByRole('link', { name: /Join a room with an invite code/ });
-      expect(join).toHaveAttribute('href', '/join');
     });
   });
 
@@ -180,7 +161,7 @@ describe('Lounge page', () => {
   it('has no accessibility violations', async () => {
     const { container } = render(<LoungePage />);
 
-    await screen.findByRole('heading', { name: 'Your rooms' });
+    await screen.findByRole('heading', { name: 'BKC Community Rooms' });
     await waitFor(async () => {
       expect(await axe(container)).toHaveNoViolations();
     });

@@ -793,47 +793,16 @@
   color: #4845d2;
 }
 
-.loungeTitle {
-  font-size: 15px;
-  letter-spacing: 0.05em;
+/* Lines the screen name up under the title rather than under the mark beside it: the
+   mark is 18px wide and the title group sets a 9px gap. */
+.loungeSubtitle {
+  padding-left: 27px;
 }
 
 .loungeBody {
   flex: 1;
   overflow-y: auto;
   padding: 12px 14px 20px;
-}
-
-.loungeSearch {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 44px;
-  padding: 0 12px;
-  margin-bottom: 12px;
-  border: 1px solid var(--room-nav-border);
-  border-radius: 10px;
-  background: var(--room-nav-bg);
-}
-
-.loungeSearch:focus-within {
-  border-color: var(--room-composer-border-focus);
-}
-
-.loungeSearchInput {
-  flex: 1;
-  min-width: 0;
-  background: none;
-  border: 0;
-  outline: none;
-  font-family: var(--room-font-body), sans-serif;
-  font-size: 14px;
-  line-height: 1.4;
-  color: var(--room-text-primary);
-}
-
-.loungeSearchInput::placeholder {
-  color: var(--room-text-muted);
 }
 
 .loungeList {
@@ -935,25 +904,4 @@
   font-size: 13px;
   line-height: 1.5;
   color: var(--room-text-muted);
-}
-
-.loungeJoin {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  margin-top: 12px;
-  padding: 10px 12px;
-  border: 1px dashed var(--room-nav-border);
-  border-radius: 14px;
-  font-family: var(--room-font-body), sans-serif;
-  font-size: 13px;
-  color: var(--room-text-muted);
-  text-decoration: none;
-}
-
-.loungeJoin:focus-visible {
-  outline: 2px solid var(--room-composer-border-focus);
-  outline-offset: 2px;
 }
