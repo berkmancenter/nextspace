@@ -121,7 +121,7 @@ describe('CommunityGroupChatPanel', () => {
 
   it('falls back to a countless empty-state line when the member count is unknown', () => {
     render(<CommunityGroupChatPanel {...baseProps} memberCount={undefined} />);
-    expect(screen.getByText("Nothing has been said yet — you're first.")).toBeInTheDocument();
+    expect(screen.getByText("Nothing has been said yet. You're first.")).toBeInTheDocument();
     expect(screen.queryByText(/members have been invited/)).not.toBeInTheDocument();
   });
 

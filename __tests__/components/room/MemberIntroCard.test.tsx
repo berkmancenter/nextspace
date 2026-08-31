@@ -35,7 +35,7 @@ describe('MemberIntroCard', () => {
   it('states the provenance and one-time-post rule', () => {
     render(<MemberIntroCard {...baseProps} />);
     expect(
-      screen.getByText("From the bio Lucía wrote when they joined. Posted once — Berkie won't mention it again."),
+      screen.getByText("From the bio Lucía wrote when they joined. Posted once. Berkie won't mention it again."),
     ).toBeInTheDocument();
   });
 

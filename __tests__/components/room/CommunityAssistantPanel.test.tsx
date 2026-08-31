@@ -65,7 +65,7 @@ describe('CommunityAssistantPanel', () => {
     render(<CommunityAssistantPanel {...baseProps} />);
     expect(
       screen.getByText(
-        "I can be wrong, and I can't see anything outside this room — no email, no publications, no other Nextspace events.",
+        "I can be wrong, and I can't see anything outside this room: no email, no publications, no other Nextspace events.",
       ),
     ).toBeInTheDocument();
   });

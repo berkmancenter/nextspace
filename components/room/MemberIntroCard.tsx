@@ -47,7 +47,7 @@ export function MemberIntroCard({ name, role, joinedLabel, bio }: MemberIntroCar
         </div>
         <p className={styles.introCardBio}>{bio}</p>
         <p className={styles.introCardProvenance}>
-          {`From the bio ${firstName} wrote when they joined. Posted once — Berkie won't mention it again.`}
+          {`From the bio ${firstName} wrote when they joined. Posted once. Berkie won't mention it again.`}
         </p>
       </div>
     </div>

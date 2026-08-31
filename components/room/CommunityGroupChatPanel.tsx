@@ -273,8 +273,8 @@ export function CommunityGroupChatPanel({
                   style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 13, color: 'var(--room-text-muted)' }}
                 >
                   {memberCount != null
-                    ? `${memberCount} members have been invited. Nothing has been said yet — you're first.`
-                    : "Nothing has been said yet — you're first."}
+                    ? `${memberCount} members have been invited. Nothing has been said yet. You're first.`
+                    : "Nothing has been said yet. You're first."}
                 </p>
                 <p
                   style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 13, color: 'var(--room-text-muted)' }}

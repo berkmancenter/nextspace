@@ -159,7 +159,7 @@ export function CommunityAssistantPanel({
             </div>
             <p style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 12, color: 'var(--room-text-muted)' }}>
               {
-                "I can be wrong, and I can't see anything outside this room — no email, no publications, no other Nextspace events."
+                "I can be wrong, and I can't see anything outside this room: no email, no publications, no other Nextspace events."
               }
             </p>
           </div>
