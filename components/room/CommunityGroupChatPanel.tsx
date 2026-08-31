@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ThreadedMessage } from '../ThreadedMessage';
+import { ThreadedMessage, isReadersMessage } from '../ThreadedMessage';
 import { ThreadPanel } from '../ThreadPanel';
 import { BotIcon } from '../BotIcon';
 import { CommunityMessageInput } from './CommunityMessageInput';
@@ -16,9 +16,9 @@ import styles from './communityRoom.module.css';
 interface CommunityGroupChatPanelProps {
   messages: PseudonymousMessage[];
   realName: string;
+  /** The reader's account id, which decides whose messages are theirs. */
+  currentUserId?: string | null;
   botName: string;
-  /** Count of invited room members, shown in the empty-state hero when known. */
-  memberCount?: number;
   /** Member real names, offered as @ mention targets in the composer. */
   mentionTargets: string[];
   /** Messages typed here that the server has not accepted yet. */
@@ -82,8 +82,8 @@ function dayLabel(iso: string): string {
 export function CommunityGroupChatPanel({
   messages,
   realName,
+  currentUserId,
   botName,
-  memberCount,
   mentionTargets,
   pendingMessages = [],
   onRetryPendingMessage,
@@ -151,7 +151,7 @@ export function CommunityGroupChatPanel({
   const waitingForThreadedReply = waitingForResponse && lastMessage?.parentMessage;
 
   const renderAvatar = (message: PseudonymousMessage) => {
-    const isCurrentUser = message.pseudonym === realName;
+    const isCurrentUser = isReadersMessage(message, realName, currentUserId);
     const isAssistant = message.fromAgent;
 
     if (isAssistant) {
@@ -212,7 +212,7 @@ export function CommunityGroupChatPanel({
       );
     }
 
-    const isCurrentUser = message.pseudonym === realName;
+    const isCurrentUser = isReadersMessage(message, realName, currentUserId);
     return (
       <div style={{ width: '85%' }}>
         <div
@@ -272,9 +272,7 @@ export function CommunityGroupChatPanel({
                 <p
                   style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 13, color: 'var(--room-text-muted)' }}
                 >
-                  {memberCount != null
-                    ? `${memberCount} members have been invited. Nothing has been said yet. You're first.`
-                    : "Nothing has been said yet. You're first."}
+                  {"Nothing has been said yet. You're first."}
                 </p>
                 <p
                   style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 13, color: 'var(--room-text-muted)' }}
@@ -326,6 +324,7 @@ export function CommunityGroupChatPanel({
                         message={message}
                         replies={threadMap.get(message.id!) || []}
                         pseudonym={realName}
+                        currentUserId={currentUserId}
                         onOpenThread={setSelectedThreadId}
                         onMarkAsRead={handleMarkAsRead}
                         botName={botName}
@@ -392,6 +391,7 @@ export function CommunityGroupChatPanel({
             parentMessage={selectedThread}
             replies={selectedThreadReplies}
             pseudonym={realName}
+            currentUserId={currentUserId}
             onClose={() => setSelectedThreadId(null)}
             onSendReply={handleSendReply}
             renderAvatar={renderAvatar}

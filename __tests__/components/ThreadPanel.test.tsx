@@ -648,4 +648,40 @@ describe('ThreadPanel Component', () => {
       expect(bouncingIcon).toBeInTheDocument();
     });
   });
+  describe('identifying the reader by account id', () => {
+    it("treats the parent message as the reader's when they own it", () => {
+      const mine = { ...mockParentMessage, owner: 'my-account-id', pseudonym: 'A Name I No Longer Use' };
+      render(<ThreadPanel {...defaultProps} parentMessage={mine} replies={[]} currentUserId="my-account-id" />);
+      expect(screen.getAllByText('(You)')).toHaveLength(1);
+    });
+
+    it("treats a namesake's reply as somebody else's", () => {
+      const namesake = { ...mockReplies[0], pseudonym: 'User1', owner: 'another-account-id' };
+      render(
+        <ThreadPanel
+          {...defaultProps}
+          parentMessage={{ ...mockParentMessage, pseudonym: 'Nobody' }}
+          replies={[namesake]}
+          currentUserId="my-account-id"
+        />,
+      );
+      expect(screen.queryByText('(You)')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('identifying the reader when no account id is given', () => {
+    it('matches the parent message on pseudonym even when it carries an owner id', () => {
+      const ownedByAnother = { ...mockParentMessage, owner: 'someone-else-id' };
+      render(<ThreadPanel {...defaultProps} parentMessage={ownedByAnother} replies={[]} />);
+      expect(screen.getAllByText('(You)')).toHaveLength(1);
+    });
+
+    it('ignores a matching owner id on a reply when the pseudonym differs', () => {
+      const reply = { ...mockReplies[0], pseudonym: 'OtherUser', owner: 'my-account-id' };
+      render(
+        <ThreadPanel {...defaultProps} parentMessage={{ ...mockParentMessage, pseudonym: 'Nobody' }} replies={[reply]} />,
+      );
+      expect(screen.queryByText('(You)')).not.toBeInTheDocument();
+    });
+  });
 });

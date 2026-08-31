@@ -38,7 +38,6 @@ describe('CommunityGroupChatPanel', () => {
     messages: [],
     realName: 'Priya Raghunathan',
     botName: 'Berkie',
-    memberCount: 204,
     mentionTargets: [],
     onSendMessage: mockOnSendMessage,
   };
@@ -50,7 +49,6 @@ describe('CommunityGroupChatPanel', () => {
   it('shows the empty-state hero when there are no messages yet', () => {
     render(<CommunityGroupChatPanel {...baseProps} />);
     expect(screen.getByText('A permanent room for the Berkman Klein community.')).toBeInTheDocument();
-    expect(screen.getByText(/204 members have been invited/)).toBeInTheDocument();
     expect(screen.getByText(/Berkie is here too/)).toBeInTheDocument();
   });
 
@@ -119,10 +117,9 @@ describe('CommunityGroupChatPanel', () => {
     expect(screen.getByText('just a normal message')).toBeInTheDocument();
   });
 
-  it('falls back to a countless empty-state line when the member count is unknown', () => {
-    render(<CommunityGroupChatPanel {...baseProps} memberCount={undefined} />);
+  it('invites the first message when the room is empty', () => {
+    render(<CommunityGroupChatPanel {...baseProps} />);
     expect(screen.getByText("Nothing has been said yet. You're first.")).toBeInTheDocument();
-    expect(screen.queryByText(/members have been invited/)).not.toBeInTheDocument();
   });
 
   it('tells the composer the room is empty so it can adjust its placeholder', () => {
@@ -457,5 +454,43 @@ describe('CommunityGroupChatPanel', () => {
     ];
     const { container } = render(<CommunityGroupChatPanel {...baseProps} messages={messages} />);
     expect(await axe(container)).toHaveNoViolations();
+  });
+  describe("telling the reader's own messages apart", () => {
+    const namesake = {
+      id: 'namesake-1',
+      body: { text: 'Posted by a different account under the same name' },
+      pseudonym: 'Priya Raghunathan',
+      owner: 'another-account-id',
+      fromAgent: false,
+      visible: true,
+      createdAt: new Date('2026-08-13T10:00:00Z').toISOString(),
+    };
+
+    it("does not dress a namesake's message as the reader's own", () => {
+      render(
+        <CommunityGroupChatPanel
+          {...baseProps}
+          realName="Priya Raghunathan"
+          currentUserId="my-account-id"
+          messages={[namesake as any]}
+        />,
+      );
+
+      expect(screen.queryByText('(You)')).not.toBeInTheDocument();
+    });
+
+    it('recognises a message the reader owns', () => {
+      const mine = { ...namesake, id: 'mine-1', owner: 'my-account-id' };
+      render(
+        <CommunityGroupChatPanel
+          {...baseProps}
+          realName="Priya Raghunathan"
+          currentUserId="my-account-id"
+          messages={[mine as any]}
+        />,
+      );
+
+      expect(screen.getByText('(You)')).toBeInTheDocument();
+    });
   });
 });

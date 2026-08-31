@@ -301,10 +301,15 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
 
     deliveringRef.current = true;
     (async () => {
-      for (const queued of queuedMessages) {
-        if (!queued.failed) await deliverMessage(queued);
+      try {
+        for (const queued of queuedMessages) {
+          if (!queued.failed) await deliverMessage(queued);
+        }
+      } finally {
+        // Without the finally, anything thrown here leaves the guard latched and
+        // every later send queues forever with nothing to say why.
+        deliveringRef.current = false;
       }
-      deliveringRef.current = false;
     })();
   }, [isOffline, queuedMessages, deliverMessage]);
 
@@ -448,6 +453,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
           <CommunityGroupChatPanel
             messages={chatMessages}
             realName={realName || ''}
+            currentUserId={userId}
             botName={botName}
             mentionTargets={mentionTargets}
             pendingMessages={queuedChatMessages}

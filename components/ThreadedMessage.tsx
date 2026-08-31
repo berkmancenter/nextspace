@@ -5,10 +5,31 @@ import { PseudonymousMessage, FeedbackConfig } from '../types.internal';
 import { normalizeAssistantPseudonym } from '../utils/Helpers';
 import { MessageFeedback } from './MessageFeedback';
 
+/**
+ * Decides whether a message belongs to the reader. Account ids are used when the caller
+ * knows its own and the message carries an owner, because a display name is not unique
+ * across a conversation's history and a room's real names can repeat a pseudonym.
+ * Everything else, including a placeholder still being sent, falls back to the name.
+ * @param message The message being rendered.
+ * @param pseudonym The reader's display name.
+ * @param currentUserId The reader's account id, when the caller knows it.
+ * @returns True when the reader wrote this message.
+ */
+export const isReadersMessage = (
+  message: Pick<PseudonymousMessage, 'owner' | 'pseudonym'>,
+  pseudonym: string | null,
+  currentUserId?: string | null,
+): boolean => {
+  if (currentUserId && message.owner) return message.owner === currentUserId;
+  return message.pseudonym === pseudonym;
+};
+
 interface ThreadedMessageProps {
   message: PseudonymousMessage;
   replies: PseudonymousMessage[];
   pseudonym: string | null;
+  /** The reader's account id. Given, it decides ownership in place of the display name. */
+  currentUserId?: string | null;
   onOpenThread?: (messageId: string) => void;
   onMarkAsRead?: (messageId: string) => void;
   botName: string;
@@ -24,6 +45,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
   message,
   replies,
   pseudonym,
+  currentUserId,
   onOpenThread,
   onMarkAsRead,
   botName,
@@ -43,7 +65,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
   const hasBeenScrolledOutRef = useRef<boolean>(false);
   const isCurrentlyVisibleRef = useRef<boolean>(false);
 
-  const isCurrentUser = message.pseudonym === pseudonym;
+  const isCurrentUser = isReadersMessage(message, pseudonym, currentUserId);
   const isAssistant = message.fromAgent;
   const displayName = normalizeAssistantPseudonym(message, botName);
   const replyCount = replies.length || message.replyCount || 0;
@@ -242,7 +264,9 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                   {/* Name */}
                   <div className="text-sm font-bold mb-1 text-left">
                     {normalizeAssistantPseudonym(replies[0], botName)}
-                    {replies[0].pseudonym === pseudonym && <span className="text-gray-600 font-normal"> (You)</span>}
+                    {isReadersMessage(replies[0], pseudonym, currentUserId) && (
+                      <span className="text-gray-600 font-normal"> (You)</span>
+                    )}
                   </div>
 
                   {/* Message bubble */}
