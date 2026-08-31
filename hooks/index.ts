@@ -12,3 +12,5 @@ export { useTabNavigation } from './useTabNavigation';
 export type { UseTabNavigationParams, UseTabNavigationReturn } from './useTabNavigation';
 export { useRoomSetup } from './useRoomSetup';
 export type { UseRoomSetupParams, UseRoomSetupReturn } from './useRoomSetup';
+export { useLoungeRooms } from './useLoungeRooms';
+export type { UseLoungeRoomsReturn } from './useLoungeRooms';

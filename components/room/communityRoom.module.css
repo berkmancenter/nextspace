@@ -197,6 +197,7 @@
   border-top: 3px solid transparent;
   margin-top: -1px;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .navButtonActive {
@@ -790,4 +791,169 @@
 
 .menuItem:hover {
   color: #4845d2;
+}
+
+.loungeTitle {
+  font-size: 15px;
+  letter-spacing: 0.05em;
+}
+
+.loungeBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px 20px;
+}
+
+.loungeSearch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--room-nav-border);
+  border-radius: 10px;
+  background: var(--room-nav-bg);
+}
+
+.loungeSearch:focus-within {
+  border-color: var(--room-composer-border-focus);
+}
+
+.loungeSearchInput {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: 0;
+  outline: none;
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--room-text-primary);
+}
+
+.loungeSearchInput::placeholder {
+  color: var(--room-text-muted);
+}
+
+.loungeList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loungeRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 68px;
+  padding: 10px 12px;
+  border: 1px solid var(--room-chrome-border);
+  border-radius: 14px;
+  background: var(--room-chrome-bg);
+  text-align: left;
+  cursor: pointer;
+}
+
+.loungeRow:focus-visible {
+  outline: 2px solid var(--room-composer-border-focus);
+  outline-offset: 2px;
+}
+
+.loungeRowAvatar {
+  width: 44px;
+  height: 44px;
+  font-size: 14px;
+  background: var(--room-other-avatar-bg);
+  color: var(--room-other-avatar-text);
+}
+
+.loungeRowText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.loungeRowTopLine {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.loungeRowName {
+  font-family: var(--room-font-display), sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--room-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loungeRowStamp {
+  flex: none;
+  font-family: var(--room-font-mono), monospace;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--room-text-muted);
+}
+
+.loungeRowPreview {
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--room-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Holds the dot's width whether or not it is drawn, so every name and preview in
+   the list starts and ends on the same vertical line. */
+.loungeUnreadSlot {
+  flex: none;
+  width: 9px;
+  display: flex;
+  justify-content: center;
+}
+
+.loungeUnreadDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--room-you-bg);
+}
+
+.loungeNotice {
+  margin: 16px 4px;
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--room-text-muted);
+}
+
+.loungeJoin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed var(--room-nav-border);
+  border-radius: 14px;
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 13px;
+  color: var(--room-text-muted);
+  text-decoration: none;
+}
+
+.loungeJoin:focus-visible {
+  outline: 2px solid var(--room-composer-border-focus);
+  outline-offset: 2px;
 }

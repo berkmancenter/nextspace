@@ -249,3 +249,18 @@ export interface PendingRoomMessage {
   /** Why the server refused it, in words a member can act on. */
   failureReason?: string;
 }
+
+/**
+ * One row in the lounge: a community room the member belongs to, with just enough
+ * of its latest activity to render a preview.
+ * @property {string} preview - "Sender: message text", empty for a room with no messages.
+ * @property {string | null} lastMessageAt - ISO timestamp of the newest message, null if there is none.
+ * @property {boolean} hasUnread - Whether messages arrived since this device last opened the room.
+ */
+export interface LoungeRoom {
+  id: string;
+  name: string;
+  preview: string;
+  lastMessageAt: string | null;
+  hasUnread: boolean;
+}
