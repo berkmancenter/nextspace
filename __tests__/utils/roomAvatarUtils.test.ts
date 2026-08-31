@@ -1,4 +1,4 @@
-import { getRoomInitials } from '../../utils/roomAvatarUtils';
+import { getRoomInitials, getRoomNameInitials } from '../../utils/roomAvatarUtils';
 
 describe('getRoomInitials', () => {
   it('returns the first letter of the first and last word for a two-word name', () => {
@@ -31,5 +31,31 @@ describe('getRoomInitials', () => {
 
   it('returns an empty string for an empty name', () => {
     expect(getRoomInitials('')).toBe('');
+  });
+});
+
+describe('getRoomNameInitials', () => {
+  it('takes the first letter of each of the first two words', () => {
+    expect(getRoomNameInitials('Digital Rights Reading Group')).toBe('DR');
+  });
+
+  it('takes the first two letters when the first word is an acronym', () => {
+    expect(getRoomNameInitials('BKC Community Room')).toBe('BK');
+  });
+
+  it('treats a trailing acronym as an ordinary word', () => {
+    expect(getRoomNameInitials('Algorithmic Accountability WG')).toBe('AA');
+  });
+
+  it('handles a single-word name by taking its first two letters', () => {
+    expect(getRoomNameInitials('Commons')).toBe('CO');
+  });
+
+  it('collapses extra whitespace between words', () => {
+    expect(getRoomNameInitials('  Platform   Governance  Cohort ')).toBe('PG');
+  });
+
+  it('returns an empty string for an empty name', () => {
+    expect(getRoomNameInitials('')).toBe('');
   });
 });
