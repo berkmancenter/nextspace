@@ -253,6 +253,33 @@ describe('RoomPage', () => {
     expect(mockRetrieveData.mock.calls.length).toBe(callsAfterSettling);
   });
 
+  describe('sending while another message is in flight', () => {
+    it('delivers the second message too', async () => {
+      const user = userEvent.setup();
+      let releaseFirstSend: (value: unknown) => void = () => {};
+      mockSendData
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              releaseFirstSend = resolve;
+            }),
+        )
+        .mockResolvedValue({ id: 'sent-message-2' });
+
+      render(<RoomPage authType="user" />);
+
+      await user.click(screen.getByRole('button', { name: 'Send group message' }));
+      await waitFor(() => expect(mockSendData).toHaveBeenCalledTimes(1));
+
+      await user.click(screen.getByRole('button', { name: 'Send group message' }));
+      await act(async () => {
+        releaseFirstSend({ id: 'sent-message-1' });
+      });
+
+      await waitFor(() => expect(mockSendData).toHaveBeenCalledTimes(2));
+    });
+  });
+
   describe('the app menu', () => {
     it('sits to the right of the account control', () => {
       render(<RoomPage authType="user" />);
