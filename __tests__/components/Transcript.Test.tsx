@@ -1214,6 +1214,24 @@ describe('Transcript', () => {
         });
       });
 
+      /* A generated passcode only ever uses characters that are safe in a query string, but a
+         channel created with a custom passcode can carry ones that are not. */
+      it('encodes a moderator passcode that contains query string characters', async () => {
+        const user = setupUser();
+        (SendData as jest.Mock).mockResolvedValue({ success: true });
+
+        render(<Transcript {...moderatorProps} moderatorPasscode="a&b c" />);
+        await confirmControl(user, 'Pause recording', 'Yes, Pause');
+
+        await waitFor(() => {
+          expect(SendData).toHaveBeenCalledWith(
+            `transcript/${baseProps.conversationId}/pause?channel=moderator,a%26b%20c`,
+            {},
+            'token',
+          );
+        });
+      });
+
       it('explains that a moderator link is required when a control is refused', async () => {
         const user = setupUser();
         // SendData reports non-400 failures as bare HTTP status text.

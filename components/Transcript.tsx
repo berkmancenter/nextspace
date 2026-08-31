@@ -185,7 +185,8 @@ export function Transcript(props: TranscriptProps) {
    * passcode rides in every participant's link and grants nothing here. Empty when the page
    * has no moderator passcode, so a page without one sends a bare request.
    */
-  const controlQuery = (): string => (props.moderatorPasscode ? `?channel=moderator,${props.moderatorPasscode}` : '');
+  const controlQuery = (): string =>
+    props.moderatorPasscode ? `?channel=moderator,${encodeURIComponent(props.moderatorPasscode)}` : '';
 
   /*
    * Turns a refused control into something a moderator can act on. A 403 means the moderator
