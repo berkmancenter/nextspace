@@ -22,11 +22,11 @@ export const Layout = ({ children, authType = 'guest' }: Readonly<{ children: Re
   const router = useRouter();
   const currentUrl = router.isReady ? router.asPath : '';
 
-  // The community room draws its own header and fills the viewport, so the app's
-  // header and footer would frame a second header and push the room into a scroll.
-  // Its asPath carries a room id rather than the literal "conversationId", so the
-  // check below can't see it.
-  const isRoomRoute = router.pathname.startsWith('/room');
+  // The community room and the lounge draw their own header and fill the viewport, so
+  // the app's header and footer would frame a second header and push them into a
+  // scroll. A room's asPath carries a room id rather than the literal
+  // "conversationId", so the check below can't see it.
+  const isRoomRoute = router.pathname.startsWith('/room') || router.pathname.startsWith('/lounge');
 
   // Pages where footer should be hidden (full-screen chat interfaces)
   const hideFooter = isRoomRoute || currentUrl.includes('conversationId');

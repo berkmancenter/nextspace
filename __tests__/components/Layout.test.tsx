@@ -44,4 +44,18 @@ describe('Layout', () => {
     expect(screen.queryByTestId('app-footer')).not.toBeInTheDocument();
     expect(screen.getByText('room body')).toBeInTheDocument();
   });
+
+  it('leaves the lounge to draw its own chrome', () => {
+    mockUseRouter.mockReturnValue({ pathname: '/lounge', asPath: '/lounge', isReady: true });
+
+    render(
+      <Layout>
+        <p>lounge body</p>
+      </Layout>,
+    );
+
+    expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('app-footer')).not.toBeInTheDocument();
+    expect(screen.getByText('lounge body')).toBeInTheDocument();
+  });
 });
