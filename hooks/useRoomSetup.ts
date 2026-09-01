@@ -14,6 +14,7 @@ export interface UseRoomSetupReturn {
   setGeneralError: React.Dispatch<React.SetStateAction<string | null>>;
   roomName: string;
   botName: string;
+  communityName: string | null;
   agentId: string | null;
   conversationFeatures: { name: string; enabled?: boolean }[];
 }
@@ -30,6 +31,7 @@ export function useRoomSetup({ router }: UseRoomSetupParams): UseRoomSetupReturn
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [roomName, setRoomName] = useState('');
   const [botName, setBotName] = useState('Berkie');
+  const [communityName, setCommunityName] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [conversationFeatures, setConversationFeatures] = useState<{ name: string; enabled?: boolean }[]>([]);
 
@@ -62,6 +64,8 @@ export function useRoomSetup({ router }: UseRoomSetupParams): UseRoomSetupReturn
         setConversationFeatures(conversation.features ?? []);
         if (conversation.name) setRoomName(conversation.name);
         setBotName(resolveConversationBotName(conversation, config.conversationBotName));
+        const props = conversation.properties as any;
+        setCommunityName(typeof props?.communityName === 'string' ? props.communityName : null);
 
         const firstAgent = conversation.agents[0];
         if (firstAgent) setAgentId(firstAgent.id!);
@@ -82,6 +86,7 @@ export function useRoomSetup({ router }: UseRoomSetupParams): UseRoomSetupReturn
     setGeneralError,
     roomName,
     botName,
+    communityName,
     agentId,
     conversationFeatures,
   };

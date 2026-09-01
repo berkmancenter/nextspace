@@ -101,6 +101,7 @@ function setDefaultMocks() {
     setGeneralError: jest.fn(),
     roomName: 'BKC Community Room',
     botName: 'Berkie',
+    communityName: null,
     agentId: 'agent-1',
     conversationFeatures: [],
   });
@@ -133,6 +134,7 @@ describe('RoomPage', () => {
       setGeneralError: jest.fn(),
       roomName: '',
       botName: 'Berkie',
+      communityName: null,
       agentId: null,
       conversationFeatures: [],
     });
@@ -148,6 +150,7 @@ describe('RoomPage', () => {
       setGeneralError: jest.fn(),
       roomName: '',
       botName: 'Berkie',
+      communityName: null,
       agentId: null,
       conversationFeatures: [],
     });

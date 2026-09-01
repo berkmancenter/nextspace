@@ -68,7 +68,7 @@ export default function LoungePage() {
             <span aria-hidden="true" className={styles.headerIcon}>
               <RoomMarkIcon />
             </span>
-            <h1 className={styles.headerTitle}>BKC Community Rooms</h1>
+            <h1 className={styles.headerTitle}>Community Rooms</h1>
           </div>
           <div className={`${styles.headerSubtitle} ${styles.loungeSubtitle}`}>Your rooms</div>
         </div>

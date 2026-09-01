@@ -48,7 +48,7 @@ describe('CommunityGroupChatPanel', () => {
 
   it('shows the empty-state hero when there are no messages yet', () => {
     render(<CommunityGroupChatPanel {...baseProps} />);
-    expect(screen.getByText('A permanent room for the Berkman Klein community.')).toBeInTheDocument();
+    expect(screen.getByText('A permanent room for your community.')).toBeInTheDocument();
     expect(screen.getByText(/Berkie is here too/)).toBeInTheDocument();
   });
 
@@ -145,7 +145,7 @@ describe('CommunityGroupChatPanel', () => {
       },
     ];
     render(<CommunityGroupChatPanel {...baseProps} messages={messages} />);
-    expect(screen.queryByText('A permanent room for the Berkman Klein community.')).not.toBeInTheDocument();
+    expect(screen.queryByText('A permanent room for your community.')).not.toBeInTheDocument();
     expect(screen.getByTestId('community-message-input')).toHaveAttribute('data-empty-room', 'false');
   });
 
@@ -398,7 +398,7 @@ describe('CommunityGroupChatPanel', () => {
       />,
     );
 
-    expect(screen.queryByText('A permanent room for the Berkman Klein community.')).not.toBeInTheDocument();
+    expect(screen.queryByText('A permanent room for your community.')).not.toBeInTheDocument();
     expect(screen.getByText('First thing said here.')).toBeInTheDocument();
   });
 

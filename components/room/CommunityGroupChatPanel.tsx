@@ -19,6 +19,7 @@ interface CommunityGroupChatPanelProps {
   /** The reader's account id, which decides whose messages are theirs. */
   currentUserId?: string | null;
   botName: string;
+  communityName?: string | null;
   /** Member real names, offered as @ mention targets in the composer. */
   mentionTargets: string[];
   /** Messages typed here that the server has not accepted yet. */
@@ -63,7 +64,7 @@ const highlightMentions = (text: string, mentionNames: string[]): React.ReactNod
 
 /**
  * The room's group chat feed. Forked from GroupChatPanel because Solar
- * Signal needs a different empty state, avatar palette, and Berkie bubble
+ * Signal needs a different empty state, avatar palette, and bot bubble
  * treatment (an "AI Bot" pill, no reply feedback row) than the shared
  * panel hardcodes.
  */
@@ -84,6 +85,7 @@ export function CommunityGroupChatPanel({
   realName,
   currentUserId,
   botName,
+  communityName,
   mentionTargets,
   pendingMessages = [],
   onRetryPendingMessage,
@@ -261,7 +263,7 @@ export function CommunityGroupChatPanel({
                     color: 'var(--room-text-primary)',
                   }}
                 >
-                  A permanent room for the Berkman Klein community.
+                  A permanent room for {communityName ? `the ${communityName}` : 'your'} community.
                 </h2>
                 <p style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 15, color: 'var(--room-text-body)' }}>
                   {

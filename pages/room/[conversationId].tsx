@@ -49,7 +49,9 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   const router = useRouter();
   const conversationId = router.query.conversationId as string | undefined;
 
-  const { loaded, notFound, generalError, setGeneralError, roomName, botName, agentId } = useRoomSetup({ router });
+  const { loaded, notFound, generalError, setGeneralError, roomName, botName, communityName, agentId } = useRoomSetup({
+    router,
+  });
 
   const { socket, pseudonym: sessionPseudonym, userId, isConnected, lastReconnectTime } = useSessionJoin(true);
 
@@ -368,7 +370,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
             <span aria-hidden="true" className={styles.headerIcon}>
               {activeTab === 'assistant' ? <BotIcon size={18} color="var(--room-berkie-accent)" /> : <RoomMarkIcon />}
             </span>
-            <h1 className={styles.headerTitle}>{activeTab === 'assistant' ? botName : roomName || 'BKC Community Room'}</h1>
+            <h1 className={styles.headerTitle}>{activeTab === 'assistant' ? botName : roomName || 'Community Room'}</h1>
             {activeTab === 'assistant' && <span className={styles.badge}>PRIVATE</span>}
           </div>
           {activeTab === 'assistant' && <div className={styles.headerSubtitle}>Private to you</div>}
@@ -452,6 +454,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
             realName={realName || ''}
             currentUserId={userId}
             botName={botName}
+            communityName={communityName}
             mentionTargets={mentionTargets}
             pendingMessages={queuedChatMessages}
             onRetryPendingMessage={retryQueuedMessage}

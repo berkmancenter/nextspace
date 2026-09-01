@@ -124,7 +124,7 @@ describe('Lounge page', () => {
     it('names the space, with the screen named below it', async () => {
       render(<LoungePage />);
 
-      expect(await screen.findByRole('heading', { name: 'BKC Community Rooms' })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: 'Community Rooms' })).toBeInTheDocument();
       expect(screen.getByText('Your rooms')).toBeInTheDocument();
     });
 
@@ -161,7 +161,7 @@ describe('Lounge page', () => {
   it('has no accessibility violations', async () => {
     const { container } = render(<LoungePage />);
 
-    await screen.findByRole('heading', { name: 'BKC Community Rooms' });
+    await screen.findByRole('heading', { name: 'Community Rooms' });
     await waitFor(async () => {
       expect(await axe(container)).toHaveNoViolations();
     });
