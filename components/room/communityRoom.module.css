@@ -1,0 +1,907 @@
+/*
+ * Solar Signal (light) / Night Archive (dark) design tokens for the community
+ * room. Scoped under .root so nothing here reaches the rest of the app:
+ * globals.css's shared @theme block is untouched. The design treats dark mode
+ * as a single toggle over the whole palette with no dedicated in-app control,
+ * so [data-theme='dark'] is supported for a future explicit toggle, but today
+ * the room follows the system's prefers-color-scheme only.
+ */
+
+.root {
+  --room-canvas: #f6f5f1;
+  --room-chrome-bg: #ffffff;
+  --room-chrome-border: rgba(17, 22, 28, 0.12);
+  --room-text-primary: #12161c;
+  --room-text-muted: #5e6874;
+  --room-text-body: #2a3039;
+
+  --room-you-bg: #4845d2;
+  --room-you-text: #fff3ee;
+  --room-you-bubble-bg: rgba(72, 69, 210, 0.08);
+  --room-you-bubble-border: rgba(72, 69, 210, 0.32);
+
+  --room-other-avatar-bg: #e3e0d8;
+  --room-other-avatar-text: #3f4650;
+  --room-other-bubble-bg: #ffffff;
+  --room-other-bubble-border: rgba(17, 22, 28, 0.12);
+
+  --room-bot-accent: #0f7d6b;
+  --room-bot-avatar-bg: #ddf3ee;
+  --room-bot-bubble-bg: rgba(15, 125, 107, 0.06);
+  --room-bot-bubble-border: rgba(15, 125, 107, 0.26);
+  --room-bot-pill-bg: #efede7;
+  --room-bot-pill-border: #dedbd3;
+
+  --room-nav-bg: #efede7;
+  --room-nav-border: #dedbd3;
+  --room-nav-active-bg: #ffffff;
+
+  --room-composer-bg: #f6f5f1;
+  --room-composer-border: #dedbd3;
+  --room-composer-border-focus: #4845d2;
+
+  --room-badge-border: rgba(17, 22, 28, 0.16);
+  --room-live-border: rgba(15, 125, 107, 0.34);
+  --room-pending-border: #87909c;
+  --room-pending-text: #5e6874;
+  --room-error: #b3261e;
+
+  background: var(--room-canvas);
+  color: var(--room-text-primary);
+}
+
+@media (prefers-color-scheme: dark) {
+  .root:not([data-theme='light']) {
+    --room-canvas: #111214;
+    --room-chrome-bg: #17181b;
+    --room-chrome-border: rgba(255, 255, 255, 0.12);
+    --room-text-primary: #f2f0e9;
+    --room-text-muted: #96aec6;
+    --room-text-body: #f2f0e9;
+
+    --room-you-text: #f2f0e9;
+
+    --room-other-avatar-bg: #1f2530;
+    --room-other-avatar-text: #e7e9ec;
+    --room-other-bubble-bg: #17181b;
+    --room-other-bubble-border: rgba(255, 255, 255, 0.12);
+
+    --room-bot-accent: #96aec6;
+    --room-bot-avatar-bg: rgba(150, 174, 198, 0.14);
+    --room-bot-pill-bg: #17181b;
+    --room-bot-pill-border: rgba(255, 255, 255, 0.13);
+
+    --room-nav-bg: #17181b;
+    --room-nav-border: rgba(255, 255, 255, 0.12);
+    --room-nav-active-bg: rgba(255, 255, 255, 0.07);
+
+    --room-composer-bg: #111214;
+    --room-composer-border: rgba(255, 255, 255, 0.13);
+    --room-composer-border-focus: #96aec6;
+
+    --room-badge-border: rgba(255, 255, 255, 0.16);
+
+    --room-pending-border: #b3aea3;
+    --room-pending-text: #b3aea3;
+    --room-error: #ffb4ab;
+  }
+}
+
+.root[data-theme='dark'] {
+  --room-canvas: #111214;
+  --room-chrome-bg: #17181b;
+  --room-chrome-border: rgba(255, 255, 255, 0.12);
+  --room-text-primary: #f2f0e9;
+  --room-text-muted: #96aec6;
+  --room-text-body: #f2f0e9;
+
+  --room-you-text: #f2f0e9;
+
+  --room-other-avatar-bg: #1f2530;
+  --room-other-avatar-text: #e7e9ec;
+  --room-other-bubble-bg: #17181b;
+  --room-other-bubble-border: rgba(255, 255, 255, 0.12);
+
+  --room-bot-accent: #96aec6;
+  --room-bot-avatar-bg: rgba(150, 174, 198, 0.14);
+  --room-bot-pill-bg: #17181b;
+  --room-bot-pill-border: rgba(255, 255, 255, 0.13);
+
+  --room-nav-bg: #17181b;
+  --room-nav-border: rgba(255, 255, 255, 0.12);
+  --room-nav-active-bg: rgba(255, 255, 255, 0.07);
+
+  --room-composer-bg: #111214;
+  --room-composer-border: rgba(255, 255, 255, 0.13);
+  --room-composer-border-focus: #96aec6;
+
+  --room-badge-border: rgba(255, 255, 255, 0.16);
+
+  --room-pending-border: #b3aea3;
+  --room-pending-text: #b3aea3;
+  --room-error: #ffb4ab;
+}
+
+/* Threading UI (ThreadedMessage/ThreadPanel) is reused unmodified per its own
+   accessibility behavior, but its static Tailwind gray-400/gray-600 text
+   doesn't adapt to Night Archive, and gray-600 in particular fails contrast on
+   a dark canvas. Re-tint just those text colors within the room, without
+   touching the shared component. */
+.root[data-theme='dark'] :global(.text-gray-400) {
+  color: #96aec6 !important;
+}
+.root[data-theme='dark'] :global(.text-gray-600) {
+  color: #c9c5bb !important;
+}
+@media (prefers-color-scheme: dark) {
+  .root:not([data-theme='light']) :global(.text-gray-400) {
+    color: #96aec6 !important;
+  }
+  .root:not([data-theme='light']) :global(.text-gray-600) {
+    color: #c9c5bb !important;
+  }
+}
+
+/* ThreadedMessage and ThreadPanel print the sender name in Tailwind's bold
+   text-sm, which is the app's Inter at 14px. The room's design sets it in Space
+   Grotesk at 13px, and re-typing it here leaves those shared files untouched. */
+.root :global(.text-sm.font-bold) {
+  font-family: var(--room-font-display), sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--room-text-primary);
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: 999px;
+  font-family: var(--room-font-mono), monospace;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.badge {
+  flex: none;
+  font-family: var(--room-font-mono), monospace;
+  font-weight: 500;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  border: 1px solid var(--room-badge-border);
+  border-radius: 2px;
+  padding: 3px 5px;
+  text-transform: uppercase;
+}
+
+.nav {
+  flex: none;
+  display: flex;
+  height: 60px;
+  background: var(--room-nav-bg);
+  border-top: 1px solid var(--room-nav-border);
+}
+
+.navButton {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: transparent;
+  border: 0;
+  border-top: 3px solid transparent;
+  margin-top: -1px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.navButtonActive {
+  background: var(--room-nav-active-bg);
+}
+
+.navButtonUnread {
+  border-top-color: var(--room-you-bg);
+}
+
+.navIconWithDot {
+  position: relative;
+  display: flex;
+}
+
+.unreadDot {
+  position: absolute;
+  top: -1px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--room-you-bg);
+}
+
+.navLabelIdle,
+.navLabelActive {
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.navLabelIdle {
+  font-family: var(--room-font-body), sans-serif;
+  font-weight: 400;
+  color: var(--room-text-muted);
+}
+
+.navLabelActive {
+  font-family: var(--room-font-mono), monospace;
+  font-weight: 600;
+  color: var(--room-text-primary);
+}
+
+@media (min-width: 1024px) {
+  .navButton {
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .navLabelIdle,
+  .navLabelActive {
+    font-size: 11px;
+  }
+}
+
+.composerWrap {
+  flex: none;
+  background: var(--room-chrome-bg);
+  border-top: 1px solid var(--room-nav-border);
+  padding: 8px 8px 6px;
+}
+
+/* Column, so the button row spans the full width below the text. As a row the
+   textarea's flex:1 pushed @ and Ask [botName] into the right edge beside Send. */
+.composerBox {
+  display: flex;
+  flex-direction: column;
+  background: var(--room-composer-bg);
+  border: 1px solid var(--room-composer-border);
+  border-radius: 8px;
+}
+
+.composerBox:focus-within {
+  border-color: var(--room-composer-border-focus);
+}
+
+.composerTextarea {
+  width: 100%;
+  min-height: 24px;
+  max-height: 120px;
+  resize: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--room-text-body);
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+  padding: 10px 12px 2px;
+}
+
+.composerTextarea::placeholder {
+  color: var(--room-text-muted);
+}
+
+/* space-between is what keeps @ and Ask [botName] on the left edge with send pinned
+   right; without it the three controls bunch together. */
+.composerButtonRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 2px;
+}
+
+.composerButtonGroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* The buttons stay 44px for the WCAG 2.5.5 tap target while their visible
+   circles are 32px, so the artwork matches the design without shrinking the
+   target. */
+.mentionButton,
+.sendButton {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  background: none !important;
+  border-radius: 999px;
+}
+
+.mentionButtonInner {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--room-bot-pill-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--room-font-mono), monospace;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--room-text-muted);
+}
+
+.askBotButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: 44px;
+  padding: 0 12px 0 8px;
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  color: var(--room-bot-accent);
+}
+
+.askBotLabel {
+  font-family: var(--room-font-mono), monospace;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.sendButtonInner {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--room-you-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Matches the send button's idle dimming, so a paused shortcut reads the same
+   way as an inactive send. aria-disabled rather than disabled keeps them
+   focusable, so a keyboard user still finds them and the strip explains why. */
+.shortcutIdle {
+  opacity: 0.5;
+}
+
+/* Dims the whole circle, not just the arrow inside it. Dimming only the arrow
+   leaves a full-strength button carrying a 2.9:1 glyph, which reads as active
+   and fails WCAG 1.4.11; fading the circle keeps the control legible as the
+   inactive state its aria-disabled already reports. */
+.sendButtonIdle {
+  opacity: 0.5;
+}
+
+.disclosure {
+  margin: 7px 4px 0;
+  color: var(--room-text-muted);
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.introCardWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.introCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.introCardLabel {
+  font-family: var(--room-font-mono), monospace;
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--room-bot-accent);
+  white-space: nowrap;
+}
+
+.introCardRule {
+  flex: 1;
+  height: 1px;
+  background: var(--room-chrome-border);
+}
+
+.agentBadge {
+  display: inline-block;
+  flex: none;
+  font-family: var(--room-font-mono), monospace;
+  font-weight: 600;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--room-bot-accent);
+  background: var(--room-bot-pill-bg);
+  border: 1px solid var(--room-bot-pill-border);
+  border-radius: 999px;
+  padding: 3px 6px;
+}
+
+/* Teal outline rather than the neutral chrome border, so the card reads as
+   the bot's, matching the border on its message bubbles. */
+.introCardBody {
+  background: var(--room-chrome-bg);
+  border: 1px solid var(--room-bot-bubble-border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.introCardTopRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.introCardName {
+  font-family: var(--room-font-display), sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--room-text-primary);
+}
+
+.introCardRole {
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 12px;
+  color: var(--room-text-muted);
+}
+
+.introCardBio {
+  margin: 11px 0 0;
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--room-text-body);
+}
+
+.introCardProvenance {
+  margin: 10px 0 0;
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--room-text-muted);
+}
+
+.jumpPill {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--room-chrome-bg);
+  color: var(--room-text-primary);
+  border: 1px solid var(--room-chrome-border);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(17, 22, 28, 0.15);
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dayDivider {
+  position: sticky;
+  top: 2px;
+  z-index: 2;
+  align-self: center;
+  padding: 4px 12px;
+  border: 1px solid var(--room-nav-border);
+  border-radius: 999px;
+  background: var(--room-chrome-bg);
+  font-family: var(--room-font-mono), monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  color: var(--room-text-muted);
+}
+
+.jumpPillDot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: 7px;
+  border-radius: 999px;
+  background: var(--room-you-bg);
+}
+
+.header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 52px;
+  padding: 0 8px 0 14px;
+  background: var(--room-chrome-bg);
+  border-bottom: 1px solid var(--room-chrome-border);
+  box-shadow: 0 1px 2px rgba(17, 22, 28, 0.07);
+}
+
+.headerLead {
+  min-width: 0;
+}
+
+.headerTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.headerIcon {
+  display: flex;
+  flex: none;
+}
+
+.headerSubtitle {
+  margin-top: 1px;
+  font-family: var(--room-font-body), sans-serif;
+  font-weight: 400;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--room-text-muted);
+}
+
+/* 44px keeps the tap target at the WCAG 2.5.5 enhanced size while the visible
+   circle stays 32px, matching the design. */
+.accountButton {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 0;
+  padding: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.accountAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--room-you-bg);
+  color: var(--room-you-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--room-font-mono), monospace;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.headerTitle {
+  margin: 0;
+  font-family: var(--room-font-display), sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--room-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.errorBanner {
+  flex: none;
+  padding: 8px 14px;
+  background: var(--room-chrome-bg);
+  border-top: 1px solid var(--room-chrome-border);
+  color: var(--room-error);
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 13px;
+}
+
+.reconnectBanner {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  background: var(--room-chrome-bg);
+  border-bottom: 1px solid var(--room-nav-border);
+  font-family: var(--room-font-display), sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--room-bot-accent);
+}
+
+.reconnectDot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--room-bot-accent);
+  animation: roomPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes roomPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reconnectDot {
+    animation: none;
+  }
+}
+
+.pendingRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Dashed border, muted text, and the clock label below carry the undelivered
+   state together, so it never rests on colour alone. */
+.pendingBubble {
+  width: 85%;
+  background: var(--room-chrome-bg);
+  border: 1px dashed var(--room-pending-border);
+  border-radius: 16px;
+  padding: 7px 11px;
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--room-pending-text);
+  text-wrap: pretty;
+}
+
+.pendingStatus {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  font-family: var(--room-font-display), sans-serif;
+  font-weight: 600;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--room-pending-text);
+}
+
+.pendingBubbleFailed {
+  border-color: var(--room-error);
+  color: var(--room-error);
+}
+
+.pendingStatusFailed {
+  color: var(--room-error);
+}
+
+.pendingRetry {
+  min-height: 44px;
+  padding: 0 4px;
+  font-family: inherit;
+  font-weight: inherit;
+  font-size: inherit;
+  color: var(--room-error);
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.pendingRetry:focus-visible {
+  outline: 2px solid #4845d2;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.headerActions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.menuButton {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 0;
+  padding: 0;
+  border-radius: 999px;
+  color: var(--room-you-bg);
+  cursor: pointer;
+}
+
+/* The drawer is portalled outside .root, so the room's tokens and webfonts
+   don't reach it and it keeps the app's own menu styling. */
+.menuPanel {
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 16px 12px;
+}
+
+/* Aligned to the drawer's own edge rather than the room header, since the
+   drawer opens over the page and has no header to line up with. */
+.menuClose {
+  align-self: flex-end;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  background: none;
+  border: 0;
+  padding: 0;
+  border-radius: 999px;
+  color: #4845d2;
+  cursor: pointer;
+}
+
+.menuClose:focus-visible,
+.menuItem:focus-visible {
+  outline: 2px solid #4845d2;
+  outline-offset: 2px;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 16px;
+  color: #12161c;
+}
+
+.menuItem:hover {
+  color: #4845d2;
+}
+
+/* Lines the screen name up under the title rather than under the mark beside it: the
+   mark is 18px wide and the title group sets a 9px gap. */
+.loungeSubtitle {
+  padding-left: 27px;
+}
+
+.loungeBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px 20px;
+}
+
+.loungeList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loungeRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 68px;
+  padding: 10px 12px;
+  border: 1px solid var(--room-chrome-border);
+  border-radius: 14px;
+  background: var(--room-chrome-bg);
+  text-align: left;
+  cursor: pointer;
+}
+
+.loungeRow:focus-visible {
+  outline: 2px solid var(--room-composer-border-focus);
+  outline-offset: 2px;
+}
+
+.loungeRowAvatar {
+  width: 44px;
+  height: 44px;
+  font-size: 14px;
+  background: var(--room-other-avatar-bg);
+  color: var(--room-other-avatar-text);
+}
+
+.loungeRowText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.loungeRowTopLine {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.loungeRowName {
+  font-family: var(--room-font-display), sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--room-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loungeRowStamp {
+  flex: none;
+  font-family: var(--room-font-mono), monospace;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--room-text-muted);
+}
+
+.loungeRowPreview {
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--room-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Holds the dot's width whether or not it is drawn, so every name and preview in
+   the list starts and ends on the same vertical line. */
+.loungeUnreadSlot {
+  flex: none;
+  width: 9px;
+  display: flex;
+  justify-content: center;
+}
+
+.loungeUnreadDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--room-you-bg);
+}
+
+.loungeNotice {
+  margin: 16px 4px;
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--room-text-muted);
+}

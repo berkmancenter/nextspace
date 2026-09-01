@@ -123,6 +123,7 @@ describe('LoginPage', () => {
       user: {
         id: 'user123',
         username: 'testuser',
+        role: 'admin',
         pseudonyms: [
           {
             pseudonym: 'Intuitive Lyra',
@@ -192,6 +193,7 @@ describe('LoginPage', () => {
       user: {
         id: 'user123',
         username: 'testuser',
+        role: 'admin',
         pseudonyms: [
           {
             pseudonym: 'Intuitive Lyra',
@@ -236,6 +238,7 @@ describe('LoginPage', () => {
       user: {
         id: 'user123',
         username: 'testuser',
+        role: 'admin',
         pseudonyms: [
           {
             pseudonym: 'Intuitive Lyra',
@@ -290,6 +293,77 @@ describe('LoginPage', () => {
     });
 
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  describe('where a successful login lands', () => {
+    function mockLogin(role?: string) {
+      (Authenticate as jest.Mock).mockResolvedValue({
+        user: {
+          id: 'user123',
+          username: 'testuser',
+          ...(role ? { role } : {}),
+          pseudonyms: [{ pseudonym: 'Intuitive Lyra', active: true }],
+        },
+        tokens: {
+          access: { token: 'access-token-123' },
+          refresh: { token: 'refresh-token-456' },
+        },
+      });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ message: 'Successfully set cookie!' }),
+      });
+    }
+
+    async function signIn() {
+      const user = userEvent.setup();
+      render(<LoginPage />);
+      await user.type(screen.getByLabelText(/Username/i), 'testuser');
+      await user.type(document.querySelector('input[name="password"]')!, 'password123');
+      await user.click(screen.getByRole('button', { name: /Login/i }));
+    }
+
+    it('sends a participant to the lounge', async () => {
+      mockLogin('participant');
+
+      await signIn();
+
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/lounge'));
+    });
+
+    it('sends an admin to the events page', async () => {
+      mockLogin('admin');
+
+      await signIn();
+
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/admin/events'));
+    });
+
+    it('sends an account with no role to the lounge rather than the admin pages', async () => {
+      mockLogin(undefined);
+
+      await signIn();
+
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/lounge'));
+    });
+
+    it('still honours a safe redirectTo for a participant', async () => {
+      mockSearchParams = new URLSearchParams('redirectTo=/room/abc123');
+      mockLogin('participant');
+
+      await signIn();
+
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/room/abc123'));
+    });
+
+    it('falls back to the lounge when a participant arrives with an unsafe redirectTo', async () => {
+      mockSearchParams = new URLSearchParams({ redirectTo: 'https://evil.com' });
+      mockLogin('participant');
+
+      await signIn();
+
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/lounge'));
+    });
   });
 
   it('handles missing active pseudonym error', async () => {
@@ -436,6 +510,7 @@ describe('LoginPage', () => {
       user: {
         id: 'auth-user-456',
         username: 'authenticateduser',
+        role: 'admin',
         pseudonyms: [
           {
             pseudonym: 'Authenticated Pro',

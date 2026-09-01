@@ -111,7 +111,7 @@ describe('EventDetails', () => {
       expandSection('Event Details');
       expect(screen.getByText('Legal Frontiers Seminar Series')).toBeInTheDocument();
       expect(screen.getByText('PUBLIC')).toBeInTheDocument();
-      expect(screen.getByText(/retained in memory for Berkie/)).toBeInTheDocument();
+      expect(screen.getByText(/retained in memory for bots/)).toBeInTheDocument();
     });
 
     it('shows a PRIVATE badge and private retention copy when the topic is private', () => {
@@ -119,7 +119,7 @@ describe('EventDetails', () => {
       expandSection('Event Details');
       expect(screen.queryByText('PUBLIC')).not.toBeInTheDocument();
       expect(screen.getByText('PRIVATE')).toBeInTheDocument();
-      expect(screen.getByText(/not retained, so Berkie and other bots won't reference this event/)).toBeInTheDocument();
+      expect(screen.getByText(/not retained, so bots won't reference this event/)).toBeInTheDocument();
     });
 
     it('still shows the Series label with a "None" value when no topic is set', () => {

@@ -22,16 +22,24 @@ export const Layout = ({ children, authType = 'guest' }: Readonly<{ children: Re
   const router = useRouter();
   const currentUrl = router.isReady ? router.asPath : '';
 
+  // The community room and the lounge draw their own header and fill the viewport, so
+  // the app's header and footer would frame a second header and push them into a
+  // scroll. A room's asPath carries a room id rather than the literal
+  // "conversationId", so the check below can't see it.
+  const isRoomRoute = router.pathname.startsWith('/room') || router.pathname.startsWith('/lounge');
+
   // Pages where footer should be hidden (full-screen chat interfaces)
-  const hideFooter = currentUrl.includes('conversationId');
+  const hideFooter = isRoomRoute || currentUrl.includes('conversationId');
 
   return (
     <div
       className={`min-h-screen flex flex-col ${
-        currentUrl.includes('conversationId') ? 'bg-[#FFFFFF]' : 'bg-main bg-transparent bg-cover bg-center bg-no-repeat'
+        isRoomRoute || currentUrl.includes('conversationId')
+          ? 'bg-[#FFFFFF]'
+          : 'bg-main bg-transparent bg-cover bg-center bg-no-repeat'
       }`}
     >
-      <Header authType={authType} />
+      {!isRoomRoute && <Header authType={authType} />}
 
       <main className="flex-1">{children}</main>
 

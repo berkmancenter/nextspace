@@ -356,6 +356,13 @@ function generateEventUrls(conversationData: Conversation, botName: string): Eve
         url: modUrl,
       });
     }
+  } else if (convType && convType.name === 'communityRoom') {
+    // Named for the destination, not the bot: unlike the assistant links above, this
+    // one opens the room itself.
+    participant.push({
+      label: 'Community Room',
+      url: `${urlPrefix}/room/${conversationData.id}`,
+    });
   }
 
   return {

@@ -245,8 +245,8 @@ export const EventDetails: React.FC<{
           >
             {isPublicSeries ? <PublicOutlined fontSize="inherit" /> : <LockOutlined fontSize="inherit" />}
             {isPublicSeries
-              ? 'Public series: event transcripts and group chats are retained in memory for Berkie and other bots to reference in the future.'
-              : "Private series: event transcripts and group chats are not retained, so Berkie and other bots won't reference this event in the future."}
+              ? 'Public series: event transcripts and group chats are retained in memory for bots to reference in the future.'
+              : "Private series: event transcripts and group chats are not retained, so bots won't reference this event in the future."}
           </p>
         )}
 
@@ -349,7 +349,7 @@ export const EventDetails: React.FC<{
 
         <Subhead className="mt-4">Features</Subhead>
         {ORGANIZER_FEATURES.map(({ name, label, defaultEnabled }) => {
-          const conversationFeature = conversationData.features?.find((f) => f.name === name);
+          const conversationFeature = conversationData.features?.find((f: { name: string }) => f.name === name);
           const enabled = conversationFeature ? (conversationFeature.enabled ?? true) : defaultEnabled;
           return (
             <div
@@ -378,7 +378,7 @@ export const EventDetails: React.FC<{
       >
         <Subhead>Moderator</Subhead>
         {conversationData.moderators && conversationData.moderators.length > 0 ? (
-          conversationData.moderators.map((moderator, index) => (
+          conversationData.moderators.map((moderator: { name: string; bio?: string }, index) => (
             <div key={index} className="mt-1">
               <p className="text-[14px] font-bold text-[#0B0D0E]">{moderator.name}</p>
               {moderator.bio && <p className="text-[14px] text-[#4B5563]">{moderator.bio}</p>}

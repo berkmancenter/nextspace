@@ -107,6 +107,51 @@ describe('ThreadedMessage Component', () => {
     expect(screen.queryByText('(You)')).not.toBeInTheDocument();
   });
 
+  describe('identifying the reader by account id', () => {
+    it('treats a message the reader owns as theirs even under a different name', () => {
+      const mine = { ...mockMessage, owner: 'my-account-id', pseudonym: 'A Name I No Longer Use' };
+      render(<ThreadedMessage {...defaultProps} message={mine} currentUserId="my-account-id" />);
+      expect(screen.getByText('(You)')).toBeInTheDocument();
+    });
+
+    it("treats a namesake's message as somebody else's", () => {
+      const namesake = { ...mockMessage, owner: 'another-account-id' };
+      render(<ThreadedMessage {...defaultProps} message={namesake} currentUserId="my-account-id" />);
+      expect(screen.queryByText('(You)')).not.toBeInTheDocument();
+    });
+
+    it('falls back to the pseudonym for a message with no owner, such as one still sending', () => {
+      render(<ThreadedMessage {...defaultProps} currentUserId="my-account-id" />);
+      expect(screen.getByText('(You)')).toBeInTheDocument();
+    });
+
+    it('applies the same rule to a reply', () => {
+      const reply = { ...mockReplies[0], owner: 'my-account-id', pseudonym: 'Someone Else' };
+      render(<ThreadedMessage {...defaultProps} replies={[reply]} currentUserId="my-account-id" />);
+      expect(screen.getAllByText('(You)').length).toBeGreaterThan(1);
+    });
+  });
+
+  describe('identifying the reader when no account id is given', () => {
+    it('matches on pseudonym even when the message carries an owner id', () => {
+      const ownedByAnother = { ...mockMessage, owner: 'someone-else-id' };
+      render(<ThreadedMessage {...defaultProps} message={ownedByAnother} />);
+      expect(screen.getByText('(You)')).toBeInTheDocument();
+    });
+
+    it('ignores a matching owner id when the pseudonym differs', () => {
+      const sameOwnerOtherName = { ...mockMessage, owner: 'my-account-id', pseudonym: 'OtherUser' };
+      render(<ThreadedMessage {...defaultProps} message={sameOwnerOtherName} />);
+      expect(screen.queryByText('(You)')).not.toBeInTheDocument();
+    });
+
+    it('matches a reply on pseudonym alone', () => {
+      const reply = { ...mockReplies[0], pseudonym: 'User1', owner: 'someone-else-id' };
+      render(<ThreadedMessage {...defaultProps} replies={[reply]} />);
+      expect(screen.getAllByText('(You)').length).toBeGreaterThan(1);
+    });
+  });
+
   it('shows reply button on mouse enter', async () => {
     render(<ThreadedMessage {...defaultProps} />);
     const messageContainer = screen.getByTestId(`message-${mockMessage.id}`).parentElement!.parentElement!;
@@ -581,10 +626,25 @@ describe('ThreadedMessage Component', () => {
       expect(unreadIndicator).not.toBeInTheDocument();
     });
 
+    it('names the additional replies control as unread so it is not signalled by styling alone', () => {
+      render(<ThreadedMessage {...defaultProps} replies={mockReplies} hasUnreadReplies={true} isThreadOpen={false} />);
+      expect(screen.getByLabelText('View 1 more reply, unread')).toBeInTheDocument();
+    });
+
+    it('leaves the additional replies control name unchanged once the replies are read', () => {
+      render(<ThreadedMessage {...defaultProps} replies={mockReplies} hasUnreadReplies={false} isThreadOpen={false} />);
+      expect(screen.getByLabelText('View 1 more reply')).toBeInTheDocument();
+    });
+
+    it('drops the unread wording from the control name while the thread is open', () => {
+      render(<ThreadedMessage {...defaultProps} replies={mockReplies} hasUnreadReplies={true} isThreadOpen={true} />);
+      expect(screen.getByLabelText('View 1 more reply')).toBeInTheDocument();
+    });
+
     it('makes additional replies button bold when hasUnreadReplies is true', () => {
       render(<ThreadedMessage {...defaultProps} replies={mockReplies} hasUnreadReplies={true} isThreadOpen={false} />);
 
-      const moreRepliesButton = screen.getByLabelText('View 1 more reply');
+      const moreRepliesButton = screen.getByLabelText('View 1 more reply, unread');
       expect(moreRepliesButton.className).toContain('font-bold');
     });
 

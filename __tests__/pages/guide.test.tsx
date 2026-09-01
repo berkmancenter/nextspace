@@ -151,6 +151,12 @@ describe('GuidePage', () => {
     await waitFor(() => expect(screen.getByText('Conversation not found.')).toBeInTheDocument());
   });
 
+  it('shows a not-found error for a community room conversation id', async () => {
+    resolveWith({ ...GUIDE_RESPONSE, conversationType: 'communityRoom' });
+    render(<GuidePage />);
+    await waitFor(() => expect(screen.getByText('Conversation not found.')).toBeInTheDocument());
+  });
+
   it('fetches from the correct endpoint', async () => {
     resolveWith(GUIDE_RESPONSE);
     render(<GuidePage />);

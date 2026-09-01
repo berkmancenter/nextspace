@@ -266,6 +266,7 @@ describe('generateEventUrls (via createConversationFromData)', () => {
     conversationTypes: [
       { id: '1', name: 'eventAssistant' },
       { id: '2', name: 'backChannel' },
+      { id: '3', name: 'communityRoom' },
     ],
     availablePlatforms: [],
     conversationBotName: 'Berkie',
@@ -325,6 +326,17 @@ describe('generateEventUrls (via createConversationFromData)', () => {
     };
     const result = await createConversationFromData(data as any);
     expect(result.eventUrls.moderator.length).toBe(0);
+  });
+
+  it('returns a /room URL with no passcode params for a communityRoom conversation', async () => {
+    const data = {
+      ...baseConversation,
+      conversationType: 'communityRoom',
+      agents: [{ id: 'agent-1', agentType: 'communityAssistant' }],
+      channels: [{ name: 'chat', passcode: 'chat-pass' }],
+    };
+    const result = await createConversationFromData(data as any);
+    expect(result.eventUrls.participant).toEqual([{ label: 'Community Room', url: 'https://example.com/room/conv-123' }]);
   });
 });
 

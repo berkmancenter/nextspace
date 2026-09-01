@@ -7,11 +7,14 @@ import { normalizeAssistantPseudonym } from '../utils/Helpers';
 import { GenericEnhancerMenu } from './GenericEnhancerMenu';
 import { MessageFeedback } from './MessageFeedback';
 import { BotIcon } from './BotIcon';
+import { isReadersMessage } from './ThreadedMessage';
 
 interface ThreadPanelProps {
   parentMessage: PseudonymousMessage;
   replies: PseudonymousMessage[];
   pseudonym: string | null;
+  /** The reader's account id. Given, it decides ownership in place of the display name. */
+  currentUserId?: string | null;
   onClose: () => void;
   onSendReply: (text: string, parentId: string) => void;
   renderAvatar: (msg: PseudonymousMessage) => React.ReactNode;
@@ -26,6 +29,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
   parentMessage,
   replies,
   pseudonym,
+  currentUserId,
   onClose,
   onSendReply,
   renderAvatar,
@@ -227,7 +231,9 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
               {/* Name and timestamp */}
               <div className="text-sm font-bold mb-1 text-left">
                 {normalizeAssistantPseudonym(parentMessage, botName)}
-                {parentMessage.pseudonym === pseudonym && <span className="text-gray-600 font-normal"> (You)</span>}
+                {isReadersMessage(parentMessage, pseudonym, currentUserId) && (
+                  <span className="text-gray-600 font-normal"> (You)</span>
+                )}
                 {parentMessage.createdAt && (
                   <span className="text-xs font-normal text-gray-400 ml-2">
                     {new Date(parentMessage.createdAt).toLocaleTimeString('en-US', {
@@ -280,7 +286,9 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                 {/* Name and timestamp */}
                 <div className="text-sm font-bold mb-1 text-left">
                   {normalizeAssistantPseudonym(reply, botName)}
-                  {reply.pseudonym === pseudonym && <span className="text-gray-600 font-normal"> (You)</span>}
+                  {isReadersMessage(reply, pseudonym, currentUserId) && (
+                    <span className="text-gray-600 font-normal"> (You)</span>
+                  )}
                   {reply.createdAt && (
                     <span className="text-xs font-normal text-gray-400 ml-2">
                       {new Date(reply.createdAt).toLocaleTimeString('en-US', {

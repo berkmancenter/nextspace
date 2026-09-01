@@ -81,6 +81,12 @@ export interface HeaderProps extends BaseComponentProps {
  */
 export type PseudonymousMessage = components['schemas']['Message'] & {
   body: any;
+  /**
+   * Set only on client-side placeholders for a message the server has not accepted:
+   * 'waiting' while it is queued for delivery, 'failed' once the server refused it.
+   * Never present on a message that came back from the API or the socket.
+   */
+  pending?: 'waiting' | 'failed';
 };
 
 /**
@@ -190,4 +196,71 @@ export interface WhatsNewEntry {
   title: string;
   body: string;
   releasedAt: string;
+}
+
+/**
+ * Payload carried on the `content` field of a message whose body type is
+ * `memberIntro`. The bot posts one of these the first time a member appears in a
+ * community room, and the room feed renders it as a MemberIntroCard instead of
+ * an ordinary message bubble.
+ * @property {string} name - The member's real name, as registered.
+ * @property {string} bio - The bio the member supplied when they joined.
+ * @property {string} [role] - Affiliation line, e.g. "Fellow, metaLAB".
+ * @property {string} [joinedLabel] - Human-readable join recency, e.g. "joined this week".
+ */
+export interface MemberIntroContent {
+  name: string;
+  bio: string;
+  role?: string;
+  joinedLabel?: string;
+}
+
+/**
+ * One entry from GET /v1/users/pseudonyms. A community room stamps messages with the
+ * entry registered for that room rather than the account's active pseudonym, so both
+ * flavors come back here and the caller picks.
+ * @property {boolean} [isRealName] - True on the real-name entry created at registration.
+ * @property {string[]} [conversations] - Conversation ids this entry is scoped to.
+ */
+export interface UserPseudonym {
+  pseudonym: string;
+  active?: boolean;
+  isRealName?: boolean;
+  conversations?: string[];
+}
+
+/**
+ * A message a room member has sent that the server has not accepted yet, either
+ * because the socket is down or because its POST is still in flight. The room
+ * queues these and delivers them when the connection returns, so `id` is a
+ * client-side handle with no server meaning.
+ * @property {string} body - The text the member typed.
+ * @property {'chat' | 'assistant'} tab - Which room feed the message belongs to.
+ * @property {string} [parentMessageId] - Set when the message is a threaded reply.
+ * @property {boolean} [failed] - True once the server refused it.
+ */
+export interface PendingRoomMessage {
+  id: string;
+  body: string;
+  tab: 'chat' | 'assistant';
+  parentMessageId?: string;
+  /** Set once the server has refused this message, which stops further delivery attempts. */
+  failed?: boolean;
+  /** Why the server refused it, in words a member can act on. */
+  failureReason?: string;
+}
+
+/**
+ * One row in the lounge: a community room the member belongs to, with just enough
+ * of its latest activity to render a preview.
+ * @property {string} preview - "Sender: message text", empty for a room with no messages.
+ * @property {string | null} lastMessageAt - ISO timestamp of the newest message, null if there is none.
+ * @property {boolean} hasUnread - Whether messages arrived since this device last opened the room.
+ */
+export interface LoungeRoom {
+  id: string;
+  name: string;
+  preview: string;
+  lastMessageAt: string | null;
+  hasUnread: boolean;
 }

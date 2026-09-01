@@ -11,6 +11,9 @@ import { Close, Menu } from '@mui/icons-material';
 import Logo from './Logo';
 import { QuickGuideIconButton } from './QuickGuideIconButton';
 
+export const GIVE_FEEDBACK_URL =
+  'https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform';
+
 // Admin pages navigation items (without Log In/Log Out - added dynamically)
 const adminPagesBase: Record<string, { url: string }> = {
   'Event Schedule': { url: '/admin/events' },
@@ -67,9 +70,6 @@ export const Header = ({ className = '', variant = 'transparent', authType = 'gu
     backgroundColor: 'transparent',
   };
 
-  const giveFeedbackUrl =
-    'https://docs.google.com/forms/d/e/1FAIpQLScVXBLSEJ5YVJtW8rwR01KDunJWnopN33Rs49YUC37OPrOgCg/viewform';
-
   const isOnAssistantPage = router.asPath.includes('conversationId');
 
   const TrailingNavItems = () => (
@@ -84,7 +84,7 @@ export const Header = ({ className = '', variant = 'transparent', authType = 'gu
           </Button>
         </div>
       )}
-      <Link href={giveFeedbackUrl} target="_blank" rel="noopener noreferrer">
+      <Link href={GIVE_FEEDBACK_URL} target="_blank" rel="noopener noreferrer">
         <Button sx={navButtonSx}>Give Feedback</Button>
       </Link>
       {isLoggedIn && (
