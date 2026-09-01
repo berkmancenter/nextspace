@@ -158,8 +158,8 @@ export function CommunityGroupChatPanel({
 
     if (isAssistant) {
       return (
-        <div className={styles.avatar} style={{ width: 32, height: 32, background: 'var(--room-berkie-avatar-bg)' }}>
-          <BotIcon size={22} color="var(--room-berkie-accent)" />
+        <div className={styles.avatar} style={{ width: 32, height: 32, background: 'var(--room-bot-avatar-bg)' }}>
+          <BotIcon size={22} color="var(--room-bot-accent)" />
         </div>
       );
     }
@@ -203,8 +203,8 @@ export function CommunityGroupChatPanel({
           <div
             className="rounded-2xl px-2 py-1"
             style={{
-              backgroundColor: 'var(--room-berkie-bubble-bg)',
-              border: '1px solid var(--room-berkie-bubble-border)',
+              backgroundColor: 'var(--room-bot-bubble-bg)',
+              border: '1px solid var(--room-bot-bubble-border)',
               color: 'var(--room-text-body)',
             }}
           >
@@ -354,7 +354,7 @@ export function CommunityGroupChatPanel({
 
                 {waitingForResponse && !waitingForThreadedReply && parentMessages.length > 0 && (
                   <div className="relative z-10 flex items-center gap-1 mt-2 mb-1">
-                    <BotIcon size={28} color="var(--room-berkie-accent)" bouncing />
+                    <BotIcon size={28} color="var(--room-bot-accent)" bouncing />
                     <span style={{ fontSize: 12, fontStyle: 'italic', color: 'var(--room-text-muted)' }}>thinking...</span>
                   </div>
                 )}

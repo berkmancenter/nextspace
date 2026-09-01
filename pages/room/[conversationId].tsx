@@ -368,7 +368,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
         <div className={styles.headerLead}>
           <div className={styles.headerTitleGroup}>
             <span aria-hidden="true" className={styles.headerIcon}>
-              {activeTab === 'assistant' ? <BotIcon size={18} color="var(--room-berkie-accent)" /> : <RoomMarkIcon />}
+              {activeTab === 'assistant' ? <BotIcon size={18} color="var(--room-bot-accent)" /> : <RoomMarkIcon />}
             </span>
             <h1 className={styles.headerTitle}>{activeTab === 'assistant' ? botName : roomName || 'Community Room'}</h1>
             {activeTab === 'assistant' && <span className={styles.badge}>PRIVATE</span>}

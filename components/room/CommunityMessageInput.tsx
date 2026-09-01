@@ -182,10 +182,10 @@ export function CommunityMessageInput({
                   aria-disabled={offline ? 'true' : undefined}
                   disabled={disabled}
                   onClick={() => !offline && insertAtCursor(`@${botName} `)}
-                  className={`${styles.askBerkieButton}${offline ? ` ${styles.shortcutIdle}` : ''}`}
+                  className={`${styles.askBotButton}${offline ? ` ${styles.shortcutIdle}` : ''}`}
                 >
-                  <BotIcon size={20} color="var(--room-berkie-accent)" />
-                  <span className={styles.askBerkieLabel}>Ask {botName}</span>
+                  <BotIcon size={20} color="var(--room-bot-accent)" />
+                  <span className={styles.askBotLabel}>Ask {botName}</span>
                 </IconButton>
               </>
             )}

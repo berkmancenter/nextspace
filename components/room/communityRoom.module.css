@@ -25,12 +25,12 @@
   --room-other-bubble-bg: #ffffff;
   --room-other-bubble-border: rgba(17, 22, 28, 0.12);
 
-  --room-berkie-accent: #0f7d6b;
-  --room-berkie-avatar-bg: #ddf3ee;
-  --room-berkie-bubble-bg: rgba(15, 125, 107, 0.06);
-  --room-berkie-bubble-border: rgba(15, 125, 107, 0.26);
-  --room-berkie-pill-bg: #efede7;
-  --room-berkie-pill-border: #dedbd3;
+  --room-bot-accent: #0f7d6b;
+  --room-bot-avatar-bg: #ddf3ee;
+  --room-bot-bubble-bg: rgba(15, 125, 107, 0.06);
+  --room-bot-bubble-border: rgba(15, 125, 107, 0.26);
+  --room-bot-pill-bg: #efede7;
+  --room-bot-pill-border: #dedbd3;
 
   --room-nav-bg: #efede7;
   --room-nav-border: #dedbd3;
@@ -66,10 +66,10 @@
     --room-other-bubble-bg: #17181b;
     --room-other-bubble-border: rgba(255, 255, 255, 0.12);
 
-    --room-berkie-accent: #96aec6;
-    --room-berkie-avatar-bg: rgba(150, 174, 198, 0.14);
-    --room-berkie-pill-bg: #17181b;
-    --room-berkie-pill-border: rgba(255, 255, 255, 0.13);
+    --room-bot-accent: #96aec6;
+    --room-bot-avatar-bg: rgba(150, 174, 198, 0.14);
+    --room-bot-pill-bg: #17181b;
+    --room-bot-pill-border: rgba(255, 255, 255, 0.13);
 
     --room-nav-bg: #17181b;
     --room-nav-border: rgba(255, 255, 255, 0.12);
@@ -102,10 +102,10 @@
   --room-other-bubble-bg: #17181b;
   --room-other-bubble-border: rgba(255, 255, 255, 0.12);
 
-  --room-berkie-accent: #96aec6;
-  --room-berkie-avatar-bg: rgba(150, 174, 198, 0.14);
-  --room-berkie-pill-bg: #17181b;
-  --room-berkie-pill-border: rgba(255, 255, 255, 0.13);
+  --room-bot-accent: #96aec6;
+  --room-bot-avatar-bg: rgba(150, 174, 198, 0.14);
+  --room-bot-pill-bg: #17181b;
+  --room-bot-pill-border: rgba(255, 255, 255, 0.13);
 
   --room-nav-bg: #17181b;
   --room-nav-border: rgba(255, 255, 255, 0.12);
@@ -263,7 +263,7 @@
 }
 
 /* Column, so the button row spans the full width below the text. As a row the
-   textarea's flex:1 pushed @ and Ask Berkie into the right edge beside Send. */
+   textarea's flex:1 pushed @ and Ask [botName] into the right edge beside Send. */
 .composerBox {
   display: flex;
   flex-direction: column;
@@ -295,7 +295,7 @@
   color: var(--room-text-muted);
 }
 
-/* space-between is what keeps @ and Ask Berkie on the left edge with send pinned
+/* space-between is what keeps @ and Ask [botName] on the left edge with send pinned
    right; without it the three controls bunch together. */
 .composerButtonRow {
   display: flex;
@@ -328,7 +328,7 @@
   width: 32px;
   height: 32px;
   border-radius: 999px;
-  background: var(--room-berkie-pill-bg);
+  background: var(--room-bot-pill-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -339,7 +339,7 @@
   color: var(--room-text-muted);
 }
 
-.askBerkieButton {
+.askBotButton {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -349,10 +349,10 @@
   background: none;
   border: 0;
   border-radius: 999px;
-  color: var(--room-berkie-accent);
+  color: var(--room-bot-accent);
 }
 
-.askBerkieLabel {
+.askBotLabel {
   font-family: var(--room-font-mono), monospace;
   font-size: 12px;
   font-weight: 600;
@@ -413,7 +413,7 @@
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--room-berkie-accent);
+  color: var(--room-bot-accent);
   white-space: nowrap;
 }
 
@@ -432,18 +432,18 @@
   line-height: 1;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--room-berkie-accent);
-  background: var(--room-berkie-pill-bg);
-  border: 1px solid var(--room-berkie-pill-border);
+  color: var(--room-bot-accent);
+  background: var(--room-bot-pill-bg);
+  border: 1px solid var(--room-bot-pill-border);
   border-radius: 999px;
   padding: 3px 6px;
 }
 
 /* Teal outline rather than the neutral chrome border, so the card reads as
-   Berkie's, matching the border on its message bubbles. */
+   the bot's, matching the border on its message bubbles. */
 .introCardBody {
   background: var(--room-chrome-bg);
-  border: 1px solid var(--room-berkie-bubble-border);
+  border: 1px solid var(--room-bot-bubble-border);
   border-radius: 12px;
   padding: 14px;
 }
@@ -635,7 +635,7 @@
   font-weight: 600;
   font-size: 12.5px;
   line-height: 1.4;
-  color: var(--room-berkie-accent);
+  color: var(--room-bot-accent);
 }
 
 .reconnectDot {
@@ -643,7 +643,7 @@
   height: 8px;
   flex: none;
   border-radius: 999px;
-  background: var(--room-berkie-accent);
+  background: var(--room-bot-accent);
   animation: roomPulse 1.4s ease-in-out infinite;
 }
 

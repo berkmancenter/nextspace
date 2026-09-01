@@ -21,7 +21,7 @@ export function MemberIntroCard({ name, role, joinedLabel, bio, botName }: Membe
   return (
     <div role="group" aria-label={`Introduction posted by ${botName}`} className={styles.introCardWrap}>
       <div className={styles.introCardHeader}>
-        <BotIcon size={18} color="var(--room-berkie-accent)" />
+        <BotIcon size={18} color="var(--room-bot-accent)" />
         <span className={styles.introCardLabel}>Introduced by {botName}</span>
         <span className={styles.agentBadge}>AI Bot</span>
         <span className={styles.introCardRule} />
