@@ -1,6 +1,5 @@
 import React from 'react';
 
-/** The community room's mark, drawn beside the title in the room and lounge headers. */
 export function RoomMarkIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">

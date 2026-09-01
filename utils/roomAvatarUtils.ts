@@ -1,8 +1,4 @@
 /**
- * Computes avatar initials for a real-name community room participant.
- * Two-plus-word names use the first letter of the first and last word
- * (e.g. "Priya Raghunathan" -> "PR"); a single word uses its first two
- * letters (e.g. "Berkie" -> "BE").
  * @param name The participant's real display name.
  * @returns Up to two uppercase initials, or an empty string for an empty name.
  */
@@ -14,10 +10,8 @@ export function getRoomInitials(name: string): string {
 }
 
 /**
- * Computes avatar initials for a room, which read differently from a person's:
- * ordinary names use the first letter of the first two words ("Digital Rights
- * Reading Group" -> "DR"), but an all-caps first word is an acronym and reads
- * better on its own ("BKC Community Room" -> "BK", not "BC").
+ * An all-caps first word is an acronym and reads better on its own:
+ * "BKC Community Room" gives "BK", not "BC".
  * @param name The room's display name.
  * @returns Up to two uppercase initials, or an empty string for an empty name.
  */

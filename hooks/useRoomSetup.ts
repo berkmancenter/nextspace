@@ -19,11 +19,9 @@ export interface UseRoomSetupReturn {
 }
 
 /**
- * Fetches and resolves the data a community room page needs: the room's name, its
- * bot name, the id of its (single) agent, and its feature list. Modeled on
- * {@link useConversationSetup} but without the event-specific concerns a room
- * doesn't have: passcodes, the event-status dialog, and active/endTime derivation
- * (a room is permanently active by construction).
+ * Modeled on {@link useConversationSetup} but without the event-specific concerns
+ * a room doesn't have: passcodes, the event-status dialog, and active/endTime
+ * derivation (a room is permanently active by construction).
  * @returns An object with the room's loaded/error state plus its resolved fields.
  */
 export function useRoomSetup({ router }: UseRoomSetupParams): UseRoomSetupReturn {

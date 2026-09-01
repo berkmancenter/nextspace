@@ -28,9 +28,7 @@ export const getServerSideProps = async (context: { req: any }) => {
 };
 
 /**
- * The member's home after signing in: every community room they can open, with the
- * latest line from each. Rooms arrive by invitation, so there is nothing to browse
- * or join from this screen.
+ * Rooms arrive by invitation, so there is nothing to browse or join from this screen.
  */
 export default function LoungePage() {
   const router = useRouter();

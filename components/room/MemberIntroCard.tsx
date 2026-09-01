@@ -10,9 +10,8 @@ interface MemberIntroCardProps {
 }
 
 /**
- * The one-time introduction Berkie posts on a member's first appearance in the
- * room. Rendered by the group feed for any message whose body type is
- * `memberIntro`; the fields come from that body's `content` payload.
+ * Rendered for any message whose body type is `memberIntro`; the props come from
+ * that body's `content` payload rather than from the message itself.
  */
 export function MemberIntroCard({ name, role, joinedLabel, bio }: MemberIntroCardProps) {
   const firstName = name.trim().split(/\s+/)[0];

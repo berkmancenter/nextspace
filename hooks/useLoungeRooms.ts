@@ -31,9 +31,6 @@ function buildPreview(message: PseudonymousMessage, userId: string): string {
 }
 
 /**
- * Lists the community rooms the signed-in member can open, newest activity first,
- * each with its last message and whether anything in it is unread.
- *
  * The room list comes from the conversations the member owns or follows, which is
  * the only listing endpoint that exists today: a member who was added by roster
  * import but has never followed a room will not see it here until the backend

@@ -54,21 +54,20 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   const { socket, pseudonym: sessionPseudonym, userId, isConnected, lastReconnectTime } = useSessionJoin(true);
 
   const [registeredName, setRegisteredName] = useState<string | null>(null);
-  // Kept apart from useRoomSetup's generalError, which doubles as the fatal
-  // "this room would not load" screen when the room never finished loading.
+  // Kept apart from useRoomSetup's generalError, which doubles as the fatal "room would not load" screen.
   const [sendError, setSendError] = useState<string | null>(null);
 
-  // The session carries the account's active pseudonym, but a room posts under the
-  // real-name entry registered for that room, which is what the server stamps on the
-  // message (llm_engine resolveMessageName). Reading it here keeps the composer and
-  // the member's own messages agreeing with what everyone else sees.
+  /**
+   * A room posts under the real-name entry registered for that room, not the account's
+   * active pseudonym, and that is what the server stamps on the message (llm_engine
+   * resolveMessageName). Reading it here keeps the composer agreeing with what everyone else sees.
+   */
   useEffect(() => {
     if (!conversationId || !userId || !Api.get().GetTokens()) return undefined;
     let cancelled = false;
 
     (async () => {
-      // The account's own record, not the pseudonyms endpoint: that one needs admin
-      // rights, which a room member never has.
+      // The account's own record: the pseudonyms endpoint needs admin rights, which a room member never has.
       const account = await RetrieveData(`users/user/${userId}`, Api.get().getAccessToken());
       if (cancelled) return;
       if (!account || account.error) {
@@ -104,9 +103,10 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   const queuedIdRef = useRef(0);
   const deliveringRef = useRef(false);
 
-  // useConversationMessages rebuilds its fetchers whenever these change, and re-fetches
-  // whenever the fetchers change. A fresh array or object literal here would therefore
-  // start a fetch on every render, which never settles.
+  /**
+   * useConversationMessages rebuilds its fetchers whenever these change and re-fetches whenever
+   * the fetchers change, so a fresh array or object literal here would fetch on every render.
+   */
   const agentIds = useMemo(() => (agentId ? [agentId] : []), [agentId]);
   const chatIntroRef = useMemo(() => ({ current: [] as PseudonymousMessage[] }), []);
   const assistantIntroRef = useMemo(() => ({ current: [] as PseudonymousMessage[] }), []);
@@ -132,8 +132,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     conversationId,
   });
 
-  // The lounge has no server-side read state to read, so being in the room is what
-  // marks it read: it records the newest message this device has now displayed.
+  // Nothing on the server records what anyone has read, so being in the room is what marks it read.
   useEffect(() => {
     if (!conversationId || !chatMessages.length) return;
     const newest = chatMessages.reduce((latest, message) =>
@@ -147,10 +146,10 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     [chatMessages, realName],
   );
 
-  // Join the room's chat channel plus a direct channel with its assistant, once
-  // the socket and agent are known. Unlike an event, the room's chat channel
-  // has no passcode by design. Unlike pages/assistant.tsx, the channel is always
-  // pushed rather than gated on a passcode being present.
+  /**
+   * Unlike an event, the room's chat channel has no passcode by design, so unlike
+   * pages/assistant.tsx the channel is always pushed rather than gated on one being present.
+   */
   useEffect(() => {
     if (!socket || !userId || !conversationId || !agentId) return;
 
@@ -188,9 +187,10 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, userId, conversationId, agentId]);
 
-  // Only chat history is fetched here: useConversationMessages already auto-fetches
-  // assistant messages, but it gates its chat fetch on a truthy chatPasscode, which a
-  // room's channel never has by design.
+  /**
+   * useConversationMessages auto-fetches assistant messages, but gates its chat fetch on a
+   * truthy chatPasscode, which a room's channel never has, so only chat is fetched here.
+   */
   useEffect(() => {
     if (!initialJoinComplete) return;
     fetchChatMessages().catch((err) => console.error('Error fetching chat messages:', err));
@@ -242,9 +242,10 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
           ...(queued.parentMessageId !== undefined && { parentMessage: queued.parentMessageId }),
         });
 
-        // Marked on the message itself rather than raised as a page-level error: the
-        // member needs to know which message was refused, and a refusal is final, so
-        // it stays visible instead of being retried on the next connection.
+        /**
+         * Marked on the message rather than raised page-level: the member needs to know which
+         * message was refused, and a refusal is final, so it is never retried on reconnect.
+         */
         if (response && 'error' in response) {
           const failureReason = describeRefusal(response);
           setQueuedMessages((prev) => prev.map((m) => (m.id === queued.id ? { ...m, failed: true, failureReason } : m)));
@@ -263,9 +264,10 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     [userId, agentId, botName, conversationId],
   );
 
-  // navigator.onLine flips the moment the machine loses its network, while the socket
-  // only notices after its own ping timeout. Reading both keeps the room from posting
-  // into a connection that is already gone during that gap.
+  /**
+   * navigator.onLine flips the moment the machine loses its network, while the socket only
+   * notices after its ping timeout. Reading both stops sends into an already-dead connection.
+   */
   useEffect(() => {
     const sync = () => setBrowserOnline(window.navigator.onLine);
     sync();
@@ -279,8 +281,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
 
   const isOffline = !isConnected || !browserOnline;
 
-  // After this long the strip stops promising an imminent reconnect and says the
-  // message is saved locally instead, per the design's escalation.
+  // After this long the strip stops promising a reconnect and says the message is saved locally.
   useEffect(() => {
     if (!isOffline) {
       setOfflineTooLong(false);
@@ -291,10 +292,10 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     return () => clearTimeout(timer);
   }, [isOffline]);
 
-  // Every send goes through the queue rather than posting directly, so a message
-  // typed while the socket is down waits here and leaves on the next connection
-  // instead of being lost. A message that fails to post stays queued for the same
-  // reason, and is retried the next time this runs.
+  /**
+   * Every send goes through the queue rather than posting directly, so a message typed while
+   * the socket is down waits here and leaves on the next connection instead of being lost.
+   */
   useEffect(() => {
     if (isOffline || deliveringRef.current) return;
     if (queuedMessages.every((m) => m.failed)) return;
@@ -306,8 +307,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
           if (!queued.failed) await deliverMessage(queued);
         }
       } finally {
-        // Without the finally, anything thrown here leaves the guard latched and
-        // every later send queues forever with nothing to say why.
+        // Without this, anything thrown above leaves the guard latched and every later send queues forever.
         deliveringRef.current = false;
       }
     })();
@@ -315,9 +315,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
 
   const sendMessage = async (tab: CommunityNavTab, message: string, parentMessageId?: string): Promise<boolean> => {
     if (!message) return false;
-    // Without a token or a conversation the send can't even be attempted, and the
-    // member gets nothing back unless this says so: the text stays in the composer,
-    // which on its own reads as a stuck button.
+    // Without this the text just stays in the composer, which on its own reads as a stuck button.
     if (!Api.get().GetTokens() || !conversationId) {
       console.warn('Room send skipped: no access token or conversation id available.');
       setSendError('That message was not sent. Reload the page and sign in again.');
@@ -330,8 +328,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     return true;
   };
 
-  // Clearing the failed flag puts the message back in front of the delivery
-  // effect, which is what actually sends it again.
+  // Clearing the failed flag puts the message back in front of the delivery effect, which resends it.
   const retryQueuedMessage = useCallback((id: string) => {
     setQueuedMessages((prev) => prev.map((m) => (m.id === id ? { ...m, failed: false } : m)));
   }, []);
