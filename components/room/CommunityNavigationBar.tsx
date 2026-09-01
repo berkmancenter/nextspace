@@ -11,6 +11,7 @@ interface CommunityNavigationBarProps {
   activeTab: CommunityNavTab;
   onTabChange: (tab: CommunityNavTab) => void;
   unreadAssistantCount: number;
+  botName: string;
 }
 
 /**
@@ -19,12 +20,17 @@ interface CommunityNavigationBarProps {
  * the Solar Signal design, and marks unread Berkie messages with three
  * non-color cues: a dot, a bold/mono label swap, and an aria-label count.
  */
-export function CommunityNavigationBar({ activeTab, onTabChange, unreadAssistantCount }: CommunityNavigationBarProps) {
+export function CommunityNavigationBar({
+  activeTab,
+  onTabChange,
+  unreadAssistantCount,
+  botName,
+}: CommunityNavigationBarProps) {
   const assistantHasUnread = unreadAssistantCount > 0 && activeTab !== 'assistant';
 
   const assistantLabel = assistantHasUnread
-    ? `Berkie, ${unreadAssistantCount} unread message${unreadAssistantCount === 1 ? '' : 's'}`
-    : 'Berkie';
+    ? `${botName}, ${unreadAssistantCount} unread message${unreadAssistantCount === 1 ? '' : 's'}`
+    : botName;
 
   return (
     <nav aria-label="Room sections" className={styles.nav}>
@@ -57,7 +63,7 @@ export function CommunityNavigationBar({ activeTab, onTabChange, unreadAssistant
           {assistantHasUnread && <span aria-hidden="true" className={styles.unreadDot} />}
         </span>
         <span className={activeTab === 'assistant' || assistantHasUnread ? styles.navLabelActive : styles.navLabelIdle}>
-          Berkie
+          {botName}
         </span>
       </button>
     </nav>

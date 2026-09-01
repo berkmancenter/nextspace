@@ -7,21 +7,22 @@ interface MemberIntroCardProps {
   role?: string;
   joinedLabel?: string;
   bio: string;
+  botName: string;
 }
 
 /**
  * Rendered for any message whose body type is `memberIntro`; the props come from
  * that body's `content` payload rather than from the message itself.
  */
-export function MemberIntroCard({ name, role, joinedLabel, bio }: MemberIntroCardProps) {
+export function MemberIntroCard({ name, role, joinedLabel, bio, botName }: MemberIntroCardProps) {
   const firstName = name.trim().split(/\s+/)[0];
   const roleLine = role && joinedLabel ? `${role} · ${joinedLabel}` : role || joinedLabel;
 
   return (
-    <div role="group" aria-label="Introduction posted by Berkie" className={styles.introCardWrap}>
+    <div role="group" aria-label={`Introduction posted by ${botName}`} className={styles.introCardWrap}>
       <div className={styles.introCardHeader}>
         <BotIcon size={18} color="var(--room-berkie-accent)" />
-        <span className={styles.introCardLabel}>Introduced by Berkie</span>
+        <span className={styles.introCardLabel}>Introduced by {botName}</span>
         <span className={styles.agentBadge}>AI Bot</span>
         <span className={styles.introCardRule} />
       </div>
@@ -46,7 +47,7 @@ export function MemberIntroCard({ name, role, joinedLabel, bio }: MemberIntroCar
         </div>
         <p className={styles.introCardBio}>{bio}</p>
         <p className={styles.introCardProvenance}>
-          {`From the bio ${firstName} wrote when they joined. Posted once. Berkie won't mention it again.`}
+          {`From the bio ${firstName} wrote when they joined. Posted once. ${botName} won't mention it again.`}
         </p>
       </div>
     </div>

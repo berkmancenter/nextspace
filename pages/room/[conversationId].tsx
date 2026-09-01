@@ -477,6 +477,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
         activeTab={activeTab as CommunityNavTab}
         onTabChange={handleTabChange}
         unreadAssistantCount={unseenAssistantCount}
+        botName={botName}
       />
 
       {(generalError || sendError) && (

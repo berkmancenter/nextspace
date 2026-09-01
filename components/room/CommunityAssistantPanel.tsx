@@ -33,7 +33,7 @@ const renderMarkdown = (text: string): React.ReactNode => (
 );
 
 /**
- * The room's private 1:1 with Berkie. Forked from AssistantChatPanel for the
+ * The room's private 1:1 with the bot. Forked from AssistantChatPanel for the
  * same reason as CommunityGroupChatPanel: Solar Signal's empty state,
  * avatar palette, and "AI Bot" pill don't fit through the shared panel's
  * existing props.
@@ -214,6 +214,7 @@ export function CommunityAssistantPanel({
         <CommunityMessageInput
           tab="assistant"
           realName={realName}
+          botName={botName}
           mentionTargets={[]}
           onSendMessage={onSendMessage}
           offline={offline}

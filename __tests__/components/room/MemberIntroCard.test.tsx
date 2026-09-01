@@ -9,6 +9,7 @@ describe('MemberIntroCard', () => {
     role: 'Affiliate',
     joinedLabel: 'joined today',
     bio: "Works on public-interest AI procurement in Latin America. Previously at Chile's data protection authority.",
+    botName: 'Berkie',
   };
 
   it('renders as a labelled group so it reads as one introduction unit', () => {

@@ -306,6 +306,7 @@ export function CommunityGroupChatPanel({
                           role={intro.role}
                           joinedLabel={intro.joinedLabel}
                           bio={intro.bio}
+                          botName={botName}
                         />
                       </React.Fragment>
                     );
@@ -378,6 +379,7 @@ export function CommunityGroupChatPanel({
           <CommunityMessageInput
             tab="chat"
             realName={realName}
+            botName={botName}
             mentionTargets={mentionTargets}
             onSendMessage={onSendMessage}
             isEmptyRoom={isEmptyRoom}

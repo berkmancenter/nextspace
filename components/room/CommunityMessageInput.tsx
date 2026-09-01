@@ -9,6 +9,7 @@ import styles from './communityRoom.module.css';
 interface CommunityMessageInputProps {
   tab: 'chat' | 'assistant';
   realName: string;
+  botName: string;
   mentionTargets: string[];
   onSendMessage: (message: string) => Promise<boolean>;
   isEmptyRoom?: boolean;
@@ -21,20 +22,21 @@ interface CommunityMessageInputProps {
   offline?: boolean;
 }
 
-const PLACEHOLDER: Record<string, string> = {
+const placeholders = (botName: string): Record<string, string> => ({
   chat: 'Message the room',
   chatEmpty: 'Say the first thing',
-  assistant: 'Ask Berkie',
-};
+  assistant: `Ask ${botName}`,
+});
 
 /**
  * The room's composer. Forked from the shared MessageInput because the
  * Solar Signal design drops the pseudonym pill (rooms use real names) and
- * adds an "Ask Berkie" shortcut alongside the @ mention button.
+ * adds an "Ask [botName]" shortcut alongside the @ mention button.
  */
 export function CommunityMessageInput({
   tab,
   realName,
+  botName,
   mentionTargets,
   onSendMessage,
   isEmptyRoom = false,
@@ -47,7 +49,7 @@ export function CommunityMessageInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const enhancers = useMemo(
-    () => (tab === 'chat' ? [createMentionsEnhancer([...mentionTargets, 'Berkie'])] : []),
+    () => (tab === 'chat' ? [createMentionsEnhancer([...mentionTargets, botName])] : []),
     [tab, mentionTargets],
   );
 
@@ -143,6 +145,7 @@ export function CommunityMessageInput({
     return () => window.removeEventListener('keydown', onWindowKeyDown);
   }, [activeEnhancer, handleEnhancerSelect]);
 
+  const PLACEHOLDER = placeholders(botName);
   const placeholder = tab === 'chat' ? (isEmptyRoom ? PLACEHOLDER.chatEmpty : PLACEHOLDER.chat) : PLACEHOLDER.assistant;
   const disclosure = tab === 'chat' ? `You're posting as ${realName}` : 'Only you can see this conversation';
 
@@ -175,14 +178,14 @@ export function CommunityMessageInput({
                   </span>
                 </IconButton>
                 <IconButton
-                  aria-label="Ask Berkie"
+                  aria-label={`Ask ${botName}`}
                   aria-disabled={offline ? 'true' : undefined}
                   disabled={disabled}
-                  onClick={() => !offline && insertAtCursor('@Berkie ')}
+                  onClick={() => !offline && insertAtCursor(`@${botName} `)}
                   className={`${styles.askBerkieButton}${offline ? ` ${styles.shortcutIdle}` : ''}`}
                 >
                   <BotIcon size={20} color="var(--room-berkie-accent)" />
-                  <span className={styles.askBerkieLabel}>Ask Berkie</span>
+                  <span className={styles.askBerkieLabel}>Ask {botName}</span>
                 </IconButton>
               </>
             )}

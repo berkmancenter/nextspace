@@ -8,40 +8,40 @@ describe('CommunityMessageInput', () => {
   const noop = async () => true;
 
   it('shows the "Message the room" placeholder on the group tab by default', () => {
-    render(<CommunityMessageInput tab="chat" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={noop} />);
+    render(<CommunityMessageInput tab="chat" realName="Priya Raghunathan" botName="Berkie" mentionTargets={[]} onSendMessage={noop} />);
     expect(screen.getByPlaceholderText('Message the room')).toBeInTheDocument();
   });
 
   it('shows the "Say the first thing" placeholder on the group tab when there are no messages yet', () => {
     render(
-      <CommunityMessageInput tab="chat" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={noop} isEmptyRoom />,
+      <CommunityMessageInput tab="chat" realName="Priya Raghunathan" botName="Berkie" mentionTargets={[]} onSendMessage={noop} isEmptyRoom />,
     );
     expect(screen.getByPlaceholderText('Say the first thing')).toBeInTheDocument();
   });
 
   it('shows the "Ask Berkie" placeholder on the assistant tab', () => {
-    render(<CommunityMessageInput tab="assistant" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={noop} />);
+    render(<CommunityMessageInput tab="assistant" realName="Priya Raghunathan" botName="Berkie" mentionTargets={[]} onSendMessage={noop} />);
     expect(screen.getByPlaceholderText('Ask Berkie')).toBeInTheDocument();
   });
 
   it('shows the group-chat disclosure line with the real name', () => {
-    render(<CommunityMessageInput tab="chat" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={noop} />);
+    render(<CommunityMessageInput tab="chat" realName="Priya Raghunathan" botName="Berkie" mentionTargets={[]} onSendMessage={noop} />);
     expect(screen.getByText("You're posting as Priya Raghunathan")).toBeInTheDocument();
   });
 
   it('shows the assistant-tab disclosure line', () => {
-    render(<CommunityMessageInput tab="assistant" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={noop} />);
+    render(<CommunityMessageInput tab="assistant" realName="Priya Raghunathan" botName="Berkie" mentionTargets={[]} onSendMessage={noop} />);
     expect(screen.getByText('Only you can see this conversation')).toBeInTheDocument();
   });
 
   it('shows the @ mention and Ask Berkie buttons on the group tab', () => {
-    render(<CommunityMessageInput tab="chat" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={noop} />);
+    render(<CommunityMessageInput tab="chat" realName="Priya Raghunathan" botName="Berkie" mentionTargets={[]} onSendMessage={noop} />);
     expect(screen.getByRole('button', { name: 'Mention a member' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ask Berkie' })).toBeInTheDocument();
   });
 
   it('hides the @ mention and Ask Berkie buttons on the assistant tab', () => {
-    render(<CommunityMessageInput tab="assistant" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={noop} />);
+    render(<CommunityMessageInput tab="assistant" realName="Priya Raghunathan" botName="Berkie" mentionTargets={[]} onSendMessage={noop} />);
     expect(screen.queryByRole('button', { name: 'Mention a member' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Ask Berkie' })).not.toBeInTheDocument();
   });
@@ -52,6 +52,7 @@ describe('CommunityMessageInput', () => {
       <CommunityMessageInput
         tab="chat"
         realName="Priya Raghunathan"
+        botName="Berkie"
         mentionTargets={['Sofia Marchetti']}
         onSendMessage={noop}
       />,
@@ -66,7 +67,7 @@ describe('CommunityMessageInput', () => {
 
   it('inserts the mention at the current cursor position rather than replacing existing text', async () => {
     const user = userEvent.setup();
-    render(<CommunityMessageInput tab="chat" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={noop} />);
+    render(<CommunityMessageInput tab="chat" realName="Priya Raghunathan" botName="Berkie" mentionTargets={[]} onSendMessage={noop} />);
 
     const textarea = screen.getByPlaceholderText('Message the room') as HTMLTextAreaElement;
     await user.type(textarea, 'hello ');
@@ -79,7 +80,7 @@ describe('CommunityMessageInput', () => {
     const user = userEvent.setup();
     const onSendMessage = jest.fn().mockResolvedValue(true);
     render(
-      <CommunityMessageInput tab="chat" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={onSendMessage} />,
+      <CommunityMessageInput tab="chat" realName="Priya Raghunathan" botName="Berkie" mentionTargets={[]} onSendMessage={onSendMessage} />,
     );
 
     const textarea = screen.getByPlaceholderText('Message the room');
@@ -92,7 +93,7 @@ describe('CommunityMessageInput', () => {
   it('keeps the shortcuts visible but unavailable while the connection is down', async () => {
     const user = userEvent.setup();
     render(
-      <CommunityMessageInput tab="chat" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={noop} offline />,
+      <CommunityMessageInput tab="chat" realName="Priya Raghunathan" botName="Berkie" mentionTargets={[]} onSendMessage={noop} offline />,
     );
 
     const askBerkie = screen.getByRole('button', { name: 'Ask Berkie' });
@@ -111,6 +112,7 @@ describe('CommunityMessageInput', () => {
       <CommunityMessageInput
         tab="chat"
         realName="Priya Raghunathan"
+        botName="Berkie"
         mentionTargets={[]}
         onSendMessage={onSendMessage}
         offline
@@ -125,14 +127,14 @@ describe('CommunityMessageInput', () => {
 
   it('has no accessibility violations on the group tab', async () => {
     const { container } = render(
-      <CommunityMessageInput tab="chat" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={noop} />,
+      <CommunityMessageInput tab="chat" realName="Priya Raghunathan" botName="Berkie" mentionTargets={[]} onSendMessage={noop} />,
     );
     expect(await axe(container)).toHaveNoViolations();
   });
 
   it('has no accessibility violations on the assistant tab', async () => {
     const { container } = render(
-      <CommunityMessageInput tab="assistant" realName="Priya Raghunathan" mentionTargets={[]} onSendMessage={noop} />,
+      <CommunityMessageInput tab="assistant" realName="Priya Raghunathan" botName="Berkie" mentionTargets={[]} onSendMessage={noop} />,
     );
     expect(await axe(container)).toHaveNoViolations();
   });
