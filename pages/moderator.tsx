@@ -320,6 +320,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
                 socket={socket}
                 conversationId={router.query.conversationId as string}
                 transcriptPasscode={transcriptPasscode}
+                moderatorPasscode={modPasscode}
                 showControls={true}
                 lastReconnectTime={lastReconnectTime}
                 setErrorMessage={setGeneralError}
