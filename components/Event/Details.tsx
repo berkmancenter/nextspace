@@ -349,7 +349,7 @@ export const EventDetails: React.FC<{
 
         <Subhead className="mt-4">Features</Subhead>
         {ORGANIZER_FEATURES.map(({ name, label, defaultEnabled }) => {
-          const conversationFeature = conversationData.features?.find((f) => f.name === name);
+          const conversationFeature = conversationData.features?.find((f: { name: string }) => f.name === name);
           const enabled = conversationFeature ? (conversationFeature.enabled ?? true) : defaultEnabled;
           return (
             <div
@@ -378,7 +378,7 @@ export const EventDetails: React.FC<{
       >
         <Subhead>Moderator</Subhead>
         {conversationData.moderators && conversationData.moderators.length > 0 ? (
-          conversationData.moderators.map((moderator, index) => (
+          conversationData.moderators.map((moderator: { name: string; bio?: string }, index) => (
             <div key={index} className="mt-1">
               <p className="text-[14px] font-bold text-[#0B0D0E]">{moderator.name}</p>
               {moderator.bio && <p className="text-[14px] text-[#4B5563]">{moderator.bio}</p>}
