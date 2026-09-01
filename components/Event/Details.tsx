@@ -245,8 +245,8 @@ export const EventDetails: React.FC<{
           >
             {isPublicSeries ? <PublicOutlined fontSize="inherit" /> : <LockOutlined fontSize="inherit" />}
             {isPublicSeries
-              ? 'Public series: event transcripts and group chats are retained in memory for Berkie and other bots to reference in the future.'
-              : "Private series: event transcripts and group chats are not retained, so Berkie and other bots won't reference this event in the future."}
+              ? 'Public series: event transcripts and group chats are retained in memory for bots to reference in the future.'
+              : "Private series: event transcripts and group chats are not retained, so bots won't reference this event in the future."}
           </p>
         )}
 

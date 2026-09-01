@@ -15,9 +15,9 @@ interface CommunityNavigationBarProps {
 }
 
 /**
- * The community room's two-tab bottom nav (Group Chat / Berkie). Unlike the
+ * The community room's two-tab bottom nav (Group Chat / Bot). Unlike the
  * shared NavigationBar, this stays a bottom bar at every viewport width per
- * the Solar Signal design, and marks unread Berkie messages with three
+ * the Solar Signal design, and marks unread bot messages with three
  * non-color cues: a dot, a bold/mono label swap, and an aria-label count.
  */
 export function CommunityNavigationBar({
