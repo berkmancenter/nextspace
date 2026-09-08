@@ -1,5 +1,7 @@
 import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
-import { useTheme, useMediaQuery } from '@mui/material';
+import { useTheme, useMediaQuery, IconButton, Tooltip } from '@mui/material';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { AssistantMessage, UserMessage, JargonClarificationMessage } from '../components/messages';
 import { MessageInput } from './MessageInput';
 import { SlashCommand, createSlashCommandEnhancer } from './enhancers/slashCommandEnhancer';
@@ -55,6 +57,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   inactive = false,
 }) => {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [inputHidden, setInputHidden] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -398,16 +401,31 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
               This event has ended. {botName} is no longer active.
             </div>
           ) : (
-            <MessageInput
-              pseudonym={pseudonym}
-              enhancers={enhancers}
-              onSendMessage={onSendMessage}
-              waitingForResponse={waitingForResponse}
-              controlledMode={controlledMode}
-              onExitControlledMode={onExitControlledMode}
-              inputValue={inputValue}
-              onInputChange={onInputChange}
-            />
+            <>
+              <div className="flex items-center justify-end border-t border-gray-200 px-2 py-0.5 bg-white">
+                <Tooltip title={inputHidden ? 'Show input' : 'Hide input'}>
+                  <IconButton
+                    size="small"
+                    onClick={() => setInputHidden((h) => !h)}
+                    aria-label={inputHidden ? 'Show input' : 'Hide input'}
+                  >
+                    {inputHidden ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
+                  </IconButton>
+                </Tooltip>
+              </div>
+              {!inputHidden && (
+                <MessageInput
+                  pseudonym={pseudonym}
+                  enhancers={enhancers}
+                  onSendMessage={onSendMessage}
+                  waitingForResponse={waitingForResponse}
+                  controlledMode={controlledMode}
+                  onExitControlledMode={onExitControlledMode}
+                  inputValue={inputValue}
+                  onInputChange={onInputChange}
+                />
+              )}
+            </>
           )}
         </div>
       </div>

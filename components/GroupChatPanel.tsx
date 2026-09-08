@@ -1,4 +1,4 @@
-import React, { FC, useMemo, useRef } from 'react';
+import React, { FC, useMemo, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { MessageInput } from './MessageInput';
@@ -14,6 +14,8 @@ import { normalizeAssistantPseudonym, parseMessageBody } from '../utils/Helpers'
 import { PollMessage, PollMessageBody } from './messages/PollMessage';
 import { IconButton, Tooltip } from '@mui/material';
 import ArrowCircleDownIcon from '@mui/icons-material/ArrowCircleDown';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 
 /**
  * Render assistant message with markdown support
@@ -90,6 +92,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
 }) => {
   // State for tracking which thread is open in split view
   const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(null);
+  const [inputHidden, setInputHidden] = useState(false);
 
   // Extract unique contributors for mentions
   const contributors = useMemo(
@@ -385,18 +388,31 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
           </div>
         ) : (
           <div ref={messageInputRef} className="flex-shrink-0">
-            <MessageInput
-              pseudonym={pseudonym}
-              pseudonymFunFact={pseudonymFunFact}
-              enhancers={enhancers}
-              onSendMessage={onSendMessage}
-              waitingForResponse={waitingForResponse && !waitingForThreadedReply}
-              controlledMode={controlledMode || null}
-              onExitControlledMode={onExitControlledMode || (() => {})}
-              inputValue={inputValue}
-              onInputChange={onInputChange}
-              disableWhileWaiting={false}
-            />
+            <div className="flex items-center justify-end border-t border-gray-200 px-2 py-0.5 bg-white">
+              <Tooltip title={inputHidden ? 'Show input' : 'Hide input'}>
+                <IconButton
+                  size="small"
+                  onClick={() => setInputHidden((h) => !h)}
+                  aria-label={inputHidden ? 'Show input' : 'Hide input'}
+                >
+                  {inputHidden ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+            </div>
+            {!inputHidden && (
+              <MessageInput
+                pseudonym={pseudonym}
+                pseudonymFunFact={pseudonymFunFact}
+                enhancers={enhancers}
+                onSendMessage={onSendMessage}
+                waitingForResponse={waitingForResponse && !waitingForThreadedReply}
+                controlledMode={controlledMode || null}
+                onExitControlledMode={onExitControlledMode || (() => {})}
+                inputValue={inputValue}
+                onInputChange={onInputChange}
+                disableWhileWaiting={false}
+              />
+            )}
           </div>
         )}
       </div>
