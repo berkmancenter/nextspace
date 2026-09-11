@@ -1,0 +1,184 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Socket } from 'socket.io-client';
+import { Api, ArtifactRequestError, emitWithTokenRefresh, listArtifacts } from '../utils';
+import { Artifact, ArtifactContainer, ArtifactVersionEvent } from '../types.internal';
+
+/**
+ * Parameters for the useArtifacts hook.
+ * @property container - Exactly one of `conversationId` or `topicId`. Null until the router is ready.
+ * @property artifactPasscode - The container's read passcode. Omit it for an owner or admin, who read without one.
+ * @property socket - A connected socket, for live version updates. Omit it and the list is simply static.
+ */
+export interface UseArtifactsParams {
+  container: ArtifactContainer | null;
+  artifactPasscode?: string;
+  socket?: Socket | null;
+}
+
+/**
+ * State and controls the useArtifacts hook provides.
+ * @property artifacts - The container's artifacts, newest first, each at its latest version.
+ * @property loading - True while the first (or a re-issued) list request is in flight.
+ * @property error - Why the list could not be read, or null.
+ * @property needsPasscode - True when the read was refused for want of a passcode, which is the only actionable reading of the endpoint's 403.
+ * @property liveArtifactIds - Ids whose current version arrived over the socket since load, so the UI can mark what just changed.
+ * @property reload - Re-fetches the list.
+ */
+export interface UseArtifactsReturn {
+  artifacts: Artifact[];
+  loading: boolean;
+  error: string | null;
+  needsPasscode: boolean;
+  liveArtifactIds: Set<string>;
+  reload: () => void;
+}
+
+/**
+ * Loads a conversation's or topic's artifacts and keeps them current.
+ *
+ * Conversation-scoped artifacts are revised while the event runs, and every appended
+ * version is broadcast to the conversation room as `artifact:version` carrying the whole
+ * version — so this hook applies the broadcast in place rather than refetching, which also
+ * means it never has to re-present the passcode. It joins the conversation room with no
+ * channels, which is all the bare room requires and all this page is entitled to: the
+ * reader may hold the artifact passcode and no chat credentials at all.
+ *
+ * Topic-scoped artifacts are not broadcast — there is no topic-wide room — so a topic
+ * container is read once and refreshed only by {@link UseArtifactsReturn.reload}.
+ *
+ * See {@link UseArtifactsParams} for parameter details.
+ */
+export function useArtifacts({ container, artifactPasscode, socket }: UseArtifactsParams): UseArtifactsReturn {
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [needsPasscode, setNeedsPasscode] = useState<boolean>(false);
+  const [liveArtifactIds, setLiveArtifactIds] = useState<Set<string>>(new Set());
+  const [reloadCount, setReloadCount] = useState(0);
+
+  /* The handler below has to know whether a broadcast names an artifact already in hand,
+     and a state updater's work is not done by the time it returns — so the current list is
+     mirrored here, where the handler can read it synchronously. */
+  const artifactsRef = useRef<Artifact[]>([]);
+  useEffect(() => {
+    artifactsRef.current = artifacts;
+  }, [artifacts]);
+
+  const conversationId = container?.conversationId ?? null;
+  const topicId = container?.topicId ?? null;
+
+  const reload = useCallback(() => setReloadCount((n) => n + 1), []);
+
+  useEffect(() => {
+    if (!conversationId && !topicId) return;
+
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const containerArg = (conversationId ? { conversationId } : { topicId }) as ArtifactContainer;
+        const result = await listArtifacts(containerArg, artifactPasscode);
+        if (cancelled) return;
+        setArtifacts(result);
+        setError(null);
+        setNeedsPasscode(false);
+      } catch (err) {
+        if (cancelled) return;
+        setArtifacts([]);
+        if (err instanceof ArtifactRequestError && err.needsPasscode) {
+          // A wrong passcode, a missing one, and an unknown id are one indistinguishable
+          // 403, so the only thing worth telling the visitor is that a passcode is what's
+          // missing — never that the artifact doesn't exist.
+          setNeedsPasscode(true);
+          setError(null);
+        } else {
+          setNeedsPasscode(false);
+          setError(err instanceof Error ? err.message : 'Could not load artifacts.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId, topicId, artifactPasscode, reloadCount]);
+
+  // Join the bare conversation room so the socket receives this conversation's
+  // `artifact:version` broadcasts. Passing no channels is deliberate: the room itself needs
+  // none, and a reader holding only the artifact passcode has no channel passcode to offer.
+  const hasJoinedRef = useRef(false);
+  useEffect(() => {
+    if (!socket || !conversationId) return;
+    hasJoinedRef.current = false;
+
+    const join = () => {
+      if (hasJoinedRef.current) return;
+      hasJoinedRef.current = true;
+      emitWithTokenRefresh(
+        socket,
+        'conversation:join',
+        { conversationId, token: Api.get().getAccessToken(), channels: [] },
+        () => console.log('Joined conversation room for artifact updates'),
+        (err) => {
+          console.error('Failed to join conversation room for artifact updates:', err);
+          hasJoinedRef.current = false;
+        },
+      );
+    };
+
+    const onConnect = () => {
+      hasJoinedRef.current = false;
+      join();
+    };
+
+    socket.on('connect', onConnect);
+    if (socket.connected) join();
+
+    return () => {
+      socket.off('connect', onConnect);
+    };
+  }, [socket, conversationId]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const onArtifactVersion = (event: ArtifactVersionEvent) => {
+      console.log('artifact:version received', event.artifactId, event.version?.versionNumber);
+      if (!event?.artifactId || !event.version) return;
+
+      const known = artifactsRef.current.some((artifact) => artifact.id === event.artifactId);
+      if (!known) {
+        // An artifact created after this list was read. Its first version is the only notice
+        // we get, and we hold nothing else about it, so re-read the list.
+        reload();
+        return;
+      }
+
+      setArtifacts((prev) =>
+        prev.map((artifact) => {
+          if (artifact.id !== event.artifactId) return artifact;
+          // The payload is the whole artifact, not a patch, so the new version replaces the
+          // current one outright. versionNumber only ever moves forward, but a broadcast
+          // that crosses a reload can arrive stale, so an older one is ignored.
+          if (event.version.versionNumber < artifact.currentVersionNumber) return artifact;
+          return {
+            ...artifact,
+            currentVersion: event.version,
+            currentVersionNumber: event.version.versionNumber,
+          };
+        }),
+      );
+      setLiveArtifactIds((prev) => new Set(prev).add(event.artifactId));
+    };
+
+    socket.on('artifact:version', onArtifactVersion);
+    return () => {
+      socket.off('artifact:version', onArtifactVersion);
+    };
+  }, [socket, reload]);
+
+  return { artifacts, loading, error, needsPasscode, liveArtifactIds, reload };
+}

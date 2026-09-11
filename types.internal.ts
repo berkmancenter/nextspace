@@ -264,3 +264,198 @@ export interface LoungeRoom {
   lastMessageAt: string | null;
   hasUnread: boolean;
 }
+
+/* ---------------------------------------------------------------------------
+ * Artifacts
+ *
+ * Shared objects that emerge from one or more conversations. These shapes are all
+ * published in the backend's OpenAPI spec (`Artifact`, `ArtifactVersion`,
+ * `ConceptGraphPayload`, `GraphConcept`, `GraphContribution`, `GraphOriginPrompt`,
+ * `GraphNodeProvenance`), but the branch that adds them (llm_engine's bm/artifacts)
+ * has not merged, so `types.ts` has no trace of them yet. Written out by hand here
+ * for the same reason `Conversation.draft` above is — delete this block and switch
+ * to `components['schemas'][...]` once types.ts is regenerated against a main that
+ * carries them.
+ * ------------------------------------------------------------------------- */
+
+/** Which renderer an artifact needs, and what shape its version payload has. */
+export type ArtifactType = 'DocumentArtifact' | 'ConceptGraphArtifact';
+
+/**
+ * Where a graph node came from. Every field is optional: a node assembled from several
+ * conversations, or written by an organizer rather than drawn from a message, may carry
+ * none of it.
+ *
+ * DO NOT RENDER THIS TO A PASSCODE HOLDER. Generated graphs are unattributed by design —
+ * the events they come from are held under the Chatham House Rule, so what was said may be
+ * used but who said it may not be revealed, affiliation included. `messageId` resolves to a
+ * message that has an owner, which re-identifies the contributor, and `pseudonym` names one
+ * outright. Any affordance built on either — jump-to-message above all — has to be gated to
+ * organizers, not to everyone holding the artifact passcode. Nothing in this app renders
+ * these fields today, and that is deliberate rather than unfinished.
+ *
+ * @property {string} [conversationId] - The conversation the node was drawn from; topic graphs draw on several.
+ * @property {string} [messageId] - The message it came from. Re-identifying: organizer-gated affordances only.
+ * @property {string} [pseudonym] - Who contributed it. Re-identifying: organizer-gated affordances only.
+ */
+export interface GraphNodeProvenance {
+  conversationId?: string;
+  messageId?: string;
+  pseudonym?: string;
+}
+
+/**
+ * An idea or entity in a concept graph.
+ * @property {string} id - Opaque and stable; key on this, never on the label.
+ * @property {string} label - What the client draws.
+ * @property {string} [origin] - Id of the GraphOriginPrompt this concept came out of.
+ */
+export interface GraphConcept {
+  id: string;
+  label: string;
+  origin?: string;
+  provenance?: GraphNodeProvenance;
+}
+
+/**
+ * A relationship between concepts, reified as its own node rather than left as an edge —
+ * which is what lets one contribution join three or more concepts at once. Concepts never
+ * reference each other directly; they are always joined through a contribution.
+ * @property {string} kind - The relationship's name, and the short label drawn on the node.
+ * @property {string} [statement] - What the conversation said about the relationship, in a sentence.
+ * @property {string[]} concepts - Ids of the concepts this relationship joins; one or more, and more than two is normal.
+ * @property {string} [origin] - Id of the GraphOriginPrompt this contribution came out of.
+ */
+export interface GraphContribution {
+  id: string;
+  kind: string;
+  statement?: string;
+  concepts: string[];
+  origin?: string;
+  provenance?: GraphNodeProvenance;
+}
+
+/**
+ * The prompt or question a concept or contribution came out of: the third node kind.
+ * Attached by a direct `origin` reference rather than through a contribution, since an
+ * origin is attribution rather than a relationship between concepts.
+ */
+export interface GraphOriginPrompt {
+  id: string;
+  text: string;
+  provenance?: GraphNodeProvenance;
+}
+
+/**
+ * The version payload of a ConceptGraphArtifact. Every array defaults to empty, so an
+ * artifact can exist before an event has filled it in — render an empty state rather than
+ * assuming nodes. Ids are unique across all three arrays, and the backend guarantees every
+ * id in `contributions[].concepts` and every `origin` names a node in the same payload, so
+ * lookups need no null-guarding.
+ */
+export interface ConceptGraphPayload {
+  concepts: GraphConcept[];
+  contributions: GraphContribution[];
+  originPrompts: GraphOriginPrompt[];
+}
+
+/** The version payload of a DocumentArtifact: a single body of text. */
+export interface DocumentPayload {
+  body: string;
+}
+
+export type ArtifactPayload = DocumentPayload | ConceptGraphPayload;
+
+/**
+ * One immutable revision of an artifact. Versions are append-only, and each carries the
+ * whole payload rather than a patch.
+ * @property {number} versionNumber - 1-based and strictly increasing, but NOT contiguous: a
+ *   failed append burns a number. Use it for ordering and display, never as a count.
+ * @property {string} [note] - Free-text note on what changed, for the history view.
+ */
+export interface ArtifactVersion {
+  id: string;
+  artifact: string;
+  versionNumber: number;
+  payload: ArtifactPayload;
+  createdBy?: string;
+  note?: string;
+  createdAt?: string;
+}
+
+/**
+ * A shared object scoped to one conversation or one topic. The artifact's content is the
+ * payload of its `currentVersion`; every earlier version stays readable through the
+ * versions endpoints.
+ * @property {ArtifactType} type - Switch the renderer on this. Published as `type`, never as mongoose's `__t`.
+ * @property {string} topic - Always set, conversation-scoped artifacts included.
+ * @property {string} [conversation] - Set only when `scope` is "conversation".
+ * @property {ArtifactVersion} [currentVersion] - Populated by the fetch and list endpoints.
+ * @property {boolean} locked - When true no further versions may be appended; the artifact stays readable.
+ */
+export interface Artifact {
+  id: string;
+  type: ArtifactType;
+  scope: 'topic' | 'conversation';
+  topic: string;
+  conversation?: string;
+  title: string;
+  description?: string;
+  currentVersion?: ArtifactVersion;
+  currentVersionNumber: number;
+  createdBy?: string;
+  locked: boolean;
+  createdAt?: string;
+}
+
+/** A page of an artifact's history, as the versions endpoint returns it. */
+export interface ArtifactVersionPage {
+  results: ArtifactVersion[];
+  page: number;
+  limit: number;
+  totalPages: number;
+  totalResults: number;
+}
+
+/**
+ * The `artifact:version` socket event, broadcast to the conversation room whenever a
+ * version is appended. It carries the version itself so a client can re-render without
+ * refetching — and so it never has to re-present the passcode over the socket.
+ */
+export interface ArtifactVersionEvent {
+  artifactId: string;
+  type: ArtifactType;
+  title: string;
+  version: ArtifactVersion;
+}
+
+/**
+ * Which container's artifacts to read. Exactly one of the two is set — the API rejects
+ * both and neither.
+ */
+export type ArtifactContainer = { conversationId: string; topicId?: never } | { topicId: string; conversationId?: never };
+
+/**
+ * What POST /v1/artifacts/generate answers with.
+ *
+ * A run that finds too little of the event record to map, or whose output does not survive
+ * the Chatham House checks, is a success with nothing to show rather than a failure: it
+ * answers `generated: false` with a reason. A run that wrote something answers
+ * `generated: true` with the artifact, the version it appended, and what the assembly and
+ * safety passes removed on the way.
+ * @property {boolean} generated - Whether a version was written.
+ * @property {string} [reason] - Why nothing was written, when nothing was.
+ */
+export interface ConceptGraphGenerationResult {
+  generated: boolean;
+  reason?: string;
+  artifact?: Artifact;
+  version?: ArtifactVersion;
+  report?: {
+    droppedConcepts?: number;
+    droppedContributions?: number;
+    droppedStatements?: number;
+    droppedOriginPrompts?: number;
+    mergedConcepts?: number;
+  };
+}
