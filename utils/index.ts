@@ -22,5 +22,22 @@ export {
   fetchArtifactVersion,
   fetchArtifactPasscode,
 } from './artifacts';
-export { buildGraph, computeFitTransform, connectedIds, describeGraph, linkEndpointId } from './conceptGraph';
-export type { BuiltGraph, FitTransform, GraphNodeType, GraphSimLink, GraphSimNode, NodeExtent } from './conceptGraph';
+export {
+  buildGraph,
+  computeFitTransform,
+  connectedIds,
+  describeGraph,
+  estimateTextWidth,
+  linkEndpointId,
+  selectVisibleLabels,
+  sessionIndexById,
+} from './conceptGraph';
+export type {
+  BuiltGraph,
+  FitTransform,
+  GraphNodeType,
+  GraphSimLink,
+  GraphSimNode,
+  LabelCandidate,
+  NodeExtent,
+} from './conceptGraph';

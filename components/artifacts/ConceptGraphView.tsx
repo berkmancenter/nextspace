@@ -10,7 +10,10 @@ import {
   computeFitTransform,
   connectedIds,
   describeGraph,
+  estimateTextWidth,
   linkEndpointId,
+  selectVisibleLabels,
+  sessionIndexById,
   type GraphSimNode,
 } from '../../utils/conceptGraph';
 import { ConceptGraphPayload } from '../../types.internal';
@@ -29,6 +32,11 @@ interface ConceptGraphViewProps {
    kind of thing rather than a variant of the same one; origin prompts a teal that is
    neither. All three pass AA against the white canvas. */
 const CONCEPT = '#4845D2';
+/* Concepts on a series graph are coloured by the session that raised them. Five hues that
+   stay apart from each other, from the contribution amber, and against white; a sixth session
+   and beyond falls back to the plain concept colour rather than inventing a hue nobody can
+   tell from the last one. */
+const SESSION_COLORS = ['#4845D2', '#0E7490', '#9333EA', '#166534', '#B91C1C'];
 const CONTRIBUTION = '#B45309';
 const CONTRIBUTION_FILL = '#B4530914';
 const ORIGIN = '#0E7490';
@@ -50,9 +58,14 @@ const MAX_SCALE = 6;
 const FIT_MARGIN = 0.92;
 /** How far a label hangs below the node it belongs to, which the fit has to allow for. */
 const LABEL_DROP = 18;
-/** The alpha below which the layout has stopped moving enough to be worth framing. */
-const FIT_AT_ALPHA = 0.08;
+/** How often to re-frame a settling layout. Every tick would be wasted work at 60fps. */
+const FIT_EVERY_TICKS = 4;
 const ORIGIN_PILL_HEIGHT = 22;
+const CONCEPT_LABEL_SIZE = 11.5;
+/** The golden angle, which is what spreads a spiral evenly rather than into spokes. */
+const SEED_ANGLE = Math.PI * (3 - Math.sqrt(5));
+const SEED_SPACING = 24;
+const CONTRIBUTION_LABEL_SIZE = 9.5;
 
 /** How many characters of an origin prompt fit in its pill before it needs eliding. */
 const ORIGIN_LABEL_MAX = 32;
@@ -85,18 +98,31 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
   /* Set once the reader zooms or pans deliberately, after which the view is theirs and
      auto-fit stops touching it. */
   const hasUserZoomedRef = useRef(false);
-  /** Whether this layout has been framed yet, so it is framed once rather than every tick. */
-  const hasFittedRef = useRef(false);
 
   const [width, setWidth] = useState<number>(720);
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // Bumped on every simulation tick to pull the freshly written node positions into a render.
-  const [, setTick] = useState(0);
+  /* Bumped on every simulation tick to pull the freshly written node positions into a
+     render. It is also a dependency of the label layout below: d3 moves nodes by mutating
+     them in place, so the array they live in never changes identity and is no signal at all
+     that anything has moved. */
+  const [tick, setTick] = useState(0);
 
   const { simNodes, links, originLinks, degree } = useMemo(() => buildGraph(payload), [payload]);
   const isEmpty = simNodes.length === 0;
+
+  /* A series graph folds in every event under a topic, so which session raised a concept is
+     worth seeing; a single event's graph has nothing to distinguish and this is empty. */
+  const sessions = useMemo(() => sessionIndexById(payload), [payload]);
+
+  const conceptColor = useCallback(
+    (node: GraphSimNode) => {
+      const session = node.provenance?.conversationId ? sessions.get(node.provenance.conversationId) : undefined;
+      return session === undefined ? CONCEPT : (SESSION_COLORS[session] ?? CONCEPT);
+    },
+    [sessions],
+  );
 
   const rConcept = useMemo(() => {
     const maxDegree =
@@ -163,16 +189,28 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
     if (isEmpty) return;
 
     const positions = positionsRef.current;
-    for (const node of simNodes) {
+    /* A node keeps the place it held in the previous version — ids are stable across
+       versions, so a concept that survived a revision is the same node and should not jump.
+       Anything new starts on a small spiral around the middle of the canvas: d3's own
+       initial placement is centred on the origin, which is the top-left corner here, so the
+       first frame would otherwise be drawn off the edge before the forces pull it back. */
+    simNodes.forEach((node, i) => {
       const previous = positions.get(node.id);
       if (previous) {
         node.x = previous.x;
         node.y = previous.y;
+        return;
       }
-    }
+      if (node.x === undefined || node.y === undefined) {
+        const angle = i * SEED_ANGLE;
+        const radius = SEED_SPACING * Math.sqrt(i + 0.5);
+        node.x = width / 2 + radius * Math.cos(angle);
+        node.y = height / 2 + radius * Math.sin(angle);
+      }
+    });
 
-    // A fresh layout gets a fresh fit: this run's nodes are somewhere new.
-    hasFittedRef.current = false;
+    // Counted per run, so a fresh layout is framed from its first frames.
+    let ticksSinceFit = FIT_EVERY_TICKS;
 
     const simulation = forceSimulation<GraphSimNode>(simNodes)
       .force(
@@ -190,17 +228,24 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
       .force('center', forceCenter(width / 2, height / 2))
       .on('tick', () => {
         setTick((t) => t + 1);
-        /* Frame the graph as soon as the layout has cooled enough to have stopped moving
-           much, rather than waiting for the simulation's 'end' event: a resize or a remount
-           restarts the simulation, and one that keeps restarting never reaches 'end' at all,
-           which would leave the graph running off every edge of the canvas.
+        /* Keep the graph framed as it settles, rather than framing it once at the end.
+           A force layout spreads for a second or two after it starts, and it knows nothing
+           about the size of the box it is drawn in, so a graph framed only at the end spends
+           that whole time with nodes wandering off the edges — and a simulation that keeps
+           being restarted by a resize or a remount never reaches its end event at all.
 
-           Never over someone who has taken hold of the view, though — a version arriving
-           mid-inspection must not yank it away from them. */
-        if (!hasFittedRef.current && simulation.alpha() < FIT_AT_ALPHA) {
-          hasFittedRef.current = true;
-          if (!hasUserZoomedRef.current) fitToViewRef.current();
+           Never over someone who has taken hold of the view, though: once the reader has
+           zoomed or panned, the view is theirs, and a version arriving mid-inspection must
+           not yank it away from them. */
+        ticksSinceFit += 1;
+        if (!hasUserZoomedRef.current && ticksSinceFit >= FIT_EVERY_TICKS) {
+          ticksSinceFit = 0;
+          fitToViewRef.current();
         }
+      })
+      // And once more when it stops for good, on the arrangement the reader is left with.
+      .on('end', () => {
+        if (!hasUserZoomedRef.current) fitToViewRef.current();
       });
 
     return () => {
@@ -290,9 +335,75 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
   const activeNode = activeId ? simNodes.find((n) => n.id === activeId) : undefined;
   const nodeById = useMemo(() => new Map(simNodes.map((n) => [n.id, n])), [simNodes]);
 
-  // Labels fade in continuously as you zoom past ~0.7x, so a dense graph reads as shape
-  // first and text second.
-  const labelOpacity = Math.max(0, Math.min(1, (transform.k - 0.45) / 0.35));
+  /**
+   * Which labels to draw, and where, in screen coordinates.
+   *
+   * Every concept and contribution wants a label; in a dense graph they cannot all have one
+   * without printing over each other, so the better-connected node wins the space. Whatever
+   * is under the cursor keeps its label regardless, along with everything it is joined to,
+   * since that is precisely what the reader is asking about.
+   */
+  const visibleLabels = useMemo(() => {
+    const candidates = simNodes
+      .filter((node) => node.type !== 'origin' && node.x !== undefined && node.y !== undefined)
+      .map((node) => {
+        const fontSize = node.type === 'concept' ? CONCEPT_LABEL_SIZE : CONTRIBUTION_LABEL_SIZE;
+        const mono = node.type === 'contribution';
+        return {
+          node,
+          mono,
+          fontSize,
+          isActive: activeId === node.id,
+          // Screen position: the node's place in the graph, put through the current zoom.
+          x: node.x! * transform.k + transform.x,
+          y: node.y! * transform.k + transform.y + radiusOf(node) * transform.k + fontSize + 3,
+          width: estimateTextWidth(node.label, fontSize, mono ? 0.62 : 0.55),
+          height: fontSize,
+          priority: degree.get(node.id) ?? 0,
+          required: activeId === node.id || (!!lit && lit.has(node.id)),
+        };
+      })
+      .filter((candidate) => {
+        // Nothing outside the canvas is worth the space it would take from a label inside it.
+        const margin = candidate.width / 2;
+        return (
+          candidate.x > -margin && candidate.x < width + margin && candidate.y > 0 && candidate.y < height + candidate.height
+        );
+      });
+
+    /* An origin prompt draws its text inside its own pill, in the zoomed layer, so it is
+       never a candidate here — but it is very much in the way. Passing the pills in as
+       already-placed boxes is what keeps a label from being printed across one. */
+    const pills = simNodes
+      .filter((node) => node.type === 'origin' && node.x !== undefined && node.y !== undefined)
+      .map((node) => ({
+        id: node.id,
+        x: node.x! * transform.k + transform.x,
+        y: node.y! * transform.k + transform.y,
+        width: originWidth(node) * transform.k,
+        height: ORIGIN_PILL_HEIGHT * transform.k,
+        priority: Number.POSITIVE_INFINITY,
+        required: true,
+      }));
+
+    const visible = selectVisibleLabels([
+      ...pills,
+      ...candidates.map(({ node, x, y, width: w, height: h, priority, required }) => ({
+        id: node.id,
+        x,
+        y,
+        width: w,
+        height: h,
+        priority,
+        required,
+      })),
+    ]);
+
+    return candidates.filter((candidate) => visible.has(candidate.node.id));
+    // `tick` is in the dependency list because node positions are mutated in place: without
+    // it the labels would stay where the nodes started while the nodes themselves moved off.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simNodes, tick, transform, radiusOf, originWidth, degree, activeId, lit, width, height]);
 
   const description = useMemo(() => describeGraph(payload), [payload]);
 
@@ -353,7 +464,22 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
           {transform.k.toFixed(2)}x
         </Typography>
         <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', ml: 'auto' }}>
-          <LegendChip color={CONCEPT} shape="circle" label="concept" />
+          {sessions.size > 0 ? (
+            /* Sessions are numbered by first appearance: a conversation id says nothing to a
+               reader, and a session is the one piece of provenance safe to show them. */
+            Array.from(sessions.values())
+              .sort((a, b) => a - b)
+              .map((index) => (
+                <LegendChip
+                  key={index}
+                  color={SESSION_COLORS[index] ?? CONCEPT}
+                  shape="circle"
+                  label={`session ${index + 1}`}
+                />
+              ))
+          ) : (
+            <LegendChip color={CONCEPT} shape="circle" label="concept" />
+          )}
           <LegendChip color={CONTRIBUTION} shape="diamond" label="contribution" />
           <LegendChip color={ORIGIN} shape="pill" label="origin prompt" />
         </Box>
@@ -398,11 +524,11 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
               const r = radiusOf(node);
               const dim = !!lit && !lit.has(node.id);
               const isActive = activeId === node.id;
-              const labelFade = isActive ? 1 : Math.max(labelOpacity, r / 34);
 
               return (
                 <g
                   key={node.id}
+                  data-node-id={node.id}
                   transform={`translate(${node.x},${node.y})`}
                   opacity={dim ? 0.25 : 1}
                   onMouseEnter={() => setHoverId(node.id)}
@@ -413,7 +539,7 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
                   {node.type === 'concept' && (
                     <circle
                       r={r}
-                      fill={CONCEPT}
+                      fill={conceptColor(node)}
                       fillOpacity={0.85}
                       stroke={isActive ? TEXT : '#FFFFFF'}
                       strokeWidth={isActive ? 2.5 : 1}
@@ -445,29 +571,19 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
                     />
                   )}
 
-                  {node.type === 'origin' ? (
+                  {/* An origin prompt's text sits inside its own pill, which is the shape of
+                      the node rather than a label beside it. Concept and contribution labels
+                      are drawn in the overlay below, at a fixed size. */}
+                  {node.type === 'origin' && (
                     <text
                       y={4}
                       textAnchor="middle"
                       fontSize={9.5}
                       fontFamily="ui-monospace, monospace"
                       fill={ORIGIN}
-                      opacity={labelFade}
                       style={{ pointerEvents: 'none' }}
                     >
                       {truncate(node.label, ORIGIN_LABEL_MAX)}
-                    </text>
-                  ) : (
-                    <text
-                      y={r + 13}
-                      textAnchor="middle"
-                      fontSize={node.type === 'concept' ? 11 : 9.5}
-                      fontFamily={node.type === 'concept' ? 'inherit' : 'ui-monospace, monospace'}
-                      fill={isActive ? TEXT : LABEL}
-                      opacity={labelFade}
-                      style={{ pointerEvents: 'none' }}
-                    >
-                      {node.label}
                     </text>
                   )}
                 </g>
@@ -475,9 +591,34 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
             })}
           </g>
         </g>
+
+        {/* Labels live outside the zoomed layer, so they keep one size however far in the
+            reader zooms — which is what lets zooming spread crowded nodes apart until their
+            labels stop colliding and reappear. */}
+        <g>
+          {visibleLabels.map(({ node, x, y, fontSize, mono, isActive }) => (
+            <text
+              key={node.id}
+              x={x}
+              y={y}
+              textAnchor="middle"
+              fontSize={fontSize}
+              fontFamily={mono ? 'ui-monospace, monospace' : 'inherit'}
+              fill={isActive ? TEXT : LABEL}
+              opacity={!!lit && !lit.has(node.id) ? 0.25 : 1}
+              style={{ pointerEvents: 'none' }}
+            >
+              {node.label}
+            </text>
+          ))}
+        </g>
       </svg>
 
-      <NodeDetail node={activeNode} degree={activeNode ? (degree.get(activeNode.id) ?? 0) : 0} />
+      <NodeDetail
+        node={activeNode}
+        degree={activeNode ? (degree.get(activeNode.id) ?? 0) : 0}
+        session={activeNode?.provenance?.conversationId ? sessions.get(activeNode.provenance.conversationId) : undefined}
+      />
     </Box>
   );
 };
@@ -490,7 +631,7 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
  * of events held under the Chatham House Rule, and anyone reaching this page holds only the
  * artifact passcode. See {@link GraphNodeProvenance}.
  */
-function NodeDetail({ node, degree }: { node?: GraphSimNode; degree: number }) {
+function NodeDetail({ node, degree, session }: { node?: GraphSimNode; degree: number; session?: number }) {
   if (!node) {
     return (
       <Typography variant="caption" sx={{ display: 'block', mt: 1, color: MUTED }}>
@@ -513,6 +654,7 @@ function NodeDetail({ node, degree }: { node?: GraphSimNode; degree: number }) {
       >
         {kindLabel}
         {node.type !== 'origin' && ` · joins ${degree}`}
+        {session !== undefined && ` · session ${session + 1}`}
       </Typography>
       <Typography variant="body2" sx={{ color: TEXT, fontWeight: 500 }}>
         {node.label}

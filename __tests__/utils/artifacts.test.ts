@@ -128,10 +128,19 @@ describe('fetchArtifactPasscode', () => {
 });
 
 describe('generateConceptGraph', () => {
+  it('asks for a series graph when given a topic', async () => {
+    mockSendData.mockResolvedValue({ generated: true, version: { versionNumber: 1 } });
+
+    await generateConceptGraph({ topicId: 'topic-1' });
+
+    // One key, not both: the endpoint takes exactly one container.
+    expect(mockSendData).toHaveBeenCalledWith('artifacts/generate', { topicId: 'topic-1' }, 'test-token');
+  });
+
   it('posts the conversation to the generate endpoint', async () => {
     mockSendData.mockResolvedValue({ generated: true, version: { versionNumber: 4 } });
 
-    await generateConceptGraph('conv-1');
+    await generateConceptGraph({ conversationId: 'conv-1' });
 
     expect(mockSendData).toHaveBeenCalledWith('artifacts/generate', { conversationId: 'conv-1' }, 'test-token');
   });
@@ -139,7 +148,7 @@ describe('generateConceptGraph', () => {
   it('passes a run that mapped nothing back as a result rather than an error', async () => {
     mockSendData.mockResolvedValue({ generated: false, reason: 'Not enough of the event record to map' });
 
-    await expect(generateConceptGraph('conv-1')).resolves.toEqual({
+    await expect(generateConceptGraph({ conversationId: 'conv-1' })).resolves.toEqual({
       generated: false,
       reason: 'Not enough of the event record to map',
     });
@@ -148,6 +157,6 @@ describe('generateConceptGraph', () => {
   it('throws when the endpoint refuses the caller', async () => {
     mockSendData.mockResolvedValue({ error: true, status: 403, message: 'Forbidden' });
 
-    await expect(generateConceptGraph('conv-1')).rejects.toBeInstanceOf(ArtifactRequestError);
+    await expect(generateConceptGraph({ conversationId: 'conv-1' })).rejects.toBeInstanceOf(ArtifactRequestError);
   });
 });

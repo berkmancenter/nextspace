@@ -148,17 +148,25 @@ export const fetchArtifactPasscode = async (container: ArtifactContainer): Promi
 };
 
 /**
- * Builds a concept graph from a finished event's transcript and group chat.
+ * Builds a concept graph from a finished event, or folds a whole series into one.
  *
  * Administrators only, and safe to re-run: a second run appends a version to the existing
  * graph rather than replacing it or creating a duplicate, so a poor extraction can be redone
  * with both attempts left readable and comparable.
  *
+ * A topic container asks for the series graph, which is refined rather than rebuilt — each
+ * event merges into what the series already knows — so its version history is a record of how
+ * the group's understanding developed. Running it on a topic also backfills a series that
+ * predates the feature.
+ *
  * A run that finds too little to map, or whose output does not survive the Chatham House
  * checks, comes back with `generated: false` and a reason. That is a result, not an error,
  * and has to be shown as one.
+ *
+ * @param container - Exactly one of `conversationId` (one event) or `topicId` (the series).
  */
-export const generateConceptGraph = async (conversationId: string): Promise<ConceptGraphGenerationResult> => {
-  const response = await SendData('artifacts/generate', { conversationId }, Api.get().getAccessToken());
+export const generateConceptGraph = async (container: ArtifactContainer): Promise<ConceptGraphGenerationResult> => {
+  const body = container.conversationId ? { conversationId: container.conversationId } : { topicId: container.topicId };
+  const response = await SendData('artifacts/generate', body, Api.get().getAccessToken());
   return unwrap<ConceptGraphGenerationResult>(response, 'Could not generate a concept graph.');
 };

@@ -227,3 +227,101 @@ export function computeFitTransform(
     y: height / 2 - (k * (minY + maxY)) / 2,
   };
 }
+
+/**
+ * A label wanting to be drawn, measured in screen pixels.
+ * @property {number} priority - Higher wins a collision. Degree is the natural choice: the better-connected node is the one worth naming.
+ * @property {boolean} [required] - Never dropped. The node under the cursor and its neighbours are named whatever else has to give way.
+ */
+export interface LabelCandidate {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  priority: number;
+  required?: boolean;
+}
+
+/**
+ * Chooses which labels can be drawn without overlapping each other.
+ *
+ * A force layout puts nodes where the forces leave them, which in a dense graph is close
+ * enough together that their labels collide and the text becomes unreadable — several words
+ * printed over each other are worth less than one word printed clearly. So labels are placed
+ * greedily, best first, and one that will not fit is left out rather than drawn on top of
+ * what is already there.
+ *
+ * This only works on labels of a fixed screen size. Labels that scale with the graph collide
+ * identically at every zoom, so dropping them would hide the same words however far in the
+ * reader zoomed; at a fixed size, zooming spreads the nodes apart on screen and the labels
+ * come back by themselves. That is what makes zoom worth having on a crowded graph.
+ *
+ * @param candidates - Every label that wants to be drawn, in screen coordinates.
+ * @param padding - Breathing room required between two labels.
+ * @returns The ids to draw.
+ */
+export function selectVisibleLabels(candidates: LabelCandidate[], padding = 2): Set<string> {
+  const ordered = [...candidates].sort((a, b) => {
+    if (!!b.required !== !!a.required) return b.required ? 1 : -1;
+    return b.priority - a.priority;
+  });
+
+  const placed: LabelCandidate[] = [];
+  const visible = new Set<string>();
+
+  for (const candidate of ordered) {
+    const overlaps = placed.some(
+      (other) =>
+        Math.abs(candidate.x - other.x) * 2 < candidate.width + other.width + padding * 2 &&
+        Math.abs(candidate.y - other.y) * 2 < candidate.height + other.height + padding * 2,
+    );
+
+    // A required label is drawn even over a neighbour: being told what is under the cursor
+    // matters more than the tidiness of a label it happens to land on.
+    if (!overlaps || candidate.required) {
+      placed.push(candidate);
+      visible.add(candidate.id);
+    }
+  }
+
+  return visible;
+}
+
+/**
+ * Roughly how wide a string renders, without measuring it in the DOM.
+ *
+ * Close enough to lay labels out: the ratio is the average advance width of the typeface as a
+ * fraction of its size, and a label whose estimate is a few pixels out still reads, whereas
+ * measuring every label on every frame of a running simulation would not.
+ */
+export function estimateTextWidth(text: string, fontSize: number, ratio = 0.55): number {
+  return text.length * fontSize * ratio;
+}
+
+/**
+ * The sessions a graph draws on, in the order they first appear, with each mapped to its
+ * position in that order.
+ *
+ * A series graph folds in every conversation under a topic, so its nodes carry different
+ * `provenance.conversationId` values and which session raised what is worth seeing. A single
+ * event's graph has at most one, and there is nothing to distinguish — so this returns an
+ * empty map and the caller draws the graph in one colour.
+ *
+ * A session is not a person: this is the one provenance field safe to render to everyone, and
+ * the sessions are numbered by first appearance because a conversation id means nothing to a
+ * reader. See {@link GraphNodeProvenance}.
+ *
+ * @returns Conversation id to zero-based session index, or an empty map for a graph from one session.
+ */
+export function sessionIndexById(payload: Partial<ConceptGraphPayload>): Map<string, number> {
+  const { concepts = [], contributions = [], originPrompts = [] } = payload;
+  const ordered = new Map<string, number>();
+
+  for (const node of [...concepts, ...contributions, ...originPrompts]) {
+    const id = node.provenance?.conversationId;
+    if (id && !ordered.has(id)) ordered.set(id, ordered.size);
+  }
+
+  return ordered.size > 1 ? ordered : new Map();
+}

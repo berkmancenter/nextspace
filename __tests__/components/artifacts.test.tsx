@@ -4,7 +4,11 @@ jest.mock('../../utils', () => ({
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { conceptGraphFixture, minimalConceptGraphFixture } from '../../content/conceptGraphFixture';
+import {
+  conceptGraphFixture,
+  minimalConceptGraphFixture,
+  seriesConceptGraphFixture,
+} from '../../content/conceptGraphFixture';
 import { generateConceptGraph } from '../../utils';
 import { GenerateGraphButton } from '../../components/artifacts/GenerateGraphButton';
 import { ArtifactList } from '../../components/artifacts/ArtifactList';
@@ -23,12 +27,24 @@ const graph = {
 };
 
 describe('ConceptGraphView', () => {
-  it('draws concepts by label and contributions by kind', () => {
-    render(<ConceptGraphView payload={graph} />);
+  it('draws a node per concept and per contribution, keyed by id', () => {
+    const { container } = render(<ConceptGraphView payload={graph} />);
 
-    expect(screen.getByText('Issuer')).toBeInTheDocument();
-    expect(screen.getByText('Verifier')).toBeInTheDocument();
-    expect(screen.getByText('co-governs')).toBeInTheDocument();
+    // Keyed on id rather than label: ids are stable across versions, so a concept that
+    // survives a revision is the same node and keeps its place.
+    expect(container.querySelector('[data-node-id="c-issuer"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-node-id="c-verifier"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-node-id="k15"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-node-id="p1"]')).toBeInTheDocument();
+  });
+
+  it('names concepts by label and contributions by kind', () => {
+    render(<ConceptGraphView payload={graph} />);
+    const description = screen.getByText(/concepts joined by/);
+
+    expect(description).toHaveTextContent('Issuer');
+    expect(description).toHaveTextContent('Verifier');
+    expect(description).toHaveTextContent('co-governs');
   });
 
   it('reads the graph out in sentences for anyone not looking at the picture', () => {
@@ -54,19 +70,35 @@ describe('ConceptGraphView', () => {
 });
 
 describe('ConceptGraphView, against the fixture the preview page draws', () => {
-  it('draws every concept in the fixture', () => {
-    render(<ConceptGraphView payload={conceptGraphFixture} />);
-
-    for (const concept of conceptGraphFixture.concepts) {
-      expect(screen.getByText(concept.label)).toBeInTheDocument();
-    }
-  });
+  /** The node group itself, which is what carries the hover and click handlers. */
+  const nodeHandle = (container: HTMLElement, id: string) => container.querySelector(`[data-node-id="${id}"]`);
 
   it('draws the contribution that joins three concepts as one node', () => {
-    render(<ConceptGraphView payload={conceptGraphFixture} />);
+    const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
 
-    // One diamond labelled co-governs, not three edges.
-    expect(screen.getAllByText('co-governs')).toHaveLength(1);
+    // One diamond, not three edges: that is the whole point of a contribution being a node.
+    expect(container.querySelectorAll('[data-node-id="k15"]')).toHaveLength(1);
+  });
+
+  it('names the best-connected concepts on the canvas', () => {
+    const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
+    const drawn = Array.from(container.querySelectorAll('text')).map((t) => t.textContent);
+
+    // Labels that would print over each other are dropped, so not every concept is named —
+    // but the hub of the graph always is, because degree wins the space.
+    expect(drawn).toContain('Verifiable Credential');
+    expect(drawn.length).toBeGreaterThan(1);
+  });
+
+  it('leaves no concept out of the reading, whatever the canvas had room to label', () => {
+    render(<ConceptGraphView payload={conceptGraphFixture} />);
+    const description = screen.getByText(/concepts joined by/);
+
+    // Dropping a label is a drawing decision, never a loss of content: everything the graph
+    // holds stays in the description a screen reader gets.
+    for (const concept of conceptGraphFixture.concepts) {
+      expect(description).toHaveTextContent(concept.label);
+    }
   });
 
   it('draws an origin prompt, eliding text too long for its pill', () => {
@@ -77,10 +109,9 @@ describe('ConceptGraphView, against the fixture the preview page draws', () => {
   });
 
   it('reads a contribution’s statement out when the node is selected', () => {
-    render(<ConceptGraphView payload={conceptGraphFixture} />);
-    const node = screen.getByText('co-governs').closest('g');
+    const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
 
-    fireEvent.click(node!);
+    fireEvent.click(nodeHandle(container, 'k15')!);
 
     // Scoped to the card: the statement is also in the graph's screen-reader description.
     const detail = within(screen.getByTestId('graph-node-detail'));
@@ -88,12 +119,68 @@ describe('ConceptGraphView, against the fixture the preview page draws', () => {
     expect(detail.getByText(/joins 3/)).toBeInTheDocument();
   });
 
+  it('labels whatever the reader points at, even where the canvas is crowded', () => {
+    const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
+
+    fireEvent.mouseEnter(nodeHandle(container, 'c-schema')!);
+    const drawn = Array.from(container.querySelectorAll('text')).map((t) => t.textContent);
+
+    // A label may lose its place to a better-connected neighbour, but never while it is the
+    // thing being asked about.
+    expect(drawn).toContain('Schema');
+  });
+
   it('shows nothing about who contributed a node, under the Chatham House Rule', () => {
+    const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
+
+    fireEvent.click(nodeHandle(container, 'k15')!);
+
+    const detail = within(screen.getByTestId('graph-node-detail'));
+    expect(detail.queryByText(/pseudonym|contributed by|said by/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('ConceptGraphView on a series graph', () => {
+  it('colours concepts by the session that raised them, and says which in the legend', () => {
+    render(<ConceptGraphView payload={seriesConceptGraphFixture} />);
+
+    // Sessions are numbered by first appearance: a conversation id means nothing to a reader.
+    expect(screen.getByText('session 1')).toBeInTheDocument();
+    expect(screen.getByText('session 2')).toBeInTheDocument();
+    expect(screen.getByText('session 3')).toBeInTheDocument();
+    expect(screen.queryByText('concept')).not.toBeInTheDocument();
+  });
+
+  it('draws concepts from different sessions in different colours', () => {
+    const { container } = render(<ConceptGraphView payload={seriesConceptGraphFixture} />);
+    const fillOf = (id: string) => container.querySelector(`[data-node-id="${id}"] circle`)?.getAttribute('fill');
+
+    // s-c-issuer is from the first session, s-c-verifier from the second.
+    expect(fillOf('s-c-issuer')).not.toBe(fillOf('s-c-verifier'));
+  });
+
+  it('names the session in the detail card, since that is what the colour means', () => {
+    const { container } = render(<ConceptGraphView payload={seriesConceptGraphFixture} />);
+
+    fireEvent.click(container.querySelector('[data-node-id="s-c-verifier"]')!);
+
+    expect(within(screen.getByTestId('graph-node-detail')).getByText(/session 2/)).toBeInTheDocument();
+  });
+
+  it('leaves a single event’s graph in one colour, with no session legend', () => {
     render(<ConceptGraphView payload={conceptGraphFixture} />);
-    const node = screen.getByText('co-governs').closest('g');
 
-    fireEvent.click(node!);
+    // One session is not a series; a legend saying so would be noise.
+    expect(screen.getByText('concept')).toBeInTheDocument();
+    expect(screen.queryByText('session 1')).not.toBeInTheDocument();
+  });
 
+  it('still shows nothing that identifies a person', () => {
+    const { container } = render(<ConceptGraphView payload={seriesConceptGraphFixture} />);
+
+    fireEvent.click(container.querySelector('[data-node-id="s-c-verifier"]')!);
+
+    // A session is not a person: conversationId may be drawn, pseudonym and messageId may not.
     const detail = within(screen.getByTestId('graph-node-detail'));
     expect(detail.queryByText(/pseudonym|contributed by|said by/i)).not.toBeInTheDocument();
   });
@@ -198,13 +285,19 @@ describe('GenerateGraphButton', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('names the action for a conversation that has no graph yet', () => {
-    render(<GenerateGraphButton conversationId="conv-1" onGenerated={jest.fn()} />);
+    render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} onGenerated={jest.fn()} />);
 
     expect(screen.getByRole('button', { name: /generate concept graph/i })).toBeInTheDocument();
   });
 
+  it('calls the action a series graph when pointed at a topic', () => {
+    render(<GenerateGraphButton container={{ topicId: 'topic-1' }} onGenerated={jest.fn()} />);
+
+    expect(screen.getByRole('button', { name: /generate series graph/i })).toBeInTheDocument();
+  });
+
   it('offers a re-run once a graph exists, since re-running appends rather than overwrites', () => {
-    render(<GenerateGraphButton conversationId="conv-1" hasExistingGraph onGenerated={jest.fn()} />);
+    render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} hasExistingGraph onGenerated={jest.fn()} />);
 
     expect(screen.getByRole('button', { name: /regenerate concept graph/i })).toBeInTheDocument();
   });
@@ -217,7 +310,7 @@ describe('GenerateGraphButton', () => {
       report: { droppedStatements: 2, mergedConcepts: 1 },
     });
     const onGenerated = jest.fn();
-    render(<GenerateGraphButton conversationId="conv-1" onGenerated={onGenerated} />);
+    render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} onGenerated={onGenerated} />);
 
     await userEvent.click(screen.getByRole('button', { name: /generate concept graph/i }));
 
@@ -229,7 +322,7 @@ describe('GenerateGraphButton', () => {
   it('shows a run that mapped nothing as a result, not a failure', async () => {
     mockGenerate.mockResolvedValue({ generated: false, reason: 'Not enough of the event record to map' });
     const onGenerated = jest.fn();
-    render(<GenerateGraphButton conversationId="conv-1" onGenerated={onGenerated} />);
+    render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} onGenerated={onGenerated} />);
 
     await userEvent.click(screen.getByRole('button', { name: /generate concept graph/i }));
 
@@ -239,7 +332,7 @@ describe('GenerateGraphButton', () => {
 
   it('surfaces a refusal', async () => {
     mockGenerate.mockRejectedValue(new Error('Forbidden'));
-    render(<GenerateGraphButton conversationId="conv-1" onGenerated={jest.fn()} />);
+    render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} onGenerated={jest.fn()} />);
 
     await userEvent.click(screen.getByRole('button', { name: /generate concept graph/i }));
 

@@ -1,4 +1,13 @@
-import { buildGraph, computeFitTransform, connectedIds, describeGraph, linkEndpointId } from '../../utils/conceptGraph';
+import {
+  buildGraph,
+  computeFitTransform,
+  connectedIds,
+  describeGraph,
+  estimateTextWidth,
+  linkEndpointId,
+  selectVisibleLabels,
+  sessionIndexById,
+} from '../../utils/conceptGraph';
 
 const payload = {
   originPrompts: [{ id: 'p1', text: 'What has to be trustworthy here?' }],
@@ -207,5 +216,128 @@ describe('computeFitTransform', () => {
     )!;
 
     expect(wide.k).toBeLessThan(narrow.k);
+  });
+});
+
+describe('selectVisibleLabels', () => {
+  /* A force layout leaves nodes wherever the forces put them, which in a dense graph is close
+     enough that labels print over each other. Several words overlapping are worth less than
+     one word readable, so a label that will not fit is dropped rather than drawn. */
+  const label = (id: string, x: number, y: number, priority = 0, extra: Record<string, unknown> = {}) => ({
+    id,
+    x,
+    y,
+    width: 60,
+    height: 12,
+    priority,
+    ...extra,
+  });
+
+  it('draws everything when nothing collides', () => {
+    const visible = selectVisibleLabels([label('a', 0, 0), label('b', 500, 500)]);
+
+    expect(visible).toEqual(new Set(['a', 'b']));
+  });
+
+  it('drops the label that loses a collision rather than printing both', () => {
+    const visible = selectVisibleLabels([label('low', 100, 100, 1), label('high', 105, 100, 9)]);
+
+    expect(visible).toEqual(new Set(['high']));
+  });
+
+  it('gives the space to the better-connected node, whatever order they arrive in', () => {
+    const candidates = [label('weak', 100, 100, 1), label('strong', 104, 102, 12)];
+
+    expect(selectVisibleLabels(candidates)).toEqual(new Set(['strong']));
+    expect(selectVisibleLabels([...candidates].reverse())).toEqual(new Set(['strong']));
+  });
+
+  it('never drops a required label, which is what the reader is pointing at', () => {
+    const visible = selectVisibleLabels([label('hub', 100, 100, 99), label('hovered', 102, 100, 0, { required: true })]);
+
+    expect(visible).toContain('hovered');
+  });
+
+  it('keeps labels that only just clear each other', () => {
+    // 60 wide, so centres 62 apart do not overlap; 12 tall, so rows 14 apart do not either.
+    expect(selectVisibleLabels([label('a', 0, 0), label('b', 66, 0)])).toEqual(new Set(['a', 'b']));
+    expect(selectVisibleLabels([label('a', 0, 0), label('b', 0, 18)])).toEqual(new Set(['a', 'b']));
+  });
+
+  it('treats a near-miss on one axis as no collision at all', () => {
+    // Overlapping horizontally but on different rows is perfectly readable.
+    expect(selectVisibleLabels([label('a', 0, 0), label('b', 10, 40)])).toEqual(new Set(['a', 'b']));
+  });
+
+  it('has nothing to draw when given nothing', () => {
+    expect(selectVisibleLabels([])).toEqual(new Set());
+  });
+});
+
+describe('estimateTextWidth', () => {
+  it('grows with the text and with the type size', () => {
+    expect(estimateTextWidth('hello', 10)).toBeLessThan(estimateTextWidth('hello there', 10));
+    expect(estimateTextWidth('hello', 10)).toBeLessThan(estimateTextWidth('hello', 20));
+  });
+
+  it('measures an empty string as taking no room', () => {
+    expect(estimateTextWidth('', 12)).toBe(0);
+  });
+});
+
+describe('sessionIndexById', () => {
+  const node = (id: string, conversationId?: string) => ({
+    id,
+    label: id,
+    ...(conversationId ? { provenance: { conversationId } } : {}),
+  });
+
+  it('numbers the sessions of a series by when they first appear', () => {
+    const sessions = sessionIndexById({
+      concepts: [node('a', 'conv-1'), node('b', 'conv-2'), node('c', 'conv-1'), node('d', 'conv-3')],
+      contributions: [],
+      originPrompts: [],
+    });
+
+    expect(sessions.get('conv-1')).toBe(0);
+    expect(sessions.get('conv-2')).toBe(1);
+    expect(sessions.get('conv-3')).toBe(2);
+  });
+
+  it('has nothing to distinguish on a single event’s graph', () => {
+    // One session is not a series: colouring every node identically says the same thing as
+    // colouring them by session, and a legend would be noise.
+    const sessions = sessionIndexById({
+      concepts: [node('a', 'conv-1'), node('b', 'conv-1')],
+      contributions: [],
+      originPrompts: [],
+    });
+
+    expect(sessions.size).toBe(0);
+  });
+
+  it('ignores nodes with no provenance at all', () => {
+    const sessions = sessionIndexById({
+      concepts: [node('a'), node('b', 'conv-1'), node('c', 'conv-2')],
+      contributions: [],
+      originPrompts: [],
+    });
+
+    expect(sessions.size).toBe(2);
+    expect(sessions.has('conv-1')).toBe(true);
+  });
+
+  it('counts sessions across all three node kinds', () => {
+    const sessions = sessionIndexById({
+      concepts: [node('a', 'conv-1')],
+      contributions: [{ id: 'k1', kind: 'joins', concepts: ['a'], provenance: { conversationId: 'conv-2' } }],
+      originPrompts: [{ id: 'p1', text: 'why?', provenance: { conversationId: 'conv-3' } }],
+    });
+
+    expect(sessions.size).toBe(3);
+  });
+
+  it('has nothing to say about an empty graph', () => {
+    expect(sessionIndexById({})).toEqual(new Map());
   });
 });

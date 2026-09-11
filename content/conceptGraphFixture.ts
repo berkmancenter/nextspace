@@ -94,12 +94,99 @@ export const emptyConceptGraphFixture: ConceptGraphPayload = {
 /**
  * The smallest graph that still draws all three node kinds, for checking labels and spacing
  * without fifteen contributions in the way.
+ *
+ * Its ids are prefixed so they do not collide with the full fixture's. The API only promises
+ * ids are unique within one payload, but the preview page puts both graphs on one screen, and
+ * two nodes answering to the same id there is confusing to anyone reading the DOM.
  */
 export const minimalConceptGraphFixture: ConceptGraphPayload = {
-  originPrompts: [{ id: 'p1', text: 'What is actually being trusted here?' }],
+  originPrompts: [{ id: 'min-p1', text: 'What is actually being trusted here?' }],
   concepts: [
-    { id: 'c-issuer', label: 'Issuer', origin: 'p1' },
-    { id: 'c-verifier', label: 'Verifier' },
+    { id: 'min-c-issuer', label: 'Issuer', origin: 'min-p1' },
+    { id: 'min-c-verifier', label: 'Verifier' },
   ],
-  contributions: [{ id: 'k1', kind: 'vouches for', concepts: ['c-issuer', 'c-verifier'] }],
+  contributions: [{ id: 'min-k1', kind: 'vouches for', concepts: ['min-c-issuer', 'min-c-verifier'] }],
+};
+
+/* Three invented conversation ids, standing in for three events in one series. They are
+   opaque to the reader — the graph numbers sessions by first appearance rather than showing
+   these — and a session is not a person, so unlike the rest of provenance this is safe to
+   render. */
+const SESSION_ONE = '6733fe79ca20209f1fa02168';
+const SESSION_TWO = '6733fe79ca20209f1fa02169';
+const SESSION_THREE = '6733fe79ca20209f1fa0216a';
+
+/**
+ * A series graph: one topic's worth of sessions folded into a single graph.
+ *
+ * A topic graph is refined rather than rebuilt, so a concept raised in the first session and
+ * returned to in the third is one node with a high degree rather than three nodes — which is
+ * what makes `provenance.conversationId` worth rendering here and pointless on a single
+ * event's graph. `c-consent` below is exactly that case: raised early, joined again later.
+ *
+ * Carries `conversationId` and nothing else: a generated graph is unattributed, so a fixture
+ * that modelled a pseudonym or a messageId would be modelling data the generator never emits.
+ */
+export const seriesConceptGraphFixture: ConceptGraphPayload = {
+  originPrompts: [
+    { id: 's-p1', text: 'What has to be trustworthy here?', provenance: { conversationId: SESSION_ONE } },
+    { id: 's-p2', text: 'Who carries the cost when it fails?', provenance: { conversationId: SESSION_THREE } },
+  ],
+  concepts: [
+    { id: 's-c-credential', label: 'Credential', origin: 's-p1', provenance: { conversationId: SESSION_ONE } },
+    { id: 's-c-issuer', label: 'Issuer', provenance: { conversationId: SESSION_ONE } },
+    { id: 's-c-consent', label: 'Consent', provenance: { conversationId: SESSION_ONE } },
+    { id: 's-c-verifier', label: 'Verifier', provenance: { conversationId: SESSION_TWO } },
+    { id: 's-c-registry', label: 'Trust Registry', provenance: { conversationId: SESSION_TWO } },
+    { id: 's-c-redress', label: 'Redress', origin: 's-p2', provenance: { conversationId: SESSION_THREE } },
+    { id: 's-c-liability', label: 'Liability', provenance: { conversationId: SESSION_THREE } },
+  ],
+  contributions: [
+    {
+      id: 's-k1',
+      kind: 'issued by',
+      concepts: ['s-c-credential', 's-c-issuer'],
+      provenance: { conversationId: SESSION_ONE },
+    },
+    {
+      id: 's-k2',
+      kind: 'requires',
+      concepts: ['s-c-credential', 's-c-consent'],
+      statement: 'The first session held that a credential presented without consent is a disclosure, not a proof.',
+      provenance: { conversationId: SESSION_ONE },
+    },
+    {
+      id: 's-k3',
+      kind: 'checks',
+      concepts: ['s-c-verifier', 's-c-registry'],
+      provenance: { conversationId: SESSION_TWO },
+    },
+    {
+      id: 's-k4',
+      kind: 'presented to',
+      concepts: ['s-c-credential', 's-c-verifier'],
+      provenance: { conversationId: SESSION_TWO },
+    },
+    {
+      id: 's-k5',
+      kind: 'complicates',
+      concepts: ['s-c-consent', 's-c-verifier'],
+      statement: 'The second session returned to consent, arguing a verifier cannot tell a fresh one from a stale one.',
+      provenance: { conversationId: SESSION_TWO },
+    },
+    {
+      id: 's-k6',
+      kind: 'falls to',
+      concepts: ['s-c-redress', 's-c-liability', 's-c-issuer'],
+      statement: 'By the third session the question had moved from whether it fails to who is left holding the failure.',
+      origin: 's-p2',
+      provenance: { conversationId: SESSION_THREE },
+    },
+    {
+      id: 's-k7',
+      kind: 'depends on',
+      concepts: ['s-c-redress', 's-c-consent'],
+      provenance: { conversationId: SESSION_THREE },
+    },
+  ],
 };

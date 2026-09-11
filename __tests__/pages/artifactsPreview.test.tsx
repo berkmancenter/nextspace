@@ -13,17 +13,17 @@ jest.mock('next/dynamic', () => (loader: () => Promise<any>, options: any) => {
 
 describe('the artifact preview page', () => {
   it('draws the full fixture, so the renderer can be looked at without a backend', () => {
-    render(<ArtifactPreviewPage />);
+    const { container } = render(<ArtifactPreviewPage />);
 
-    expect(screen.getByText('Verifiable Credential')).toBeInTheDocument();
-    expect(screen.getByText('Trust Registry')).toBeInTheDocument();
-    expect(screen.getByText('co-governs')).toBeInTheDocument();
+    expect(container.querySelector('[data-node-id="c-verifiable-credential"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-node-id="c-trust-registry"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-node-id="k15"]')).toBeInTheDocument();
   });
 
   it('draws the minimal fixture alongside it', () => {
-    render(<ArtifactPreviewPage />);
+    const { container } = render(<ArtifactPreviewPage />);
 
-    expect(screen.getByText(minimalConceptGraphFixture.contributions[0].kind)).toBeInTheDocument();
+    expect(container.querySelectorAll(`[data-node-id="${minimalConceptGraphFixture.contributions[0].id}"]`)).toHaveLength(1);
   });
 
   it('shows the empty state too, which is a valid graph', () => {
@@ -38,11 +38,13 @@ describe('the artifact preview page', () => {
     expect(screen.getByText(/makes no requests/i)).toBeInTheDocument();
   });
 
-  it('draws every concept the fixture holds', () => {
-    render(<ArtifactPreviewPage />);
+  it('draws a node for every concept the fixture holds', () => {
+    // Every concept gets a node. Whether it gets a *label* depends on whether one fits
+    // without printing over a better-connected neighbour, which is the renderer's call.
+    const { container } = render(<ArtifactPreviewPage />);
 
     for (const concept of conceptGraphFixture.concepts) {
-      expect(screen.getAllByText(concept.label).length).toBeGreaterThan(0);
+      expect(container.querySelector(`[data-node-id="${concept.id}"]`)).toBeInTheDocument();
     }
   });
 });

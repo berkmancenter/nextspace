@@ -5,6 +5,7 @@ import {
   conceptGraphFixture,
   emptyConceptGraphFixture,
   minimalConceptGraphFixture,
+  seriesConceptGraphFixture,
 } from '../../content/conceptGraphFixture';
 
 const ConceptGraphView = dynamic(
@@ -50,6 +51,13 @@ export default function ArtifactPreviewPage() {
           note="Twelve concepts, fifteen contributions, two origin prompts. The diamond labelled co-governs joins three concepts at once — the case a plain edge cannot express. Hover or tap a node to read it; scroll to zoom, drag to pan."
         >
           <ConceptGraphView payload={conceptGraphFixture} />
+        </Section>
+
+        <Section
+          title="A series graph"
+          note="One topic's sessions folded into a single graph. Concepts are coloured by the session that raised them, numbered by first appearance — a session is not a person, and it is the one piece of provenance safe to show a reader. Consent, raised in the first session and returned to in the second and third, is one node rather than three."
+        >
+          <ConceptGraphView payload={seriesConceptGraphFixture} height={420} />
         </Section>
 
         <Section

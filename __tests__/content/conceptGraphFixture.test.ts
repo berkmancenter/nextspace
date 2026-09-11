@@ -2,14 +2,16 @@ import {
   conceptGraphFixture,
   emptyConceptGraphFixture,
   minimalConceptGraphFixture,
+  seriesConceptGraphFixture,
 } from '../../content/conceptGraphFixture';
-import { buildGraph } from '../../utils/conceptGraph';
+import { buildGraph, sessionIndexById } from '../../utils/conceptGraph';
 import { ConceptGraphPayload } from '../../types.internal';
 
 const fixtures: [string, ConceptGraphPayload][] = [
   ['conceptGraphFixture', conceptGraphFixture],
   ['minimalConceptGraphFixture', minimalConceptGraphFixture],
   ['emptyConceptGraphFixture', emptyConceptGraphFixture],
+  ['seriesConceptGraphFixture', seriesConceptGraphFixture],
 ];
 
 /* The backend guarantees these properties of every payload it serves, and the renderer is
@@ -82,5 +84,31 @@ describe('conceptGraphFixture exercises the cases worth looking at', () => {
       ...conceptGraphFixture.originPrompts,
     ];
     expect(nodes.every((node) => !node.provenance)).toBe(true);
+  });
+});
+
+describe('seriesConceptGraphFixture models what a topic graph is', () => {
+  it('draws on several sessions, which is what makes it a series', () => {
+    expect(sessionIndexById(seriesConceptGraphFixture).size).toBeGreaterThan(1);
+  });
+
+  it('keeps a concept returned to across sessions as one node, not one per session', () => {
+    const consent = seriesConceptGraphFixture.concepts.filter((c) => c.label === 'Consent');
+    const { degree } = buildGraph(seriesConceptGraphFixture);
+
+    // A topic graph is refined rather than rebuilt, so recurrence shows up as degree.
+    expect(consent).toHaveLength(1);
+    expect(degree.get(consent[0].id)).toBeGreaterThan(1);
+  });
+
+  it('carries the session a node came from, and nothing that identifies a person', () => {
+    const nodes = [
+      ...seriesConceptGraphFixture.concepts,
+      ...seriesConceptGraphFixture.contributions,
+      ...seriesConceptGraphFixture.originPrompts,
+    ];
+
+    expect(nodes.every((node) => node.provenance?.conversationId)).toBe(true);
+    expect(nodes.every((node) => !node.provenance?.pseudonym && !node.provenance?.messageId)).toBe(true);
   });
 });

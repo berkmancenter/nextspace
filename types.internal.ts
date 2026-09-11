@@ -286,15 +286,21 @@ export type ArtifactType = 'DocumentArtifact' | 'ConceptGraphArtifact';
  * conversations, or written by an organizer rather than drawn from a message, may carry
  * none of it.
  *
- * DO NOT RENDER THIS TO A PASSCODE HOLDER. Generated graphs are unattributed by design —
- * the events they come from are held under the Chatham House Rule, so what was said may be
- * used but who said it may not be revealed, affiliation included. `messageId` resolves to a
- * message that has an owner, which re-identifies the contributor, and `pseudonym` names one
- * outright. Any affordance built on either — jump-to-message above all — has to be gated to
- * organizers, not to everyone holding the artifact passcode. Nothing in this app renders
- * these fields today, and that is deliberate rather than unfinished.
+ * The three fields are not equally safe to draw, and the difference matters.
  *
- * @property {string} [conversationId] - The conversation the node was drawn from; topic graphs draw on several.
+ * `conversationId` names a session, not a person. On a series graph — where nodes come from
+ * several events — it is the field that says which session raised what, and colouring or
+ * filtering by it is exactly what the backend intends.
+ *
+ * `messageId` and `pseudonym` identify a contributor and MUST NOT be rendered to a passcode
+ * holder. Generated graphs are unattributed by design: the events they come from are held
+ * under the Chatham House Rule, so what was said may be used but who said it may not be
+ * revealed, affiliation included. `messageId` resolves to a message that has an owner, so a
+ * jump-to-message affordance re-identifies its contributor on its own; gate anything built on
+ * either field to organizers. Nothing in this app renders them today, and that is deliberate
+ * rather than unfinished.
+ *
+ * @property {string} [conversationId] - Which session the node came from. Safe to draw: a session is not a person.
  * @property {string} [messageId] - The message it came from. Re-identifying: organizer-gated affordances only.
  * @property {string} [pseudonym] - Who contributed it. Re-identifying: organizer-gated affordances only.
  */

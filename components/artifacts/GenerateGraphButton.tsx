@@ -2,16 +2,16 @@ import { useState } from 'react';
 import { Alert, Box, Button, CircularProgress } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { generateConceptGraph } from '../../utils';
-import { ConceptGraphGenerationResult } from '../../types.internal';
+import { ArtifactContainer, ConceptGraphGenerationResult } from '../../types.internal';
 
 /**
  * Props for GenerateGraphButton.
- * @property conversationId - The finished conversation to map.
- * @property hasExistingGraph - Whether this conversation already has a graph, which changes what the action is called.
+ * @property container - The finished conversation to map, or the topic whose series to fold into one graph.
+ * @property hasExistingGraph - Whether a graph already exists here, which changes what the action is called.
  * @property onGenerated - Called with the result of a run that wrote something, so the caller can pick the artifact up.
  */
 interface GenerateGraphButtonProps {
-  conversationId: string;
+  container: ArtifactContainer;
   hasExistingGraph?: boolean;
   onGenerated: (result: ConceptGraphGenerationResult) => void;
 }
@@ -30,14 +30,16 @@ function describeReport(report: ConceptGraphGenerationResult['report']): string 
 }
 
 /**
- * The organizer's trigger for building a concept graph out of a finished event.
+ * The organizer's trigger for building a concept graph out of a finished event, or out of a
+ * whole series when it is given a topic.
  *
  * Shown to administrators only — the endpoint refuses anyone else, and this is the
- * affordance, not the enforcement. Re-running is the supported way to redo a poor
- * extraction: it appends a version rather than overwriting, so both attempts stay readable,
- * which is why the button stays available once a graph exists.
+ * affordance, not the enforcement. Re-running is the supported way to redo a poor extraction:
+ * it appends a version rather than overwriting, so both attempts stay readable, which is why
+ * the button stays available once a graph exists. On a topic it is also how a series that
+ * predates the feature gets backfilled.
  */
-export const GenerateGraphButton = ({ conversationId, hasExistingGraph, onGenerated }: GenerateGraphButtonProps) => {
+export const GenerateGraphButton = ({ container, hasExistingGraph, onGenerated }: GenerateGraphButtonProps) => {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<ConceptGraphGenerationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +49,7 @@ export const GenerateGraphButton = ({ conversationId, hasExistingGraph, onGenera
     setResult(null);
     setError(null);
     try {
-      const generation = await generateConceptGraph(conversationId);
+      const generation = await generateConceptGraph(container);
       setResult(generation);
       if (generation.generated) onGenerated(generation);
     } catch (err) {
@@ -68,7 +70,15 @@ export const GenerateGraphButton = ({ conversationId, hasExistingGraph, onGenera
         disabled={running}
         startIcon={running ? <CircularProgress size={14} /> : <AutoAwesomeIcon />}
       >
-        {running ? 'Reading the event…' : hasExistingGraph ? 'Regenerate concept graph' : 'Generate concept graph'}
+        {running
+          ? container.topicId
+            ? 'Reading the series…'
+            : 'Reading the event…'
+          : hasExistingGraph
+            ? 'Regenerate concept graph'
+            : container.topicId
+              ? 'Generate series graph'
+              : 'Generate concept graph'}
       </Button>
 
       {error && (

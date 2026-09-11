@@ -23,3 +23,4 @@ export { ArtifactVersionHistory } from './artifacts/ArtifactVersionHistory';
 export { ConceptGraphView } from './artifacts/ConceptGraphView';
 export { DocumentArtifactView } from './artifacts/DocumentArtifactView';
 export { GenerateGraphButton } from './artifacts/GenerateGraphButton';
+export { ArtifactsBrowser } from './artifacts/ArtifactsBrowser';
