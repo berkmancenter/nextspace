@@ -26,6 +26,19 @@ const graph = {
   contributions: [{ id: 'k15', kind: 'co-governs', concepts: ['c-issuer', 'c-verifier'] }],
 };
 
+/* jsdom never lays out real content, so a container's `clientWidth` is always 0 — which would
+   pin every ConceptGraphView render here to the 320px mobile floor it falls back to, rather
+   than a width anything like a real desktop viewport. d3-force's own ticks are scheduled by
+   rAF and nothing here awaits them, so a render also never gets a real fit-to-view pass; the
+   nodes below sit exactly where the initial seed spiral placed them, seeded against the
+   component's own initial `width` state (720) before that measurement ever lands — so this
+   has to differ from 720, or React sees no change and never re-renders the seeded positions
+   in at all. A realistic, different width keeps that seed placement safely on screen without
+   leaning on any one label's incidental size to make the margin work out. */
+beforeEach(() => {
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, value: 900 });
+});
+
 describe('ConceptGraphView', () => {
   it('draws a node per concept and per contribution, keyed by id', () => {
     const { container } = render(<ConceptGraphView payload={graph} />);
@@ -35,6 +48,11 @@ describe('ConceptGraphView', () => {
     expect(container.querySelector('[data-node-id="c-issuer"]')).toBeInTheDocument();
     expect(container.querySelector('[data-node-id="c-verifier"]')).toBeInTheDocument();
     expect(container.querySelector('[data-node-id="k15"]')).toBeInTheDocument();
+
+    // Origin prompts are hidden until asked for — see the 'origin prompts' describe block
+    // below — so this one only appears once the toggle is switched on.
+    expect(container.querySelector('[data-node-id="p1"]')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show origin prompts' }));
     expect(container.querySelector('[data-node-id="p1"]')).toBeInTheDocument();
   });
 
@@ -77,7 +95,7 @@ describe('ConceptGraphView, against the fixture the preview page draws', () => {
     const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
 
     // One diamond, not three edges: that is the whole point of a contribution being a node.
-    expect(container.querySelectorAll('[data-node-id="k15"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-node-id="k18"]')).toHaveLength(1);
   });
 
   it('names the best-connected concepts on the canvas', () => {
@@ -86,7 +104,7 @@ describe('ConceptGraphView, against the fixture the preview page draws', () => {
 
     // Labels that would print over each other are dropped, so not every concept is named —
     // but the hub of the graph always is, because degree wins the space.
-    expect(drawn).toContain('Verifiable Credential');
+    expect(drawn).toContain('The Assistant');
     expect(drawn.length).toBeGreaterThan(1);
   });
 
@@ -101,39 +119,60 @@ describe('ConceptGraphView, against the fixture the preview page draws', () => {
     }
   });
 
-  it('draws an origin prompt, eliding text too long for its pill', () => {
+  it('keeps an origin prompt hidden until the reader asks for it, then draws it in full', () => {
     render(<ConceptGraphView payload={minimalConceptGraphFixture} />);
 
-    // 'What is actually being trusted here?' is longer than a pill holds, so it elides.
-    expect(screen.getByText('What is actually being trusted…')).toBeInTheDocument();
+    // Hidden by default: most nodes carry no origin at all, and drawing every prompt
+    // unconditionally would spend canvas space on something most readers are not looking for.
+    expect(screen.queryByText('What does it feel like when it actually helps?')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show origin prompts' }));
+
+    // Shown in full, never elided — a pill wide enough for the whole prompt rather than an
+    // ellipsis cutting it short.
+    expect(screen.getByText('What does it feel like when it actually helps?')).toBeInTheDocument();
+  });
+
+  it('offers no origin toggle on a graph that has none to show', () => {
+    render(<ConceptGraphView payload={{ concepts: [{ id: 'c1', label: 'One' }], contributions: [], originPrompts: [] }} />);
+
+    expect(screen.queryByRole('button', { name: /origin prompts/i })).not.toBeInTheDocument();
+  });
+
+  it('names the toggle for whichever state it would switch to', () => {
+    render(<ConceptGraphView payload={minimalConceptGraphFixture} />);
+
+    const button = screen.getByRole('button', { name: 'Show origin prompts' });
+    fireEvent.click(button);
+    expect(screen.getByRole('button', { name: 'Hide origin prompts' })).toBeInTheDocument();
   });
 
   it('reads a contribution’s statement out when the node is selected', () => {
     const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
 
-    fireEvent.click(nodeHandle(container, 'k15')!);
+    fireEvent.click(nodeHandle(container, 'k18')!);
 
     // Scoped to the card: the statement is also in the graph's screen-reader description.
     const detail = within(screen.getByTestId('graph-node-detail'));
-    expect(detail.getByText(/Governance was argued to sit across all three/)).toBeInTheDocument();
+    expect(detail.getByText(/doesn't come from believing it's always right/)).toBeInTheDocument();
     expect(detail.getByText(/joins 3/)).toBeInTheDocument();
   });
 
   it('labels whatever the reader points at, even where the canvas is crowded', () => {
     const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
 
-    fireEvent.mouseEnter(nodeHandle(container, 'c-schema')!);
+    fireEvent.mouseEnter(nodeHandle(container, 'c-habit')!);
     const drawn = Array.from(container.querySelectorAll('text')).map((t) => t.textContent);
 
     // A label may lose its place to a better-connected neighbour, but never while it is the
     // thing being asked about.
-    expect(drawn).toContain('Schema');
+    expect(drawn).toContain('Habit');
   });
 
   it('shows nothing about who contributed a node, under the Chatham House Rule', () => {
     const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
 
-    fireEvent.click(nodeHandle(container, 'k15')!);
+    fireEvent.click(nodeHandle(container, 'k18')!);
 
     const detail = within(screen.getByTestId('graph-node-detail'));
     expect(detail.queryByText(/pseudonym|contributed by|said by/i)).not.toBeInTheDocument();
@@ -155,14 +194,14 @@ describe('ConceptGraphView on a series graph', () => {
     const { container } = render(<ConceptGraphView payload={seriesConceptGraphFixture} />);
     const fillOf = (id: string) => container.querySelector(`[data-node-id="${id}"] circle`)?.getAttribute('fill');
 
-    // s-c-issuer is from the first session, s-c-verifier from the second.
-    expect(fillOf('s-c-issuer')).not.toBe(fillOf('s-c-verifier'));
+    // s-c-assistant is from the first session, s-c-skepticism from the second.
+    expect(fillOf('s-c-assistant')).not.toBe(fillOf('s-c-skepticism'));
   });
 
   it('names the session in the detail card, since that is what the colour means', () => {
     const { container } = render(<ConceptGraphView payload={seriesConceptGraphFixture} />);
 
-    fireEvent.click(container.querySelector('[data-node-id="s-c-verifier"]')!);
+    fireEvent.click(container.querySelector('[data-node-id="s-c-skepticism"]')!);
 
     expect(within(screen.getByTestId('graph-node-detail')).getByText(/session 2/)).toBeInTheDocument();
   });
@@ -178,7 +217,7 @@ describe('ConceptGraphView on a series graph', () => {
   it('still shows nothing that identifies a person', () => {
     const { container } = render(<ConceptGraphView payload={seriesConceptGraphFixture} />);
 
-    fireEvent.click(container.querySelector('[data-node-id="s-c-verifier"]')!);
+    fireEvent.click(container.querySelector('[data-node-id="s-c-skepticism"]')!);
 
     // A session is not a person: conversationId may be drawn, pseudonym and messageId may not.
     const detail = within(screen.getByTestId('graph-node-detail'));

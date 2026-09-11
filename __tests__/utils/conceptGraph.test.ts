@@ -7,6 +7,7 @@ import {
   linkEndpointId,
   selectVisibleLabels,
   sessionIndexById,
+  wrapLabel,
 } from '../../utils/conceptGraph';
 
 const payload = {
@@ -85,6 +86,29 @@ describe('buildGraph', () => {
     });
 
     expect(simNodes.find((n) => n.id === 'k1')?.statement).toBe('The group said so.');
+  });
+
+  it('draws a contribution by its statement, not its kind, when it has one', () => {
+    // A leaf's whole content is the statement it carries — the kind is only what it falls
+    // back to when there is no one account to draw instead.
+    const { simNodes } = buildGraph({
+      concepts: [{ id: 'c1', label: 'One' }],
+      contributions: [{ id: 'k1', kind: 'anchors', statement: 'The group said so.', concepts: ['c1'] }],
+      originPrompts: [],
+    });
+
+    expect(simNodes.find((n) => n.id === 'k1')?.label).toBe('The group said so.');
+    expect(simNodes.find((n) => n.id === 'k1')?.kind).toBe('anchors');
+  });
+
+  it('falls back to a contribution’s kind when it carries no statement', () => {
+    const { simNodes } = buildGraph({
+      concepts: [{ id: 'c1', label: 'One' }],
+      contributions: [{ id: 'k1', kind: 'anchors', concepts: ['c1'] }],
+      originPrompts: [],
+    });
+
+    expect(simNodes.find((n) => n.id === 'k1')?.label).toBe('anchors');
   });
 });
 
@@ -282,6 +306,48 @@ describe('estimateTextWidth', () => {
 
   it('measures an empty string as taking no room', () => {
     expect(estimateTextWidth('', 12)).toBe(0);
+  });
+});
+
+describe('wrapLabel', () => {
+  it('leaves a short label on one line', () => {
+    expect(wrapLabel('The Assistant', 130, 11.5, 0.55)).toEqual(['The Assistant']);
+  });
+
+  it('breaks a long label into more than one line', () => {
+    const lines = wrapLabel(
+      "It told me something completely wrong with so much confidence that I almost didn't check.",
+      130,
+      9.5,
+      0.62,
+    );
+
+    expect(lines.length).toBeGreaterThan(1);
+    // Every line still has to fit — wrapping that leaves a line over width defeats the point.
+    for (const line of lines) {
+      expect(estimateTextWidth(line, 9.5, 0.62)).toBeLessThanOrEqual(130);
+    }
+  });
+
+  it('rejoins wrapped lines back into the original words, in order', () => {
+    const text = 'Every few months it changes enough that I feel like I am learning it all over again.';
+    const lines = wrapLabel(text, 100, 9.5, 0.62);
+
+    expect(lines.join(' ')).toBe(text);
+  });
+
+  it('never splits a single word wider than the limit, even if the line runs over', () => {
+    const lines = wrapLabel('Supercalifragilisticexpialidocious', 20, 11.5, 0.55);
+
+    expect(lines).toEqual(['Supercalifragilisticexpialidocious']);
+  });
+
+  it('wraps an empty label to a single empty line, so there is always one to draw', () => {
+    expect(wrapLabel('', 130, 11.5, 0.55)).toEqual(['']);
+  });
+
+  it('collapses runs of whitespace between words rather than preserving them', () => {
+    expect(wrapLabel('one   two', 130, 11.5, 0.55)).toEqual(['one two']);
   });
 });
 

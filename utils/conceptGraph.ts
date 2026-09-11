@@ -15,13 +15,18 @@ export type GraphNodeType = 'concept' | 'contribution' | 'origin';
  * One node in the simulation. `x`/`y`/`vx`/`vy` are written in place by d3-force on every
  * tick, which is why these objects are mutable and reused rather than rebuilt per frame.
  * @property {string} id - Unique across all three payload arrays, so one map keyed by id is safe.
- * @property {string} label - What to draw: a concept's label, a contribution's kind, an origin prompt's text.
+ * @property {string} label - What to draw on the canvas: a concept's label, an origin prompt's
+ *   text, or — for a contribution — its statement when it has one, since that is the actual
+ *   content a leaf carries, falling back to its `kind` for a contribution that is a plain
+ *   relationship between concepts rather than any one person's account.
+ * @property {string} [kind] - A contribution's short relationship verb, always present, for the detail panel.
  * @property {string} [statement] - A contribution's sentence-long account of the relationship, for the detail panel.
  */
 export interface GraphSimNode extends SimulationNodeDatum {
   id: string;
   type: GraphNodeType;
   label: string;
+  kind?: string;
   statement?: string;
   provenance?: GraphNodeProvenance;
 }
@@ -89,7 +94,10 @@ export function buildGraph({
     simNodes.push({
       id: k.id,
       type: 'contribution',
-      label: k.kind,
+      // A leaf's whole point is the statement it carries; a plain relationship between
+      // concepts has none, and falls back to naming what it is.
+      label: k.statement ?? k.kind,
+      kind: k.kind,
       statement: k.statement,
       provenance: k.provenance,
     });
@@ -297,6 +305,44 @@ export function selectVisibleLabels(candidates: LabelCandidate[], padding = 2): 
  */
 export function estimateTextWidth(text: string, fontSize: number, ratio = 0.55): number {
   return text.length * fontSize * ratio;
+}
+
+/**
+ * Breaks a label into lines that each fit within `maxWidth`, so a long one — a leaf's
+ * statement, in particular — wraps into a block near its node instead of a single line wide
+ * enough to run through whatever else is on the canvas.
+ *
+ * Greedy word wrap: a word is added to the current line as long as the line still fits, and
+ * moved to a new one the moment it would not. A single word wider than `maxWidth` on its own
+ * is left whole on its own line rather than split — this wraps prose, not code, and breaking
+ * a word mid-letter would read worse than one slightly wide line.
+ *
+ * @param text - The label to wrap. An empty string wraps to a single empty line, so the caller
+ *   always has at least one line to measure and draw.
+ * @param maxWidth - The widest a line may be, in the same screen-pixel units as {@link estimateTextWidth}.
+ * @param fontSize - Passed through to {@link estimateTextWidth} for each candidate line.
+ * @param ratio - Passed through to {@link estimateTextWidth}.
+ * @returns One or more lines, in order.
+ */
+export function wrapLabel(text: string, maxWidth: number, fontSize: number, ratio = 0.55): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [''];
+
+  const lines: string[] = [];
+  let line = words[0];
+
+  for (const word of words.slice(1)) {
+    const candidate = `${line} ${word}`;
+    if (estimateTextWidth(candidate, fontSize, ratio) <= maxWidth) {
+      line = candidate;
+    } else {
+      lines.push(line);
+      line = word;
+    }
+  }
+  lines.push(line);
+
+  return lines;
 }
 
 /**

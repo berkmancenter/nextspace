@@ -48,21 +48,21 @@ export default function ArtifactPreviewPage() {
 
         <Section
           title="A full graph"
-          note="Twelve concepts, fifteen contributions, two origin prompts. The diamond labelled co-governs joins three concepts at once — the case a plain edge cannot express. Hover or tap a node to read it; scroll to zoom, drag to pan."
+          note="Ten concepts, eighteen contributions, two origin prompts. Most contributions are leaves — one person's statement about living with the assistant, linked to the concept it speaks to — drawn by that statement rather than a short kind, so a long one only resolves once you zoom in far enough for it to stop colliding with its neighbours. A few contributions are plain relationships between concepts that no single statement carries. The diamond labelled co-shapes joins three concepts at once — the case a plain edge cannot express. Origin prompts are hidden until you switch them on with the button above the canvas; shown, each is drawn in full, never elided. Hover or tap a node to read it; scroll to zoom, drag to pan."
         >
           <ConceptGraphView payload={conceptGraphFixture} />
         </Section>
 
         <Section
           title="A series graph"
-          note="One topic's sessions folded into a single graph. Concepts are coloured by the session that raised them, numbered by first appearance — a session is not a person, and it is the one piece of provenance safe to show a reader. Consent, raised in the first session and returned to in the second and third, is one node rather than three."
+          note="One topic's sessions folded into a single graph. Concepts are coloured by the session that raised them, numbered by first appearance — a session is not a person, and it is the one piece of provenance safe to show a reader. Trust, raised in the first session and returned to in the second and third, is one node rather than three."
         >
           <ConceptGraphView payload={seriesConceptGraphFixture} height={420} />
         </Section>
 
         <Section
           title="The smallest graph that draws all three node kinds"
-          note="One concept pair, one contribution, one origin prompt attached by a dashed link."
+          note="One concept, its one leaf statement, and the origin prompt attached to the concept by a dashed link — switch on 'Show origin prompts' above the canvas to see it."
         >
           <ConceptGraphView payload={minimalConceptGraphFixture} height={320} />
         </Section>

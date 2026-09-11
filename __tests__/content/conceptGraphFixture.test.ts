@@ -93,12 +93,12 @@ describe('seriesConceptGraphFixture models what a topic graph is', () => {
   });
 
   it('keeps a concept returned to across sessions as one node, not one per session', () => {
-    const consent = seriesConceptGraphFixture.concepts.filter((c) => c.label === 'Consent');
+    const trust = seriesConceptGraphFixture.concepts.filter((c) => c.label === 'Trust');
     const { degree } = buildGraph(seriesConceptGraphFixture);
 
     // A topic graph is refined rather than rebuilt, so recurrence shows up as degree.
-    expect(consent).toHaveLength(1);
-    expect(degree.get(consent[0].id)).toBeGreaterThan(1);
+    expect(trust).toHaveLength(1);
+    expect(degree.get(trust[0].id)).toBeGreaterThan(1);
   });
 
   it('carries the session a node came from, and nothing that identifies a person', () => {

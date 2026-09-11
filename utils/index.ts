@@ -31,6 +31,7 @@ export {
   linkEndpointId,
   selectVisibleLabels,
   sessionIndexById,
+  wrapLabel,
 } from './conceptGraph';
 export type {
   BuiltGraph,

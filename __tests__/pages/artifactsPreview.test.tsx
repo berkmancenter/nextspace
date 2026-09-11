@@ -15,9 +15,9 @@ describe('the artifact preview page', () => {
   it('draws the full fixture, so the renderer can be looked at without a backend', () => {
     const { container } = render(<ArtifactPreviewPage />);
 
-    expect(container.querySelector('[data-node-id="c-verifiable-credential"]')).toBeInTheDocument();
-    expect(container.querySelector('[data-node-id="c-trust-registry"]')).toBeInTheDocument();
-    expect(container.querySelector('[data-node-id="k15"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-node-id="c-assistant"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-node-id="c-trust"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-node-id="k18"]')).toBeInTheDocument();
   });
 
   it('draws the minimal fixture alongside it', () => {
