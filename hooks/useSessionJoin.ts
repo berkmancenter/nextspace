@@ -22,6 +22,8 @@ const RECONNECT_GAP_THRESHOLD_MS = 10_000; // 10 seconds
  *   issues a new token this hook updates socket.auth so any subsequent
  *   reconnection uses the fresh token.
  * - Tab visibility changes trigger TokenManager to check expiry and refresh if needed.
+ * - A page hidden for longer than RECONNECT_GAP_THRESHOLD_MS, or restored from
+ *   the back/forward cache, signals a history re-fetch via lastReconnectTime.
  *
  * @returns Object containing socket, pseudonym, userId, connection state, and
  *          lastReconnectTime (non-null whenever the socket reconnected after a
@@ -51,6 +53,9 @@ export function useSessionJoin(
   const [lastReconnectTime, setLastReconnectTime] = useState<number | null>(null);
   // Records when the socket disconnected so we can measure gap duration on reconnect.
   const disconnectedAtRef = useRef<number | null>(null);
+  // Mobile Safari freezes a hidden page, so the socket only notices its disconnect
+  // on wake and disconnectedAtRef measures seconds even after minutes locked.
+  const hiddenAtRef = useRef<number | null>(null);
   // Keep a stable ref to the socket for use inside closures.
   const socketRef = useRef<Socket | null>(null);
 
@@ -236,21 +241,57 @@ export function useSessionJoin(
    * away, ask TokenManager to check the token expiry and refresh if needed.
    * TokenManager deduplicates the call and coordinates with other tabs via
    * BroadcastChannel, so this is safe to call on every visibility change.
+   *
+   * Also measures how long the page was hidden and signals a history re-fetch
+   * when that gap crosses RECONNECT_GAP_THRESHOLD_MS. This runs alongside the
+   * socket-disconnect measurement rather than replacing it: a real network drop
+   * on a visible page never fires visibilitychange, and a frozen mobile page
+   * never fires a timely disconnect.
    */
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        console.log('Tab became visible — checking token expiry via TokenManager…');
-        // TokenManager will refresh if the token is expired or within the
-        // 2-minute buffer, otherwise it's a no-op.
-        TokenManagerDefault.getValidToken().catch((err) => console.error('Visibility-change token check failed:', err));
+      if (document.visibilityState === 'hidden') {
+        hiddenAtRef.current = Date.now();
+        return;
+      }
+      if (document.visibilityState !== 'visible') return;
+
+      console.log('Tab became visible — checking token expiry via TokenManager…');
+      // TokenManager will refresh if the token is expired or within the
+      // 2-minute buffer, otherwise it's a no-op.
+      TokenManagerDefault.getValidToken().catch((err) => console.error('Visibility-change token check failed:', err));
+
+      const hiddenAt = hiddenAtRef.current;
+      if (hiddenAt === null) return;
+      hiddenAtRef.current = null;
+
+      const gapMs = Date.now() - hiddenAt;
+      if (gapMs >= RECONNECT_GAP_THRESHOLD_MS) {
+        console.log(`Page visible after ${Math.round(gapMs / 1000)}s hidden: signalling history re-fetch`);
+        setLastReconnectTime(Date.now());
       }
     };
 
-    if (enableSocket) document.addEventListener('visibilitychange', handleVisibilityChange);
+    // Safari closes sockets while a page sits in the back/forward cache, so a
+    // persisted pageshow always means messages were missed. It fires before the
+    // matching visibilitychange, so clearing hiddenAtRef here prevents a second signal.
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      console.log('Page restored from back/forward cache: signalling history re-fetch');
+      setLastReconnectTime(Date.now());
+      hiddenAtRef.current = null;
+    };
+
+    if (enableSocket) {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('pageshow', handlePageShow);
+    }
 
     return () => {
-      if (enableSocket) document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (enableSocket) {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('pageshow', handlePageShow);
+      }
     };
   }, [enableSocket]);
 

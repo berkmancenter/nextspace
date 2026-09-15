@@ -525,6 +525,145 @@ describe('useSessionJoin', () => {
     });
   });
 
+  describe('hidden-page gap detection (lastReconnectTime)', () => {
+    let visibilityHandler: Function;
+    let pageshowHandler: Function;
+
+    const setVisibilityState = (value: 'hidden' | 'visible') => {
+      Object.defineProperty(document, 'visibilityState', { value, writable: true, configurable: true });
+    };
+
+    beforeEach(() => {
+      jest.spyOn(window, 'addEventListener');
+      jest.spyOn(window, 'removeEventListener');
+      (document.addEventListener as jest.Mock).mockImplementation((event: string, handler: Function) => {
+        if (event === 'visibilitychange') visibilityHandler = handler;
+      });
+      (window.addEventListener as jest.Mock).mockImplementation((event: string, handler: Function) => {
+        if (event === 'pageshow') pageshowHandler = handler;
+      });
+    });
+
+    afterEach(() => {
+      setVisibilityState('visible');
+    });
+
+    it('should set lastReconnectTime when the page was hidden for 10s or more, then became visible', async () => {
+      const { result } = renderHook(() => useSessionJoin(true, false));
+
+      await waitFor(() => {
+        expect(document.addEventListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
+      });
+
+      setVisibilityState('hidden');
+      act(() => {
+        visibilityHandler!();
+      });
+
+      jest.advanceTimersByTime(10_000);
+
+      setVisibilityState('visible');
+      await act(async () => {
+        await visibilityHandler!();
+      });
+
+      await waitFor(() => {
+        expect(result.current.lastReconnectTime).toBe(Date.now());
+      });
+    });
+
+    it('should NOT set lastReconnectTime when the page was hidden for less than 10s', async () => {
+      const { result } = renderHook(() => useSessionJoin(true, false));
+
+      await waitFor(() => {
+        expect(document.addEventListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
+      });
+
+      setVisibilityState('hidden');
+      act(() => {
+        visibilityHandler!();
+      });
+
+      jest.advanceTimersByTime(3_000);
+
+      setVisibilityState('visible');
+      await act(async () => {
+        await visibilityHandler!();
+      });
+
+      expect(result.current.lastReconnectTime).toBeNull();
+    });
+
+    it('should NOT set lastReconnectTime when the page becomes visible without a recorded hidden time', async () => {
+      const { result } = renderHook(() => useSessionJoin(true, false));
+
+      await waitFor(() => {
+        expect(document.addEventListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
+      });
+
+      jest.advanceTimersByTime(60_000);
+
+      setVisibilityState('visible');
+      await act(async () => {
+        await visibilityHandler!();
+      });
+
+      expect(result.current.lastReconnectTime).toBeNull();
+    });
+
+    it('should set lastReconnectTime on pageshow with persisted: true', async () => {
+      const { result } = renderHook(() => useSessionJoin(true, false));
+
+      await waitFor(() => {
+        expect(window.addEventListener).toHaveBeenCalledWith('pageshow', expect.any(Function));
+      });
+
+      act(() => {
+        pageshowHandler!({ persisted: true });
+      });
+
+      await waitFor(() => {
+        expect(result.current.lastReconnectTime).toBe(Date.now());
+      });
+    });
+
+    it('should NOT set lastReconnectTime on pageshow with persisted: false', async () => {
+      const { result } = renderHook(() => useSessionJoin(true, false));
+
+      await waitFor(() => {
+        expect(window.addEventListener).toHaveBeenCalledWith('pageshow', expect.any(Function));
+      });
+
+      act(() => {
+        pageshowHandler!({ persisted: false });
+      });
+
+      expect(result.current.lastReconnectTime).toBeNull();
+    });
+
+    it('should not register the pageshow listener when the socket is disabled', async () => {
+      renderHook(() => useSessionJoin(false, false));
+
+      await waitFor(() => {
+        expect(mockGetSessionInfo).toHaveBeenCalled();
+      });
+
+      expect(window.addEventListener).not.toHaveBeenCalledWith('pageshow', expect.any(Function));
+    });
+
+    it('should remove the pageshow listener on unmount', async () => {
+      const { unmount } = renderHook(() => useSessionJoin(true, false));
+
+      await waitFor(() => {
+        expect(window.addEventListener).toHaveBeenCalledWith('pageshow', expect.any(Function));
+      });
+
+      unmount();
+
+      expect(window.removeEventListener).toHaveBeenCalledWith('pageshow', expect.any(Function));
+    });
+  });
+
   describe('connect_error handling', () => {
     it('should refresh token on auth-related connect_error', async () => {
       mockTokenManagerRefresh.mockResolvedValue(true);
