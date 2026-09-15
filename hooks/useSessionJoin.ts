@@ -53,10 +53,8 @@ export function useSessionJoin(
   const [lastReconnectTime, setLastReconnectTime] = useState<number | null>(null);
   // Records when the socket disconnected so we can measure gap duration on reconnect.
   const disconnectedAtRef = useRef<number | null>(null);
-  // Records when the page went hidden. Mobile Safari freezes a backgrounded page
-  // outright, so the socket only notices its disconnect once the page wakes and
-  // disconnectedAtRef ends up measuring a gap of a second or two no matter how
-  // long the phone was locked. The hidden timestamp is the honest start of the gap.
+  // Mobile Safari freezes a hidden page, so the socket only notices its disconnect
+  // on wake and disconnectedAtRef measures seconds even after minutes locked.
   const hiddenAtRef = useRef<number | null>(null);
   // Keep a stable ref to the socket for use inside closures.
   const socketRef = useRef<Socket | null>(null);
@@ -256,34 +254,31 @@ export function useSessionJoin(
         hiddenAtRef.current = Date.now();
         return;
       }
+      if (document.visibilityState !== 'visible') return;
 
-      if (document.visibilityState === 'visible') {
-        console.log('Tab became visible — checking token expiry via TokenManager…');
-        // TokenManager will refresh if the token is expired or within the
-        // 2-minute buffer, otherwise it's a no-op.
-        TokenManagerDefault.getValidToken().catch((err) => console.error('Visibility-change token check failed:', err));
+      console.log('Tab became visible — checking token expiry via TokenManager…');
+      // TokenManager will refresh if the token is expired or within the
+      // 2-minute buffer, otherwise it's a no-op.
+      TokenManagerDefault.getValidToken().catch((err) => console.error('Visibility-change token check failed:', err));
 
-        const hiddenAt = hiddenAtRef.current;
-        if (hiddenAt !== null) {
-          const gapMs = Date.now() - hiddenAt;
-          if (gapMs >= RECONNECT_GAP_THRESHOLD_MS) {
-            console.log(`Page visible after ${Math.round(gapMs / 1000)}s hidden — signalling history re-fetch`);
-            setLastReconnectTime(Date.now());
-          }
-          hiddenAtRef.current = null;
-        }
+      const hiddenAt = hiddenAtRef.current;
+      if (hiddenAt === null) return;
+      hiddenAtRef.current = null;
+
+      const gapMs = Date.now() - hiddenAt;
+      if (gapMs >= RECONNECT_GAP_THRESHOLD_MS) {
+        console.log(`Page visible after ${Math.round(gapMs / 1000)}s hidden: signalling history re-fetch`);
+        setLastReconnectTime(Date.now());
       }
     };
 
-    // Safari serves Back navigation from a frozen snapshot of the page and
-    // closes its sockets while frozen, so a persisted pageshow always means
-    // messages were missed regardless of how long the page was away.
+    // Safari closes sockets while a page sits in the back/forward cache, so a
+    // persisted pageshow always means messages were missed. It fires before the
+    // matching visibilitychange, so clearing hiddenAtRef here prevents a second signal.
     const handlePageShow = (event: PageTransitionEvent) => {
       if (!event.persisted) return;
-      console.log('Page restored from back/forward cache — signalling history re-fetch');
+      console.log('Page restored from back/forward cache: signalling history re-fetch');
       setLastReconnectTime(Date.now());
-      // pageshow fires before the visibilitychange that follows a restore;
-      // clearing the hidden timestamp avoids signalling twice for one return.
       hiddenAtRef.current = null;
     };
 
