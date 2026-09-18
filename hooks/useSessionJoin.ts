@@ -115,6 +115,9 @@ export function useSessionJoin(
     return () => {
       socketLocal.disconnect();
       socketRef.current = null;
+      // Stop background token refreshes — the socket is gone and the event is
+      // over. On-demand calls to getValidToken() will reschedule if needed.
+      TokenManagerDefault.pauseProactiveRefresh();
     };
   }, [enableSocket, onSuccess]);
 

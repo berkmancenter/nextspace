@@ -562,6 +562,23 @@ describe('TokenManager', () => {
       expect(clearTimeoutSpy).toHaveBeenCalled();
     });
 
+    it('pauseProactiveRefresh cancels the timer without clearing stored tokens', () => {
+      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+
+      tokenManager.setTokens({
+        access: { token: 'acc', expires: FUTURE_ACCESS_EXPIRES },
+        refresh: { token: 'ref', expires: FUTURE_REFRESH_EXPIRES },
+      });
+
+      tokenManager.pauseProactiveRefresh();
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      // Tokens are still present — session is not ended, just background refresh stopped.
+      expect(tokenManager.getAccessToken()).toBe('acc');
+
+      tokenManager.clearTokens();
+    });
+
     it('fires proactive refresh immediately when token is within the buffer window', async () => {
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce({

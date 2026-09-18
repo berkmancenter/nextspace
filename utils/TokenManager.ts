@@ -45,9 +45,7 @@ type TokenChangeListener = (tokens: TokenSet) => void;
  * can refuse to adopt tokens for a different user (which would cause the tab to
  * authenticate as one user while building channel names for another).
  */
-type TabMessage =
-  | { type: 'TOKENS_REFRESHED'; tokens: TokenSet; userId: string | null }
-  | { type: 'REFRESH_STARTING' };
+type TabMessage = { type: 'TOKENS_REFRESHED'; tokens: TokenSet; userId: string | null } | { type: 'REFRESH_STARTING' };
 
 class TokenManagerClass {
   private static _instance: TokenManagerClass;
@@ -457,6 +455,17 @@ class TokenManagerClass {
     } else {
       this._callRefreshApi = fn;
     }
+  }
+
+  /**
+   * Cancels the proactive refresh timer without clearing the stored tokens.
+   * Use this when the session no longer needs background token maintenance
+   * (e.g. the conversation has ended and the socket has been torn down).
+   * The next call to `getValidToken()` or `refresh()` will reschedule it
+   * automatically if needed.
+   */
+  pauseProactiveRefresh(): void {
+    this._cancelProactiveRefresh();
   }
 
   private _cancelProactiveRefresh(): void {

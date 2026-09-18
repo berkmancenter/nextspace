@@ -57,6 +57,7 @@ jest.mock('../../utils/TokenManager', () => ({
     getValidToken: (...args: any[]) => mockTokenManagerGetValidToken(...args),
     getAccessToken: (...args: any[]) => mockTokenManagerGetAccessToken(...args),
     onTokensChanged: (...args: any[]) => mockTokenManagerOnTokensChanged(...args),
+    pauseProactiveRefresh: jest.fn(),
   },
   TokenManager: { get: jest.fn() },
 }));
@@ -318,6 +319,19 @@ describe('useSessionJoin', () => {
     unmount();
 
     expect(mockSocket.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('should pause proactive token refresh when the socket is torn down', async () => {
+    const TokenManagerDefault = (await import('../../utils/TokenManager')).default;
+    const { unmount } = renderHook(() => useSessionJoin(true, false));
+
+    await waitFor(() => {
+      expect(mockIo).toHaveBeenCalled();
+    });
+
+    unmount();
+
+    expect(TokenManagerDefault.pauseProactiveRefresh).toHaveBeenCalledTimes(1);
   });
 
   it('should cleanup socket event listeners on unmount', async () => {

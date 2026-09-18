@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { NextRouter } from 'next/router';
 import type { Socket } from 'socket.io-client';
 import { PseudonymousMessage } from '../types.internal';
@@ -41,6 +41,7 @@ export interface UseConversationSetupReturn {
   eventStatus: 'active' | 'future' | 'ended';
   showEventStatusDialog: boolean;
   setShowEventStatusDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  markEventEnded: () => void;
   setInitialJoinComplete: React.Dispatch<React.SetStateAction<boolean>>;
   chatIntroRef: React.MutableRefObject<PseudonymousMessage[]>;
   assistantIntroRef: React.MutableRefObject<PseudonymousMessage[]>;
@@ -183,6 +184,14 @@ export function useConversationSetup({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, router]);
 
+  // Called when the backend sends conversation:stopped so open tabs disconnect
+  // their sockets instead of reconnecting indefinitely. If the event later
+  // restarts, a page refresh re-runs the initial active check and reconnects.
+  const markEventEnded = useCallback(() => {
+    setEventStatus('ended');
+    setShowEventStatusDialog(true);
+  }, []);
+
   return {
     generalError,
     setGeneralError,
@@ -208,5 +217,6 @@ export function useConversationSetup({
     eventStatus,
     showEventStatusDialog,
     setShowEventStatusDialog,
+    markEventEnded,
   };
 }
