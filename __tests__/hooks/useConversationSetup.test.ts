@@ -349,6 +349,23 @@ describe('useConversationSetup', () => {
       expect(result.current.showEventStatusDialog).toBe(true);
     });
 
+    it('markEventEnded sets eventStatus to ended and shows the dialog', async () => {
+      const { result } = renderSetup();
+
+      await waitFor(() => {
+        expect(result.current.eventStatusLoaded).toBe(true);
+      });
+
+      expect(result.current.eventStatus).toBe('active');
+
+      act(() => {
+        result.current.markEventEnded();
+      });
+
+      expect(result.current.eventStatus).toBe('ended');
+      expect(result.current.showEventStatusDialog).toBe(true);
+    });
+
     it('leaves eventStatus as active when the conversation is active', async () => {
       const { result } = renderSetup();
 

@@ -562,6 +562,51 @@ describe('TokenManager', () => {
       expect(clearTimeoutSpy).toHaveBeenCalled();
     });
 
+    it('pauseProactiveRefresh cancels the timer without clearing stored tokens', () => {
+      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+
+      tokenManager.setTokens({
+        access: { token: 'acc', expires: FUTURE_ACCESS_EXPIRES },
+        refresh: { token: 'ref', expires: FUTURE_REFRESH_EXPIRES },
+      });
+
+      tokenManager.pauseProactiveRefresh();
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      // Tokens are still present — session is not ended, just background refresh stopped.
+      expect(tokenManager.getAccessToken()).toBe('acc');
+
+      tokenManager.clearTokens();
+    });
+
+    it('pauseProactiveRefresh prevents cross-tab broadcasts from rescheduling the timer', () => {
+      const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+
+      tokenManager.setTokens({
+        access: { token: 'acc', expires: FUTURE_ACCESS_EXPIRES },
+        refresh: { token: 'ref', expires: FUTURE_REFRESH_EXPIRES },
+      });
+
+      tokenManager.pauseProactiveRefresh();
+      setTimeoutSpy.mockClear();
+
+      // Simulate receiving a cross-tab TOKENS_REFRESHED broadcast.
+      tokenManager.setTokens(
+        {
+          access: { token: 'acc2', expires: FUTURE_ACCESS_EXPIRES },
+          refresh: { token: 'ref2', expires: FUTURE_REFRESH_EXPIRES },
+        },
+        { broadcast: false },
+      );
+
+      // Timer must NOT be rescheduled — pause is still in effect.
+      expect(setTimeoutSpy).not.toHaveBeenCalled();
+      // Tokens are still updated (API calls will use the new token).
+      expect(tokenManager.getAccessToken()).toBe('acc2');
+
+      tokenManager.clearTokens();
+    });
+
     it('fires proactive refresh immediately when token is within the buffer window', async () => {
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce({
@@ -910,13 +955,7 @@ describe('TokenManager', () => {
       mockBroadcastPostMessage.mockClear();
 
       // Login as admin in the same tab — an authoritative local write updates owner.
-      tokenManager.setTokensFromStrings(
-        'admin-acc',
-        'admin-ref',
-        FUTURE_ACCESS_EXPIRES,
-        FUTURE_REFRESH_EXPIRES,
-        'admin-1',
-      );
+      tokenManager.setTokensFromStrings('admin-acc', 'admin-ref', FUTURE_ACCESS_EXPIRES, FUTURE_REFRESH_EXPIRES, 'admin-1');
 
       expect(tokenManager.getAccessToken()).toBe('admin-acc');
 
