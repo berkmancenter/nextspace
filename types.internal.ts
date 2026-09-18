@@ -1,4 +1,4 @@
-import { components } from './types';
+import { components, operations } from './types';
 
 /**
  * Authentication type for user sessions
@@ -265,163 +265,52 @@ export interface LoungeRoom {
   hasUnread: boolean;
 }
 
-/* ---------------------------------------------------------------------------
- * Artifacts
- *
- * Shared objects that emerge from one or more conversations. These shapes are all
- * published in the backend's OpenAPI spec (`Artifact`, `ArtifactVersion`,
- * `ConceptGraphPayload`, `GraphConcept`, `GraphContribution`, `GraphOriginPrompt`,
- * `GraphNodeProvenance`), but the branch that adds them (llm_engine's bm/artifacts)
- * has not merged, so `types.ts` has no trace of them yet. Written out by hand here
- * for the same reason `Conversation.draft` above is — delete this block and switch
- * to `components['schemas'][...]` once types.ts is regenerated against a main that
- * carries them.
- * ------------------------------------------------------------------------- */
+/* Artifacts. The shapes come from the backend's OpenAPI spec through types.ts. The spec
+   leaves most fields optional because one schema covers both a bare id and a populated
+   document; the aliases below narrow to what the read routes actually return. */
+type Schemas = components['schemas'];
 
-/** Which renderer an artifact needs, and what shape its version payload has. */
-export type ArtifactType = 'DocumentArtifact' | 'ConceptGraphArtifact';
+export type ArtifactType = NonNullable<Schemas['Artifact']['type']>;
 
 /**
- * Where a graph node came from. Every field is optional: a node assembled from several
- * conversations, or written by an organizer rather than drawn from a message, may carry
- * none of it.
- *
- * The three fields are not equally safe to draw, and the difference matters.
- *
- * `conversationId` names a session, not a person. On a series graph — where nodes come from
- * several events — it is the field that says which session raised what, and colouring or
- * filtering by it is exactly what the backend intends.
- *
- * `messageId` and `pseudonym` identify a contributor and MUST NOT be rendered to a passcode
- * holder. Generated graphs are unattributed by design: the events they come from are held
- * under the Chatham House Rule, so what was said may be used but who said it may not be
- * revealed, affiliation included. `messageId` resolves to a message that has an owner, so a
- * jump-to-message affordance re-identifies its contributor on its own; gate anything built on
- * either field to organizers. Nothing in this app renders them today, and that is deliberate
- * rather than unfinished.
- *
- * @property {string} [conversationId] - Which session the node came from. Safe to draw: a session is not a person.
- * @property {string} [messageId] - The message it came from. Re-identifying: organizer-gated affordances only.
- * @property {string} [pseudonym] - Who contributed it. Re-identifying: organizer-gated affordances only.
+ * `conversationId` names a session, not a person, and is safe to draw. `messageId` and
+ * `pseudonym` re-identify a contributor of an event held under the Chatham House Rule and
+ * must never be rendered to a passcode holder; gate anything built on them to organizers.
  */
-export interface GraphNodeProvenance {
-  conversationId?: string;
-  messageId?: string;
-  pseudonym?: string;
-}
+export type GraphNodeProvenance = Schemas['GraphNodeProvenance'];
+export type GraphConcept = Schemas['GraphConcept'];
+export type GraphContribution = Schemas['GraphContribution'];
+export type GraphOriginPrompt = Schemas['GraphOriginPrompt'];
 
-/**
- * An idea or entity in a concept graph.
- * @property {string} id - Opaque and stable; key on this, never on the label.
- * @property {string} label - What the client draws.
- * @property {string} [origin] - Id of the GraphOriginPrompt this concept came out of.
- */
-export interface GraphConcept {
-  id: string;
-  label: string;
-  origin?: string;
-  provenance?: GraphNodeProvenance;
-}
+/* The backend defaults every array to [], so a payload never lacks one. */
+export type ConceptGraphPayload = Required<Schemas['ConceptGraphPayload']>;
 
-/**
- * A relationship between concepts, reified as its own node rather than left as an edge —
- * which is what lets one contribution join three or more concepts at once. Concepts never
- * reference each other directly; they are always joined through a contribution.
- * @property {string} kind - The relationship's name, and the short label drawn on the node.
- * @property {string} [statement] - What the conversation said about the relationship, in a sentence.
- * @property {string[]} concepts - Ids of the concepts this relationship joins; one or more, and more than two is normal.
- * @property {string} [origin] - Id of the GraphOriginPrompt this contribution came out of.
- */
-export interface GraphContribution {
-  id: string;
-  kind: string;
-  statement?: string;
-  concepts: string[];
-  origin?: string;
-  provenance?: GraphNodeProvenance;
-}
-
-/**
- * The prompt or question a concept or contribution came out of: the third node kind.
- * Attached by a direct `origin` reference rather than through a contribution, since an
- * origin is attribution rather than a relationship between concepts.
- */
-export interface GraphOriginPrompt {
-  id: string;
-  text: string;
-  provenance?: GraphNodeProvenance;
-}
-
-/**
- * The version payload of a ConceptGraphArtifact. Every array defaults to empty, so an
- * artifact can exist before an event has filled it in — render an empty state rather than
- * assuming nodes. Ids are unique across all three arrays, and the backend guarantees every
- * id in `contributions[].concepts` and every `origin` names a node in the same payload, so
- * lookups need no null-guarding.
- */
-export interface ConceptGraphPayload {
-  concepts: GraphConcept[];
-  contributions: GraphContribution[];
-  originPrompts: GraphOriginPrompt[];
-}
-
-/** The version payload of a DocumentArtifact: a single body of text. */
+/* The spec types a document payload as an open object; this is the shape it holds. */
 export interface DocumentPayload {
   body: string;
 }
 
-export type ArtifactPayload = DocumentPayload | ConceptGraphPayload;
+export type ArtifactPayload = Schemas['ArtifactVersion']['payload'];
+/* Serialized documents always carry their id, whatever the spec marks optional. */
+export type ArtifactVersion = Schemas['ArtifactVersion'] & { id: string };
 
-/**
- * One immutable revision of an artifact. Versions are append-only, and each carries the
- * whole payload rather than a patch.
- * @property {number} versionNumber - 1-based and strictly increasing, but NOT contiguous: a
- *   failed append burns a number. Use it for ordering and display, never as a count.
- * @property {string} [note] - Free-text note on what changed, for the history view.
- */
-export interface ArtifactVersion {
-  id: string;
-  artifact: string;
-  versionNumber: number;
-  payload: ArtifactPayload;
-  createdBy?: string;
-  note?: string;
-  createdAt?: string;
-}
-
-/**
- * A shared object scoped to one conversation or one topic. The artifact's content is the
- * payload of its `currentVersion`; every earlier version stays readable through the
- * versions endpoints.
- * @property {ArtifactType} type - Switch the renderer on this. Published as `type`, never as mongoose's `__t`.
- * @property {string} topic - Always set, conversation-scoped artifacts included.
- * @property {string} [conversation] - Set only when `scope` is "conversation".
- * @property {ArtifactVersion} [currentVersion] - Populated by the fetch and list endpoints.
- * @property {boolean} locked - When true no further versions may be appended; the artifact stays readable.
- */
-export interface Artifact {
+/* Read routes return topic and conversation as ids, populate currentVersion, and always
+   carry id, type and currentVersionNumber. */
+export type Artifact = Omit<
+  Schemas['Artifact'],
+  'id' | 'type' | 'topic' | 'conversation' | 'currentVersion' | 'currentVersionNumber'
+> & {
   id: string;
   type: ArtifactType;
-  scope: 'topic' | 'conversation';
   topic: string;
   conversation?: string;
-  title: string;
-  description?: string;
   currentVersion?: ArtifactVersion;
   currentVersionNumber: number;
-  createdBy?: string;
-  locked: boolean;
-  createdAt?: string;
-}
+};
 
-/** A page of an artifact's history, as the versions endpoint returns it. */
-export interface ArtifactVersionPage {
-  results: ArtifactVersion[];
-  page: number;
-  limit: number;
-  totalPages: number;
-  totalResults: number;
-}
+/* The paginate plugin fills every field, whatever the spec marks optional. */
+type VersionPageResponse = Required<operations['listArtifactVersions']['responses'][200]['content']['application/json']>;
+export type ArtifactVersionPage = Omit<VersionPageResponse, 'results'> & { results: ArtifactVersion[] };
 
 /**
  * The `artifact:version` socket event, sent to the conversation room whenever a version is
@@ -445,26 +334,12 @@ export interface ArtifactVersionEvent {
 export type ArtifactContainer = { conversationId: string; topicId?: never } | { topicId: string; conversationId?: never };
 
 /**
- * What POST /v1/artifacts/generate answers with.
- *
- * A run that finds too little of the event record to map, or whose output does not survive
- * the Chatham House checks, is a success with nothing to show rather than a failure: it
- * answers `generated: false` with a reason. A run that wrote something answers
- * `generated: true` with the artifact, the version it appended, and what the assembly and
- * safety passes removed on the way.
- * @property {boolean} generated - Whether a version was written.
- * @property {string} [reason] - Why nothing was written, when nothing was.
+ * What POST /v1/artifacts/generate answers with. A run that finds too little to map, or whose
+ * output does not survive the Chatham House checks, is a success with nothing to show: it
+ * answers `generated: false` with a reason rather than an error.
  */
-export interface ConceptGraphGenerationResult {
-  generated: boolean;
-  reason?: string;
-  artifact?: Artifact;
-  version?: ArtifactVersion;
-  report?: {
-    droppedConcepts?: number;
-    droppedContributions?: number;
-    droppedStatements?: number;
-    droppedOriginPrompts?: number;
-    mergedConcepts?: number;
-  };
-}
+type GenerateResponses = operations['generateConceptGraph']['responses'];
+export type ConceptGraphGenerationResult = { generated: boolean; artifact?: Artifact } & Omit<
+  GenerateResponses[200]['content']['application/json'] & GenerateResponses[202]['content']['application/json'],
+  'generated' | 'artifact'
+>;
