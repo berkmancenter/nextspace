@@ -1,4 +1,4 @@
-import { components } from './types';
+import { components, operations } from './types';
 
 /**
  * Authentication type for user sessions
@@ -264,3 +264,82 @@ export interface LoungeRoom {
   lastMessageAt: string | null;
   hasUnread: boolean;
 }
+
+/* Artifacts. The shapes come from the backend's OpenAPI spec through types.ts. The spec
+   leaves most fields optional because one schema covers both a bare id and a populated
+   document; the aliases below narrow to what the read routes actually return. */
+type Schemas = components['schemas'];
+
+export type ArtifactType = NonNullable<Schemas['Artifact']['type']>;
+
+/**
+ * `conversationId` names a session, not a person, and is safe to draw. `messageId` and
+ * `pseudonym` re-identify a contributor of an event held under the Chatham House Rule and
+ * must never be rendered to a passcode holder; gate anything built on them to organizers.
+ */
+export type GraphNodeProvenance = Schemas['GraphNodeProvenance'];
+export type GraphConcept = Schemas['GraphConcept'];
+export type GraphContribution = Schemas['GraphContribution'];
+export type GraphOriginPrompt = Schemas['GraphOriginPrompt'];
+
+/* The backend defaults every array to [], so a payload never lacks one. */
+export type ConceptGraphPayload = Required<Schemas['ConceptGraphPayload']>;
+
+/* The spec types a document payload as an open object; this is the shape it holds. */
+export interface DocumentPayload {
+  body: string;
+}
+
+export type ArtifactPayload = Schemas['ArtifactVersion']['payload'];
+/* Serialized documents always carry their id, whatever the spec marks optional. */
+export type ArtifactVersion = Schemas['ArtifactVersion'] & { id: string };
+
+/* Read routes return topic and conversation as ids, populate currentVersion, and always
+   carry id, type and currentVersionNumber. */
+export type Artifact = Omit<
+  Schemas['Artifact'],
+  'id' | 'type' | 'topic' | 'conversation' | 'currentVersion' | 'currentVersionNumber'
+> & {
+  id: string;
+  type: ArtifactType;
+  topic: string;
+  conversation?: string;
+  currentVersion?: ArtifactVersion;
+  currentVersionNumber: number;
+};
+
+/* The paginate plugin fills every field, whatever the spec marks optional. */
+type VersionPageResponse = Required<operations['listArtifactVersions']['responses'][200]['content']['application/json']>;
+export type ArtifactVersionPage = Omit<VersionPageResponse, 'results'> & { results: ArtifactVersion[] };
+
+/**
+ * The `artifact:version` socket event, sent to the conversation room whenever a version is
+ * appended. It names the version and its container and carries no content: the room is
+ * joined without any passcode, so the content has to come from the REST route that checks
+ * one. A received event does not say which room delivered it, so the container is what a
+ * client filters on. `conversationId` is present only when `scope` is "conversation".
+ */
+export interface ArtifactVersionEvent {
+  artifactId: string;
+  versionNumber: number;
+  scope: 'topic' | 'conversation';
+  topicId: string;
+  conversationId?: string;
+}
+
+/**
+ * Which container's artifacts to read. Exactly one of the two is set — the API rejects
+ * both and neither.
+ */
+export type ArtifactContainer = { conversationId: string; topicId?: never } | { topicId: string; conversationId?: never };
+
+/**
+ * What POST /v1/artifacts/generate answers with. A run that finds too little to map, or whose
+ * output does not survive the Chatham House checks, is a success with nothing to show: it
+ * answers `generated: false` with a reason rather than an error.
+ */
+type GenerateResponses = operations['generateConceptGraph']['responses'];
+export type ConceptGraphGenerationResult = { generated: boolean; artifact?: Artifact } & Omit<
+  GenerateResponses[200]['content']['application/json'] & GenerateResponses[202]['content']['application/json'],
+  'generated' | 'artifact'
+>;
