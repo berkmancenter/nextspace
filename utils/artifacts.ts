@@ -77,9 +77,10 @@ function unwrap<T>(response: any, fallbackMessage: string): T {
 }
 
 /**
- * Every artifact in a container, newest first, each with `currentVersion` populated — so a
- * list view can render the whole set without a request per artifact. A topic listing
- * includes the artifacts of that topic's conversations.
+ * Every artifact in a container, newest first, each with `currentVersion` populated, so a
+ * list view can render the whole set without a request per artifact. A topic listing read
+ * with the topic passcode holds only topic-scoped artifacts; the topic owner and admins also
+ * get the artifacts of the topic's conversations.
  * @param container - Exactly one of `conversationId` or `topicId`.
  * @param artifactPasscode - The container's read passcode. Omit it when the caller owns the container or is an admin.
  * @returns The container's artifacts.

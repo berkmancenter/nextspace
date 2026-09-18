@@ -18,6 +18,7 @@ export { TranscriptIcon } from './TranscriptIcon';
 export { Errors, ParamErrors } from './Errors';
 export { ArtifactList } from './artifacts/ArtifactList';
 export { ArtifactPasscodePrompt } from './artifacts/ArtifactPasscodePrompt';
+export { ArtifactShareLink } from './artifacts/ArtifactShareLink';
 export { ArtifactView } from './artifacts/ArtifactView';
 export { ArtifactVersionHistory } from './artifacts/ArtifactVersionHistory';
 export { ConceptGraphView } from './artifacts/ConceptGraphView';

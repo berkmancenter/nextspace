@@ -13,10 +13,11 @@ export const getServerSideProps = async (context: { req: any }) => {
 /**
  * A series' artifacts: what a whole topic produced, its own concept graph included.
  *
- * A topic listing covers the artifacts of every conversation under it as well as the topic's
- * own, so this is the view of a series rather than of one evening. The series graph is
- * refined rather than rebuilt — each event that ends merges into what the series already
- * knows — so its version history is a record of how the group's understanding developed, and
+ * A reader holding the topic's artifact passcode sees only topic-scoped artifacts: the topic
+ * passcode never opens a conversation's own artifacts, so the listing leaves them out. The
+ * topic owner and administrators see the conversations' artifacts here too. The series graph
+ * is refined rather than rebuilt (each event that ends merges into what the series already
+ * knows), so its version history is a record of how the group's understanding developed, and
  * a concept returned to across sessions is one node with a high degree rather than several.
  *
  * There is no socket here, deliberately: topic-scoped artifacts are broadcast nowhere,

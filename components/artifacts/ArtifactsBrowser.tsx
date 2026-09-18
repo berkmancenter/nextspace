@@ -3,6 +3,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import type { Socket } from 'socket.io-client';
 import { ArtifactList } from './ArtifactList';
 import { ArtifactPasscodePrompt } from './ArtifactPasscodePrompt';
+import { ArtifactShareLink } from './ArtifactShareLink';
 import { ArtifactView } from './ArtifactView';
 import { GenerateGraphButton } from './GenerateGraphButton';
 import { useArtifacts } from '../../hooks/useArtifacts';
@@ -59,6 +60,12 @@ export const ArtifactsBrowser = ({
 
   const selected: Artifact | undefined = artifacts.find((artifact) => artifact.id === selectedArtifactId) ?? artifacts[0];
   const isTopic = !!container?.topicId;
+  // An admin's topic listing also holds the topic's conversation graphs, which are not the
+  // series graph; only a graph scoped like the container counts as already existing here.
+  const containerScope = isTopic ? 'topic' : 'conversation';
+  const hasGraphForContainer = artifacts.some(
+    (artifact) => artifact.type === 'ConceptGraphArtifact' && artifact.scope === containerScope,
+  );
 
   if (needsPasscode) {
     return (
@@ -113,13 +120,14 @@ export const ArtifactsBrowser = ({
             </Button>
           )}
 
-          {/* Generating reads the record of an event, or of a whole series, and writes a
-              graph — the organizer's action rather than a reader's. The endpoint refuses
-              anyone else; this only decides whether to offer it. */}
+          {/* Minting the share link and generating a graph are the organizer's actions
+              rather than a reader's: the passcode route and the generate route both refuse
+              anyone but an admin, so this only decides whether to offer them. */}
+          {authType === 'admin' && container && <ArtifactShareLink container={container} selectedArtifact={selected} />}
           {authType === 'admin' && container && (
             <GenerateGraphButton
               container={container}
-              hasExistingGraph={artifacts.some((artifact) => artifact.type === 'ConceptGraphArtifact')}
+              hasExistingGraph={hasGraphForContainer}
               onGenerated={(result) => {
                 reload();
                 if (result.artifact?.id) onSelectArtifact(result.artifact.id);
