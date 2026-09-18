@@ -568,9 +568,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
             {/* ── Main content area ── */}
             <div className="flex-1 flex flex-row overflow-hidden">
-              {/* Transcript full-screen view when transcript tab is active */}
-              {router.query.view !== 'preferences' && activeTab === 'transcript' && transcriptPasscode ? (
-                <div className="flex-1 overflow-hidden">
+              {/* Transcript full-screen view when transcript tab is active.
+                  Always mounted so it doesn't re-fetch on every tab/view switch. */}
+              {transcriptPasscode && (
+                <div
+                  className={`flex-1 overflow-hidden${activeTab === 'transcript' && router.query.view !== 'preferences' ? '' : ' hidden'}`}
+                >
                   <Transcript
                     category="assistant"
                     socket={socket}
@@ -580,7 +583,23 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                     hideToggle={true}
                   />
                 </div>
-              ) : (
+              )}
+              {/* Transcript sidebar — always mounted so it doesn't re-fetch on tab switch.
+                  Hidden when the full-screen transcript is active, on preferences, or on small screens. */}
+              {transcriptPasscode && (
+                <div
+                  className={`lg:order-2${activeTab === 'transcript' || router.query.view === 'preferences' ? ' hidden' : ' hidden lg:block'}`}
+                >
+                  <Transcript
+                    category="assistant"
+                    socket={socket}
+                    conversationId={router.query.conversationId as string}
+                    transcriptPasscode={transcriptPasscode}
+                    lastReconnectTime={lastReconnectTime}
+                  />
+                </div>
+              )}
+              {activeTab !== 'transcript' ? (
                 <>
                   {/* Chat / Assistant / Resources / Preferences panel */}
                   <div className="flex-1 flex flex-col relative overflow-hidden">
@@ -702,21 +721,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                       </div>
                     )}
                   </div>
-
-                  {/* Transcript sidebar — still accessible on Chat and Event Bot views */}
-                  {transcriptPasscode && (
-                    <div className="lg:order-2 hidden lg:block">
-                      <Transcript
-                        category="assistant"
-                        socket={socket}
-                        conversationId={router.query.conversationId as string}
-                        transcriptPasscode={transcriptPasscode}
-                        lastReconnectTime={lastReconnectTime}
-                      />
-                    </div>
-                  )}
                 </>
-              )}
+              ) : null}
             </div>
           </>
         )}
