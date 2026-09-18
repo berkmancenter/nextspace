@@ -146,6 +146,9 @@ export function useArtifacts({ container, artifactPasscode, socket }: UseArtifac
 
     return () => {
       socket.off('connect', onConnect);
+      // The server never drops a room on its own, so without this the socket would keep
+      // receiving the old conversation's notices after the page moves on.
+      if (hasJoinedRef.current) socket.emit('conversation:leave', { conversationId, token: Api.get().getAccessToken() });
     };
   }, [socket, conversationId, authorizedConversationId]);
 
@@ -155,6 +158,12 @@ export function useArtifacts({ container, artifactPasscode, socket }: UseArtifac
 
     const onArtifactVersion = async (notice: ArtifactVersionEvent) => {
       if (!notice?.artifactId || typeof notice.versionNumber !== 'number') return;
+      // A received event does not say which room delivered it, and one socket can sit in
+      // several, so the notice's own container decides whether it is ours.
+      const ours =
+        (notice.scope === 'conversation' && notice.conversationId === conversationId) ||
+        (notice.scope === 'topic' && notice.topicId === topicId);
+      if (!ours) return;
 
       const known = artifactsRef.current.find((artifact) => artifact.id === notice.artifactId);
       if (!known) {
@@ -188,7 +197,7 @@ export function useArtifacts({ container, artifactPasscode, socket }: UseArtifac
       active = false;
       socket.off('artifact:version', onArtifactVersion);
     };
-  }, [socket, reload, artifactPasscode]);
+  }, [socket, reload, artifactPasscode, conversationId, topicId]);
 
   return { artifacts, loading, error, needsPasscode, liveArtifactIds, reload };
 }

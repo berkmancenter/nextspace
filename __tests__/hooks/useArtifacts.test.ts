@@ -43,9 +43,14 @@ function makeSocket() {
         (handlers.get(event) ?? []).filter((h) => h !== handler),
       );
     }),
-    emit: (event: string, payload: any) => (handlers.get(event) ?? []).forEach((h) => h(payload)),
+    emit: jest.fn(),
+    /** Delivers a server event to whatever the hook registered for it. */
+    fire: (event: string, payload: any) => (handlers.get(event) ?? []).forEach((h) => h(payload)),
   };
 }
+
+/** The container every notice in these tests belongs to, unless a test says otherwise. */
+const here = { scope: 'conversation', topicId: 't1', conversationId: 'conv-1' };
 
 const artifact = {
   id: 'a1',
@@ -173,7 +178,7 @@ describe('live updates', () => {
     await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
 
     act(() => {
-      socket.emit('artifact:version', { artifactId: 'a1', versionNumber: 3 });
+      socket.fire('artifact:version', { ...here, artifactId: 'a1', versionNumber: 3 });
     });
 
     await waitFor(() => expect(result.current.artifacts[0].currentVersionNumber).toBe(3));
@@ -192,7 +197,7 @@ describe('live updates', () => {
 
     const smuggled = { id: 'vx', artifact: 'a1', versionNumber: 3, payload: { concepts: [{ id: 'evil', label: 'Evil' }] } };
     act(() => {
-      socket.emit('artifact:version', { artifactId: 'a1', versionNumber: 3, title: 'Renamed', version: smuggled });
+      socket.fire('artifact:version', { ...here, artifactId: 'a1', versionNumber: 3, title: 'Renamed', version: smuggled });
     });
 
     await waitFor(() => expect(result.current.artifacts[0].currentVersionNumber).toBe(3));
@@ -206,8 +211,8 @@ describe('live updates', () => {
     await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
 
     act(() => {
-      socket.emit('artifact:version', { artifactId: 'a1', versionNumber: 1 });
-      socket.emit('artifact:version', { artifactId: 'a1', versionNumber: 2 });
+      socket.fire('artifact:version', { ...here, artifactId: 'a1', versionNumber: 1 });
+      socket.fire('artifact:version', { ...here, artifactId: 'a1', versionNumber: 2 });
     });
 
     expect(mockFetchArtifact).not.toHaveBeenCalled();
@@ -226,7 +231,7 @@ describe('live updates', () => {
     await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
 
     act(() => {
-      socket.emit('artifact:version', { artifactId: 'a1', versionNumber: 3 });
+      socket.fire('artifact:version', { ...here, artifactId: 'a1', versionNumber: 3 });
     });
 
     await waitFor(() => expect(mockFetchArtifact).toHaveBeenCalled());
@@ -235,13 +240,46 @@ describe('live updates', () => {
     expect(result.current.liveArtifactIds.size).toBe(0);
   });
 
+  it('ignores a notice from another conversation, with no request of any kind', async () => {
+    // One socket can sit in several rooms and a received event says nothing about which
+    // room delivered it, so the notice's own container is the only thing to go on.
+    const socket = makeSocket();
+    const { result } = renderHook(() => useArtifacts({ container: { conversationId: 'conv-1' }, socket: socket as any }));
+    await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
+
+    act(() => {
+      socket.fire('artifact:version', {
+        artifactId: 'a9',
+        versionNumber: 1,
+        scope: 'conversation',
+        topicId: 't1',
+        conversationId: 'conv-2',
+      });
+      socket.fire('artifact:version', { artifactId: 'a1', versionNumber: 3, scope: 'topic', topicId: 't1' });
+    });
+
+    await act(async () => {});
+    expect(mockFetchArtifact).not.toHaveBeenCalled();
+    expect(mockListArtifacts).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the room it joined when the page moves on', async () => {
+    const socket = makeSocket();
+    const { unmount } = renderHook(() => useArtifacts({ container: { conversationId: 'conv-1' }, socket: socket as any }));
+    await waitFor(() => expect(mockEmit).toHaveBeenCalledTimes(1));
+
+    unmount();
+
+    expect(socket.emit).toHaveBeenCalledWith('conversation:leave', { conversationId: 'conv-1', token: 'test-token' });
+  });
+
   it('re-reads the list when the notice names an artifact it has never seen', async () => {
     const socket = makeSocket();
     const { result } = renderHook(() => useArtifacts({ container: { conversationId: 'conv-1' }, socket: socket as any }));
     await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
 
     act(() => {
-      socket.emit('artifact:version', { artifactId: 'a2', versionNumber: 1 });
+      socket.fire('artifact:version', { ...here, artifactId: 'a2', versionNumber: 1 });
     });
 
     await waitFor(() => expect(mockListArtifacts).toHaveBeenCalledTimes(2));
@@ -255,7 +293,7 @@ describe('live updates', () => {
     await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
 
     act(() => {
-      socket.emit('artifact:version', { artifactId: 'a1', versionNumber: 3 });
+      socket.fire('artifact:version', { ...here, artifactId: 'a1', versionNumber: 3 });
     });
 
     await waitFor(() => expect(result.current.error).toBe('Boom'));

@@ -425,12 +425,17 @@ export interface ArtifactVersionPage {
 
 /**
  * The `artifact:version` socket event, sent to the conversation room whenever a version is
- * appended. It names the version and carries none of it: the room is joined without any
- * passcode, so the content has to come from the REST route that checks one.
+ * appended. It names the version and its container and carries no content: the room is
+ * joined without any passcode, so the content has to come from the REST route that checks
+ * one. A received event does not say which room delivered it, so the container is what a
+ * client filters on. `conversationId` is present only when `scope` is "conversation".
  */
 export interface ArtifactVersionEvent {
   artifactId: string;
   versionNumber: number;
+  scope: 'topic' | 'conversation';
+  topicId: string;
+  conversationId?: string;
 }
 
 /**
