@@ -181,8 +181,11 @@ export function useConversationSetup({
     }
     fetchConversationData();
     // setBotNameContext, setConversationType, setResources are stable setters — safe to omit.
+    // router.query.view and other view-only params are intentionally excluded: navigating
+    // between views (e.g. preferences) must not re-fetch conversation data and re-trigger
+    // the event status dialog.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, router]);
+  }, [socket, router.isReady, router.query.conversationId, router.query.channel]);
 
   // Called when the backend sends conversation:stopped so open tabs disconnect
   // their sockets instead of reconnecting indefinitely. If the event later
