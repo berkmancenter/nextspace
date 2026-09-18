@@ -15,6 +15,7 @@ jest.mock('../../utils', () => {
   return {
     ArtifactRequestError,
     listArtifacts: jest.fn(),
+    fetchArtifact: jest.fn(),
     emitWithTokenRefresh: jest.fn(),
     Api: { get: () => ({ getAccessToken: () => 'test-token' }) },
   };
@@ -22,9 +23,10 @@ jest.mock('../../utils', () => {
 
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useArtifacts } from '../../hooks/useArtifacts';
-import { ArtifactRequestError, emitWithTokenRefresh, listArtifacts } from '../../utils';
+import { ArtifactRequestError, emitWithTokenRefresh, fetchArtifact, listArtifacts } from '../../utils';
 
 const mockListArtifacts = listArtifacts as jest.Mock;
+const mockFetchArtifact = fetchArtifact as jest.Mock;
 const mockEmit = emitWithTokenRefresh as jest.Mock;
 
 /** A socket that records its handlers so a test can fire a broadcast at the hook. */
@@ -57,9 +59,13 @@ const artifact = {
   locked: false,
 };
 
+const versionThree = { id: 'v3', artifact: 'a1', versionNumber: 3, payload: { concepts: [{ id: 'c1', label: 'New' }] } };
+const artifactAtThree = { ...artifact, currentVersionNumber: 3, currentVersion: versionThree };
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockListArtifacts.mockResolvedValue([artifact]);
+  mockFetchArtifact.mockResolvedValue(artifactAtThree);
 });
 
 describe('reading a container', () => {
@@ -120,54 +126,141 @@ describe('live updates', () => {
     expect(mockEmit.mock.calls[0][2]).toEqual({ conversationId: 'conv-1', token: 'test-token', channels: [] });
   });
 
-  it('applies a broadcast version in place instead of refetching', async () => {
+  it('does not join the room while the read is refused', async () => {
+    // The room join is a chat-side action with side effects of its own, and hearing a notice
+    // is useless to a reader the route has turned away. Join only once a read has succeeded.
+    mockListArtifacts.mockRejectedValue(new ArtifactRequestError('Forbidden', 403));
     const socket = makeSocket();
     const { result } = renderHook(() => useArtifacts({ container: { conversationId: 'conv-1' }, socket: socket as any }));
+
+    await waitFor(() => expect(result.current.needsPasscode).toBe(true));
+    expect(mockEmit).not.toHaveBeenCalled();
+  });
+
+  it('does not join a new conversation’s room on the strength of the old one’s read', async () => {
+    const socket = makeSocket();
+    const { result, rerender } = renderHook(
+      ({ conversationId }: { conversationId: string }) =>
+        useArtifacts({ container: { conversationId }, socket: socket as any }),
+      { initialProps: { conversationId: 'conv-1' } },
+    );
+    await waitFor(() => expect(mockEmit).toHaveBeenCalledTimes(1));
+
+    mockListArtifacts.mockRejectedValue(new ArtifactRequestError('Forbidden', 403));
+    rerender({ conversationId: 'conv-2' });
+
+    await waitFor(() => expect(result.current.needsPasscode).toBe(true));
+    expect(mockEmit).toHaveBeenCalledTimes(1);
+    expect(mockEmit.mock.calls[0][2].conversationId).toBe('conv-1');
+  });
+
+  it('does not rejoin the room on a reload of the same container', async () => {
+    const socket = makeSocket();
+    const { result } = renderHook(() => useArtifacts({ container: { conversationId: 'conv-1' }, socket: socket as any }));
+    await waitFor(() => expect(mockEmit).toHaveBeenCalledTimes(1));
+
+    act(() => result.current.reload());
+
+    await waitFor(() => expect(mockListArtifacts).toHaveBeenCalledTimes(2));
+    expect(mockEmit).toHaveBeenCalledTimes(1);
+  });
+
+  it('refetches the artifact from the REST route, with the passcode, when a newer version is announced', async () => {
+    const socket = makeSocket();
+    const { result } = renderHook(() =>
+      useArtifacts({ container: { conversationId: 'conv-1' }, artifactPasscode: 'Xk3fA9dQ', socket: socket as any }),
+    );
     await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
 
-    const version = { id: 'v3', artifact: 'a1', versionNumber: 3, payload: { concepts: [{ id: 'c1', label: 'New' }] } };
     act(() => {
-      socket.emit('artifact:version', { artifactId: 'a1', type: 'ConceptGraphArtifact', title: 'x', version });
+      socket.emit('artifact:version', { artifactId: 'a1', versionNumber: 3 });
     });
 
-    expect(result.current.artifacts[0].currentVersion).toBe(version);
-    expect(result.current.artifacts[0].currentVersionNumber).toBe(3);
+    await waitFor(() => expect(result.current.artifacts[0].currentVersionNumber).toBe(3));
+    expect(mockFetchArtifact).toHaveBeenCalledWith('a1', 'Xk3fA9dQ');
+    expect(result.current.artifacts[0].currentVersion).toEqual(versionThree);
     expect(result.current.liveArtifactIds.has('a1')).toBe(true);
     expect(mockListArtifacts).toHaveBeenCalledTimes(1);
   });
 
-  it('ignores a version older than the one in hand', async () => {
+  it('takes nothing off the socket but the ids, even when a payload rides along', async () => {
+    // The room is joined with no passcode, so whatever arrives in it is unverified. The
+    // artifact is what the passcode-checked route returns, never what the event carried.
     const socket = makeSocket();
     const { result } = renderHook(() => useArtifacts({ container: { conversationId: 'conv-1' }, socket: socket as any }));
     await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
 
+    const smuggled = { id: 'vx', artifact: 'a1', versionNumber: 3, payload: { concepts: [{ id: 'evil', label: 'Evil' }] } };
     act(() => {
-      socket.emit('artifact:version', {
-        artifactId: 'a1',
-        type: 'ConceptGraphArtifact',
-        title: 'x',
-        version: { id: 'v1', artifact: 'a1', versionNumber: 1, payload: {} },
-      });
+      socket.emit('artifact:version', { artifactId: 'a1', versionNumber: 3, title: 'Renamed', version: smuggled });
     });
 
-    expect(result.current.artifacts[0].currentVersionNumber).toBe(2);
+    await waitFor(() => expect(result.current.artifacts[0].currentVersionNumber).toBe(3));
+    expect(result.current.artifacts[0].currentVersion).toEqual(versionThree);
+    expect(result.current.artifacts[0].title).toBe(artifact.title);
   });
 
-  it('re-reads the list when the version belongs to an artifact it has never seen', async () => {
+  it('ignores a notice for a version it already has, without a request', async () => {
     const socket = makeSocket();
     const { result } = renderHook(() => useArtifacts({ container: { conversationId: 'conv-1' }, socket: socket as any }));
     await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
 
     act(() => {
-      socket.emit('artifact:version', {
-        artifactId: 'a2',
-        type: 'DocumentArtifact',
-        title: 'Brand new',
-        version: { id: 'v1', artifact: 'a2', versionNumber: 1, payload: { body: 'hello' } },
-      });
+      socket.emit('artifact:version', { artifactId: 'a1', versionNumber: 1 });
+      socket.emit('artifact:version', { artifactId: 'a1', versionNumber: 2 });
+    });
+
+    expect(mockFetchArtifact).not.toHaveBeenCalled();
+    expect(result.current.artifacts[0].currentVersionNumber).toBe(2);
+    expect(result.current.liveArtifactIds.size).toBe(0);
+  });
+
+  it('does not mark an artifact live when the refetch comes back older than what it holds', async () => {
+    mockFetchArtifact.mockResolvedValue({
+      ...artifact,
+      currentVersionNumber: 1,
+      currentVersion: { id: 'v1', artifact: 'a1', versionNumber: 1, payload: {} },
+    });
+    const socket = makeSocket();
+    const { result } = renderHook(() => useArtifacts({ container: { conversationId: 'conv-1' }, socket: socket as any }));
+    await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
+
+    act(() => {
+      socket.emit('artifact:version', { artifactId: 'a1', versionNumber: 3 });
+    });
+
+    await waitFor(() => expect(mockFetchArtifact).toHaveBeenCalled());
+    await act(async () => {});
+    expect(result.current.artifacts[0].currentVersionNumber).toBe(2);
+    expect(result.current.liveArtifactIds.size).toBe(0);
+  });
+
+  it('re-reads the list when the notice names an artifact it has never seen', async () => {
+    const socket = makeSocket();
+    const { result } = renderHook(() => useArtifacts({ container: { conversationId: 'conv-1' }, socket: socket as any }));
+    await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
+
+    act(() => {
+      socket.emit('artifact:version', { artifactId: 'a2', versionNumber: 1 });
     });
 
     await waitFor(() => expect(mockListArtifacts).toHaveBeenCalledTimes(2));
+    expect(mockFetchArtifact).not.toHaveBeenCalled();
+  });
+
+  it('reports a refetch that fails, and keeps what it had', async () => {
+    mockFetchArtifact.mockRejectedValue(new ArtifactRequestError('Boom', 500));
+    const socket = makeSocket();
+    const { result } = renderHook(() => useArtifacts({ container: { conversationId: 'conv-1' }, socket: socket as any }));
+    await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
+
+    act(() => {
+      socket.emit('artifact:version', { artifactId: 'a1', versionNumber: 3 });
+    });
+
+    await waitFor(() => expect(result.current.error).toBe('Boom'));
+    expect(result.current.artifacts[0].currentVersionNumber).toBe(2);
+    expect(result.current.liveArtifactIds.size).toBe(0);
   });
 
   it('stops listening when unmounted', async () => {

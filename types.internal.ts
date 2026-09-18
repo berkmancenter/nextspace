@@ -424,15 +424,13 @@ export interface ArtifactVersionPage {
 }
 
 /**
- * The `artifact:version` socket event, broadcast to the conversation room whenever a
- * version is appended. It carries the version itself so a client can re-render without
- * refetching — and so it never has to re-present the passcode over the socket.
+ * The `artifact:version` socket event, sent to the conversation room whenever a version is
+ * appended. It names the version and carries none of it: the room is joined without any
+ * passcode, so the content has to come from the REST route that checks one.
  */
 export interface ArtifactVersionEvent {
   artifactId: string;
-  type: ArtifactType;
-  title: string;
-  version: ArtifactVersion;
+  versionNumber: number;
 }
 
 /**
