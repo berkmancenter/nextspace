@@ -45,9 +45,7 @@ type TokenChangeListener = (tokens: TokenSet) => void;
  * can refuse to adopt tokens for a different user (which would cause the tab to
  * authenticate as one user while building channel names for another).
  */
-type TabMessage =
-  | { type: 'TOKENS_REFRESHED'; tokens: TokenSet; userId: string | null }
-  | { type: 'REFRESH_STARTING' };
+type TabMessage = { type: 'TOKENS_REFRESHED'; tokens: TokenSet; userId: string | null } | { type: 'REFRESH_STARTING' };
 
 class TokenManagerClass {
   private static _instance: TokenManagerClass;
@@ -59,6 +57,7 @@ class TokenManagerClass {
   private _ownerUserId: string | null = null;
   private _inflightRefresh: Promise<boolean> | null = null;
   private _proactiveTimer: ReturnType<typeof setTimeout> | null = null;
+  private _proactiveRefreshPaused: boolean = false;
   private _lastRefreshAt: number = 0;
   private _listeners: Set<TokenChangeListener> = new Set();
   private _channel: BroadcastChannel | null = null;
@@ -206,11 +205,13 @@ class TokenManagerClass {
   }
 
   /**
-   * Clear all tokens (e.g. on logout).  Cancels any pending proactive refresh.
+   * Clear all tokens (e.g. on logout).  Cancels any pending proactive refresh
+   * and resets the paused flag so a fresh session can schedule normally.
    */
   clearTokens(): void {
     this._tokens = null;
     this._ownerUserId = null;
+    this._proactiveRefreshPaused = false;
     this._cancelProactiveRefresh();
   }
 
@@ -388,6 +389,7 @@ class TokenManagerClass {
    * expires, replacing any previously scheduled timer.
    */
   private _scheduleProactiveRefresh(): void {
+    if (this._proactiveRefreshPaused) return;
     this._cancelProactiveRefresh();
 
     if (!this._tokens) return;
@@ -459,10 +461,23 @@ class TokenManagerClass {
     }
   }
 
+  /**
+   * Cancels the proactive refresh timer and prevents it from being rescheduled
+   * (e.g. by cross-tab token broadcasts).  Use this when the session no longer
+   * needs background token maintenance (e.g. the conversation has ended and the
+   * socket has been torn down).  Tokens are kept so on-demand API calls still
+   * work.  Cleared on logout (`clearTokens`).
+   */
+  pauseProactiveRefresh(): void {
+    this._proactiveRefreshPaused = true;
+    this._cancelProactiveRefresh();
+  }
+
   private _cancelProactiveRefresh(): void {
     if (this._proactiveTimer !== null) {
       clearTimeout(this._proactiveTimer);
       this._proactiveTimer = null;
+      console.log('TokenManager: proactive refresh cancelled');
     }
   }
 

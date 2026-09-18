@@ -3013,4 +3013,81 @@ describe('EventAssistantRoom', () => {
       });
     });
   });
+
+  describe('conversation:stopped socket event', () => {
+    beforeEach(async () => {
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+        }
+        return Promise.resolve([]);
+      });
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        active: true,
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
+      await waitFor(() => expect(mockSocket.on).toHaveBeenCalledWith('conversation:stopped', expect.any(Function)));
+    });
+
+    it('registers the conversation:stopped handler on the socket', () => {
+      const call = mockSocket.on.mock.calls.find(([event]: [string]) => event === 'conversation:stopped');
+      expect(call).toBeDefined();
+    });
+
+    it('shows the Event Has Ended dialog when conversation:stopped fires', async () => {
+      const [, handler] = mockSocket.on.mock.calls.find(([event]: [string]) => event === 'conversation:stopped');
+
+      act(() => {
+        handler();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Event Has Ended')).toBeInTheDocument();
+      });
+    });
+
+    it('shows "This event is not active" after dismissing the dialog', async () => {
+      const [, handler] = mockSocket.on.mock.calls.find(([event]: [string]) => event === 'conversation:stopped');
+
+      act(() => {
+        handler();
+      });
+
+      const closeButton = await screen.findByRole('button', { name: /close event has ended dialog/i });
+      await act(async () => {
+        await userEvent.click(closeButton);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('This event is not active.')).toBeInTheDocument();
+      });
+    });
+
+    it('does not re-fetch message history when conversation:stopped fires on an active tab', async () => {
+      const [, handler] = mockSocket.on.mock.calls.find(([event]: [string]) => event === 'conversation:stopped');
+
+      const callsBefore = (RetrieveData as jest.Mock).mock.calls.length;
+
+      act(() => {
+        handler();
+      });
+
+      // Allow any queued effects to flush.
+      await act(async () => {});
+
+      const messageCalls = (RetrieveData as jest.Mock).mock.calls
+        .slice(callsBefore)
+        .filter(([path]: [string]) => path.startsWith('messages/'));
+
+      expect(messageCalls).toHaveLength(0);
+    });
+  });
 });

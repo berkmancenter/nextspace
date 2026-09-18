@@ -320,6 +320,18 @@ describe('useSessionJoin', () => {
     expect(mockSocket.disconnect).toHaveBeenCalledTimes(1);
   });
 
+  it('should disconnect the socket when unmounted', async () => {
+    const { unmount } = renderHook(() => useSessionJoin(true, false));
+
+    await waitFor(() => {
+      expect(mockIo).toHaveBeenCalled();
+    });
+
+    unmount();
+
+    expect(mockSocket.disconnect).toHaveBeenCalledTimes(1);
+  });
+
   it('should cleanup socket event listeners on unmount', async () => {
     const { unmount } = renderHook(() => useSessionJoin(true, false));
 

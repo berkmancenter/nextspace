@@ -17,6 +17,7 @@ import { NavigationBar } from '../components/NavigationBar';
 import { PreferencesPanel } from '../components/PreferencesPanel';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
 import { CheckAuthHeader } from '../utils/Helpers';
+import TokenManagerDefault from '../utils/TokenManager';
 import { Button, Dialog } from '@mui/material';
 import { Info } from '@mui/icons-material';
 import {
@@ -112,11 +113,19 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     eventStatusLoaded,
     showEventStatusDialog,
     setShowEventStatusDialog,
+    markEventEnded,
   } = useConversationSetup({ socket, userId, router, setConversationType, setBotNameContext, setResources });
 
-  // Enable socket connection only when the event status is loaded and active
+  // Enable socket connection only when the event status is loaded and active.
+  // conversation:stopped flips eventStatus to 'ended' which disconnects the
+  // socket here. If the event later restarts, a page refresh re-runs the
+  // initial active check and reconnects.
   useEffect(() => {
-    setEnableSocket(eventStatusLoaded && eventStatus === 'active');
+    const active = eventStatusLoaded && eventStatus === 'active';
+    setEnableSocket(active);
+    if (eventStatusLoaded && !active) {
+      TokenManagerDefault.pauseProactiveRefresh();
+    }
   }, [eventStatusLoaded, eventStatus]);
 
   const {
@@ -224,6 +233,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     socket.on('message:new', messageHandler);
     socket.on('resources:updated', resourcesUpdatedHandler);
     socket.on('conversation:ending', handleConversationEnding);
+    socket.on('conversation:stopped', markEventEnded);
     socket.on('choice:new', pollChoiceHandler);
 
     console.log('Socket event listeners registered');
@@ -232,11 +242,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
       socket.off('message:new', messageHandler);
       socket.off('resources:updated', resourcesUpdatedHandler);
       socket.off('conversation:ending', handleConversationEnding);
+      socket.off('conversation:stopped', markEventEnded);
       socket.off('choice:new', pollChoiceHandler);
     };
     // activeTabRef is a ref; the remaining omitted values are stable state setters from hooks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, socket?.connected, handleResourcesUpdated, handleConversationEnding]);
+  }, [socket, socket?.connected, handleResourcesUpdated, handleConversationEnding, markEventEnded]);
 
   // Track user ID in analytics when pseudonym is available
   useEffect(() => {
@@ -341,6 +352,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     if (eventStatus === 'active' && (!lastReconnectTime || lastReconnectTime < Date.now() - 10000)) return;
     if (!router.query.conversationId) return;
     if (!initialJoinComplete && !hasNoArchivedMessages) return;
+    // If the event just ended at runtime (conversation:stopped), we were an active
+    // participant and already have all messages — skip the re-fetch.
+    if (eventStatus === 'ended' && initialJoinComplete) return;
 
     console.log('Assistant re-fetching message history after gap-reconnect...');
 
