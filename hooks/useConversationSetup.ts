@@ -95,6 +95,10 @@ export function useConversationSetup({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.query.conversationId]);
 
+  // Serialize channel to a stable string — Next.js creates a new array reference on every
+  // router update even when the value is unchanged, which would cause spurious re-fetches.
+  const channelDep = Array.isArray(router.query.channel) ? router.query.channel.join(',') : router.query.channel;
+
   useEffect(() => {
     if (!Api.get().getAccessToken() || !router.isReady) return;
     const queryError = QueryParamsError(router, 'assistant');
@@ -181,11 +185,13 @@ export function useConversationSetup({
     }
     fetchConversationData();
     // setBotNameContext, setConversationType, setResources are stable setters — safe to omit.
-    // router.query.view and other view-only params are intentionally excluded: navigating
-    // between views (e.g. preferences) must not re-fetch conversation data and re-trigger
-    // the event status dialog.
+    // setBotNameContext, setConversationType, setResources are stable setters — safe to omit.
+    // setBotNameContext, setConversationType, setResources are stable setters — safe to omit.
+    // channelDep is a serialized string (not router.query.channel directly) to avoid
+    // spurious re-fetches from Next.js creating a new array reference on every router update.
+    // router.query.view and other view-only params are intentionally excluded.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, router.isReady, router.query.conversationId, router.query.channel]);
+  }, [socket, router.isReady, router.query.conversationId, channelDep]);
 
   // Called when the backend sends conversation:stopped so open tabs disconnect
   // their sockets instead of reconnecting indefinitely. If the event later
