@@ -194,7 +194,9 @@ export interface FitTransform {
  * A force simulation spreads as far as its nodes push each other and knows nothing about the
  * size of the box it is drawn in, so without this the graph simply runs off the edges. This
  * measures what was actually laid out — pill widths and the labels hanging below nodes
- * included — and centres it at the largest scale that still fits.
+ * included — and centres it at the largest scale that still fits. A graph too vast to fit
+ * even at `minScale` stops shrinking there instead: it is left to be panned rather than
+ * squeezed down to dust.
  *
  * @param extents - Every placed node. An empty list has nothing to frame and returns null.
  * @param margin - Fraction of the canvas to fill, leaving a little air around the graph.

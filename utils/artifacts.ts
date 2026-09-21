@@ -45,19 +45,24 @@ export class ArtifactRequestError extends Error {
   }
 }
 
+/** Encodes the given params as a query string, skipping any that are unset. */
+function encodeQuery(params: Record<string, string | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value) search.set(key, value);
+  }
+  return search.toString();
+}
+
 /** Turns a container plus an optional passcode into a query string, encoding as it goes. */
 function containerQuery(container: ArtifactContainer, artifactPasscode?: string): string {
-  const params = new URLSearchParams();
-  if (container.conversationId) params.set('conversationId', container.conversationId);
-  if (container.topicId) params.set('topicId', container.topicId);
-  if (artifactPasscode) params.set('artifactPasscode', artifactPasscode);
-  return params.toString();
+  return encodeQuery({ conversationId: container.conversationId, topicId: container.topicId, artifactPasscode });
 }
 
 /** Appends `?artifactPasscode=…` when there is one, encoded. */
 function passcodeQuery(artifactPasscode?: string): string {
-  if (!artifactPasscode) return '';
-  return `?${new URLSearchParams({ artifactPasscode }).toString()}`;
+  const query = encodeQuery({ artifactPasscode });
+  return query ? `?${query}` : '';
 }
 
 /**

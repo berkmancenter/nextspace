@@ -171,9 +171,9 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
       max(
         simNodes.filter((n) => n.type === 'contribution'),
         (n) => degree.get(n.id) ?? 0,
-      ) || 2;
+      ) || 1;
     return scaleSqrt()
-      .domain([2, Math.max(2, maxDegree)])
+      .domain([1, Math.max(1, maxDegree)])
       .range([5, 16])
       .clamp(true);
   }, [simNodes, degree]);
