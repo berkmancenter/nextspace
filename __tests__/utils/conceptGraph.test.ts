@@ -257,44 +257,108 @@ describe('selectVisibleLabels', () => {
     ...extra,
   });
 
+  /** The ids selectVisibleLabels actually drew, independent of where it put each one. */
+  const ids = (visible: Map<string, { x: number; y: number }>) => new Set(visible.keys());
+
   it('draws everything when nothing collides', () => {
     const visible = selectVisibleLabels([label('a', 0, 0), label('b', 500, 500)]);
 
-    expect(visible).toEqual(new Set(['a', 'b']));
+    expect(ids(visible)).toEqual(new Set(['a', 'b']));
   });
 
   it('drops the label that loses a collision rather than printing both', () => {
     const visible = selectVisibleLabels([label('low', 100, 100, 1), label('high', 105, 100, 9)]);
 
-    expect(visible).toEqual(new Set(['high']));
+    expect(ids(visible)).toEqual(new Set(['high']));
   });
 
   it('gives the space to the better-connected node, whatever order they arrive in', () => {
     const candidates = [label('weak', 100, 100, 1), label('strong', 104, 102, 12)];
 
-    expect(selectVisibleLabels(candidates)).toEqual(new Set(['strong']));
-    expect(selectVisibleLabels([...candidates].reverse())).toEqual(new Set(['strong']));
+    expect(ids(selectVisibleLabels(candidates))).toEqual(new Set(['strong']));
+    expect(ids(selectVisibleLabels([...candidates].reverse()))).toEqual(new Set(['strong']));
   });
 
   it('never drops a required label, which is what the reader is pointing at', () => {
     const visible = selectVisibleLabels([label('hub', 100, 100, 99), label('hovered', 102, 100, 0, { required: true })]);
 
-    expect(visible).toContain('hovered');
+    expect(visible.has('hovered')).toBe(true);
+  });
+
+  it('drops even a required label rather than printing it over a hard obstacle', () => {
+    // A hard obstacle is a node's own circle, not another label — required only ever
+    // overrides losing space to a competing label, never to a node it would hide.
+    const visible = selectVisibleLabels([
+      label('some-other-node', 100, 100, Infinity, { hardObstacle: true }),
+      label('focused-neighbour', 102, 100, 0, { required: true }),
+    ]);
+
+    expect(visible.has('focused-neighbour')).toBe(false);
+  });
+
+  it('lets a required label win space from a competing label as before, obstacle or not', () => {
+    // The obstacle sits elsewhere; the only real collision is with the ordinary label.
+    const visible = selectVisibleLabels([
+      label('elsewhere', 900, 900, Infinity, { hardObstacle: true }),
+      label('hub', 100, 100, 99),
+      label('hovered', 102, 100, 0, { required: true }),
+    ]);
+
+    expect(visible.has('hovered')).toBe(true);
   });
 
   it('keeps labels that only just clear each other', () => {
     // 60 wide, so centres 62 apart do not overlap; 12 tall, so rows 14 apart do not either.
-    expect(selectVisibleLabels([label('a', 0, 0), label('b', 66, 0)])).toEqual(new Set(['a', 'b']));
-    expect(selectVisibleLabels([label('a', 0, 0), label('b', 0, 18)])).toEqual(new Set(['a', 'b']));
+    expect(ids(selectVisibleLabels([label('a', 0, 0), label('b', 66, 0)]))).toEqual(new Set(['a', 'b']));
+    expect(ids(selectVisibleLabels([label('a', 0, 0), label('b', 0, 18)]))).toEqual(new Set(['a', 'b']));
   });
 
   it('treats a near-miss on one axis as no collision at all', () => {
     // Overlapping horizontally but on different rows is perfectly readable.
-    expect(selectVisibleLabels([label('a', 0, 0), label('b', 10, 40)])).toEqual(new Set(['a', 'b']));
+    expect(ids(selectVisibleLabels([label('a', 0, 0), label('b', 10, 40)]))).toEqual(new Set(['a', 'b']));
   });
 
   it('has nothing to draw when given nothing', () => {
-    expect(selectVisibleLabels([])).toEqual(new Set());
+    expect(ids(selectVisibleLabels([]))).toEqual(new Set());
+  });
+
+  it('tries an alternate spot rather than dropping a label outright', () => {
+    // 'b' sits right where 'a' would print by default; 'a' has a clear alternate on offer.
+    const visible = selectVisibleLabels([
+      label('b', 100, 100, 5),
+      label('a', 102, 100, 1, { alternates: [{ x: 300, y: 300 }] }),
+    ]);
+
+    expect(ids(visible)).toEqual(new Set(['a', 'b']));
+    expect(visible.get('a')).toEqual({ x: 300, y: 300 });
+  });
+
+  it('prefers a candidate’s own spot over any alternate when it already clears everything', () => {
+    const visible = selectVisibleLabels([label('a', 0, 0, 0, { alternates: [{ x: 300, y: 300 }] })]);
+
+    expect(visible.get('a')).toEqual({ x: 0, y: 0 });
+  });
+
+  it('still drops a label with no alternate left standing that clears the board', () => {
+    const visible = selectVisibleLabels([
+      label('b', 100, 100, 5),
+      label('a', 102, 100, 1, { alternates: [{ x: 104, y: 100 }] }), // also collides with 'b'
+    ]);
+
+    expect(ids(visible)).toEqual(new Set(['b']));
+  });
+
+  it('never lets an alternate spot land on a hard obstacle either', () => {
+    const visible = selectVisibleLabels([
+      label('obstacle', 300, 300, Infinity, { hardObstacle: true }),
+      // Forces 'a' off its own primary spot, onto the alternate, which sits on the obstacle.
+      label('blocker', 100, 100, 5),
+      label('a', 102, 100, 1, { alternates: [{ x: 300, y: 300 }] }),
+    ]);
+
+    // The alternate would clear every ordinary label, but it lands on the obstacle, so 'a'
+    // is dropped rather than being drawn there — same rule as its primary spot.
+    expect(ids(visible)).toEqual(new Set(['blocker']));
   });
 });
 

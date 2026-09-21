@@ -238,10 +238,18 @@ export function computeFitTransform(
   };
 }
 
+/** Where a candidate label would sit if drawn — either its primary spot or one of its {@link LabelCandidate.alternates}. */
+export interface LabelPosition {
+  x: number;
+  y: number;
+}
+
 /**
  * A label wanting to be drawn, measured in screen pixels.
  * @property {number} priority - Higher wins a collision. Degree is the natural choice: the better-connected node is the one worth naming.
- * @property {boolean} [required] - Never dropped. The node under the cursor and its neighbours are named whatever else has to give way.
+ * @property {boolean} [required] - Never dropped for overlapping another label. The node under the cursor and its neighbours are named over whatever other label has to give way — but never over a {@link hardObstacle}; see below.
+ * @property {boolean} [hardObstacle] - Not a label at all, just a reservation — a node's own circle, or a shown origin pill. No candidate may be drawn over one of these, `required` or not: a label is worth losing space over another label's tidiness, never worth hiding a different node entirely and blocking its own click target.
+ * @property {LabelPosition[]} [alternates] - Other spots to try, in order, before the label is dropped — e.g. above a node rather than only ever below it. Same size, different anchor; the first spot (this candidate's own `x`/`y`, tried first) or alternate that clears every rule wins.
  */
 export interface LabelCandidate {
   id: string;
@@ -251,47 +259,79 @@ export interface LabelCandidate {
   height: number;
   priority: number;
   required?: boolean;
+  hardObstacle?: boolean;
+  alternates?: LabelPosition[];
 }
 
 /**
- * Chooses which labels can be drawn without overlapping each other.
+ * Chooses which labels can be drawn without overlapping each other, and where.
  *
  * A force layout puts nodes where the forces leave them, which in a dense graph is close
  * enough together that their labels collide and the text becomes unreadable — several words
  * printed over each other are worth less than one word printed clearly. So labels are placed
- * greedily, best first, and one that will not fit is left out rather than drawn on top of
- * what is already there.
+ * greedily, best first: a candidate tries its own spot, then each of its `alternates` in
+ * turn, and takes the first one that fits rather than being dropped outright — the reader
+ * gets more names on screen for the same crowding, at no cost to legibility, since a chosen
+ * alternate is held to exactly the same rules as the primary spot would have been.
  *
  * This only works on labels of a fixed screen size. Labels that scale with the graph collide
  * identically at every zoom, so dropping them would hide the same words however far in the
  * reader zoomed; at a fixed size, zooming spreads the nodes apart on screen and the labels
  * come back by themselves. That is what makes zoom worth having on a crowded graph.
  *
+ * A spot that would land on a {@link LabelCandidate.hardObstacle} is ruled out outright,
+ * `required` or not — required only ever overrides a collision with another label, since
+ * focusing on a well-connected node makes every one of its neighbours required at once, and
+ * without this a tight focused view could paper an unrelated node's own circle with someone
+ * else's caption, hiding it and blocking its click target.
+ *
  * @param candidates - Every label that wants to be drawn, in screen coordinates.
  * @param padding - Breathing room required between two labels.
- * @returns The ids to draw.
+ * @returns Each visible id mapped to the position it was actually drawn at.
  */
-export function selectVisibleLabels(candidates: LabelCandidate[], padding = 2): Set<string> {
-  const ordered = [...candidates].sort((a, b) => {
+export function selectVisibleLabels(candidates: LabelCandidate[], padding = 2): Map<string, LabelPosition> {
+  const overlapsWith = (box: { x: number; y: number; width: number; height: number }, other: typeof box) =>
+    Math.abs(box.x - other.x) * 2 < box.width + other.width + padding * 2 &&
+    Math.abs(box.y - other.y) * 2 < box.height + other.height + padding * 2;
+
+  // Obstacles are not competing for space — a node's circle, or a shown origin pill, is
+  // already there regardless of what any label wants — so they are seeded into `placed`
+  // up front rather than taking their turn in the priority order below. A required label
+  // sorts ahead of everything else in that order, which would otherwise let it be checked,
+  // and placed, before a lower-priority obstacle ever got a turn to block it.
+  const obstacles = candidates.filter((c) => c.hardObstacle);
+  const contenders = candidates.filter((c) => !c.hardObstacle);
+
+  const ordered = contenders.sort((a, b) => {
     if (!!b.required !== !!a.required) return b.required ? 1 : -1;
     return b.priority - a.priority;
   });
 
-  const placed: LabelCandidate[] = [];
-  const visible = new Set<string>();
+  const placed: { x: number; y: number; width: number; height: number }[] = obstacles.map(({ x, y, width, height }) => ({
+    x,
+    y,
+    width,
+    height,
+  }));
+  const visible = new Map<string, LabelPosition>();
 
   for (const candidate of ordered) {
-    const overlaps = placed.some(
-      (other) =>
-        Math.abs(candidate.x - other.x) * 2 < candidate.width + other.width + padding * 2 &&
-        Math.abs(candidate.y - other.y) * 2 < candidate.height + other.height + padding * 2,
-    );
+    const spots = [{ x: candidate.x, y: candidate.y }, ...(candidate.alternates ?? [])];
 
-    // A required label is drawn even over a neighbour: being told what is under the cursor
-    // matters more than the tidiness of a label it happens to land on.
-    if (!overlaps || candidate.required) {
-      placed.push(candidate);
-      visible.add(candidate.id);
+    for (const spot of spots) {
+      const box = { x: spot.x, y: spot.y, width: candidate.width, height: candidate.height };
+      if (obstacles.some((obstacle) => overlapsWith(box, obstacle))) continue;
+
+      const overlaps = placed.some((other) => overlapsWith(box, other));
+
+      // A required label is drawn even over a neighbouring label: being told what is under
+      // the cursor matters more than the tidiness of a label it happens to land on. It still
+      // can't land on an obstacle — ruled out above, before this check ever runs.
+      if (!overlaps || candidate.required) {
+        placed.push(box);
+        visible.set(candidate.id, spot);
+        break;
+      }
     }
   }
 

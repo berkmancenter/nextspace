@@ -42,7 +42,10 @@ const CONTRIBUTION = '#B45309';
 const CONTRIBUTION_FILL = '#B4530914';
 const ORIGIN = '#0E7490';
 const ORIGIN_FILL = '#0E749010';
-const LINK = '#CBD5E1';
+/* Darker than the panel border it's close to in hue, and drawn wider below — a link is
+   what tells the reader a graph exists at all, and a pale one recedes against link-dense
+   areas until it reads as empty canvas. */
+const LINK = '#94A3B8';
 const LINK_HOT = '#B45309';
 const TEXT = '#0B0D0E';
 const MUTED = '#64748B';
@@ -61,9 +64,19 @@ const MIN_SCALE = 0.35;
 const MAX_SCALE = 6;
 /** Leaves a little air around the graph rather than fitting it flush to the edges. */
 const FIT_MARGIN = 0.92;
+/** Tighter than {@link FIT_MARGIN}: a focused node and its one or two neighbours would
+    otherwise be framed with the same generous air meant for a whole graph, and end up
+    looking lost in the middle of the canvas. */
+const FOCUS_MARGIN = 0.75;
+/** How long a focus change takes to pan/zoom into place. */
+const FOCUS_DURATION_MS = 420;
+/** How far a contribution link bows away from a straight line, as a fraction of its own
+    length — enough to read as a deliberate curve, not so much it loops back on itself. */
+const LINK_CURVATURE = 0.12;
 /** How far a label's block hangs below the node it belongs to, before its own height, which
-    the fit has to allow for. */
-const LABEL_GAP = 3;
+    the fit has to allow for. Wide enough that the two read as separate even when the node
+    itself has shrunk to a few screen pixels at low zoom. */
+const LABEL_GAP = 5;
 /** How wide a label may run before wrapping to another line — a leaf's statement stays a
     block near its node rather than a single line long enough to cross the canvas. */
 const LABEL_MAX_WIDTH = 130;
@@ -121,6 +134,23 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
   /* Set once the reader zooms or pans deliberately, after which the view is theirs and
      auto-fit stops touching it. */
   const hasUserZoomedRef = useRef(false);
+  /* Mirrors `selectedId` for the simulation's tick/end handlers below, which close over this
+     once when the simulation is built rather than re-reading React state every frame — while
+     a node is focused, the settling layout's own periodic re-fit must not yank the camera
+     back to the whole graph. */
+  const selectedIdRef = useRef<string | null>(null);
+  /* The previous value of `selectedId`, so the focus effect can tell a real transition (into
+     focus, out of focus, or to a different node) from a no-op re-run and skip animating on
+     first mount, when there is nothing to animate from. */
+  const prevSelectedRef = useRef<string | null>(null);
+  /* The in-flight focus/unfocus animation's requestAnimationFrame id, so a new one cancels
+     whatever the previous focus change was still doing rather than fighting it for the
+     transform. */
+  const focusAnimRef = useRef<number | null>(null);
+  /* The last committed transform, read by `animateTo` as its animation's starting point.
+     Kept as a ref rather than reading the `transform` state directly so `animateTo` itself
+     never needs `transform` in its own dependency list. */
+  const transformRef = useRef({ x: 0, y: 0, k: 1 });
 
   const [width, setWidth] = useState<number>(720);
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
@@ -137,6 +167,10 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
      them in place, so the array they live in never changes identity and is no signal at all
      that anything has moved. */
   const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    transformRef.current = transform;
+  }, [transform]);
 
   const { simNodes, links, originLinks, degree } = useMemo(() => buildGraph(payload), [payload]);
   const isEmpty = simNodes.length === 0;
@@ -295,16 +329,17 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
 
            Never over someone who has taken hold of the view, though: once the reader has
            zoomed or panned, the view is theirs, and a version arriving mid-inspection must
-           not yank it away from them. */
+           not yank it away from them. Same while a node is focused — the whole-graph fit is
+           exactly the view the reader has deliberately zoomed away from. */
         ticksSinceFit += 1;
-        if (!hasUserZoomedRef.current && ticksSinceFit >= FIT_EVERY_TICKS) {
+        if (!hasUserZoomedRef.current && !selectedIdRef.current && ticksSinceFit >= FIT_EVERY_TICKS) {
           ticksSinceFit = 0;
           fitToViewRef.current();
         }
       })
       // And once more when it stops for good, on the arrangement the reader is left with.
       .on('end', () => {
-        if (!hasUserZoomedRef.current) fitToViewRef.current();
+        if (!hasUserZoomedRef.current && !selectedIdRef.current) fitToViewRef.current();
       });
 
     return () => {
@@ -361,41 +396,99 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
   }, [width, height]);
 
   /**
-   * Frames the whole graph in the canvas.
-   *
-   * A force layout spreads as far as its nodes push each other and has no idea how big the
-   * box is, so left alone it runs off every edge. This measures what was actually laid out —
-   * labels and pill widths included — and picks the transform that brings it inside.
+   * Every placed node's extent, in the shape {@link computeFitTransform} wants — labels and
+   * pill widths included — optionally narrowed to a subset of ids. Shared by the whole-graph
+   * fit and the focus fit below, so the two can never disagree about what a node occupies.
    */
-  /** Applies {@link computeFitTransform} to the canvas, framing the whole graph in it. */
-  const fitToView = useCallback(() => {
+  const buildExtents = useCallback(
+    (idFilter?: Set<string>) =>
+      simNodes
+        // Hidden origin nodes still hold a position from the simulation, but framing around
+        // something nobody can see would waste canvas the rest of the graph could use.
+        .filter(
+          (n) =>
+            n.x !== undefined &&
+            n.y !== undefined &&
+            (showOrigins || n.type !== 'origin') &&
+            (!idFilter || idFilter.has(n.id)),
+        )
+        .map((node) => ({
+          x: node.x!,
+          y: node.y!,
+          halfWidth: footprintOf(node),
+          halfHeight: radiusOf(node),
+          // A label's block hangs below a concept or contribution, so the bottom needs room
+          // for its actual wrapped height — a leaf's statement may run several lines deep.
+          labelDrop: node.type === 'origin' ? 0 : LABEL_GAP + (labelInfo.get(node.id)?.height ?? 0),
+        })),
+    [simNodes, showOrigins, footprintOf, radiusOf, labelInfo],
+  );
+
+  /**
+   * Eases the canvas from wherever it currently sits to `target`, rather than snapping —
+   * used for a deliberate focus change, never for the settling simulation's own repeated
+   * re-fits, which still snap on every tick as before.
+   *
+   * Hand-rolled rather than pulled in from d3-transition: the step buttons already skip
+   * animation for the same reason (see below), and a focus change is the one place here that
+   * actually wants easing, which a dozen lines of `requestAnimationFrame` covers on its own.
+   */
+  const animateTo = useCallback((target: { x: number; y: number; k: number }) => {
     const svg = svgRef.current;
     const behavior = zoomRef.current;
     if (!svg || !behavior) return;
 
-    const extents = simNodes
-      // Hidden origin nodes still hold a position from the simulation, but framing around
-      // something nobody can see would waste canvas the rest of the graph could use.
-      .filter((n) => n.x !== undefined && n.y !== undefined && (showOrigins || n.type !== 'origin'))
-      .map((node) => ({
-        x: node.x!,
-        y: node.y!,
-        halfWidth: footprintOf(node),
-        halfHeight: radiusOf(node),
-        // A label's block hangs below a concept or contribution, so the bottom needs room
-        // for its actual wrapped height — a leaf's statement may run several lines deep.
-        labelDrop: node.type === 'origin' ? 0 : LABEL_GAP + (labelInfo.get(node.id)?.height ?? 0),
-      }));
+    if (focusAnimRef.current !== null) cancelAnimationFrame(focusAnimRef.current);
 
-    const fit = computeFitTransform(extents, width, height, {
-      margin: FIT_MARGIN,
-      minScale: MIN_SCALE,
-      maxScale: MAX_SCALE,
-    });
-    if (!fit) return;
+    const start = transformRef.current;
+    const startTime = performance.now();
+    // Interpolating `k` in log space is what makes the zoom read as a constant rate of
+    // change rather than slowing to a crawl on the way to a much smaller scale.
+    const logStart = Math.log(start.k);
+    const logTarget = Math.log(target.k);
 
-    select(svg).call(behavior.transform, zoomIdentity.translate(fit.x, fit.y).scale(fit.k));
-  }, [simNodes, width, height, footprintOf, radiusOf, showOrigins, labelInfo]);
+    const step = (now: number) => {
+      const t = Math.min(1, (now - startTime) / FOCUS_DURATION_MS);
+      const eased = 1 - (1 - t) ** 3;
+      const k = Math.exp(logStart + (logTarget - logStart) * eased);
+      const x = start.x + (target.x - start.x) * eased;
+      const y = start.y + (target.y - start.y) * eased;
+      select(svg).call(behavior.transform, zoomIdentity.translate(x, y).scale(k));
+
+      focusAnimRef.current = t < 1 ? requestAnimationFrame(step) : null;
+    };
+    focusAnimRef.current = requestAnimationFrame(step);
+  }, []);
+
+  /**
+   * Frames the whole graph in the canvas.
+   *
+   * A force layout spreads as far as its nodes push each other and has no idea how big the
+   * box is, so left alone it runs off every edge. This measures what was actually laid out
+   * and picks the transform that brings it inside.
+   *
+   * Snaps by default, the way the settling simulation's own repeated calls always have; pass
+   * `animate` for a reader-initiated return to the whole graph (the "fit" button, or
+   * deselecting), where a jump-cut would read as a glitch rather than a deliberate zoom out.
+   */
+  const fitToView = useCallback(
+    (animate = false) => {
+      const svg = svgRef.current;
+      const behavior = zoomRef.current;
+      if (!svg || !behavior) return;
+
+      const fit = computeFitTransform(buildExtents(), width, height, {
+        margin: FIT_MARGIN,
+        minScale: MIN_SCALE,
+        maxScale: MAX_SCALE,
+      });
+      if (!fit) return;
+
+      if (animate) animateTo(fit);
+      else select(svg).call(behavior.transform, zoomIdentity.translate(fit.x, fit.y).scale(fit.k));
+    },
+    [buildExtents, width, height, animateTo],
+  );
 
   /* Kept in a ref so the simulation's 'end' handler always calls the current one without
      the simulation having to be rebuilt whenever it changes. */
@@ -416,6 +509,49 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
     }
     if (!hasUserZoomedRef.current) fitToViewRef.current();
   }, [showOrigins]);
+
+  /**
+   * Focus mode: a click on a node frames it and whatever it is joined to, rather than
+   * leaving the camera where it was and only dimming the rest — deselecting reverses it,
+   * panning back out to the whole graph. Guarded to real transitions (`prevSelectedRef`) so
+   * mounting with nothing selected doesn't animate a "return" from nowhere, and skipped
+   * while the graph is still building (`isEmpty`), before there is anything to frame.
+   */
+  useEffect(() => {
+    const prev = prevSelectedRef.current;
+    prevSelectedRef.current = selectedId;
+    selectedIdRef.current = selectedId;
+    if (isEmpty || prev === selectedId) return;
+
+    /* The camera is about to pan under a pointer that has not itself moved — a real browser
+       still re-evaluates which node that pointer sits over as the layout shifts beneath it,
+       which would otherwise leave some node the reader never asked about lit once the pan
+       settles. Clearing it here means the dim/highlight state reflects only the focus change
+       itself; a genuine hover re-establishes on the reader's next actual mouse movement. */
+    setHoverId(null);
+
+    if (selectedId) {
+      const focusIds = connectedIds(selectedId, links, originLinks) ?? new Set([selectedId]);
+      const target = computeFitTransform(buildExtents(focusIds), width, height, {
+        margin: FOCUS_MARGIN,
+        minScale: MIN_SCALE,
+        maxScale: MAX_SCALE,
+      });
+      if (target) animateTo(target);
+    } else if (prev !== null) {
+      fitToView(true);
+    }
+  }, [selectedId, links, originLinks, buildExtents, width, height, animateTo, fitToView, isEmpty]);
+
+  // Escape is the reader's other way out of focus, beside clicking the focused node again,
+  // clicking empty canvas, or the "fit" button.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedId(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   /* The buttons step the zoom rather than animating it: easing the step would mean pulling
      in d3-transition and its five transitive modules for an effect the scroll and pinch
@@ -449,9 +585,19 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         const fontSize = info?.fontSize ?? CONTRIBUTION_LABEL_SIZE;
         const blockWidth = info?.width ?? estimateTextWidth(node.label, fontSize, mono ? 0.62 : 0.55);
         const blockHeight = info?.height ?? lineHeight;
-        // Top of the block sits a small gap below the node's edge on screen; `y` is the
-        // block's vertical centre, matching how selectVisibleLabels treats every box.
-        const topY = node.y! * transform.k + transform.y + radiusOf(node) * transform.k + LABEL_GAP;
+        const screenX = node.x! * transform.k + transform.x;
+        const screenY = node.y! * transform.k + transform.y;
+        const screenRadius = radiusOf(node) * transform.k;
+        // Below the node is the preferred spot — a block's top sits a small gap below the
+        // node's edge, `y` its vertical centre, matching how selectVisibleLabels treats every
+        // box — but a busier node may have something sitting right there. Above, left, and
+        // right are offered as fallbacks rather than losing the label outright: same node,
+        // same block, just anchored a different way each time, tried in turn only once the
+        // spot before it has already lost.
+        const yBelow = screenY + screenRadius + LABEL_GAP + blockHeight / 2;
+        const yAbove = screenY - screenRadius - LABEL_GAP - blockHeight / 2;
+        const xRight = screenX + screenRadius + LABEL_GAP + blockWidth / 2;
+        const xLeft = screenX - screenRadius - LABEL_GAP - blockWidth / 2;
         return {
           node,
           mono,
@@ -460,8 +606,20 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
           lineHeight,
           isActive: activeId === node.id,
           // Screen position: the node's place in the graph, put through the current zoom.
-          x: node.x! * transform.k + transform.x,
-          y: topY + blockHeight / 2,
+          x: screenX,
+          y: yBelow,
+          /* Not yet worth adding, but worth remembering:
+             - Diagonal fallbacks (NE/NW/SE/SW) after these four — a cheap extension of the
+               same mechanism, for a label that still has room but not along an axis.
+             - Leader lines from an offset label back to its node — once a label can land to
+               the side, it can occasionally read as belonging to a neighbour instead in a
+               dense cluster. Would need to stay thin/low-opacity so it doesn't undo the
+               link-visibility fix links themselves just got. */
+          alternates: [
+            { x: screenX, y: yAbove },
+            { x: xRight, y: screenY },
+            { x: xLeft, y: screenY },
+          ],
           width: blockWidth,
           height: blockHeight,
           priority: degree.get(node.id) ?? 0,
@@ -478,9 +636,9 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
       });
 
     /* An origin prompt draws its text inside its own pill, in the zoomed layer, so it is
-       never a candidate here — but when shown it is very much in the way. Passing the pills
-       in as already-placed boxes is what keeps a label from being printed across one; when
-       origins are hidden there is nothing to reserve space for. */
+       never a candidate here — but when shown it is very much in the way. Marking the pills
+       as obstacles is what keeps a label from being printed across one; when origins are
+       hidden there is nothing to reserve space for. */
     const pills = showOrigins
       ? simNodes
           .filter((node) => node.type === 'origin' && node.x !== undefined && node.y !== undefined)
@@ -490,17 +648,41 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
             y: node.y! * transform.k + transform.y,
             width: originWidth(node) * transform.k,
             height: ORIGIN_PILL_HEIGHT * transform.k,
-            priority: Number.POSITIVE_INFINITY,
-            required: true,
+            priority: 0,
+            hardObstacle: true,
           }))
       : [];
 
+    /* Every concept and contribution reserves its own circle or diamond against ANY label —
+       including a required one — the same way a shown origin pill does above. Without this,
+       a busy hub's own label (or, while it's focused or hovered, one of its neighbours',
+       which `required` makes unconditional) could paper directly over an unrelated node
+       sitting right next to it, hiding that node and blocking its own click target. `priority`
+       plays no part here: unlike a label, a node's circle is not competing for space, it is
+       simply already there, so it always wins regardless of whose label it blocks. */
+    const nodeFootprints = simNodes
+      .filter((node) => node.type !== 'origin' && node.x !== undefined && node.y !== undefined)
+      .map((node) => {
+        const diameter = 2 * radiusOf(node) * transform.k;
+        return {
+          id: `__footprint_${node.id}`,
+          x: node.x! * transform.k + transform.x,
+          y: node.y! * transform.k + transform.y,
+          width: diameter,
+          height: diameter,
+          priority: 0,
+          hardObstacle: true,
+        };
+      });
+
     const visible = selectVisibleLabels([
       ...pills,
-      ...candidates.map(({ node, x, y, width: w, height: h, priority, required }) => ({
+      ...nodeFootprints,
+      ...candidates.map(({ node, x, y, alternates, width: w, height: h, priority, required }) => ({
         id: node.id,
         x,
         y,
+        alternates,
         width: w,
         height: h,
         priority,
@@ -508,7 +690,12 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
       })),
     ]);
 
-    return candidates.filter((candidate) => visible.has(candidate.node.id));
+    // The chosen spot may be the alternate (above) rather than the candidate's own default
+    // (below) — `visible` is what selectVisibleLabels actually settled on for each id.
+    return candidates.flatMap((candidate) => {
+      const at = visible.get(candidate.node.id);
+      return at ? [{ ...candidate, x: at.x, y: at.y }] : [];
+    });
     // `tick` is in the dependency list because node positions are mutated in place: without
     // it the labels would stay where the nodes started while the nodes themselves moved off.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -540,17 +727,53 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
       const target = nodeById.get(linkEndpointId(link.target));
       if (!source || !target || source.x === undefined || target.x === undefined) return null;
       const hot = !!lit && lit.has(source.id) && lit.has(target.id);
+      const stroke = hot ? LINK_HOT : dashed ? ORIGIN : LINK;
+      const strokeWidth = hot ? 2.75 : dashed ? 1.25 : 1.75;
+      const strokeOpacity = hot ? 0.95 : dashed ? 0.55 : 0.9;
+      const style = { transition: 'stroke 150ms ease, stroke-width 150ms ease, stroke-opacity 150ms ease' };
+
+      // An origin link is attribution, drawn straight and out of the way. A contribution
+      // link gets a gentle bow instead of a straight line — contributions already join
+      // three or more concepts as their own node (see buildGraph), so a bundle of straight
+      // spokes reads as a rigid star; a shared curvature reads as one thing radiating out.
+      // The bow's direction comes from the pair of ids, not randomness, so it never
+      // flickers between renders of the same link.
+      if (dashed) {
+        return (
+          <line
+            key={`o${i}`}
+            x1={source.x}
+            y1={source.y}
+            x2={target.x!}
+            y2={target.y}
+            stroke={stroke}
+            strokeWidth={strokeWidth}
+            strokeOpacity={strokeOpacity}
+            strokeDasharray="4 3"
+            style={style}
+          />
+        );
+      }
+
+      const dx = target.x! - source.x!;
+      const dy = target.y! - source.y!;
+      const length = Math.hypot(dx, dy);
+      const sign = source.id < target.id ? 1 : -1;
+      const bow = length * LINK_CURVATURE * sign;
+      const nx = length > 0 ? -dy / length : 0;
+      const ny = length > 0 ? dx / length : 0;
+      const controlX = (source.x! + target.x!) / 2 + nx * bow;
+      const controlY = (source.y! + target.y!) / 2 + ny * bow;
+
       return (
-        <line
-          key={`${dashed ? 'o' : 'l'}${i}`}
-          x1={source.x}
-          y1={source.y}
-          x2={target.x}
-          y2={target.y}
-          stroke={hot ? LINK_HOT : dashed ? ORIGIN : LINK}
-          strokeWidth={hot ? 2 : 1}
-          strokeOpacity={hot ? 0.9 : dashed ? 0.45 : 0.8}
-          strokeDasharray={dashed ? '4 3' : undefined}
+        <path
+          key={`l${i}`}
+          d={`M ${source.x} ${source.y} Q ${controlX} ${controlY} ${target.x} ${target.y}`}
+          fill="none"
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          strokeOpacity={strokeOpacity}
+          style={style}
         />
       );
     });
@@ -565,7 +788,17 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
           <Button onClick={() => zoomBy(1 / ZOOM_STEP)} aria-label="Zoom out">
             −
           </Button>
-          <Button onClick={fitToView} aria-label="Fit graph to view">
+          <Button
+            onClick={() => {
+              // A focused node has already claimed the camera; clearing the selection is what
+              // hands it back, and the focus effect above animates the actual pan/zoom out.
+              // With nothing selected there is no such effect to rely on, so this snaps the
+              // view itself, exactly as it always has.
+              if (selectedId !== null) setSelectedId(null);
+              else fitToView();
+            }}
+            aria-label="Fit graph to view"
+          >
             fit
           </Button>
         </ButtonGroup>
@@ -622,7 +855,11 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         role="img"
         aria-label={`Concept graph. Circles are concepts, diamonds are contributions joining them${
           hasOrigins ? `, dashed pills are the prompts they came out of${showOrigins ? '' : ' — currently hidden'}` : ''
-        }. Scroll or pinch to zoom, drag to pan.`}
+        }. Scroll or pinch to zoom, drag to pan. Click a node to focus on it and its neighbours, click empty space or press Escape to return to the whole graph.`}
+        /* A node's own click stops here before it bubbles, so this only ever fires for a
+           click that lands on empty canvas — the reader's other way to drop focus, besides
+           clicking the focused node again, the "fit" button, or Escape. */
+        onClick={() => setSelectedId(null)}
         style={{
           display: 'block',
           background: '#FFFFFF',
@@ -631,6 +868,14 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
           touchAction: 'none',
         }}
       >
+        <defs>
+          {/* One shared halo for whatever is focused, regardless of node kind or session
+              colour — the glow is about being the thing in focus, not about repeating a
+              colour the fill and stroke already carry. */}
+          <filter id="concept-graph-focus-halo" x="-60%" y="-60%" width="220%" height="220%">
+            <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor={TEXT} floodOpacity="0.35" />
+          </filter>
+        </defs>
         <g transform={`translate(${transform.x},${transform.y}) scale(${transform.k})`}>
           {showOrigins && <g>{renderLinks(originLinks, true)}</g>}
           <g>{renderLinks(links, false)}</g>
@@ -650,8 +895,13 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
                   opacity={dim ? 0.25 : 1}
                   onMouseEnter={() => setHoverId(node.id)}
                   onMouseLeave={() => setHoverId(null)}
-                  onClick={() => setSelectedId((current) => (current === node.id ? null : node.id))}
-                  style={{ cursor: 'pointer' }}
+                  onClick={(event) => {
+                    // Stops here so the svg's own onClick — background click, which drops
+                    // focus — never also fires for the same click.
+                    event.stopPropagation();
+                    setSelectedId((current) => (current === node.id ? null : node.id));
+                  }}
+                  style={{ cursor: 'pointer', transition: 'opacity 200ms ease' }}
                 >
                   {node.type === 'concept' && (
                     <circle
@@ -660,6 +910,8 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
                       fillOpacity={0.85}
                       stroke={isActive ? TEXT : '#FFFFFF'}
                       strokeWidth={isActive ? 2.5 : 1}
+                      filter={isActive ? 'url(#concept-graph-focus-halo)' : undefined}
+                      style={{ transition: 'stroke 150ms ease, stroke-width 150ms ease' }}
                     />
                   )}
                   {node.type === 'contribution' && (
@@ -672,6 +924,8 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
                       fill={CONTRIBUTION_FILL}
                       stroke={isActive ? TEXT : CONTRIBUTION}
                       strokeWidth={isActive ? 2 : 1.3}
+                      filter={isActive ? 'url(#concept-graph-focus-halo)' : undefined}
+                      style={{ transition: 'stroke 150ms ease, stroke-width 150ms ease' }}
                     />
                   )}
                   {node.type === 'origin' && (
@@ -685,6 +939,8 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
                       stroke={isActive ? TEXT : ORIGIN}
                       strokeWidth={1.4}
                       strokeDasharray="4 3"
+                      filter={isActive ? 'url(#concept-graph-focus-halo)' : undefined}
+                      style={{ transition: 'stroke 150ms ease, stroke-width 150ms ease' }}
                     />
                   )}
 
@@ -726,7 +982,7 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
               const blockTop = y - blockHeight / 2;
               const firstBaseline = blockTop + fontSize;
               return (
-                <g key={node.id} opacity={dimmed ? 0.25 : 1}>
+                <g key={node.id} opacity={dimmed ? 0.25 : 1} style={{ transition: 'opacity 200ms ease' }}>
                   <rect
                     x={x - blockWidth / 2 - LABEL_PADDING_X}
                     y={blockTop - LABEL_PADDING_Y}
