@@ -14,3 +14,5 @@ export { useRoomSetup } from './useRoomSetup';
 export type { UseRoomSetupParams, UseRoomSetupReturn } from './useRoomSetup';
 export { useLoungeRooms } from './useLoungeRooms';
 export type { UseLoungeRoomsReturn } from './useLoungeRooms';
+export { useArtifacts } from './useArtifacts';
+export type { UseArtifactsParams, UseArtifactsReturn } from './useArtifacts';
