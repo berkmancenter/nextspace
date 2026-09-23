@@ -477,12 +477,23 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
       const behavior = zoomRef.current;
       if (!svg || !behavior) return;
 
+      /* No floor on this one: the whole point of "fit" is that it shows the whole graph, so
+         a graph wide enough to need a scale below MIN_SCALE gets it — the alternative is a
+         fit button that crops what it claims to frame. */
       const fit = computeFitTransform(buildExtents(), width, height, {
         margin: FIT_MARGIN,
-        minScale: MIN_SCALE,
+        minScale: 0,
         maxScale: MAX_SCALE,
       });
       if (!fit) return;
+
+      /* MIN_SCALE remains the floor for a reader's own scroll/pinch/− on an ordinary graph —
+         the everyday case where zooming out past it would just shrink things to dust for no
+         reason. But it must never be tighter than what fit itself just needed, and a reader
+         deliberately zooming out past the whole graph — to get their bearings, or just because
+         they want to — is one step further out than fit, the same as one press of "−" would
+         give them from any other view. */
+      behavior.scaleExtent([Math.min(MIN_SCALE, fit.k / ZOOM_STEP), MAX_SCALE]);
 
       if (animate) animateTo(fit);
       else select(svg).call(behavior.transform, zoomIdentity.translate(fit.x, fit.y).scale(fit.k));
