@@ -877,7 +877,9 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
             <LegendChip color={CONCEPT} shape="circle" label="concept" />
           )}
           <LegendChip color={CONTRIBUTION} shape="diamond" label="contribution" />
-          <LegendChip color={ORIGIN} shape="pill" label="origin prompt" />
+          {/* Unconditional here would legend a shape this graph never draws — the same
+              condition already gates the "Show origin prompts" button above. */}
+          {hasOrigins && <LegendChip color={ORIGIN} shape="pill" label="origin prompt" />}
         </Box>
       </Box>
 
