@@ -160,6 +160,43 @@ describe('ConceptGraphView, against the fixture the preview page draws', () => {
     expect(detail.getByText(/joins 3/)).toBeInTheDocument();
   });
 
+  it('lists a relationship’s own concepts in its detail card, each a link to focus it', () => {
+    const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
+
+    // k6 ("meets") is a plain two-concept relationship between c-assistant and c-skepticism.
+    fireEvent.click(nodeHandle(container, 'k6')!);
+
+    const detail = within(screen.getByTestId('graph-node-detail'));
+    const assistantLink = detail.getByRole('button', { name: 'The Assistant' });
+    expect(assistantLink).toBeInTheDocument();
+    expect(detail.getByRole('button', { name: 'Skepticism' })).toBeInTheDocument();
+
+    // Clicking one is the same as clicking that concept's own node: focus moves to it.
+    fireEvent.click(assistantLink);
+    expect(within(screen.getByTestId('graph-node-detail')).getByText('The Assistant')).toBeInTheDocument();
+  });
+
+  it('lists a concept’s relationships and whatever else each one joins, every one a link', () => {
+    const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
+
+    // c-skepticism sits on several relationships, k1 ("tempers", to c-trust) and k6 ("meets",
+    // to c-assistant) among them — a concept has no direct link to another concept, only
+    // through these, so both the relationship and whatever else it joins have to come from
+    // that two-hop walk rather than a direct link.
+    fireEvent.click(nodeHandle(container, 'c-skepticism')!);
+
+    const detail = within(screen.getByTestId('graph-node-detail'));
+    expect(detail.getByRole('button', { name: 'tempers' })).toBeInTheDocument();
+    expect(detail.getByRole('button', { name: 'meets' })).toBeInTheDocument();
+    // c-trust is well-connected enough to turn up as the "other concept" on more than one of
+    // c-skepticism's relationships, so this only asserts it is reachable at all.
+    expect(detail.getAllByRole('button', { name: 'Trust' }).length).toBeGreaterThan(0);
+
+    // Clicking the relationship itself focuses it, same as clicking its own diamond.
+    fireEvent.click(detail.getByRole('button', { name: 'tempers' }));
+    expect(within(screen.getByTestId('graph-node-detail-eyebrow')).getByText(/relationship/)).toBeInTheDocument();
+  });
+
   it('may drop even a hovered node’s own label rather than paper it over a neighbour', () => {
     const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
 
@@ -212,7 +249,9 @@ describe('ConceptGraphView on a series graph', () => {
 
     fireEvent.click(container.querySelector('[data-node-id="s-c-skepticism"]')!);
 
-    expect(within(screen.getByTestId('graph-node-detail')).getByText(/session 2/)).toBeInTheDocument();
+    // Scoped to the eyebrow specifically: the card's drill-down list below may legitimately
+    // name "session 2" again, once per relationship that happens to be from that session too.
+    expect(within(screen.getByTestId('graph-node-detail-eyebrow')).getByText(/session 2/)).toBeInTheDocument();
   });
 
   it('leaves a single event’s graph in one colour, with no session legend', () => {

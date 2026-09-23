@@ -15,6 +15,7 @@ import {
   selectVisibleLabels,
   sessionIndexById,
   wrapLabel,
+  type GraphSimLink,
   type GraphSimNode,
 } from '../../utils/conceptGraph';
 import { ConceptGraphPayload } from '../../types.internal';
@@ -887,12 +888,18 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
           ) : (
             <LegendChip color={CONCEPT} shape="circle" label="concept" />
           )}
-          <LegendChip color={CONTRIBUTION} shape="diamond" label="contribution" />
+          <LegendChip color={CONTRIBUTION} shape="diamond" label="relationship" />
           {/* Unconditional here would legend a shape this graph never draws — the same
               condition already gates the "Show origin prompts" button above. */}
           {hasOrigins && <LegendChip color={ORIGIN} shape="pill" label="origin prompt" />}
         </Box>
       </Box>
+
+      {/* The one thing the legend's shapes and colours don't say on their own: size is not
+          decorative, it's the same degree that drives focus and dimming everywhere else. */}
+      <Typography variant="caption" sx={{ display: 'block', color: MUTED, mt: -0.5, mb: 1 }}>
+        Larger nodes have more connections.
+      </Typography>
 
       {/* The graph in sentences, for screen readers and anyone who would rather not parse a
           force layout. The picture above is a drawing of exactly this. */}
@@ -915,7 +922,7 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         width="100%"
         height={height}
         role="img"
-        aria-label={`Concept graph. Circles are concepts, diamonds are contributions joining them${
+        aria-label={`Concept graph. Circles are concepts, diamonds are relationships joining them${
           hasOrigins ? `, dashed pills are the prompts they came out of${showOrigins ? '' : ' — currently hidden'}` : ''
         }. Scroll or pinch to zoom, drag to pan. Click a node to focus on it and its neighbours, click empty space or press Escape to return to the whole graph.`}
         /* A node's own click stops here before it bubbles, so this only ever fires for a
@@ -1111,20 +1118,72 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         node={activeNode}
         degree={activeNode ? (degree.get(activeNode.id) ?? 0) : 0}
         session={activeNode?.provenance?.conversationId ? sessions.get(activeNode.provenance.conversationId) : undefined}
+        links={links}
+        nodeById={nodeById}
+        sessions={sessions}
+        onSelect={setSelectedId}
       />
     </Box>
   );
 };
 
+/** A concept or contribution the detail card can name and jump to. */
+function ConnectionLink({ target, onSelect }: { target: GraphSimNode; onSelect: (id: string) => void }) {
+  return (
+    <Box
+      component="button"
+      type="button"
+      onClick={() => onSelect(target.id)}
+      sx={{
+        font: 'inherit',
+        color: 'inherit',
+        background: 'none',
+        border: 0,
+        p: 0,
+        m: 0,
+        cursor: 'pointer',
+        textDecoration: 'underline',
+        textUnderlineOffset: '2px',
+        '&:hover': { color: CONTRIBUTION },
+      }}
+    >
+      {/* A contribution names itself by its verb here, never its statement — the statement is
+          drawn out in full as its own line wherever this contribution is the thing selected. */}
+      {target.type === 'contribution' ? (target.kind ?? target.label) : target.label}
+    </Box>
+  );
+}
+
 /**
  * The card under the canvas describing whatever node is hovered or selected.
  *
- * It shows the label and the statement and nothing else. A node may carry `provenance` — a
- * pseudonym, a message id — and none of it is drawn here on purpose: these graphs come out
- * of events held under the Chatham House Rule, and anyone reaching this page holds only the
- * artifact passcode. See {@link GraphNodeProvenance}.
+ * Beyond the label and statement, it lists what the node actually connects to — a
+ * relationship's own concepts, or, for a concept, every relationship that names it together
+ * with whatever else that same relationship joins (a concept has no direct link to another
+ * concept in this graph; only a relationship sits between them) — each one clickable, so
+ * reading the card is also a way to walk the graph without hunting for the next node by eye.
+ *
+ * A node may carry `provenance` — a pseudonym, a message id — and none of it is drawn here on
+ * purpose: these graphs come out of events held under the Chatham House Rule, and anyone
+ * reaching this page holds only the artifact passcode. See {@link GraphNodeProvenance}.
  */
-function NodeDetail({ node, degree, session }: { node?: GraphSimNode; degree: number; session?: number }) {
+function NodeDetail({
+  node,
+  degree,
+  session,
+  links,
+  nodeById,
+  sessions,
+  onSelect,
+}: {
+  node?: GraphSimNode;
+  degree: number;
+  session?: number;
+  links: GraphSimLink[];
+  nodeById: Map<string, GraphSimNode>;
+  sessions: Map<string, number>;
+  onSelect: (id: string) => void;
+}) {
   if (!node) {
     return (
       <Typography variant="caption" sx={{ display: 'block', mt: 1, color: MUTED }}>
@@ -1133,31 +1192,125 @@ function NodeDetail({ node, degree, session }: { node?: GraphSimNode; degree: nu
     );
   }
 
-  const kindLabel = node.type === 'origin' ? 'origin prompt' : node.type;
+  const kindLabel = node.type === 'origin' ? 'origin prompt' : node.type === 'contribution' ? 'relationship' : node.type;
   const accent = node.type === 'concept' ? CONCEPT : node.type === 'contribution' ? CONTRIBUTION : ORIGIN;
+
+  // A relationship's own concepts: one hop, since its links already point straight at each one.
+  const joinedConcepts =
+    node.type === 'contribution'
+      ? links
+          .filter((l) => linkEndpointId(l.source) === node.id)
+          .map((l) => nodeById.get(linkEndpointId(l.target)))
+          .filter((n): n is GraphSimNode => !!n)
+      : [];
+
+  // A concept's own relationships: one hop to each relationship that names it, then a second
+  // hop from that relationship to whatever *else* it joins — a concept never links straight to
+  // another concept here, only through the relationship between them.
+  const relatedVia =
+    node.type === 'concept'
+      ? links
+          .filter((l) => linkEndpointId(l.target) === node.id)
+          .map((l) => nodeById.get(linkEndpointId(l.source)))
+          .filter((n): n is GraphSimNode => !!n)
+          .map((contribution) => ({
+            contribution,
+            otherConcepts: links
+              .filter((l) => linkEndpointId(l.source) === contribution.id && linkEndpointId(l.target) !== node.id)
+              .map((l) => nodeById.get(linkEndpointId(l.target)))
+              .filter((n): n is GraphSimNode => !!n),
+          }))
+      : [];
+
+  const eyebrow = (
+    <Typography
+      data-testid="graph-node-detail-eyebrow"
+      variant="caption"
+      sx={{ display: 'block', color: accent, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}
+    >
+      {kindLabel}
+      {node.type !== 'origin' && ` · joins ${degree}`}
+      {session !== undefined && ` · session ${session + 1}`}
+    </Typography>
+  );
 
   return (
     <Box
       data-testid="graph-node-detail"
       sx={{ mt: 1, p: 1.5, border: `1px solid ${PANEL_BORDER}`, borderLeft: `3px solid ${accent}`, borderRadius: 1 }}
     >
-      <Typography
-        variant="caption"
-        sx={{ color: accent, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}
-      >
-        {kindLabel}
-        {node.type !== 'origin' && ` · joins ${degree}`}
-        {session !== undefined && ` · session ${session + 1}`}
-      </Typography>
-      <Typography variant="body2" sx={{ color: TEXT, fontWeight: 500 }}>
-        {/* On the canvas a contribution is labelled by its statement when it has one; here
-            that would repeat the line below, so this always names the relationship itself. */}
-        {node.type === 'contribution' ? (node.kind ?? node.label) : node.label}
-      </Typography>
+      {node.type === 'contribution' ? (
+        // The verb is the actual point of a relationship card — "grounds", "raises a
+        // question about" — so it leads; what kind of node this is and how connected it is
+        // follows as a smaller caption rather than the first thing read.
+        <>
+          <Typography variant="body2" sx={{ color: TEXT, fontWeight: 600 }}>
+            {node.kind ?? node.label}
+          </Typography>
+          {eyebrow}
+        </>
+      ) : (
+        <>
+          {eyebrow}
+          <Typography variant="body2" sx={{ color: TEXT, fontWeight: 500 }}>
+            {node.label}
+          </Typography>
+        </>
+      )}
       {node.statement && (
         <Typography variant="body2" sx={{ color: MUTED, mt: 0.5 }}>
           {node.statement}
         </Typography>
+      )}
+
+      {node.type === 'contribution' && joinedConcepts.length > 0 && (
+        <Box sx={{ mt: 1 }}>
+          <Typography variant="caption" sx={{ display: 'block', color: MUTED }}>
+            Joins:
+          </Typography>
+          <Typography component="div" variant="body2" sx={{ color: TEXT }}>
+            {joinedConcepts.map((concept, i) => (
+              <span key={concept.id}>
+                {i > 0 && ', '}
+                <ConnectionLink target={concept} onSelect={onSelect} />
+              </span>
+            ))}
+          </Typography>
+        </Box>
+      )}
+
+      {node.type === 'concept' && relatedVia.length > 0 && (
+        <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+          {relatedVia.map(({ contribution, otherConcepts }) => {
+            const viaSession = contribution.provenance?.conversationId
+              ? sessions.get(contribution.provenance.conversationId)
+              : undefined;
+            return (
+              <Box key={contribution.id}>
+                <Typography component="div" variant="body2" sx={{ color: TEXT }}>
+                  <ConnectionLink target={contribution} onSelect={onSelect} />
+                  {otherConcepts.length > 0 && (
+                    <>
+                      {' — '}
+                      {otherConcepts.map((concept, i) => (
+                        <span key={concept.id}>
+                          {i > 0 && ', '}
+                          <ConnectionLink target={concept} onSelect={onSelect} />
+                        </span>
+                      ))}
+                    </>
+                  )}
+                  {viaSession !== undefined && ` · session ${viaSession + 1}`}
+                </Typography>
+                {contribution.statement && (
+                  <Typography variant="caption" sx={{ display: 'block', color: MUTED }}>
+                    {contribution.statement}
+                  </Typography>
+                )}
+              </Box>
+            );
+          })}
+        </Box>
       )}
     </Box>
   );
