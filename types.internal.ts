@@ -343,3 +343,12 @@ export type ConceptGraphGenerationResult = { generated: boolean; artifact?: Arti
   GenerateResponses[200]['content']['application/json'] & GenerateResponses[202]['content']['application/json'],
   'generated' | 'artifact'
 >;
+
+/**
+ * What the room learns from trying to claim a real name. `taken` is separate from a plain
+ * failure because it is the caller's to fix: another person in that room holds the name.
+ */
+export interface SaveRealNameResult {
+  ok: boolean;
+  taken?: boolean;
+}
