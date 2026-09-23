@@ -657,13 +657,19 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
           // Screen position: the node's place in the graph, put through the current zoom.
           x: screenX,
           y: yBelow,
+          // The node's own centre, and this candidate's un-collided default spot — kept apart
+          // from `x`/`y` above, which get overwritten below with wherever selectVisibleLabels
+          // actually placed it. Comparing the two afterwards is what tells a label drawn at an
+          // alternate spot from one at its own, without selectVisibleLabels having to say so
+          // itself: the position it hands back is always one of these same, un-recomputed
+          // numbers, so comparing by value is exact.
+          nodeScreenX: screenX,
+          nodeScreenY: screenY,
+          defaultX: screenX,
+          defaultY: yBelow,
           /* Not yet worth adding, but worth remembering:
              - Diagonal fallbacks (NE/NW/SE/SW) after these four — a cheap extension of the
-               same mechanism, for a label that still has room but not along an axis.
-             - Leader lines from an offset label back to its node — once a label can land to
-               the side, it can occasionally read as belonging to a neighbour instead in a
-               dense cluster. Would need to stay thin/low-opacity so it doesn't undo the
-               link-visibility fix links themselves just got. */
+               same mechanism, for a label that still has room but not along an axis. */
           alternates: [
             { x: screenX, y: yAbove },
             { x: xRight, y: screenY },
@@ -743,7 +749,12 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
     // (below) — `visible` is what selectVisibleLabels actually settled on for each id.
     return candidates.flatMap((candidate) => {
       const at = visible.get(candidate.node.id);
-      return at ? [{ ...candidate, x: at.x, y: at.y }] : [];
+      if (!at) return [];
+      // Whenever a collision pushed a label off its own default spot, a thin leader line back
+      // to the node is what keeps it readable as *that* node's label rather than a caption
+      // drifting near whichever circle it happens to have landed beside.
+      const isOffset = at.x !== candidate.defaultX || at.y !== candidate.defaultY;
+      return [{ ...candidate, x: at.x, y: at.y, isOffset }];
     });
     // `tick` is in the dependency list because node positions are mutated in place: without
     // it the labels would stay where the nodes started while the nodes themselves moved off.
@@ -1026,7 +1037,21 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
             node happens to sit behind it. */}
         <g>
           {visibleLabels.map(
-            ({ node, x, y, fontSize, mono, isActive, lines, lineHeight, width: blockWidth, height: blockHeight }) => {
+            ({
+              node,
+              x,
+              y,
+              fontSize,
+              mono,
+              isActive,
+              lines,
+              lineHeight,
+              width: blockWidth,
+              height: blockHeight,
+              isOffset,
+              nodeScreenX,
+              nodeScreenY,
+            }) => {
               const dimmed = !!lit && !lit.has(node.id);
               // The block's own top edge, worked back from its centre `y`; the first line's
               // baseline sits fontSize below that, which is roughly a line's ascent.
@@ -1034,6 +1059,22 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
               const firstBaseline = blockTop + fontSize;
               return (
                 <g key={node.id} opacity={dimmed ? 0.25 : 1} style={{ transition: 'opacity 200ms ease' }}>
+                  {/* Only drawn once a collision has actually pushed this label off its own
+                      default spot — the ordinary case (a label sitting right below its node)
+                      already reads as attached with no help. A wayfinding aid, not a graph
+                      edge: thin and pale enough to never be mistaken for a link. */}
+                  {isOffset && (
+                    <line
+                      x1={nodeScreenX}
+                      y1={nodeScreenY}
+                      x2={x}
+                      y2={y}
+                      stroke={MUTED}
+                      strokeWidth={1}
+                      strokeOpacity={0.45}
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  )}
                   <rect
                     x={x - blockWidth / 2 - LABEL_PADDING_X}
                     y={blockTop - LABEL_PADDING_Y}
