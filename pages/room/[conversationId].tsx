@@ -8,11 +8,12 @@ import MenuIcon from '@mui/icons-material/Menu';
 import { Api, RetrieveData, SendData, emitWithTokenRefresh } from '../../utils';
 import { CheckAuthHeader } from '../../utils/Helpers';
 import { GIVE_FEEDBACK_URL } from '../../components/Header';
-import { AuthType, PendingRoomMessage, PseudonymousMessage, UserPseudonym } from '../../types.internal';
+import { AuthType, PendingRoomMessage, PseudonymousMessage, SaveRealNameResult, UserPseudonym } from '../../types.internal';
 import { useConversationMessages, useRoomSetup, useSessionJoin, useTabNavigation } from '../../hooks';
 import { CommunityNavigationBar, CommunityNavTab } from '../../components/room/CommunityNavigationBar';
 import { CommunityGroupChatPanel } from '../../components/room/CommunityGroupChatPanel';
 import { CommunityAssistantPanel } from '../../components/room/CommunityAssistantPanel';
+import { SetRealNameDialog } from '../../components/room/SetRealNameDialog';
 import { BotIcon } from '../../components/BotIcon';
 import { RoomMarkIcon } from '../../components/room/RoomMarkIcon';
 import { getRoomInitials } from '../../utils/roomAvatarUtils';
@@ -56,6 +57,8 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   const { socket, pseudonym: sessionPseudonym, userId, isConnected, lastReconnectTime } = useSessionJoin(true);
 
   const [registeredName, setRegisteredName] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [readingOnly, setReadingOnly] = useState(false);
   // Kept apart from useRoomSetup's generalError, which doubles as the fatal "room would not load" screen.
   const [sendError, setSendError] = useState<string | null>(null);
 
@@ -79,6 +82,8 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
       const pseudonyms: UserPseudonym[] = account.pseudonyms ?? [];
       const registered = pseudonyms.find((p) => p.isRealName && p.conversations?.includes(conversationId));
       if (registered) setRegisteredName(registered.pseudonym);
+      // The session cookie calls every signed-in account an admin, so the role must come from here.
+      setIsAdmin(account.role === 'admin');
     })();
 
     return () => {
@@ -87,6 +92,22 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   }, [conversationId, userId]);
 
   const realName = registeredName ?? sessionPseudonym;
+
+  // An admin may decline: reading needs no name, and the server still refuses their posts.
+  const needsRealName = isAdmin && !registeredName && !readingOnly;
+
+  const saveRealName = async (candidate: string): Promise<SaveRealNameResult> => {
+    if (!conversationId) return { ok: false };
+    const response = await SendData(
+      'users/pseudonyms/real-name',
+      { conversationId, realName: candidate },
+      Api.get().getAccessToken(),
+    );
+    if (!Array.isArray(response)) return { ok: false, taken: response?.status === 409 };
+    const claimed = (response as UserPseudonym[]).find((p) => p.isRealName && p.conversations?.includes(conversationId));
+    setRegisteredName(claimed?.pseudonym ?? candidate);
+    return { ok: true };
+  };
 
   const { activeTab, activeTabRef, unseenAssistantCount, setUnseenAssistantCount, handleTabChange } = useTabNavigation({
     router,
@@ -267,6 +288,15 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   );
 
   /**
+   * A refused post is the only route back to the naming prompt for an admin who declined it,
+   * since the room offers no other way to set a name. Watched here rather than handled inside
+   * deliverMessage, which is memoised on its own dependencies.
+   */
+  useEffect(() => {
+    if (isAdmin && !registeredName && queuedMessages.some((m) => m.failed)) setReadingOnly(false);
+  }, [isAdmin, registeredName, queuedMessages]);
+
+  /**
    * navigator.onLine flips the moment the machine loses its network, while the socket only
    * notices after its ping timeout. Reading both stops sends into an already-dead connection.
    */
@@ -441,6 +471,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
           <CommunityAssistantPanel
             messages={assistantMessages}
             realName={realName || ''}
+            isAdmin={isAdmin}
             botName={botName}
             pendingMessages={queuedAssistantMessages}
             onRetryPendingMessage={retryQueuedMessage}
@@ -452,6 +483,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
           <CommunityGroupChatPanel
             messages={chatMessages}
             realName={realName || ''}
+            isAdmin={isAdmin}
             currentUserId={userId}
             botName={botName}
             communityName={communityName}
@@ -472,6 +504,8 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
           />
         )}
       </div>
+
+      <SetRealNameDialog open={needsRealName} onSave={saveRealName} onDismiss={() => setReadingOnly(true)} />
 
       <CommunityNavigationBar
         activeTab={activeTab as CommunityNavTab}

@@ -14,6 +14,8 @@ import styles from './communityRoom.module.css';
 interface CommunityAssistantPanelProps {
   messages: PseudonymousMessage[];
   realName: string;
+  /** Labels the reader's queued messages, which the server has not answered for yet. */
+  isAdmin?: boolean;
   botName: string;
   /** Messages typed here that the server has not accepted yet. */
   pendingMessages?: PendingRoomMessage[];
@@ -41,6 +43,7 @@ const renderMarkdown = (text: string): React.ReactNode => (
 export function CommunityAssistantPanel({
   messages,
   realName,
+  isAdmin = false,
   botName,
   pendingMessages = [],
   onRetryPendingMessage,
@@ -193,6 +196,7 @@ export function CommunityAssistantPanel({
                 key={pending.id}
                 body={pending.body}
                 realName={realName}
+                isAdmin={isAdmin}
                 failed={pending.failed}
                 failureReason={pending.failureReason}
                 onRetry={onRetryPendingMessage && (() => onRetryPendingMessage(pending.id))}
