@@ -186,6 +186,32 @@ describe('ConceptGraphView, against the fixture the preview page draws', () => {
     const detail = within(screen.getByTestId('graph-node-detail'));
     expect(detail.queryByText(/pseudonym|contributed by|said by/i)).not.toBeInTheDocument();
   });
+
+  it('names what a folded concept encompasses in the detail card, never on the canvas itself', () => {
+    const folded = {
+      ...graph,
+      concepts: [{ ...graph.concepts[0], foldedFrom: ['Registry Interop', 'Cross-Registry Trust'] }, graph.concepts[1]],
+    };
+    const { container } = render(<ConceptGraphView payload={folded} />);
+
+    // No permanent mark on the canvas — the whole point is that this stays out of the way
+    // until asked for, the same as a statement or an origin prompt.
+    expect(screen.queryByText(/Registry Interop/)).not.toBeInTheDocument();
+
+    fireEvent.click(nodeHandle(container, 'c-issuer')!);
+
+    const detail = within(screen.getByTestId('graph-node-detail'));
+    expect(detail.getByText(/Registry Interop/)).toBeInTheDocument();
+    expect(detail.getByText(/Cross-Registry Trust/)).toBeInTheDocument();
+  });
+
+  it('says nothing about folding for an ordinary concept', () => {
+    const { container } = render(<ConceptGraphView payload={graph} />);
+
+    fireEvent.click(nodeHandle(container, 'c-issuer')!);
+
+    expect(within(screen.getByTestId('graph-node-detail')).queryByText(/encompasses/i)).not.toBeInTheDocument();
+  });
 });
 
 describe('ConceptGraphView on a series graph', () => {

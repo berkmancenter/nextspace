@@ -25,6 +25,7 @@ function describeReport(report: ConceptGraphGenerationResult['report']): string 
     report.droppedContributions ? `${report.droppedContributions} contribution(s) dropped` : null,
     report.droppedStatements ? `${report.droppedStatements} statement(s) removed` : null,
     report.droppedOriginPrompts ? `${report.droppedOriginPrompts} prompt(s) dropped` : null,
+    report.foldedConcepts ? `${report.foldedConcepts} concept(s) folded into related ones to stay readable` : null,
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(', ') : null;
 }

@@ -21,6 +21,7 @@ export type GraphNodeType = 'concept' | 'contribution' | 'origin';
  *   relationship between concepts rather than any one person's account.
  * @property {string} [kind] - A contribution's short relationship verb, always present, for the detail panel.
  * @property {string} [statement] - A contribution's sentence-long account of the relationship, for the detail panel.
+ * @property {string[]} [foldedFrom] - A concept's own labels folded into it once a series graph outgrew its size cap, for the detail panel.
  */
 export interface GraphSimNode extends SimulationNodeDatum {
   id: string;
@@ -28,6 +29,7 @@ export interface GraphSimNode extends SimulationNodeDatum {
   label: string;
   kind?: string;
   statement?: string;
+  foldedFrom?: string[];
   provenance?: GraphNodeProvenance;
 }
 
@@ -83,7 +85,7 @@ export function buildGraph({
   const degree = new Map<string, number>();
 
   for (const c of concepts) {
-    simNodes.push({ id: c.id, type: 'concept', label: c.label, provenance: c.provenance });
+    simNodes.push({ id: c.id, type: 'concept', label: c.label, foldedFrom: c.foldedFrom, provenance: c.provenance });
     degree.set(c.id, 0);
   }
   for (const p of originPrompts) {

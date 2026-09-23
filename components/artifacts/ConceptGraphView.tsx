@@ -1118,6 +1118,14 @@ function NodeDetail({ node, degree, session }: { node?: GraphSimNode; degree: nu
           {node.statement}
         </Typography>
       )}
+      {/* Only a concept ever carries this — a series graph that outgrew its size cap folds a
+          less-connected concept into a related one rather than dropping it, and this is the
+          one place that fold stays visible, on demand, without spending canvas space on it. */}
+      {node.foldedFrom && node.foldedFrom.length > 0 && (
+        <Typography variant="caption" sx={{ display: 'block', color: MUTED, mt: 0.5, fontStyle: 'italic' }}>
+          Also encompasses: {node.foldedFrom.join(', ')}
+        </Typography>
+      )}
     </Box>
   );
 }
