@@ -96,6 +96,17 @@ describe('ConceptGraphView, against the fixture the preview page draws', () => {
 
     // One diamond, not three edges: that is the whole point of a contribution being a node.
     expect(container.querySelectorAll('[data-node-id="k18"]')).toHaveLength(1);
+    expect(container.querySelector('[data-node-id="k18"] rect')).toBeInTheDocument();
+  });
+
+  it('draws a two-concept relationship as a line rather than a diamond', () => {
+    const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
+
+    // k6 ("meets") joins exactly c-assistant and c-skepticism.
+    const handle = container.querySelector('[data-node-id="k6"]')!;
+    expect(handle).toBeInTheDocument();
+    expect(handle.querySelector('rect')).not.toBeInTheDocument();
+    expect(handle.querySelectorAll('line')).toHaveLength(2); // the hit target, and the visible line beneath it.
   });
 
   it('names well-connected concepts on the canvas when there is room to', () => {

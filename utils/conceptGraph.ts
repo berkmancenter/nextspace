@@ -32,11 +32,27 @@ export interface GraphSimNode extends SimulationNodeDatum {
 }
 
 /**
+ * What a link carries when it IS a relationship, rather than a spoke from a contribution's
+ * own node to one of the concepts it joins — see {@link buildGraph} for which links get this
+ * and why. Everything a diamond would otherwise have held: a link is drawn interactively
+ * (labelled, clickable, hoverable) exactly when it carries one of these.
+ */
+export interface GraphRelationship {
+  id: string;
+  kind: string;
+  statement?: string;
+  origin?: string;
+  provenance?: GraphNodeProvenance;
+}
+
+/**
  * A link between two simulation nodes. d3-force replaces the `source` and `target` ids
  * with the node objects themselves on first tick, so read either through
  * {@link linkEndpointId}.
  */
-export type GraphSimLink = SimulationLinkDatum<GraphSimNode>;
+export interface GraphSimLink extends SimulationLinkDatum<GraphSimNode> {
+  relationship?: GraphRelationship;
+}
 
 /**
  * The laid-out form of a concept graph.
@@ -59,12 +75,18 @@ export function linkEndpointId(endpoint: GraphSimLink['source']): string {
 /**
  * Builds the simulation's nodes and links from an artifact payload.
  *
- * Contributions are nodes, not edges: a contribution links to each concept it joins, which
- * is what lets one of them join three or more concepts at once. Origin prompts are a third
- * node kind, attached by a direct `origin` reference — and their links are kept in a
- * separate array because they must not count toward degree. Attribution is not
- * connectedness, and counting it would inflate every well-attributed concept for a reason
- * that has nothing to do with how the conversation related it to anything.
+ * A contribution joining exactly two concepts becomes a direct link between them, carrying
+ * itself as that link's {@link GraphRelationship} rather than a node of its own — a diamond
+ * drawn only to join two things told the reader nothing a line couldn't, and doubled the
+ * canvas's visual noise for it. A contribution joining three or more concepts at once still
+ * gets its own node, since that is the one case a single line cannot express, and a
+ * contribution attached to only one concept — a leaf, one account with nothing on its other
+ * end to draw a line to — keeps its node for the same reason: there is no second point.
+ *
+ * Origin prompts are a third node kind, attached by a direct `origin` reference — and their
+ * links are kept in a separate array because they must not count toward degree. Attribution
+ * is not connectedness, and counting it would inflate every well-attributed concept for a
+ * reason that has nothing to do with how the conversation related it to anything.
  *
  * Feed the simulation `[...links, ...originLinks]` so origin nodes have a force acting on
  * them; compute sizes from `degree`, which sees only `links`.
@@ -81,6 +103,10 @@ export function buildGraph({
   const links: GraphSimLink[] = [];
   const originLinks: GraphSimLink[] = [];
   const degree = new Map<string, number>();
+  // A two-concept relationship has no node of its own for an origin-attribution line to
+  // terminate at — tracked here so the origin pass below can skip it rather than push a link
+  // to nothing. See the KNOWN GAP note there.
+  const noNodeOfItsOwn = new Set<string>();
 
   for (const c of concepts) {
     simNodes.push({ id: c.id, type: 'concept', label: c.label, provenance: c.provenance });
@@ -91,6 +117,24 @@ export function buildGraph({
     degree.set(p.id, 0);
   }
   for (const k of contributions) {
+    if (k.concepts.length === 2) {
+      const [a, b] = k.concepts;
+      links.push({
+        source: a,
+        target: b,
+        relationship: { id: k.id, kind: k.kind, statement: k.statement, origin: k.origin, provenance: k.provenance },
+      });
+      // Counted the same as it always was — a relationship still joins two concepts whether
+      // or not it gets a node of its own to say so. `degree.set(k.id, 2)` isn't for sizing
+      // anything (there is no node left to size); it's so a reader who selects this
+      // relationship still sees "joins 2" reported the same way any other node's would be.
+      degree.set(a, (degree.get(a) || 0) + 1);
+      degree.set(b, (degree.get(b) || 0) + 1);
+      degree.set(k.id, 2);
+      noNodeOfItsOwn.add(k.id);
+      continue;
+    }
+
     simNodes.push({
       id: k.id,
       type: 'contribution',
@@ -108,7 +152,13 @@ export function buildGraph({
     }
   }
   for (const n of [...concepts, ...contributions]) {
-    if (n.origin) originLinks.push({ source: n.origin, target: n.id });
+    // KNOWN GAP: a two-concept relationship's own `origin` is still carried on its link's
+    // `relationship.origin` (a reader can still be told it came out of a prompt), but there
+    // is no node here for a dashed attribution line to point at, so the line itself is not
+    // drawn. Rare in practice — a relationship needs both an origin prompt and exactly two
+    // concepts — and worth a floating attribution point (e.g. the relationship's own label
+    // position) if it turns out to matter, rather than solved speculatively here.
+    if (n.origin && !noNodeOfItsOwn.has(n.id)) originLinks.push({ source: n.origin, target: n.id });
   }
 
   return { simNodes, links, originLinks, degree };
@@ -132,6 +182,13 @@ export function connectedIds(
     const target = linkEndpointId(l.target);
     if (source === hoverId) connected.add(target);
     if (target === hoverId) connected.add(source);
+    // A two-concept relationship's own id is neither endpoint — it lives on the link as
+    // metadata rather than as a node — so hovering or focusing it has to be matched this way
+    // instead, and lights both concepts it joins since neither is "the" endpoint that matched.
+    if (l.relationship?.id === hoverId) {
+      connected.add(source);
+      connected.add(target);
+    }
   }
   return connected;
 }
