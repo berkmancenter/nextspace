@@ -131,6 +131,12 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
   /* Positions from the previous payload, so a live revision re-uses them instead of
      re-laying the whole graph out from scratch. */
   const positionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  /* The live simulation, so a pure resize (see the effect below) can retarget it in place
+     instead of the graph-rebuilding effect having to own width/height at all. */
+  const simulationRef = useRef<ReturnType<typeof forceSimulation<GraphSimNode>> | null>(null);
+  /* What the simulation-building effect actually saw width/height as, kept current without
+     being one of that effect's own dependencies — see the same effect for why. */
+  const boxRef = useRef({ width: 720, height: DEFAULT_HEIGHT });
   /* Set once the reader zooms or pans deliberately, after which the view is theirs and
      auto-fit stops touching it. */
   const hasUserZoomedRef = useRef(false);
@@ -278,9 +284,20 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
   // The force simulation. Both link sets are fed to forceLink — origin nodes would have no
   // force acting on them otherwise and would drift off — while sizes come from `degree`,
   // which counts contribution links only.
+  //
+  // Deliberately NOT keyed on width/height — see the resize effect just below this one. A
+  // rebuild here means a brand new simulation object, seeded fresh and re-ignited at full
+  // strength (alpha 1), which is right for an actually new or revised graph but wrong for a
+  // mere resize: a resize this component causes itself (the node-detail card below the
+  // canvas changing height, which can toggle a scrollbar and shrink the tracked width) would
+  // otherwise retrigger this same rebuild on every render it touches, throwing every node
+  // back into motion each time — which is what "jittery, unstable, can't click a node" turned
+  // out to be. `boxRef` is how this effect still gets a real width/height to seed and centre
+  // with, without depending on either.
   useEffect(() => {
     if (isEmpty) return;
 
+    const { width: boxWidth, height: boxHeight } = boxRef.current;
     const positions = positionsRef.current;
     /* A node keeps the place it held in the previous version — ids are stable across
        versions, so a concept that survived a revision is the same node and should not jump.
@@ -297,8 +314,8 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
       if (node.x === undefined || node.y === undefined) {
         const angle = i * SEED_ANGLE;
         const radius = SEED_SPACING * Math.sqrt(i + 0.5);
-        node.x = width / 2 + radius * Math.cos(angle);
-        node.y = height / 2 + radius * Math.sin(angle);
+        node.x = boxWidth / 2 + radius * Math.cos(angle);
+        node.y = boxHeight / 2 + radius * Math.sin(angle);
       }
     });
 
@@ -318,14 +335,14 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         'collide',
         forceCollide<GraphSimNode>().radius((d) => footprintOf(d) + 14),
       )
-      .force('center', forceCenter(width / 2, height / 2))
+      .force('center', forceCenter(boxWidth / 2, boxHeight / 2))
       .on('tick', () => {
         setTick((t) => t + 1);
         /* Keep the graph framed as it settles, rather than framing it once at the end.
            A force layout spreads for a second or two after it starts, and it knows nothing
            about the size of the box it is drawn in, so a graph framed only at the end spends
            that whole time with nodes wandering off the edges — and a simulation that keeps
-           being restarted by a resize or a remount never reaches its end event at all.
+           being restarted by a remount never reaches its end event at all.
 
            Never over someone who has taken hold of the view, though: once the reader has
            zoomed or panned, the view is theirs, and a version arriving mid-inspection must
@@ -342,6 +359,8 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         if (!hasUserZoomedRef.current && !selectedIdRef.current) fitToViewRef.current();
       });
 
+    simulationRef.current = simulation;
+
     return () => {
       for (const node of simNodes) {
         if (node.x !== undefined && node.y !== undefined) {
@@ -349,10 +368,29 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         }
       }
       simulation.stop();
+      simulationRef.current = null;
     };
     // `radiusOf` is derived from simNodes and degree, both already dependencies here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simNodes, links, originLinks, width, height, isEmpty]);
+  }, [simNodes, links, originLinks, isEmpty]);
+
+  // A pure resize retargets the existing simulation instead of the effect above rebuilding
+  // it — see its own comment for why a rebuild is the wrong response to this. A gentle nudge
+  // (not a full alpha-1 restart) is enough to drift an already-settled layout to the new
+  // middle; skipped on the very first run, since the effect above already centred on these
+  // same values when it created the simulation.
+  const boxMounted = useRef(false);
+  useEffect(() => {
+    boxRef.current = { width, height };
+    if (!boxMounted.current) {
+      boxMounted.current = true;
+      return;
+    }
+    const simulation = simulationRef.current;
+    if (!simulation) return;
+    simulation.force('center', forceCenter(width / 2, height / 2));
+    simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart();
+  }, [width, height]);
 
   // Smooth continuous zoom and pan.
   useEffect(() => {
