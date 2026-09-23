@@ -194,6 +194,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
           {/* Name */}
           <div className="text-sm font-bold mb-1 text-left">
             {displayName}
+            {message.ownerIsAdmin && <span className="text-gray-600 font-normal"> (Admin)</span>}
             {isCurrentUser && <span className="text-gray-600 font-normal"> (You)</span>}
           </div>
 
@@ -264,6 +265,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                   {/* Name */}
                   <div className="text-sm font-bold mb-1 text-left">
                     {normalizeAssistantPseudonym(replies[0], botName)}
+                    {replies[0].ownerIsAdmin && <span className="text-gray-600 font-normal"> (Admin)</span>}
                     {isReadersMessage(replies[0], pseudonym, currentUserId) && (
                       <span className="text-gray-600 font-normal"> (You)</span>
                     )}
