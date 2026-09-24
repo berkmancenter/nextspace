@@ -201,7 +201,10 @@ export const seriesConceptGraphFixture: ConceptGraphPayload = {
   ],
   concepts: [
     { id: 's-c-assistant', label: 'The Assistant', origin: 's-p1', provenance: { conversationId: SESSION_ONE } },
-    { id: 's-c-trust', label: 'Trust', provenance: { conversationId: SESSION_ONE } },
+    // A series long enough to outgrow its size cap folds a less-connected concept into a
+    // related one rather than dropping it — `foldedFrom` is what survives that fold, and this
+    // is the one fixture case exercising it. See NodeDetail's "Also encompasses" line.
+    { id: 's-c-trust', label: 'Trust', provenance: { conversationId: SESSION_ONE }, foldedFrom: ['Reliability'] },
     { id: 's-c-skepticism', label: 'Skepticism', provenance: { conversationId: SESSION_TWO } },
     { id: 's-c-habit', label: 'Habit', provenance: { conversationId: SESSION_TWO } },
     { id: 's-c-disappointment', label: 'Disappointment', origin: 's-p2', provenance: { conversationId: SESSION_THREE } },

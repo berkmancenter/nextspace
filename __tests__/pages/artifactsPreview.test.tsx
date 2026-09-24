@@ -1,6 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import ArtifactPreviewPage from '../../pages/artifacts/preview';
-import { conceptGraphFixture, minimalConceptGraphFixture } from '../../content/conceptGraphFixture';
+import { conceptGraphFixture, minimalConceptGraphFixture, seriesConceptGraphFixture } from '../../content/conceptGraphFixture';
+
+const nodeHandle = (container: HTMLElement, id: string) => container.querySelector(`[data-node-id="${id}"]`);
 
 /* next/dynamic defers the graph past this render, so it is resolved eagerly here — the point
    of these tests is that the page hands the fixtures to the renderer. */
@@ -46,5 +48,29 @@ describe('the artifact preview page', () => {
     for (const concept of conceptGraphFixture.concepts) {
       expect(container.querySelector(`[data-node-id="${concept.id}"]`)).toBeInTheDocument();
     }
+  });
+
+  it('names what the series fixture’s folded concept encompasses, on demand', () => {
+    // The series fixture stands in for a graph that outgrew its size cap: `s-c-trust` carries
+    // a `foldedFrom` the same as a real fold would leave behind, so a reviewer can see the
+    // detail card's "Also encompasses" line without a real series long enough to trigger one.
+    const folded = seriesConceptGraphFixture.concepts.find((c) => c.foldedFrom?.length);
+    expect(folded).toBeDefined();
+
+    const { container } = render(<ArtifactPreviewPage />);
+
+    // No permanent mark on the canvas — same rule as a statement or an origin prompt. Scoped
+    // to the detail cards themselves (there are none until something is hovered or clicked),
+    // since the section's own descriptive prose names the folded label deliberately, to tell a
+    // reviewer what to click for.
+    for (const detail of screen.queryAllByTestId('graph-node-detail')) {
+      expect(within(detail).queryByText(new RegExp(folded!.foldedFrom![0]))).not.toBeInTheDocument();
+    }
+
+    fireEvent.click(nodeHandle(container, folded!.id)!);
+
+    const details = screen.getAllByTestId('graph-node-detail');
+    const withFold = details.find((detail) => within(detail).queryByText(new RegExp(folded!.foldedFrom![0])));
+    expect(withFold).toBeDefined();
   });
 });
