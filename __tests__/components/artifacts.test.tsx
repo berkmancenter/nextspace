@@ -2,6 +2,10 @@ jest.mock('../../utils', () => ({
   generateConceptGraph: jest.fn(),
 }));
 
+jest.mock('../../utils/analytics', () => ({
+  trackEvent: jest.fn(),
+}));
+
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
@@ -10,6 +14,7 @@ import {
   seriesConceptGraphFixture,
 } from '../../content/conceptGraphFixture';
 import { generateConceptGraph } from '../../utils';
+import { trackEvent } from '../../utils/analytics';
 import { GenerateGraphButton } from '../../components/artifacts/GenerateGraphButton';
 import { ArtifactList } from '../../components/artifacts/ArtifactList';
 import { ArtifactPasscodePrompt } from '../../components/artifacts/ArtifactPasscodePrompt';
@@ -84,6 +89,30 @@ describe('ConceptGraphView', () => {
 
     expect(screen.getByRole('button', { name: 'Zoom in' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Fit graph to view' })).toBeInTheDocument();
+  });
+
+  it('tracks the zoom and fit controls as graph usage', () => {
+    render(<ConceptGraphView payload={graph} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(trackEvent).toHaveBeenCalledWith('graph', 'zoom_in', 'button');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }));
+    expect(trackEvent).toHaveBeenCalledWith('graph', 'zoom_out', 'button');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fit graph to view' }));
+    expect(trackEvent).toHaveBeenCalledWith('graph', 'fit', 'button');
+  });
+
+  it('tracks a scroll-wheel gesture as a zoom, once per gesture rather than per tick', async () => {
+    render(<ConceptGraphView payload={graph} />);
+
+    // d3-zoom batches a scroll run's many wheel ticks behind one start/end pair and only
+    // fires 'end' after a short pause with no further wheel events (its own wheelDelay) —
+    // this is what actually proves the tracking is gesture-scoped rather than per-event.
+    fireEvent.wheel(screen.getByRole('img'), { deltaY: -100, clientX: 100, clientY: 100 });
+    await waitFor(() => expect(trackEvent).toHaveBeenCalledWith('graph', 'zoom', 'scroll'));
+    expect((trackEvent as jest.Mock).mock.calls.filter(([, action]) => action === 'zoom')).toHaveLength(1);
   });
 });
 
