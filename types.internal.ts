@@ -278,14 +278,12 @@ export type ArtifactType = NonNullable<Schemas['Artifact']['type']>;
  * must never be rendered to a passcode holder; gate anything built on them to organizers.
  */
 export type GraphNodeProvenance = Schemas['GraphNodeProvenance'];
-/* `gloss` and `foldedFrom` are ahead of the generated spec: the backend added them for concept
-   folding (a low-connection concept consolidated into a related one once a series graph grows
-   past its size cap) before this ran against a deployed spec that has caught up. Narrowed here
-   the same way ArtifactVersion below narrows what the spec leaves optional, rather than by
+/* `foldedFrom` is ahead of the generated spec: the backend added it for concept folding (a
+   low-connection concept consolidated into a related one once a series graph grows past its
+   size cap) before this ran against a deployed spec that has caught up. Narrowed here the
+   same way ArtifactVersion below narrows what the spec leaves optional, rather than by
    hand-editing the generated file, which the next `openapi-types:generate` would overwrite. */
 export type GraphConcept = Schemas['GraphConcept'] & {
-  /* One plain sentence saying what this concept means in this discussion. */
-  gloss?: string;
   /* Labels of concepts folded into this one because the series graph outgrew its size cap —
      distinct from an ordinary cross-session merge, which leaves no trace since the two labels
      really were the same idea. A folded concept was a genuinely distinct idea, consolidated
@@ -296,7 +294,7 @@ export type GraphContribution = Schemas['GraphContribution'];
 export type GraphOriginPrompt = Schemas['GraphOriginPrompt'];
 
 /* The backend defaults every array to [], so a payload never lacks one. `concepts` is
-   narrowed to the extended GraphConcept above (gloss/foldedFrom), same reason as there. */
+   narrowed to the extended GraphConcept above (foldedFrom), same reason as there. */
 export type ConceptGraphPayload = Omit<Required<Schemas['ConceptGraphPayload']>, 'concepts'> & {
   concepts: GraphConcept[];
 };
@@ -361,8 +359,8 @@ export type ConceptGraphGenerationResult = { generated: boolean; artifact?: Arti
   GenerateResponseBody,
   'generated' | 'artifact' | 'report'
 > & {
-    /* foldedConcepts and droppedGlosses are ahead of the generated spec — concept folding is
-       new backend work; see GraphConcept's own gloss/foldedFrom note above for why this is
-       narrowed here rather than by hand-editing the generated file. */
-    report?: GenerateResponseBody['report'] & { foldedConcepts?: number; droppedGlosses?: number };
+    /* foldedConcepts is ahead of the generated spec — concept folding is new backend work;
+       see GraphConcept's own foldedFrom note above for why this is narrowed here rather than
+       by hand-editing the generated file. */
+    report?: GenerateResponseBody['report'] & { foldedConcepts?: number };
   };
