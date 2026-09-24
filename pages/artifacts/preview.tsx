@@ -55,7 +55,7 @@ export default function ArtifactPreviewPage() {
 
         <Section
           title="A series graph"
-          note="One topic's sessions folded into a single graph. Concepts are coloured by the session that raised them, numbered by first appearance — a session is not a person, and it is the one piece of provenance safe to show a reader. Trust, raised in the first session and returned to in the second and third, is one node rather than three."
+          note="One topic's sessions folded into a single graph. Concepts are coloured by the session that raised them, numbered by first appearance — a session is not a person, and it is the one piece of provenance safe to show a reader. Trust, raised in the first session and returned to in the second and third, is one node rather than three. It also stands in for a series long enough to outgrow its size cap: click it to see 'Also encompasses: Reliability', a concept folded into it rather than dropped."
         >
           <ConceptGraphView payload={seriesConceptGraphFixture} height={420} />
         </Section>

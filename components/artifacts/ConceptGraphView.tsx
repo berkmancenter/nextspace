@@ -21,6 +21,7 @@ import {
   type LabelPosition,
 } from '../../utils/conceptGraph';
 import { ConceptGraphPayload } from '../../types.internal';
+import { trackEvent } from '../../utils/analytics';
 
 /**
  * Props for ConceptGraphView.
@@ -150,6 +151,11 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
   /* Set once the reader zooms or pans deliberately, after which the view is theirs and
      auto-fit stops touching it. */
   const hasUserZoomedRef = useRef(false);
+  /* The scale a wheel/drag gesture started at, captured on d3-zoom's 'start' so 'end' can
+     tell a scale change (zoom) from a pure translation (pan) — d3-zoom fires the same
+     start/zoom/end lifecycle for both, and only the delta between the two says which one a
+     reader actually did. Cleared once the gesture's 'end' fires. */
+  const gestureStartRef = useRef<{ k: number; sourceType: string } | null>(null);
   /* Mirrors `selectedId` for the simulation's tick/end handlers below, which close over this
      once when the simulation is built rather than re-reading React state every frame — while
      a node is focused, the settling layout's own periodic re-fit must not yank the camera
@@ -434,10 +440,25 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         [0, 0],
         [width, height],
       ])
+      .on('start', (event) => {
+        // Only a gesture carries a sourceEvent; fitToView's own transform does not, and isn't
+        // usage worth counting.
+        if (event.sourceEvent) gestureStartRef.current = { k: event.transform.k, sourceType: event.sourceEvent.type };
+      })
       .on('zoom', (event) => {
         // Only a gesture carries a sourceEvent; fitToView's own transform does not.
         if (event.sourceEvent) hasUserZoomedRef.current = true;
         setTransform({ x: event.transform.x, y: event.transform.y, k: event.transform.k });
+      })
+      .on('end', (event) => {
+        // One event per whole gesture rather than per animation frame: d3-zoom already
+        // batches a drag's or a scroll run's many intermediate 'zoom' calls behind a single
+        // 'start'/'end' pair, which is what keeps this from flooding Matomo.
+        const start = gestureStartRef.current;
+        gestureStartRef.current = null;
+        if (!start || !event.sourceEvent) return;
+        const wasZoom = Math.abs(event.transform.k - start.k) > 1e-3;
+        trackEvent('graph', wasZoom ? 'zoom' : 'pan', start.sourceType === 'wheel' ? 'scroll' : 'drag');
       });
 
     zoomRef.current = behavior;
@@ -634,6 +655,7 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
      gestures — which are already continuous — don't need. */
   const zoomBy = (factor: number) => {
     if (!svgRef.current || !zoomRef.current) return;
+    trackEvent('graph', factor > 1 ? 'zoom_in' : 'zoom_out', 'button');
     select(svgRef.current).call(zoomRef.current.scaleBy, factor);
   };
 
@@ -1058,6 +1080,7 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
           </Button>
           <Button
             onClick={() => {
+              trackEvent('graph', 'fit', 'button');
               // A focused node has already claimed the camera; clearing the selection is what
               // hands it back, and the focus effect above animates the actual pan/zoom out.
               // With nothing selected there is no such effect to rely on, so this snaps the
@@ -1510,6 +1533,14 @@ const NodeDetail = memo(function NodeDetail({
       {node.statement && (
         <Typography variant="body2" sx={{ color: MUTED, mt: 0.5 }}>
           {node.statement}
+        </Typography>
+      )}
+      {/* Only a concept ever carries this — a series graph that outgrew its size cap folds a
+          less-connected concept into a related one rather than dropping it, and this is the
+          one place that fold stays visible, on demand, without spending canvas space on it. */}
+      {node.foldedFrom && node.foldedFrom.length > 0 && (
+        <Typography variant="caption" sx={{ display: 'block', color: MUTED, mt: 0.5, fontStyle: 'italic' }}>
+          Also encompasses: {node.foldedFrom.join(', ')}
         </Typography>
       )}
 
