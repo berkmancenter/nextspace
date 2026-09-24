@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Button, Dialog, TextField } from '@mui/material';
+import { Dialog } from '@mui/material';
 import { SaveRealNameResult } from '../../types.internal';
+import { roomFontVariables } from './roomFonts';
+import styles from './communityRoom.module.css';
 
 interface SetRealNameDialogProps {
   open: boolean;
@@ -60,48 +62,69 @@ export function SetRealNameDialog({ open, onSave, onDismiss }: SetRealNameDialog
       aria-describedby="set-real-name-description"
       slotProps={{
         paper: {
-          sx: { borderRadius: '16px', padding: '32px 24px', maxWidth: '440px' },
+          // The portal puts this outside the room, so styles.root has to travel with it.
+          className: `${styles.root} ${styles.nameDialogPaper}`,
+          style: roomFontVariables,
         },
       }}
     >
       <div className="flex flex-col gap-4">
-        <h2 id="set-real-name-title" className="text-2xl font-bold text-gray-900">
+        <h2 id="set-real-name-title" className={styles.nameDialogTitle}>
           Set your name for this room
         </h2>
 
         {confirming ? (
           <>
-            <p id="set-real-name-description" className="text-gray-600 text-base leading-relaxed">
+            <p id="set-real-name-description" className={styles.nameDialogBody}>
               Everyone here will see your messages under this name, and it cannot be changed later.
             </p>
-            <p className="text-lg font-bold text-gray-900">{trimmed}</p>
-            <div className="flex flex-col gap-3">
-              <Button onClick={save} disabled={saving}>
+            <p className={styles.nameDialogName}>{trimmed}</p>
+            <div className={styles.nameDialogActions}>
+              <button type="button" className={styles.nameDialogPrimary} onClick={save} disabled={saving}>
                 Yes, use this name
-              </Button>
-              <Button onClick={() => setConfirming(false)} disabled={saving}>
+              </button>
+              <button
+                type="button"
+                className={styles.nameDialogSecondary}
+                onClick={() => setConfirming(false)}
+                disabled={saving}
+              >
                 Back
-              </Button>
+              </button>
             </div>
           </>
         ) : (
           <>
-            <p id="set-real-name-description" className="text-gray-600 text-base leading-relaxed">
+            <p id="set-real-name-description" className={styles.nameDialogBody}>
               This room shows real names rather than pseudonyms, so it needs one for you before you can post. You can keep
               reading without setting one.
             </p>
-            <TextField
-              label="Your name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              error={!!problem}
-              helperText={problem ?? ' '}
-              autoFocus
-              fullWidth
-            />
-            <div className="flex flex-col gap-3">
-              <Button onClick={review}>Set my name</Button>
-              <Button onClick={onDismiss}>I&apos;m just reading</Button>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="set-real-name-field" className={styles.nameDialogLabel}>
+                Your name
+              </label>
+              <input
+                id="set-real-name-field"
+                className={styles.nameDialogInput}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                aria-describedby={problem ? 'set-real-name-problem' : undefined}
+                aria-invalid={!!problem}
+                autoFocus
+              />
+              {problem && (
+                <p id="set-real-name-problem" role="alert" className={styles.nameDialogError}>
+                  {problem}
+                </p>
+              )}
+            </div>
+            <div className={styles.nameDialogActions}>
+              <button type="button" className={styles.nameDialogPrimary} onClick={review}>
+                Set my name
+              </button>
+              <button type="button" className={styles.nameDialogSecondary} onClick={onDismiss}>
+                I&apos;m just reading
+              </button>
             </div>
           </>
         )}
