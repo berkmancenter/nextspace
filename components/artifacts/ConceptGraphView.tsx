@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Button, ButtonGroup, Typography } from '@mui/material';
 import { max } from 'd3-array';
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation } from 'd3-force';
@@ -1167,7 +1167,7 @@ function ConnectionLink({ target, onSelect }: { target: GraphSimNode; onSelect: 
  * purpose: these graphs come out of events held under the Chatham House Rule, and anyone
  * reaching this page holds only the artifact passcode. See {@link GraphNodeProvenance}.
  */
-function NodeDetail({
+const NodeDetail = memo(function NodeDetail({
   node,
   degree,
   session,
@@ -1314,7 +1314,7 @@ function NodeDetail({
       )}
     </Box>
   );
-}
+});
 
 /** One entry in the shape legend above the canvas. */
 function LegendChip({ color, shape, label }: { color: string; shape: 'circle' | 'diamond' | 'pill'; label: string }) {
