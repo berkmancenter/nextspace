@@ -1,7 +1,6 @@
-import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from 'next/font/google';
 import { Box, CircularProgress, Drawer, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -14,21 +13,12 @@ import { CommunityNavigationBar, CommunityNavTab } from '../../components/room/C
 import { CommunityGroupChatPanel } from '../../components/room/CommunityGroupChatPanel';
 import { CommunityAssistantPanel } from '../../components/room/CommunityAssistantPanel';
 import { SetRealNameDialog } from '../../components/room/SetRealNameDialog';
+import { roomFontVariables } from '../../components/room/roomFonts';
 import { BotIcon } from '../../components/BotIcon';
 import { RoomMarkIcon } from '../../components/room/RoomMarkIcon';
 import { getRoomInitials } from '../../utils/roomAvatarUtils';
 import { markRoomRead } from '../../utils/roomReadState';
 import styles from '../../components/room/communityRoom.module.css';
-
-const displayFont = Space_Grotesk({ subsets: ['latin'], weight: ['600', '700'] });
-const bodyFont = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500', '600'] });
-const monoFont = IBM_Plex_Mono({ subsets: ['latin'], weight: ['400', '500', '600'] });
-
-const roomFontVariables = {
-  '--room-font-display': displayFont.style.fontFamily,
-  '--room-font-body': bodyFont.style.fontFamily,
-  '--room-font-mono': monoFont.style.fontFamily,
-} as CSSProperties;
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
