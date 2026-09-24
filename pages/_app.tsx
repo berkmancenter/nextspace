@@ -21,6 +21,7 @@ const SESSION_BLOCKLIST = [
   '/login', // Login page
   '/signup', // Signup page
   '/logout',
+  '/reset-password',
 ];
 
 /**

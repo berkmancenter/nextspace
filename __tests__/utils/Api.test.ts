@@ -1,4 +1,4 @@
-import { fetchWithTokenRefresh, RefreshToken, RetrieveData, Request } from '../../utils/Api';
+import { fetchWithTokenRefresh, RefreshToken, ResetPassword, RetrieveData, Request } from '../../utils/Api';
 import { Api } from '../../utils/Helpers';
 
 // ─── Mock TokenManager ──────────────────────────────────────────────────────
@@ -447,5 +447,79 @@ describe('Token Refresh Functionality', () => {
 
       expect(result).toEqual(mockData);
     });
+  });
+});
+
+describe('ResetPassword', () => {
+  beforeEach(() => {
+    (global.fetch as jest.Mock).mockReset();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('posts the token and new password to the reset endpoint', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true, status: 204 });
+
+    await ResetPassword('reset-token', 'newpass123');
+
+    expect(global.fetch).toHaveBeenCalledWith(`${process.env.NEXT_PUBLIC_API_URL}/auth/resetPassword`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'reset-token', password: 'newpass123' }),
+    });
+  });
+
+  it('reports success when the backend accepts the reset', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true, status: 204 });
+
+    expect(await ResetPassword('reset-token', 'newpass123')).toEqual({ status: 'success' });
+  });
+
+  it('reports an invalid token when the backend answers 401', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({ code: 401, message: 'Password reset failed' }),
+    });
+
+    expect(await ResetPassword('used-token', 'newpass123')).toEqual({ status: 'invalid-token' });
+  });
+
+  it("passes along the backend's message when it rejects the password", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ code: 400, message: 'Password must contain at least 1 letter and 1 number.' }),
+    });
+
+    expect(await ResetPassword('reset-token', 'password')).toEqual({
+      status: 'rejected',
+      message: 'Password must contain at least 1 letter and 1 number.',
+    });
+  });
+
+  it('reports a generic error for any other failure', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) });
+
+    expect(await ResetPassword('reset-token', 'newpass123')).toEqual({ status: 'error' });
+  });
+
+  it('reports a generic error when the request never reaches the backend', async () => {
+    (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    expect(await ResetPassword('reset-token', 'newpass123')).toEqual({ status: 'error' });
+  });
+
+  it('never logs the token or the password', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) });
+
+    await ResetPassword('reset-token', 'newpass123');
+
+    const logged = JSON.stringify((console.error as jest.Mock).mock.calls);
+    expect(logged).not.toContain('reset-token');
+    expect(logged).not.toContain('newpass123');
   });
 });
