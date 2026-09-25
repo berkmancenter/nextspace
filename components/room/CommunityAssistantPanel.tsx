@@ -14,7 +14,10 @@ import styles from './communityRoom.module.css';
 interface CommunityAssistantPanelProps {
   messages: PseudonymousMessage[];
   realName: string;
-  /** Labels the reader's queued messages, which the server has not answered for yet. */
+  /**
+   * Whether the reader holds the admin role. Needed alongside the messages themselves because a
+   * queued message has not reached the server, so it carries no ownerIsAdmin of its own.
+   */
   isAdmin?: boolean;
   botName: string;
   /** Messages typed here that the server has not accepted yet. */
