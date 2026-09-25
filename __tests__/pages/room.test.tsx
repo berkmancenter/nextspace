@@ -512,16 +512,16 @@ describe('RoomPage', () => {
         await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
       });
 
-      /* Only a refusal the prompt can fix may reopen it. A network or moderation failure would
-         otherwise trap a reading admin behind a dialog that cannot address the problem. */
-      it('stays shut when a dismissed admin is refused for an unrelated reason', async () => {
+      /* Only a refusal the prompt can fix may reopen it. A moderation refusal answers 422, and
+         reopening on it would trap a reading admin behind a dialog that cannot help. */
+      it('stays shut when a dismissed admin is refused by moderation', async () => {
         const user = userEvent.setup();
         renderWithAccount(adminAccount(['some-other-room']));
 
         await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
         await user.click(screen.getByText('Just reading'));
 
-        mockSendData.mockResolvedValue({ error: true, status: 400, message: 'That message is too long.' });
+        mockSendData.mockResolvedValue({ error: true, status: 422, message: 'Rephrase that before posting.' });
         await user.click(screen.getByText('Send group message'));
 
         await waitFor(() => expect(mockSendData).toHaveBeenCalled());

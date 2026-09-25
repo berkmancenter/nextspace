@@ -37,12 +37,15 @@ function describeRefusal(response: { status?: number; message?: unknown }): stri
 }
 
 /**
- * Whether the server refused this send only because it has no real name for the poster, which
- * is the one refusal the naming prompt can fix. Matched on the server's wording because the
- * API answers with prose and no error code; a code on the backend would be the sturdier fix.
+ * Whether the refusal is the one the naming prompt can fix. The caller has already established
+ * that the poster is an admin with no name for this room, and the server resolves that name
+ * before anything else it could reject a message for: a rejected message answers 422 and an
+ * unregistered member 403, so a 400 to this poster is the missing name. Deliberately not
+ * matched against the server's wording, which would leave an admin with no way back to the
+ * prompt the day someone rewrites that sentence.
  */
-function isMissingRealNameRefusal(response: { status?: number; message?: unknown }): boolean {
-  return response.status === 400 && typeof response.message === 'string' && /set your real name/i.test(response.message);
+function isMissingRealNameRefusal(response: { status?: number }): boolean {
+  return response.status === 400;
 }
 
 export default function RoomPage({ authType }: { authType: AuthType }) {
