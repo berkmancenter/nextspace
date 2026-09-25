@@ -1,4 +1,5 @@
 import { components, operations } from './types';
+import type { ReactNode } from 'react';
 
 /**
  * Authentication type for user sessions
@@ -364,3 +365,48 @@ export type ConceptGraphGenerationResult = { generated: boolean; artifact?: Arti
        by hand-editing the generated file. */
     report?: GenerateResponseBody['report'] & { foldedConcepts?: number };
   };
+
+/**
+ * One rule a new password must meet, shown to the person before they type.
+ * @property {string} id - Stable key for the rule.
+ * @property {string} label - Text shown in the rule list.
+ * @property {(password: string) => boolean} isMet - Whether the password satisfies the rule.
+ */
+export interface PasswordRule {
+  id: string;
+  label: string;
+  isMet: (password: string) => boolean;
+}
+
+/**
+ * A one-time token read from the page's query string.
+ * `loading` means the router has not parsed the query string yet.
+ */
+export type QueryTokenState = { status: 'loading' } | { status: 'missing' } | { status: 'present'; token: string };
+
+/**
+ * Outcome of submitting a new password with a reset token.
+ * `invalid-token` covers a token that is expired, already used, or never existed.
+ * `rejected` carries the backend's reason, such as a password that breaks a rule.
+ */
+export type ResetPasswordResult =
+  | { status: 'success' }
+  | { status: 'invalid-token' }
+  | { status: 'rejected'; message: string }
+  | { status: 'error' };
+
+/**
+ * Props for the PasswordForm component
+ * @property {string} heading - Page heading shown above the form.
+ * @property {ReactNode} [intro] - Optional text under the heading.
+ * @property {string} submitLabel - Text on the submit button.
+ * @property {(password: string) => Promise<string | void>} onSubmit - Called with a password that meets the rules.
+ *   Resolve with a message to show it as an error on the field and re-enable the form. Resolve with nothing when the
+ *   caller has handled the result itself (for example by navigating away); the submit button then stays disabled.
+ */
+export interface PasswordFormProps {
+  heading: string;
+  intro?: ReactNode;
+  submitLabel: string;
+  onSubmit: (password: string) => Promise<string | void>;
+}

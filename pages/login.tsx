@@ -151,6 +151,11 @@ export default function LoginPage() {
         <Typography variant="h5" component="h2" gutterBottom sx={{ textAlign: 'center' }}>
           Log into NextSpace
         </Typography>
+        {searchParams.get('passwordReset') === '1' && (
+          <Alert severity="success" role="status" sx={{ mb: 2 }}>
+            Your password has been reset. Log in with your new password.
+          </Alert>
+        )}
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
           Don&apos;t have an account?&nbsp;
           <Link href="/signup" className="text-blue-600 hover:underline">

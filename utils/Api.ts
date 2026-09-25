@@ -5,6 +5,7 @@
 
 import { Api } from './Helpers';
 import TokenManagerDefault from './TokenManager';
+import { ResetPasswordResult } from '../types.internal';
 
 /**
  * Wrapper for fetch that automatically handles token refresh on 401 responses.
@@ -95,6 +96,35 @@ export const Authenticate = async (username: string, password: string) => {
   const data = await response.json();
   console.log('Response:', data);
   return data;
+};
+
+/**
+ * Set a new password using the one-time token from a password reset email.
+ * @param token - The token from the reset link's query string.
+ * @param password - The new password.
+ * @returns The outcome; never throws.
+ */
+export const ResetPassword = async (token: string, password: string): Promise<ResetPasswordResult> => {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/resetPassword`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password }),
+    });
+
+    if (response.ok) return { status: 'success' };
+    if (response.status === 401) return { status: 'invalid-token' };
+    if (response.status === 400) {
+      const errorData = await response.json();
+      return { status: 'rejected', message: errorData.message };
+    }
+
+    console.error(`Password reset failed with status ${response.status}`);
+    return { status: 'error' };
+  } catch (error) {
+    console.error('Password reset request failed:', error instanceof Error ? error.message : error);
+    return { status: 'error' };
+  }
 };
 
 /**
