@@ -88,19 +88,14 @@ describe('reading a container', () => {
 });
 
 describe('a series versus one event', () => {
-  it('offers a refresh on a topic, which has no socket room to hear from', async () => {
-    const reload = jest.fn();
-    mockUseArtifacts.mockReturnValue(state({ reload }));
-    render(<ArtifactsBrowser {...props} container={{ topicId: 'topic-1' }} />);
+  // A topic gets its own socket room now (see hooks/useArtifacts.ts's topic-room join
+  // effect), the same as a conversation, so neither container offers a manual refresh
+  // button — useArtifacts is what decides whether a socket is passed at all.
+  it('offers no manual refresh, on a topic or a conversation alike', () => {
+    const { rerender } = render(<ArtifactsBrowser {...props} container={{ topicId: 'topic-1' }} />);
+    expect(screen.queryByRole('button', { name: /refresh/i })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: /refresh/i }));
-
-    expect(reload).toHaveBeenCalled();
-  });
-
-  it('offers no refresh on a conversation, whose revisions arrive on their own', () => {
-    render(<ArtifactsBrowser {...props} container={{ conversationId: 'conv-1' }} />);
-
+    rerender(<ArtifactsBrowser {...props} container={{ conversationId: 'conv-1' }} />);
     expect(screen.queryByRole('button', { name: /refresh/i })).not.toBeInTheDocument();
   });
 });

@@ -309,7 +309,14 @@ export type ArtifactPayload = Schemas['ArtifactVersion']['payload'];
 export type ArtifactVersion = Schemas['ArtifactVersion'] & { id: string };
 
 /* Read routes return topic and conversation as ids, populate currentVersion, and always
-   carry id, type and currentVersionNumber. */
+   carry id, type and currentVersionNumber.
+   generationStatus/generationError track a background generation run (see
+   POST /v1/artifacts/generate below). They are hand-added here because types.ts (generated
+   via `npm run openapi-types:generate:local` against a running backend) is stale relative
+   to the backend's already-updated OpenAPI spec — this patch mirrors what a real regen
+   would produce. Regenerate types.ts for real next time a local backend is available, so
+   the two don't drift further. An artifact with generationStatus unset predates the field
+   and should be treated the same as 'ready'. */
 export type Artifact = Omit<
   Schemas['Artifact'],
   'id' | 'type' | 'topic' | 'conversation' | 'currentVersion' | 'currentVersionNumber'
@@ -320,6 +327,8 @@ export type Artifact = Omit<
   conversation?: string;
   currentVersion?: ArtifactVersion;
   currentVersionNumber: number;
+  generationStatus?: 'ready' | 'pending' | 'failed';
+  generationError?: string;
 };
 
 /* The paginate plugin fills every field, whatever the spec marks optional. */
@@ -342,25 +351,33 @@ export interface ArtifactVersionEvent {
 }
 
 /**
+ * The `artifact:generationFailed` socket event, sent to the conversation room when a
+ * background generation run errors, or finds nothing worth writing (too little of the
+ * record to map, or nothing survives the Chatham House checks). Carries no container fields
+ * — unlike ArtifactVersionEvent, a client filters by looking `artifactId` up among the
+ * artifacts it already knows about, refetching on a match.
+ */
+export interface ArtifactGenerationFailedEvent {
+  artifactId: string;
+  reason: string;
+}
+
+/**
  * Which container's artifacts to read. Exactly one of the two is set — the API rejects
  * both and neither.
  */
 export type ArtifactContainer = { conversationId: string; topicId?: never } | { topicId: string; conversationId?: never };
 
 /**
- * What POST /v1/artifacts/generate answers with. A run that finds too little to map, or whose
- * output does not survive the Chatham House checks, is a success with nothing to show: it
- * answers `generated: false` with a reason rather than an error.
+ * What POST /v1/artifacts/generate answers with. Generation runs in a background job, not
+ * inline in this request: this only confirms the run was claimed (or was already in
+ * flight) and enqueued. `artifact.generationStatus` is 'pending' on a fresh claim. The
+ * actual outcome — a new version, or a failure/skip — shows up later, via
+ * GET /v1/artifacts/:artifactId or the artifact:version / artifact:generationFailed socket
+ * events.
  */
-type GenerateResponses = operations['generateConceptGraph']['responses'];
-type GenerateResponseBody = GenerateResponses[200]['content']['application/json'] &
-  GenerateResponses[202]['content']['application/json'];
-export type ConceptGraphGenerationResult = { generated: boolean; artifact?: Artifact } & Omit<
-  GenerateResponseBody,
-  'generated' | 'artifact' | 'report'
-> & {
-    /* foldedConcepts is ahead of the generated spec — concept folding is new backend work;
-       see GraphConcept's own foldedFrom note above for why this is narrowed here rather than
-       by hand-editing the generated file. */
-    report?: GenerateResponseBody['report'] & { foldedConcepts?: number };
-  };
+export type ConceptGraphGenerationResult = {
+  generated: true;
+  artifact: Artifact;
+  status: 'ready' | 'pending' | 'failed';
+};

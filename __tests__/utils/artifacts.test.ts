@@ -129,7 +129,11 @@ describe('fetchArtifactPasscode', () => {
 
 describe('generateConceptGraph', () => {
   it('asks for a series graph when given a topic', async () => {
-    mockSendData.mockResolvedValue({ generated: true, version: { versionNumber: 1 } });
+    mockSendData.mockResolvedValue({
+      generated: true,
+      artifact: { id: 'a1', generationStatus: 'pending' },
+      status: 'pending',
+    });
 
     await generateConceptGraph({ topicId: 'topic-1' });
 
@@ -138,19 +142,28 @@ describe('generateConceptGraph', () => {
   });
 
   it('posts the conversation to the generate endpoint', async () => {
-    mockSendData.mockResolvedValue({ generated: true, version: { versionNumber: 4 } });
+    mockSendData.mockResolvedValue({
+      generated: true,
+      artifact: { id: 'a1', generationStatus: 'pending' },
+      status: 'pending',
+    });
 
     await generateConceptGraph({ conversationId: 'conv-1' });
 
     expect(mockSendData).toHaveBeenCalledWith('artifacts/generate', { conversationId: 'conv-1' }, 'test-token');
   });
 
-  it('passes a run that mapped nothing back as a result rather than an error', async () => {
-    mockSendData.mockResolvedValue({ generated: false, reason: 'Not enough of the event record to map' });
+  it('resolves with the claimed, still-pending artifact — the real result arrives later, via poll or socket', async () => {
+    mockSendData.mockResolvedValue({
+      generated: true,
+      artifact: { id: 'a1', generationStatus: 'pending' },
+      status: 'pending',
+    });
 
     await expect(generateConceptGraph({ conversationId: 'conv-1' })).resolves.toEqual({
-      generated: false,
-      reason: 'Not enough of the event record to map',
+      generated: true,
+      artifact: { id: 'a1', generationStatus: 'pending' },
+      status: 'pending',
     });
   });
 

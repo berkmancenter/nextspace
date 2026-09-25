@@ -1,33 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, CircularProgress } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { generateConceptGraph } from '../../utils';
-import { ArtifactContainer, ConceptGraphGenerationResult } from '../../types.internal';
+import { Artifact, ArtifactContainer, ConceptGraphGenerationResult } from '../../types.internal';
 
 /**
  * Props for GenerateGraphButton.
  * @property container - The finished conversation to map, or the topic whose series to fold into one graph.
- * @property hasExistingGraph - Whether a graph already exists here, which changes what the action is called.
- * @property onGenerated - Called with the result of a run that wrote something, so the caller can pick the artifact up.
+ * @property artifact - The container's current concept-graph artifact, if one exists yet. Its
+ *   `generationStatus` is the live, socket-updated source of truth for whether a run is in
+ *   flight — this component does not track that on its own.
+ * @property onGenerated - Called once the claim is made, so the caller can pick the (now pending) artifact up.
  */
 interface GenerateGraphButtonProps {
   container: ArtifactContainer;
-  hasExistingGraph?: boolean;
+  artifact?: Artifact;
   onGenerated: (result: ConceptGraphGenerationResult) => void;
 }
 
-/** Reads the removal counts back as a sentence, or returns null when nothing was removed. */
-function describeReport(report: ConceptGraphGenerationResult['report']): string | null {
-  if (!report) return null;
-  const parts = [
-    report.mergedConcepts ? `${report.mergedConcepts} concept(s) merged` : null,
-    report.droppedConcepts ? `${report.droppedConcepts} concept(s) dropped` : null,
-    report.droppedContributions ? `${report.droppedContributions} contribution(s) dropped` : null,
-    report.droppedStatements ? `${report.droppedStatements} statement(s) removed` : null,
-    report.droppedOriginPrompts ? `${report.droppedOriginPrompts} prompt(s) dropped` : null,
-    report.foldedConcepts ? `${report.foldedConcepts} concept(s) folded into related ones to stay readable` : null,
-  ].filter(Boolean);
-  return parts.length > 0 ? parts.join(', ') : null;
+type GraphStatus = 'idle' | 'pending' | 'ready' | 'failed';
+
+/** An artifact predating generationStatus is treated as 'ready' — it only ever existed once a version did. */
+function statusOf(artifact: Artifact | undefined): GraphStatus {
+  if (!artifact) return 'idle';
+  return artifact.generationStatus ?? 'ready';
 }
 
 /**
@@ -39,28 +35,57 @@ function describeReport(report: ConceptGraphGenerationResult['report']): string 
  * it appends a version rather than overwriting, so both attempts stay readable, which is why
  * the button stays available once a graph exists. On a topic it is also how a series that
  * predates the feature gets backfilled.
+ *
+ * Generation runs in a background job: POST /v1/artifacts/generate only claims the artifact
+ * and enqueues the run, so this component's job is to reflect the `artifact` prop's real
+ * `generationStatus` (kept live by the parent via useArtifacts' socket listeners), not the
+ * POST call's own duration. A completion alert is only shown for a run *this instance*
+ * observed go pending → ready/failed, so an admin who merely opens the page to an
+ * already-finished graph doesn't see a stale "just wrote a version" banner.
  */
-export const GenerateGraphButton = ({ container, hasExistingGraph, onGenerated }: GenerateGraphButtonProps) => {
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<ConceptGraphGenerationResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export const GenerateGraphButton = ({ container, artifact, onGenerated }: GenerateGraphButtonProps) => {
+  const [submitting, setSubmitting] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [completion, setCompletion] = useState<{ type: 'success' | 'failure'; message: string } | null>(null);
+
+  const status = statusOf(artifact);
+  const awaitingResultRef = useRef(false);
+  const previousStatusRef = useRef<GraphStatus>(status);
+
+  useEffect(() => {
+    const previous = previousStatusRef.current;
+    previousStatusRef.current = status;
+    if (!awaitingResultRef.current || previous !== 'pending') return;
+
+    if (status === 'ready') {
+      awaitingResultRef.current = false;
+      setCompletion({ type: 'success', message: `Wrote version ${artifact?.currentVersionNumber ?? ''}` });
+    } else if (status === 'failed') {
+      awaitingResultRef.current = false;
+      setCompletion({
+        type: 'failure',
+        message: `Generation didn't produce a new version. ${artifact?.generationError ?? 'There was too little of the event record to map.'}`,
+      });
+    }
+  }, [status, artifact]);
 
   const run = async () => {
-    setRunning(true);
-    setResult(null);
-    setError(null);
+    setSubmitting(true);
+    setRequestError(null);
+    setCompletion(null);
+    awaitingResultRef.current = true;
     try {
       const generation = await generateConceptGraph(container);
-      setResult(generation);
-      if (generation.generated) onGenerated(generation);
+      onGenerated(generation);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not generate a concept graph.');
+      awaitingResultRef.current = false;
+      setRequestError(err instanceof Error ? err.message : 'Could not generate a concept graph.');
     } finally {
-      setRunning(false);
+      setSubmitting(false);
     }
   };
 
-  const removed = result?.generated ? describeReport(result.report) : null;
+  const busy = submitting || status === 'pending';
 
   return (
     <Box sx={{ mt: 2 }}>
@@ -68,38 +93,35 @@ export const GenerateGraphButton = ({ container, hasExistingGraph, onGenerated }
         size="small"
         variant="outlined"
         onClick={run}
-        disabled={running}
-        startIcon={running ? <CircularProgress size={14} /> : <AutoAwesomeIcon />}
+        disabled={busy}
+        startIcon={busy ? <CircularProgress size={14} /> : <AutoAwesomeIcon />}
       >
-        {running
+        {busy
           ? container.topicId
             ? 'Reading the series…'
             : 'Reading the event…'
-          : hasExistingGraph
-            ? 'Regenerate concept graph'
-            : container.topicId
+          : status === 'idle'
+            ? container.topicId
               ? 'Generate series graph'
-              : 'Generate concept graph'}
+              : 'Generate concept graph'
+            : 'Regenerate concept graph'}
       </Button>
 
-      {error && (
+      {requestError && (
         <Alert severity="error" sx={{ mt: 1 }}>
-          {error}
+          {requestError}
         </Alert>
       )}
 
-      {/* A run that mapped nothing is a result, not a failure — the event record can simply
-          be too thin, or nothing in it can survive the Chatham House checks. */}
-      {result && !result.generated && (
-        <Alert severity="info" sx={{ mt: 1 }}>
-          Nothing was written. {result.reason ?? 'There was too little of the event record to map.'}
-        </Alert>
-      )}
-
-      {result?.generated && (
+      {completion?.type === 'success' && (
         <Alert severity="success" sx={{ mt: 1 }}>
-          Wrote version {result.version?.versionNumber}
-          {removed ? ` · ${removed}` : ''}
+          {completion.message}
+        </Alert>
+      )}
+
+      {completion?.type === 'failure' && (
+        <Alert severity="info" sx={{ mt: 1 }}>
+          {completion.message}
         </Alert>
       )}
     </Box>

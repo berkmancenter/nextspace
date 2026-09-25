@@ -21,7 +21,8 @@ export const getServerSideProps = async (context: { req: any }) => {
  * is refused. Which artifact is open is in the URL too, so a link can point at one artifact
  * rather than at the set.
  *
- * A series is at `/artifacts/topic/[topicId]`, which is this page without the socket.
+ * A series is at `/artifacts/topic/[topicId]`, the same page shape joined to the topic's own
+ * room instead of a conversation's.
  */
 export default function ConversationArtifactsPage({ authType }: { authType: AuthType }) {
   const router = useRouter();
