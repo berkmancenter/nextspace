@@ -80,7 +80,9 @@ export function SetRealNameDialog({ open, onSave, onDismiss }: SetRealNameDialog
             </p>
             <p className={styles.nameDialogName}>{trimmed}</p>
             <div className={styles.nameDialogActions}>
-              <button type="button" className={styles.nameDialogPrimary} onClick={save} disabled={saving}>
+              {/* Focus would otherwise land here only because MUI's focus trap recovers it after
+                  the button that was clicked unmounts, which depends on this staying first. */}
+              <button type="button" className={styles.nameDialogPrimary} onClick={save} disabled={saving} autoFocus>
                 Yes, use this name
               </button>
               <button
