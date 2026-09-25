@@ -63,6 +63,10 @@ export const ArtifactView = ({ artifact, artifactPasscode, isLive }: ArtifactVie
         </Typography>
         <Chip size="small" variant="outlined" label={TYPE_LABEL[artifact.type] ?? artifact.type} />
         {artifact.locked && <Chip size="small" variant="outlined" label="locked" />}
+        {artifact.generationStatus === 'pending' && (
+          <Chip size="small" color="primary" variant="outlined" label="generating…" />
+        )}
+        {artifact.generationStatus === 'failed' && <Chip size="small" color="error" variant="outlined" label="failed" />}
         {isLive && !isHistorical && <Chip size="small" color="primary" variant="outlined" label="updated just now" />}
       </Box>
 
@@ -103,7 +107,13 @@ export const ArtifactView = ({ artifact, artifactPasscode, isLive }: ArtifactVie
       )}
 
       {!version ? (
-        <Alert severity="warning">This artifact has no readable version yet.</Alert>
+        artifact.generationStatus === 'pending' ? (
+          <Alert severity="info">Generating…</Alert>
+        ) : artifact.generationStatus === 'failed' ? (
+          <Alert severity="warning">{artifact.generationError ?? 'Generation failed to produce a version.'}</Alert>
+        ) : (
+          <Alert severity="warning">This artifact has no readable version yet.</Alert>
+        )
       ) : artifact.type === 'ConceptGraphArtifact' ? (
         <ConceptGraphView payload={version.payload as ConceptGraphPayload} />
       ) : artifact.type === 'DocumentArtifact' ? (

@@ -1,5 +1,4 @@
-import { Alert, Box, Button, CircularProgress, Divider, Typography } from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
+import { Alert, Box, CircularProgress, Divider, Typography } from '@mui/material';
 import type { Socket } from 'socket.io-client';
 import { ArtifactList } from './ArtifactList';
 import { ArtifactPasscodePrompt } from './ArtifactPasscodePrompt';
@@ -14,7 +13,7 @@ import { Artifact, ArtifactContainer, AuthType } from '../../types.internal';
  * @property container - Which conversation's or topic's artifacts to read. Null until the route is ready.
  * @property artifactPasscode - The container's read passcode, when the reader is going on one.
  * @property authType - Decides whether the organizer's generate action is offered at all; the endpoint does the enforcing.
- * @property socket - A connected socket for live revisions. A topic has no room to join, so it passes none.
+ * @property socket - A connected socket for live revisions, joined to the container's own room.
  * @property selectedArtifactId - Which artifact to open; falls back to the first.
  * @property onSelectArtifact - Called when the reader opens another artifact.
  * @property onPasscodeSubmit - Called with a passcode typed into the prompt.
@@ -34,13 +33,9 @@ interface ArtifactsBrowserProps {
 /**
  * The artifacts of one container: a rail of what it holds beside whichever one is open.
  *
- * Both routes render this — a conversation's artifacts and a topic's differ in where they are
- * read from and whether anything arrives live, not in how they are read — so the two pages
- * stay a route and a container each rather than two copies of a browser that drift apart.
- *
- * A topic is refreshed by hand because topic-scoped artifacts are not broadcast: there is no
- * topic-wide socket room, so a series graph changes only when an event ends and nothing tells
- * this page about it.
+ * Both routes render this — a conversation's artifacts and a topic's differ only in which
+ * room the socket joins, not in how they are read or updated — so the two pages stay a route
+ * and a container each rather than two copies of a browser that drift apart.
  */
 export const ArtifactsBrowser = ({
   container,
@@ -63,7 +58,7 @@ export const ArtifactsBrowser = ({
   // An admin's topic listing also holds the topic's conversation graphs, which are not the
   // series graph; only a graph scoped like the container counts as already existing here.
   const containerScope = isTopic ? 'topic' : 'conversation';
-  const hasGraphForContainer = artifacts.some(
+  const conceptGraphArtifact = artifacts.find(
     (artifact) => artifact.type === 'ConceptGraphArtifact' && artifact.scope === containerScope,
   );
 
@@ -112,14 +107,6 @@ export const ArtifactsBrowser = ({
             onSelect={onSelectArtifact}
           />
 
-          {/* A conversation's artifacts arrive over the socket; a topic's have no room to
-              arrive in, so refreshing one is the reader's job rather than ours. */}
-          {isTopic && (
-            <Button size="small" startIcon={<RefreshIcon />} onClick={reload} disabled={loading} sx={{ mt: 1 }}>
-              {loading ? 'Refreshing…' : 'Refresh'}
-            </Button>
-          )}
-
           {/* Minting the share link and generating a graph are the organizer's actions
               rather than a reader's: the passcode route and the generate route both refuse
               anyone but an admin, so this only decides whether to offer them. */}
@@ -127,7 +114,7 @@ export const ArtifactsBrowser = ({
           {authType === 'admin' && container && (
             <GenerateGraphButton
               container={container}
-              hasExistingGraph={hasGraphForContainer}
+              artifact={conceptGraphArtifact}
               onGenerated={(result) => {
                 reload();
                 if (result.artifact?.id) onSelectArtifact(result.artifact.id);

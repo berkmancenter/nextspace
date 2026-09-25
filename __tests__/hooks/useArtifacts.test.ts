@@ -313,3 +313,230 @@ describe('live updates', () => {
     expect(socket.off).toHaveBeenCalledWith('artifact:version', expect.any(Function));
   });
 });
+
+describe('topic room', () => {
+  it('joins the topic’s own room once the read succeeds', async () => {
+    const socket = makeSocket();
+    renderHook(() => useArtifacts({ container: { topicId: 't1' }, socket: socket as any }));
+
+    await waitFor(() => expect(mockEmit).toHaveBeenCalled());
+    expect(mockEmit.mock.calls[0][1]).toBe('topic:join');
+    expect(mockEmit.mock.calls[0][2]).toEqual({ topicId: 't1', token: 'test-token' });
+  });
+
+  it('does not join the topic room while the read is refused', async () => {
+    mockListArtifacts.mockRejectedValue(new ArtifactRequestError('Forbidden', 403));
+    const socket = makeSocket();
+    const { result } = renderHook(() => useArtifacts({ container: { topicId: 't1' }, socket: socket as any }));
+
+    await waitFor(() => expect(result.current.needsPasscode).toBe(true));
+    expect(mockEmit).not.toHaveBeenCalled();
+  });
+
+  it('does not rejoin the topic room on a reload of the same container', async () => {
+    const socket = makeSocket();
+    const { result } = renderHook(() => useArtifacts({ container: { topicId: 't1' }, socket: socket as any }));
+    await waitFor(() => expect(mockEmit).toHaveBeenCalledTimes(1));
+
+    act(() => result.current.reload());
+
+    await waitFor(() => expect(mockListArtifacts).toHaveBeenCalledTimes(2));
+    expect(mockEmit).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the topic room it joined when the page moves on', async () => {
+    const socket = makeSocket();
+    const { unmount } = renderHook(() => useArtifacts({ container: { topicId: 't1' }, socket: socket as any }));
+    await waitFor(() => expect(mockEmit).toHaveBeenCalledTimes(1));
+
+    unmount();
+
+    expect(socket.emit).toHaveBeenCalledWith('topic:leave', { topicId: 't1', token: 'test-token' });
+  });
+
+  it('refetches the artifact from the REST route when a topic-scoped version notice is for this topic', async () => {
+    const socket = makeSocket();
+    const { result } = renderHook(() => useArtifacts({ container: { topicId: 't1' }, socket: socket as any }));
+    await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
+
+    act(() => {
+      socket.fire('artifact:version', { artifactId: 'a1', versionNumber: 3, scope: 'topic', topicId: 't1' });
+    });
+
+    await waitFor(() => expect(result.current.artifacts[0].currentVersionNumber).toBe(3));
+    expect(mockFetchArtifact).toHaveBeenCalledWith('a1', undefined);
+    expect(result.current.liveArtifactIds.has('a1')).toBe(true);
+  });
+
+  it('ignores a topic-scoped notice for a different series', async () => {
+    const socket = makeSocket();
+    const { result } = renderHook(() => useArtifacts({ container: { topicId: 't1' }, socket: socket as any }));
+    await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
+
+    act(() => {
+      socket.fire('artifact:version', { artifactId: 'a1', versionNumber: 3, scope: 'topic', topicId: 't-other' });
+    });
+
+    await act(async () => {});
+    expect(mockFetchArtifact).not.toHaveBeenCalled();
+  });
+
+  it('refetches the artifact when a generation-failed notice arrives over the topic room', async () => {
+    const failedArtifact = {
+      ...artifact,
+      currentVersion: undefined,
+      currentVersionNumber: 0,
+      generationStatus: 'failed',
+      generationError: 'Not enough of the record to map',
+    };
+    mockFetchArtifact.mockResolvedValue(failedArtifact);
+    const socket = makeSocket();
+    const { result } = renderHook(() => useArtifacts({ container: { topicId: 't1' }, socket: socket as any }));
+    await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
+
+    act(() => {
+      socket.fire('artifact:generationFailed', { artifactId: 'a1', reason: 'Not enough of the record to map' });
+    });
+
+    await waitFor(() => expect(result.current.artifacts[0].generationStatus).toBe('failed'));
+    expect(mockFetchArtifact).toHaveBeenCalledWith('a1', undefined);
+  });
+});
+
+describe('generation failures', () => {
+  const failedArtifact = {
+    ...artifact,
+    currentVersion: undefined,
+    currentVersionNumber: 0,
+    generationStatus: 'failed',
+    generationError: 'Not enough of the event record to map',
+  };
+
+  it('refetches the artifact from the REST route when a generation-failed notice names one it already has', async () => {
+    mockFetchArtifact.mockResolvedValue(failedArtifact);
+    const socket = makeSocket();
+    const { result } = renderHook(() =>
+      useArtifacts({ container: { conversationId: 'conv-1' }, artifactPasscode: 'Xk3fA9dQ', socket: socket as any }),
+    );
+    await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
+
+    act(() => {
+      socket.fire('artifact:generationFailed', { artifactId: 'a1', reason: 'Not enough of the event record to map' });
+    });
+
+    await waitFor(() => expect(result.current.artifacts[0].generationStatus).toBe('failed'));
+    expect(mockFetchArtifact).toHaveBeenCalledWith('a1', 'Xk3fA9dQ');
+    expect(result.current.artifacts[0].generationError).toBe('Not enough of the event record to map');
+  });
+
+  it('re-reads the list when the notice names an artifact it has never seen', async () => {
+    const socket = makeSocket();
+    const { result } = renderHook(() => useArtifacts({ container: { conversationId: 'conv-1' }, socket: socket as any }));
+    await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
+
+    act(() => {
+      socket.fire('artifact:generationFailed', { artifactId: 'a2', reason: 'boom' });
+    });
+
+    await waitFor(() => expect(mockListArtifacts).toHaveBeenCalledTimes(2));
+    expect(mockFetchArtifact).not.toHaveBeenCalled();
+  });
+
+  it('reports a refetch that fails, and keeps what it had', async () => {
+    mockFetchArtifact.mockRejectedValue(new ArtifactRequestError('Boom', 500));
+    const socket = makeSocket();
+    const { result } = renderHook(() => useArtifacts({ container: { conversationId: 'conv-1' }, socket: socket as any }));
+    await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
+
+    act(() => {
+      socket.fire('artifact:generationFailed', { artifactId: 'a1', reason: 'boom' });
+    });
+
+    await waitFor(() => expect(result.current.error).toBe('Boom'));
+    expect(result.current.artifacts[0].currentVersionNumber).toBe(2);
+  });
+
+  it('stops listening when unmounted', async () => {
+    const socket = makeSocket();
+    const { unmount, result } = renderHook(() =>
+      useArtifacts({ container: { conversationId: 'conv-1' }, socket: socket as any }),
+    );
+    await waitFor(() => expect(result.current.artifacts).toHaveLength(1));
+
+    unmount();
+
+    expect(socket.off).toHaveBeenCalledWith('artifact:generationFailed', expect.any(Function));
+  });
+});
+
+describe('pending poll fallback', () => {
+  // The interval the hook itself polls on. Kept in sync by hand since it isn't exported.
+  const PENDING_POLL_INTERVAL_MS = 5000;
+  const pendingArtifact = { ...artifact, currentVersion: undefined, currentVersionNumber: 0, generationStatus: 'pending' };
+  const readyArtifact = { ...artifact, generationStatus: 'ready' };
+
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('polls a pending artifact even with no socket at all, so a topic page still resolves it', async () => {
+    mockListArtifacts.mockResolvedValue([pendingArtifact]);
+    mockFetchArtifact.mockResolvedValue(readyArtifact);
+
+    const { result } = renderHook(() => useArtifacts({ container: { topicId: 't1' } }));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(result.current.artifacts[0].generationStatus).toBe('pending');
+
+    await act(async () => {
+      jest.advanceTimersByTime(PENDING_POLL_INTERVAL_MS);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockFetchArtifact).toHaveBeenCalledWith('a1', undefined);
+    expect(result.current.artifacts[0].generationStatus).toBe('ready');
+  });
+
+  it('never polls once nothing is pending', async () => {
+    const { result } = renderHook(() => useArtifacts({ container: { conversationId: 'conv-1' } }));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(result.current.artifacts).toHaveLength(1);
+
+    await act(async () => {
+      jest.advanceTimersByTime(PENDING_POLL_INTERVAL_MS * 4);
+      await Promise.resolve();
+    });
+
+    expect(mockFetchArtifact).not.toHaveBeenCalled();
+  });
+
+  it('stops polling once the artifact resolves, rather than continuing to poll a settled result', async () => {
+    mockListArtifacts.mockResolvedValue([pendingArtifact]);
+    mockFetchArtifact.mockResolvedValue(readyArtifact);
+
+    const { result } = renderHook(() => useArtifacts({ container: { topicId: 't1' } }));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(PENDING_POLL_INTERVAL_MS);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(result.current.artifacts[0].generationStatus).toBe('ready');
+    expect(mockFetchArtifact).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      jest.advanceTimersByTime(PENDING_POLL_INTERVAL_MS * 4);
+      await Promise.resolve();
+    });
+    expect(mockFetchArtifact).toHaveBeenCalledTimes(1);
+  });
+});
