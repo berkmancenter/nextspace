@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import { Api, ArtifactRequestError, emitWithTokenRefresh, fetchArtifact, listArtifacts } from '../utils';
-import { Artifact, ArtifactContainer, ArtifactVersionEvent } from '../types.internal';
+import { Artifact, ArtifactContainer, ArtifactGenerationFailedEvent, ArtifactVersionEvent } from '../types.internal';
+
+const PENDING_POLL_INTERVAL_MS = 5000;
 
 /**
  * Parameters for the useArtifacts hook.
@@ -36,16 +38,20 @@ export interface UseArtifactsReturn {
 /**
  * Loads a conversation's or topic's artifacts and keeps them current.
  *
- * Conversation-scoped artifacts are revised while the event runs, and every appended
- * version is announced to the conversation room as `artifact:version`. The notice carries
- * only `{ artifactId, versionNumber }`: the room is joined with no passcode at all, so
- * nothing that arrives in it is proof of anything, and the content is re-read through the
- * REST route, which checks the artifact passcode. The room join presents no channels
- * because the bare room needs none, and a reader holding only the artifact passcode has
- * no chat credentials to offer.
+ * A conversation's or a topic's artifacts are revised while the event (or the series) runs,
+ * and every appended version is announced to the container's own room as `artifact:version`;
+ * a background generation that errors or finds nothing worth writing is announced the same
+ * way as `artifact:generationFailed`. Either notice carries only ids, never content: the room
+ * is joined with no passcode at all, so nothing that arrives in it is proof of anything, and
+ * the content is re-read through the REST route, which checks the artifact passcode. The
+ * room join presents no channels because the bare room needs none, and a reader holding only
+ * the artifact passcode has no chat credentials to offer.
  *
- * Topic-scoped artifacts are not broadcast (there is no topic-wide room), so a topic
- * container is read once and refreshed only by {@link UseArtifactsReturn.reload}.
+ * A socket isn't guaranteed, though — a reader can be on a page that doesn't hold one, and
+ * one that does can still drop a notice (a disconnect, a reconnect gap). Either way, a
+ * generation left `pending` is also caught by a poll that re-reads any artifact still
+ * `pending`, so the status shown always eventually matches the server's even with no live
+ * push at all; the socket, where it exists and stays connected, only makes that happen sooner.
  *
  * See {@link UseArtifactsParams} for parameter details.
  */
@@ -56,9 +62,11 @@ export function useArtifacts({ container, artifactPasscode, socket }: UseArtifac
   const [needsPasscode, setNeedsPasscode] = useState<boolean>(false);
   const [liveArtifactIds, setLiveArtifactIds] = useState<Set<string>>(new Set());
   const [reloadCount, setReloadCount] = useState(0);
-  // Which conversation the last successful read was for. The room join keys on it, so a
-  // container change cannot ride on the previous container's authorization.
+  // Which conversation, or which topic, the last successful read was for. Each room join
+  // keys on its own, so a container change cannot ride on the previous container's
+  // authorization, and a conversation container never grants a topic-room join or vice versa.
   const [authorizedConversationId, setAuthorizedConversationId] = useState<string | null>(null);
+  const [authorizedTopicId, setAuthorizedTopicId] = useState<string | null>(null);
 
   /* The handler below has to know whether a broadcast names an artifact already in hand,
      and a state updater's work is not done by the time it returns — so the current list is
@@ -87,6 +95,7 @@ export function useArtifacts({ container, artifactPasscode, socket }: UseArtifac
         setError(null);
         setNeedsPasscode(false);
         setAuthorizedConversationId(conversationId);
+        setAuthorizedTopicId(topicId);
       } catch (err) {
         if (cancelled) return;
         setArtifacts([]);
@@ -96,6 +105,7 @@ export function useArtifacts({ container, artifactPasscode, socket }: UseArtifac
           // missing, never that the artifact doesn't exist.
           setNeedsPasscode(true);
           setAuthorizedConversationId(null);
+          setAuthorizedTopicId(null);
           setError(null);
         } else {
           setNeedsPasscode(false);
@@ -152,6 +162,43 @@ export function useArtifacts({ container, artifactPasscode, socket }: UseArtifac
     };
   }, [socket, conversationId, authorizedConversationId]);
 
+  // The topic's own room, for a series' `artifact:version`/`artifact:generationFailed`
+  // notices — same shape and same wait-for-the-read-to-succeed rule as the conversation join
+  // above, just keyed on the topic instead.
+  const hasJoinedTopicRef = useRef(false);
+  useEffect(() => {
+    if (!socket || !topicId || authorizedTopicId !== topicId) return;
+    hasJoinedTopicRef.current = false;
+
+    const join = () => {
+      if (hasJoinedTopicRef.current) return;
+      hasJoinedTopicRef.current = true;
+      emitWithTokenRefresh(
+        socket,
+        'topic:join',
+        { topicId, token: Api.get().getAccessToken() },
+        () => console.log('Joined topic room for artifact updates'),
+        (err) => {
+          console.error('Failed to join topic room for artifact updates:', err);
+          hasJoinedTopicRef.current = false;
+        },
+      );
+    };
+
+    const onConnect = () => {
+      hasJoinedTopicRef.current = false;
+      join();
+    };
+
+    socket.on('connect', onConnect);
+    if (socket.connected) join();
+
+    return () => {
+      socket.off('connect', onConnect);
+      if (hasJoinedTopicRef.current) socket.emit('topic:leave', { topicId, token: Api.get().getAccessToken() });
+    };
+  }, [socket, topicId, authorizedTopicId]);
+
   useEffect(() => {
     if (!socket) return;
     let active = true;
@@ -198,6 +245,80 @@ export function useArtifacts({ container, artifactPasscode, socket }: UseArtifac
       socket.off('artifact:version', onArtifactVersion);
     };
   }, [socket, reload, artifactPasscode, conversationId, topicId]);
+
+  // A background generation run erroring, or finding too little to map, is the other way a
+  // pending artifact resolves. The notice carries no container fields, unlike
+  // artifact:version, so an artifact already in hand is what decides it's ours.
+  useEffect(() => {
+    if (!socket) return;
+    let active = true;
+
+    const onGenerationFailed = async (notice: ArtifactGenerationFailedEvent) => {
+      if (!notice?.artifactId) return;
+
+      const known = artifactsRef.current.find((artifact) => artifact.id === notice.artifactId);
+      if (!known) {
+        // A shell artifact created after this list was read. The notice is all we hold
+        // about it, so re-read the list.
+        reload();
+        return;
+      }
+
+      try {
+        const fresh = await fetchArtifact(notice.artifactId, artifactPasscode);
+        if (!active) return;
+        setArtifacts((prev) => prev.map((artifact) => (artifact.id === fresh.id ? fresh : artifact)));
+      } catch (err) {
+        if (!active) return;
+        console.error('Failed to re-read artifact after a generation-failed notice:', err);
+        setError(err instanceof Error ? err.message : 'Could not load this artifact.');
+      }
+    };
+
+    socket.on('artifact:generationFailed', onGenerationFailed);
+    return () => {
+      active = false;
+      socket.off('artifact:generationFailed', onGenerationFailed);
+    };
+  }, [socket, reload, artifactPasscode]);
+
+  // Fallback for a pending generation with no live signal at all: a topic page is given no
+  // socket, and a conversation page's socket can miss a notice (a drop, a reconnect gap).
+  // Either way, this is what makes generationStatus eventually correct regardless — polling
+  // only the artifacts actually pending, so it costs nothing once everything is settled.
+  const pendingIds = artifacts
+    .filter((artifact) => artifact.generationStatus === 'pending')
+    .map((artifact) => artifact.id)
+    .sort()
+    .join(',');
+
+  useEffect(() => {
+    if (!pendingIds) return;
+    let active = true;
+
+    const timer = setInterval(async () => {
+      for (const id of pendingIds.split(',')) {
+        try {
+          const fresh = await fetchArtifact(id, artifactPasscode);
+          if (!active) return;
+          if (fresh.generationStatus === 'pending') continue;
+          setArtifacts((prev) => prev.map((artifact) => (artifact.id === fresh.id ? fresh : artifact)));
+          if (fresh.generationStatus === 'ready') {
+            setLiveArtifactIds((prev) => new Set(prev).add(fresh.id));
+          }
+        } catch (err) {
+          // One failed poll is not worth surfacing as a page-level error — the next tick,
+          // or the socket where there is one, will catch it up.
+          console.error('Failed to poll a pending artifact:', err);
+        }
+      }
+    }, PENDING_POLL_INTERVAL_MS);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [pendingIds, artifactPasscode]);
 
   return { artifacts, loading, error, needsPasscode, liveArtifactIds, reload };
 }
