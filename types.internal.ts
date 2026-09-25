@@ -87,6 +87,13 @@ export type PseudonymousMessage = components['schemas']['Message'] & {
    * Never present on a message that came back from the API or the socket.
    */
   pending?: 'waiting' | 'failed';
+  /**
+   * Whether the author holds the admin role right now, not when they posted. Declared here as
+   * well as in the generated schema because types.ts is regenerated from whichever backend is
+   * running, so a build against a backend without this field would otherwise stop compiling.
+   * Absent in any conversation that does not use real names.
+   */
+  ownerIsAdmin?: boolean;
 };
 
 /**
@@ -248,6 +255,12 @@ export interface PendingRoomMessage {
   failed?: boolean;
   /** Why the server refused it, in words a member can act on. */
   failureReason?: string;
+  /**
+   * Set only when the refusal was that the room has no real name for the poster. Separate from
+   * failureReason because the room acts on it, reopening the naming prompt, rather than just
+   * showing it.
+   */
+  refusedForMissingName?: boolean;
 }
 
 /**

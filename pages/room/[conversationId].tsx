@@ -36,6 +36,15 @@ function describeRefusal(response: { status?: number; message?: unknown }): stri
   return 'Message could not be sent.';
 }
 
+/**
+ * Whether the server refused this send only because it has no real name for the poster, which
+ * is the one refusal the naming prompt can fix. Matched on the server's wording because the
+ * API answers with prose and no error code; a code on the backend would be the sturdier fix.
+ */
+function isMissingRealNameRefusal(response: { status?: number; message?: unknown }): boolean {
+  return response.status === 400 && typeof response.message === 'string' && /set your real name/i.test(response.message);
+}
+
 export default function RoomPage({ authType }: { authType: AuthType }) {
   const router = useRouter();
   const conversationId = router.query.conversationId as string | undefined;
@@ -261,7 +270,10 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
          */
         if (response && 'error' in response) {
           const failureReason = describeRefusal(response);
-          setQueuedMessages((prev) => prev.map((m) => (m.id === queued.id ? { ...m, failed: true, failureReason } : m)));
+          const refusedForMissingName = isMissingRealNameRefusal(response);
+          setQueuedMessages((prev) =>
+            prev.map((m) => (m.id === queued.id ? { ...m, failed: true, failureReason, refusedForMissingName } : m)),
+          );
           setWaitingForChatResponse(false);
           setWaitingForAssistantResponse(false);
           return;
@@ -278,12 +290,14 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   );
 
   /**
-   * A refused post is the only route back to the naming prompt for an admin who declined it,
-   * since the room offers no other way to set a name. Watched here rather than handled inside
-   * deliverMessage, which is memoised on its own dependencies.
+   * A post refused for want of a name is the only route back to the naming prompt for an admin
+   * who declined it, since the room offers no other way to set one. Any other refusal leaves the
+   * prompt shut, so a network or moderation failure does not reopen a dialog that cannot help.
+   * Watched here rather than handled inside deliverMessage, which is memoised on its own
+   * dependencies.
    */
   useEffect(() => {
-    if (isAdmin && !registeredName && queuedMessages.some((m) => m.failed)) setReadingOnly(false);
+    if (isAdmin && !registeredName && queuedMessages.some((m) => m.refusedForMissingName)) setReadingOnly(false);
   }, [isAdmin, registeredName, queuedMessages]);
 
   /**

@@ -512,6 +512,22 @@ describe('RoomPage', () => {
         await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
       });
 
+      /* Only a refusal the prompt can fix may reopen it. A network or moderation failure would
+         otherwise trap a reading admin behind a dialog that cannot address the problem. */
+      it('stays shut when a dismissed admin is refused for an unrelated reason', async () => {
+        const user = userEvent.setup();
+        renderWithAccount(adminAccount(['some-other-room']));
+
+        await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
+        await user.click(screen.getByText('Just reading'));
+
+        mockSendData.mockResolvedValue({ error: true, status: 400, message: 'That message is too long.' });
+        await user.click(screen.getByText('Send group message'));
+
+        await waitFor(() => expect(mockSendData).toHaveBeenCalled());
+        expect(screen.queryByTestId('set-real-name-dialog')).not.toBeInTheDocument();
+      });
+
       it('leaves a member alone when their own message is refused', async () => {
         const user = userEvent.setup();
         renderWithAccount({ ...accountWith(['test-room-id']), role: 'participant' });
