@@ -905,3 +905,122 @@
   line-height: 1.5;
   color: var(--room-text-muted);
 }
+
+/* The naming prompt. MUI renders it through a portal on document.body, outside the room's
+   markup, so the paper carries .root itself to bring these tokens with it. Two class
+   selectors, because .root also sets a background and this needs to win over it. */
+.root.nameDialogPaper {
+  width: 100%;
+  max-width: 440px;
+  padding: 28px 24px;
+  border: 1px solid var(--room-chrome-border);
+  border-radius: 16px;
+  background: var(--room-chrome-bg);
+  color: var(--room-text-primary);
+  font-family: var(--room-font-body), sans-serif;
+}
+
+.nameDialogTitle {
+  margin: 0;
+  font-family: var(--room-font-display), sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--room-text-primary);
+}
+
+.nameDialogBody {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--room-text-body);
+}
+
+.nameDialogName {
+  margin: 0;
+  font-family: var(--room-font-display), sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--room-text-primary);
+}
+
+.nameDialogLabel {
+  font-family: var(--room-font-mono), monospace;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--room-text-muted);
+}
+
+/* Shaped like the composer's field, so the two places the room takes typing look related.
+   The border is the darker token instead of the composer's own: the field's fill is barely
+   off the dialog's white, so the border is the only thing marking its edge and has to reach
+   the 3:1 WCAG needs for a control boundary. */
+.nameDialogInput {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--room-pending-border);
+  border-radius: 10px;
+  background: var(--room-composer-bg);
+  color: var(--room-text-primary);
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 15px;
+}
+
+.nameDialogInput:focus-visible {
+  border-color: var(--room-composer-border-focus);
+  outline: 2px solid var(--room-text-primary);
+  outline-offset: 2px;
+}
+
+.nameDialogError {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--room-error);
+}
+
+.nameDialogActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nameDialogPrimary,
+.nameDialogSecondary {
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nameDialogPrimary {
+  border: 1px solid var(--room-you-bg);
+  background: var(--room-you-bg);
+  color: var(--room-you-text);
+}
+
+.nameDialogSecondary {
+  border: 1px solid var(--room-pending-border);
+  background: var(--room-chrome-bg);
+  color: var(--room-text-primary);
+}
+
+/* Sits outside the fill so the ring keeps its contrast against the dialog rather than
+   against the button it surrounds, which the filled button would swallow. */
+.nameDialogPrimary:focus-visible,
+.nameDialogSecondary:focus-visible {
+  outline: 2px solid var(--room-text-primary);
+  outline-offset: 2px;
+}
+
+.nameDialogPrimary:disabled,
+.nameDialogSecondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

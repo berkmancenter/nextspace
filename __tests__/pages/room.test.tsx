@@ -56,10 +56,18 @@ jest.mock('../../utils', () => ({
 }));
 
 jest.mock('../../components/room/CommunityGroupChatPanel', () => ({
-  CommunityGroupChatPanel: ({ messages, realName, onSendMessage, onRetryPendingMessage, pendingMessages = [] }: any) => (
+  CommunityGroupChatPanel: ({
+    messages,
+    realName,
+    isAdmin,
+    onSendMessage,
+    onRetryPendingMessage,
+    pendingMessages = [],
+  }: any) => (
     <div
       data-testid="group-chat-panel"
       data-real-name={realName}
+      data-is-admin={isAdmin ? 'true' : 'false'}
       data-pending={pendingMessages.map((m: any) => m.body).join('|')}
       data-pending-failed={pendingMessages
         .filter((m: any) => m.failed)
@@ -79,6 +87,16 @@ jest.mock('../../components/room/CommunityGroupChatPanel', () => ({
       </button>
     </div>
   ),
+}));
+
+jest.mock('../../components/room/SetRealNameDialog', () => ({
+  SetRealNameDialog: ({ open, onSave, onDismiss }: any) =>
+    open ? (
+      <div data-testid="set-real-name-dialog">
+        <button onClick={() => onSave('Alex Admin')}>Confirm name</button>
+        <button onClick={onDismiss}>Just reading</button>
+      </div>
+    ) : null,
 }));
 
 jest.mock('../../components/room/CommunityAssistantPanel', () => ({
@@ -388,6 +406,151 @@ describe('RoomPage', () => {
       );
     });
 
+    // The session cookie calls every signed-in account an admin, so the account decides instead.
+    it('marks the poster as an admin from their account, not their session', async () => {
+      mockRetrieveData.mockImplementation((url: string) =>
+        Promise.resolve(url.startsWith('users/user/') ? { ...accountWith(['test-room-id']), role: 'admin' } : []),
+      );
+
+      render(<RoomPage authType="guest" />);
+
+      await waitFor(() => expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-is-admin', 'true'));
+    });
+
+    it('leaves a participant unmarked even when their session says admin', async () => {
+      mockRetrieveData.mockImplementation((url: string) =>
+        Promise.resolve(url.startsWith('users/user/') ? { ...accountWith(['test-room-id']), role: 'participant' } : []),
+      );
+
+      render(<RoomPage authType="admin" />);
+
+      await waitFor(() =>
+        expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-real-name', 'Chelsea Johnson'),
+      );
+      expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-is-admin', 'false');
+    });
+
+    describe('asking an admin for a name', () => {
+      const adminAccount = (conversations: string[]) => ({ ...accountWith(conversations), role: 'admin' });
+
+      const renderWithAccount = (account: any) => {
+        mockRetrieveData.mockImplementation((url: string) => Promise.resolve(url.startsWith('users/user/') ? account : []));
+        return render(<RoomPage authType="admin" />);
+      };
+
+      it('asks an admin with no name for this room', async () => {
+        renderWithAccount(adminAccount(['some-other-room']));
+
+        await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
+      });
+
+      // The backend carries an existing name into each room the admin joins, so an admin who
+      // already has one here is not asked again.
+      it('leaves an admin who already has a name for this room alone', async () => {
+        renderWithAccount(adminAccount(['test-room-id']));
+
+        await waitFor(() => expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-is-admin', 'true'));
+        expect(screen.queryByTestId('set-real-name-dialog')).not.toBeInTheDocument();
+      });
+
+      it('never asks a member, whatever their session says', async () => {
+        renderWithAccount({ ...accountWith(['some-other-room']), role: 'participant' });
+
+        await waitFor(() => expect(screen.getByTestId('group-chat-panel')).toBeInTheDocument());
+        expect(screen.queryByTestId('set-real-name-dialog')).not.toBeInTheDocument();
+      });
+
+      it('claims the name against this room and uses it without a reload', async () => {
+        const user = userEvent.setup();
+        mockSendData.mockResolvedValue([
+          { pseudonym: 'Trendy Impala', active: true, isRealName: false, conversations: [] },
+          { pseudonym: 'Alex Admin', active: false, isRealName: true, conversations: ['test-room-id'] },
+        ]);
+        renderWithAccount(adminAccount(['some-other-room']));
+
+        await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
+        await user.click(screen.getByText('Confirm name'));
+
+        await waitFor(() => expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-real-name', 'Alex Admin'));
+        expect(mockSendData).toHaveBeenCalledWith(
+          'users/pseudonyms/real-name',
+          { conversationId: 'test-room-id', realName: 'Alex Admin' },
+          'mock-access-token',
+        );
+        expect(screen.queryByTestId('set-real-name-dialog')).not.toBeInTheDocument();
+      });
+
+      it('keeps the dialog open when the name is already taken here', async () => {
+        const user = userEvent.setup();
+        mockSendData.mockResolvedValue({ error: true, status: 409, message: 'Conflict' });
+        renderWithAccount(adminAccount(['some-other-room']));
+
+        await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
+        await user.click(screen.getByText('Confirm name'));
+
+        await waitFor(() => expect(mockSendData).toHaveBeenCalled());
+        expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument();
+      });
+
+      /* Dismissing must not be a dead end. An admin who declines and then tries to post is
+         refused, and that refusal is the only thing that can bring the prompt back. */
+      it('asks again when a dismissed admin tries to post', async () => {
+        const user = userEvent.setup();
+        renderWithAccount(adminAccount(['some-other-room']));
+
+        await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
+        await user.click(screen.getByText('Just reading'));
+        expect(screen.queryByTestId('set-real-name-dialog')).not.toBeInTheDocument();
+
+        mockSendData.mockResolvedValue({
+          error: true,
+          status: 400,
+          message: 'Set your real name for this conversation before posting.',
+        });
+        await user.click(screen.getByText('Send group message'));
+
+        await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
+      });
+
+      /* Only a refusal the prompt can fix may reopen it. A moderation refusal answers 422, and
+         reopening on it would trap a reading admin behind a dialog that cannot help. */
+      it('stays shut when a dismissed admin is refused by moderation', async () => {
+        const user = userEvent.setup();
+        renderWithAccount(adminAccount(['some-other-room']));
+
+        await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
+        await user.click(screen.getByText('Just reading'));
+
+        mockSendData.mockResolvedValue({ error: true, status: 422, message: 'Rephrase that before posting.' });
+        await user.click(screen.getByText('Send group message'));
+
+        await waitFor(() => expect(mockSendData).toHaveBeenCalled());
+        expect(screen.queryByTestId('set-real-name-dialog')).not.toBeInTheDocument();
+      });
+
+      it('leaves a member alone when their own message is refused', async () => {
+        const user = userEvent.setup();
+        renderWithAccount({ ...accountWith(['test-room-id']), role: 'participant' });
+        mockSendData.mockResolvedValue({ error: true, status: 400, message: 'That message is too long.' });
+
+        await user.click(screen.getByText('Send group message'));
+
+        await waitFor(() => expect(mockSendData).toHaveBeenCalled());
+        expect(screen.queryByTestId('set-real-name-dialog')).not.toBeInTheDocument();
+      });
+
+      it('stops asking once the admin says they are only reading', async () => {
+        const user = userEvent.setup();
+        renderWithAccount(adminAccount(['some-other-room']));
+
+        await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
+        await user.click(screen.getByText('Just reading'));
+
+        expect(screen.queryByTestId('set-real-name-dialog')).not.toBeInTheDocument();
+        expect(mockSendData).not.toHaveBeenCalled();
+      });
+    });
+
     it('keeps the session pseudonym when the account has no real name for this room', async () => {
       mockRetrieveData.mockImplementation((url: string) =>
         Promise.resolve(url.startsWith('users/user/') ? accountWith(['some-other-room']) : []),
@@ -441,6 +604,28 @@ describe('RoomPage', () => {
 
       await waitFor(() =>
         expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-pending-reason', 'That message is too long.'),
+      );
+    });
+
+    /* An admin who has not claimed a real name for this room is refused with a 400 saying so.
+       That has to reach them as written: "not registered" would tell them to ask for an
+       invitation, when what they need is to set a name. */
+    it('tells an admin to set a real name in the words the server used', async () => {
+      const user = userEvent.setup();
+      mockSendData.mockResolvedValue({
+        error: true,
+        status: 400,
+        message: 'Set your real name for this conversation before posting.',
+      });
+      render(<RoomPage authType="admin" />);
+
+      await user.click(screen.getByText('Send group message'));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('group-chat-panel')).toHaveAttribute(
+          'data-pending-reason',
+          'Set your real name for this conversation before posting.',
+        ),
       );
     });
 

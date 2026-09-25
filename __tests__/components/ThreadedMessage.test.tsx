@@ -107,6 +107,46 @@ describe('ThreadedMessage Component', () => {
     expect(screen.queryByText('(You)')).not.toBeInTheDocument();
   });
 
+  describe('marking an author who is currently an admin', () => {
+    it('shows (Admin) when the message says its author holds the role', () => {
+      render(<ThreadedMessage {...defaultProps} message={{ ...mockMessage, ownerIsAdmin: true }} />);
+      expect(screen.getByText('(Admin)')).toBeInTheDocument();
+    });
+
+    it('shows nothing for an author who is not an admin', () => {
+      render(<ThreadedMessage {...defaultProps} message={{ ...mockMessage, ownerIsAdmin: false }} />);
+      expect(screen.queryByText('(Admin)')).not.toBeInTheDocument();
+    });
+
+    // A conversation without real names never sends the field, so an absent one has to read
+    // as "not an admin" rather than marking every author.
+    it('shows nothing when the conversation never sends the field', () => {
+      render(<ThreadedMessage {...defaultProps} />);
+      expect(screen.queryByText('(Admin)')).not.toBeInTheDocument();
+    });
+
+    // The label sits beside the name rather than inside it: avatar initials, @mention matching
+    // and the "is this mine" check all compare against the raw pseudonym.
+    it('leaves the name itself untouched', () => {
+      const adminMessage = { ...mockMessage, pseudonym: 'OtherUser', ownerIsAdmin: true };
+      render(<ThreadedMessage {...defaultProps} message={adminMessage} />);
+      expect(screen.getByText('OtherUser')).toBeInTheDocument();
+      expect(screen.queryByText('OtherUser (Admin)')).not.toBeInTheDocument();
+    });
+
+    it('marks an admin reading their own message as both admin and author', () => {
+      render(<ThreadedMessage {...defaultProps} message={{ ...mockMessage, ownerIsAdmin: true }} />);
+      expect(screen.getByText('(Admin)')).toBeInTheDocument();
+      expect(screen.getByText('(You)')).toBeInTheDocument();
+    });
+
+    it('marks an admin who wrote a reply', () => {
+      const adminReply = { ...mockReplies[0], ownerIsAdmin: true };
+      render(<ThreadedMessage {...defaultProps} replies={[adminReply]} />);
+      expect(screen.getByText('(Admin)')).toBeInTheDocument();
+    });
+  });
+
   describe('identifying the reader by account id', () => {
     it('treats a message the reader owns as theirs even under a different name', () => {
       const mine = { ...mockMessage, owner: 'my-account-id', pseudonym: 'A Name I No Longer Use' };

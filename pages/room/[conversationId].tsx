@@ -1,33 +1,24 @@
-import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from 'next/font/google';
 import { Box, CircularProgress, Drawer, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import MenuIcon from '@mui/icons-material/Menu';
 import { Api, RetrieveData, SendData, emitWithTokenRefresh } from '../../utils';
 import { CheckAuthHeader } from '../../utils/Helpers';
 import { GIVE_FEEDBACK_URL } from '../../components/Header';
-import { AuthType, PendingRoomMessage, PseudonymousMessage, UserPseudonym } from '../../types.internal';
+import { AuthType, PendingRoomMessage, PseudonymousMessage, SaveRealNameResult, UserPseudonym } from '../../types.internal';
 import { useConversationMessages, useRoomSetup, useSessionJoin, useTabNavigation } from '../../hooks';
 import { CommunityNavigationBar, CommunityNavTab } from '../../components/room/CommunityNavigationBar';
 import { CommunityGroupChatPanel } from '../../components/room/CommunityGroupChatPanel';
 import { CommunityAssistantPanel } from '../../components/room/CommunityAssistantPanel';
+import { SetRealNameDialog } from '../../components/room/SetRealNameDialog';
+import { roomFontVariables } from '../../components/room/roomFonts';
 import { BotIcon } from '../../components/BotIcon';
 import { RoomMarkIcon } from '../../components/room/RoomMarkIcon';
 import { getRoomInitials } from '../../utils/roomAvatarUtils';
 import { markRoomRead } from '../../utils/roomReadState';
 import styles from '../../components/room/communityRoom.module.css';
-
-const displayFont = Space_Grotesk({ subsets: ['latin'], weight: ['600', '700'] });
-const bodyFont = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500', '600'] });
-const monoFont = IBM_Plex_Mono({ subsets: ['latin'], weight: ['400', '500', '600'] });
-
-const roomFontVariables = {
-  '--room-font-display': displayFont.style.fontFamily,
-  '--room-font-body': bodyFont.style.fontFamily,
-  '--room-font-mono': monoFont.style.fontFamily,
-} as CSSProperties;
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -45,6 +36,18 @@ function describeRefusal(response: { status?: number; message?: unknown }): stri
   return 'Message could not be sent.';
 }
 
+/**
+ * Whether the refusal is the one the naming prompt can fix. The caller has already established
+ * that the poster is an admin with no name for this room, and the server resolves that name
+ * before anything else it could reject a message for: a rejected message answers 422 and an
+ * unregistered member 403, so a 400 to this poster is the missing name. Deliberately not
+ * matched against the server's wording, which would leave an admin with no way back to the
+ * prompt the day someone rewrites that sentence.
+ */
+function isMissingRealNameRefusal(response: { status?: number }): boolean {
+  return response.status === 400;
+}
+
 export default function RoomPage({ authType }: { authType: AuthType }) {
   const router = useRouter();
   const conversationId = router.query.conversationId as string | undefined;
@@ -56,6 +59,8 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   const { socket, pseudonym: sessionPseudonym, userId, isConnected, lastReconnectTime } = useSessionJoin(true);
 
   const [registeredName, setRegisteredName] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [readingOnly, setReadingOnly] = useState(false);
   // Kept apart from useRoomSetup's generalError, which doubles as the fatal "room would not load" screen.
   const [sendError, setSendError] = useState<string | null>(null);
 
@@ -79,6 +84,8 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
       const pseudonyms: UserPseudonym[] = account.pseudonyms ?? [];
       const registered = pseudonyms.find((p) => p.isRealName && p.conversations?.includes(conversationId));
       if (registered) setRegisteredName(registered.pseudonym);
+      // The session cookie calls every signed-in account an admin, so the role must come from here.
+      setIsAdmin(account.role === 'admin');
     })();
 
     return () => {
@@ -87,6 +94,22 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   }, [conversationId, userId]);
 
   const realName = registeredName ?? sessionPseudonym;
+
+  // An admin may decline: reading needs no name, and the server still refuses their posts.
+  const needsRealName = isAdmin && !registeredName && !readingOnly;
+
+  const saveRealName = async (candidate: string): Promise<SaveRealNameResult> => {
+    if (!conversationId) return { ok: false };
+    const response = await SendData(
+      'users/pseudonyms/real-name',
+      { conversationId, realName: candidate },
+      Api.get().getAccessToken(),
+    );
+    if (!Array.isArray(response)) return { ok: false, taken: response?.status === 409 };
+    const claimed = (response as UserPseudonym[]).find((p) => p.isRealName && p.conversations?.includes(conversationId));
+    setRegisteredName(claimed?.pseudonym ?? candidate);
+    return { ok: true };
+  };
 
   const { activeTab, activeTabRef, unseenAssistantCount, setUnseenAssistantCount, handleTabChange } = useTabNavigation({
     router,
@@ -250,7 +273,10 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
          */
         if (response && 'error' in response) {
           const failureReason = describeRefusal(response);
-          setQueuedMessages((prev) => prev.map((m) => (m.id === queued.id ? { ...m, failed: true, failureReason } : m)));
+          const refusedForMissingName = isMissingRealNameRefusal(response);
+          setQueuedMessages((prev) =>
+            prev.map((m) => (m.id === queued.id ? { ...m, failed: true, failureReason, refusedForMissingName } : m)),
+          );
           setWaitingForChatResponse(false);
           setWaitingForAssistantResponse(false);
           return;
@@ -265,6 +291,17 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     },
     [userId, agentId, botName, conversationId],
   );
+
+  /**
+   * A post refused for want of a name is the only route back to the naming prompt for an admin
+   * who declined it, since the room offers no other way to set one. Any other refusal leaves the
+   * prompt shut, so a network or moderation failure does not reopen a dialog that cannot help.
+   * Watched here rather than handled inside deliverMessage, which is memoised on its own
+   * dependencies.
+   */
+  useEffect(() => {
+    if (isAdmin && !registeredName && queuedMessages.some((m) => m.refusedForMissingName)) setReadingOnly(false);
+  }, [isAdmin, registeredName, queuedMessages]);
 
   /**
    * navigator.onLine flips the moment the machine loses its network, while the socket only
@@ -441,6 +478,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
           <CommunityAssistantPanel
             messages={assistantMessages}
             realName={realName || ''}
+            isAdmin={isAdmin}
             botName={botName}
             pendingMessages={queuedAssistantMessages}
             onRetryPendingMessage={retryQueuedMessage}
@@ -452,6 +490,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
           <CommunityGroupChatPanel
             messages={chatMessages}
             realName={realName || ''}
+            isAdmin={isAdmin}
             currentUserId={userId}
             botName={botName}
             communityName={communityName}
@@ -472,6 +511,8 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
           />
         )}
       </div>
+
+      <SetRealNameDialog open={needsRealName} onSave={saveRealName} onDismiss={() => setReadingOnly(true)} />
 
       <CommunityNavigationBar
         activeTab={activeTab as CommunityNavTab}
