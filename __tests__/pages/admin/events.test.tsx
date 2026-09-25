@@ -18,7 +18,7 @@ const conversationTypes2 = [{ name: 'Agent3', label: 'Agent 3' }];
 
 const availablePlatforms1 = [
   { name: 'zoom', label: 'Zoom' },
-  { name: 'nextspace', label: 'Nextspace' },
+  { name: 'nextspace', label: 'NextSpace' },
 ];
 
 const availablePlatforms2 = [{ name: 'slack', label: 'Slack' }];

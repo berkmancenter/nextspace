@@ -168,7 +168,7 @@ const mockConfig = {
   availablePlatforms: [
     {
       name: 'nextspace',
-      label: 'Nextspace',
+      label: 'NextSpace',
     },
     {
       name: 'zoom',
@@ -494,7 +494,7 @@ describe('EventCreationForm Component', () => {
     await user.click(nextButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Nextspace')).toBeInTheDocument();
+      expect(screen.getByText('NextSpace')).toBeInTheDocument();
       expect(screen.getByText('Zoom')).toBeInTheDocument();
     });
   });
@@ -510,7 +510,7 @@ describe('EventCreationForm Component', () => {
     await user.click(screen.getByRole('button', { name: /next/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Nextspace')).toBeInTheDocument();
+      expect(screen.getByText('NextSpace')).toBeInTheDocument();
     });
 
     const nextspaceCheckbox = screen.getByRole('checkbox', {
@@ -539,7 +539,7 @@ describe('EventCreationForm Component', () => {
     await user.click(screen.getByRole('button', { name: /next/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Nextspace')).toBeInTheDocument();
+      expect(screen.getByText('NextSpace')).toBeInTheDocument();
     });
 
     // Try to proceed without selections
@@ -561,7 +561,7 @@ describe('EventCreationForm Component', () => {
     await user.click(screen.getByRole('button', { name: /next/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Nextspace')).toBeInTheDocument();
+      expect(screen.getByText('NextSpace')).toBeInTheDocument();
     });
 
     // Fill Step 2
@@ -603,7 +603,7 @@ describe('EventCreationForm Component', () => {
     await user.click(screen.getByRole('button', { name: /next/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Nextspace')).toBeInTheDocument();
+      expect(screen.getByText('NextSpace')).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
@@ -629,7 +629,7 @@ describe('EventCreationForm Component', () => {
     await user.click(screen.getByRole('button', { name: /next/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Nextspace')).toBeInTheDocument();
+      expect(screen.getByText('NextSpace')).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
@@ -657,7 +657,7 @@ describe('EventCreationForm Component', () => {
     // Navigate to Step 4
     await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
     await user.click(screen.getByRole('button', { name: /next/i }));
-    await waitFor(() => screen.getByText('Nextspace'));
+    await waitFor(() => screen.getByText('NextSpace'));
     await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
     await user.click(screen.getByRole('radio', { name: /back channel/i }));
     await user.click(screen.getByRole('button', { name: /next/i }));
@@ -695,7 +695,7 @@ describe('EventCreationForm Component', () => {
     // Navigate to Step 4
     await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
     await user.click(screen.getByRole('button', { name: /next/i }));
-    await waitFor(() => screen.getByText('Nextspace'));
+    await waitFor(() => screen.getByText('NextSpace'));
     await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
     await user.click(screen.getByRole('radio', { name: /back channel/i }));
     await user.click(screen.getByRole('button', { name: /next/i }));
@@ -729,7 +729,7 @@ describe('EventCreationForm Component', () => {
     await user.click(screen.getByRole('button', { name: /next/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Nextspace')).toBeInTheDocument();
+      expect(screen.getByText('NextSpace')).toBeInTheDocument();
     });
 
     // Go back to Step 1
@@ -753,7 +753,7 @@ describe('EventCreationForm Component', () => {
     // Navigate to Step 3
     await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
     await user.click(screen.getByRole('button', { name: /next/i }));
-    await waitFor(() => screen.getByText('Nextspace'));
+    await waitFor(() => screen.getByText('NextSpace'));
     await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
     await user.click(screen.getByRole('radio', { name: /back channel/i }));
     await user.click(screen.getByRole('button', { name: /next/i }));
@@ -790,7 +790,7 @@ describe('EventCreationForm Component', () => {
     await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
     await user.click(screen.getByRole('button', { name: /next/i }));
 
-    await waitFor(() => screen.getByText('Nextspace'));
+    await waitFor(() => screen.getByText('NextSpace'));
     await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
     await user.click(screen.getByRole('radio', { name: /back channel/i }));
     await user.click(screen.getByRole('button', { name: /next/i }));
@@ -850,7 +850,7 @@ describe('EventCreationForm Component', () => {
     await fillEventDetails('Test Event Assistant', 'https://huitstage.zoom.us/j/9876543210');
     await user.click(screen.getByRole('button', { name: /next/i }));
 
-    await waitFor(() => screen.getByText('Nextspace'));
+    await waitFor(() => screen.getByText('NextSpace'));
     await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
     await user.click(screen.getByRole('radio', { name: /^event assistant$/i }));
     await user.click(screen.getByRole('button', { name: /next/i }));
@@ -912,7 +912,7 @@ describe('EventCreationForm Component', () => {
     await fillEventDetails('Custom Bot Event', 'https://huitstage.zoom.us/j/5555555555');
     await user.click(screen.getByRole('button', { name: /next/i }));
 
-    await waitFor(() => screen.getByText('Nextspace'));
+    await waitFor(() => screen.getByText('NextSpace'));
     await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
     await user.click(screen.getByRole('radio', { name: /back channel/i }));
     await user.click(screen.getByRole('button', { name: /next/i }));
@@ -964,7 +964,7 @@ describe('EventCreationForm Component', () => {
     await fillEventDetails('Event with Speakers', 'https://huitstage.zoom.us/j/1111111111');
     await user.click(screen.getByRole('button', { name: /next/i }));
 
-    await waitFor(() => screen.getByText('Nextspace'));
+    await waitFor(() => screen.getByText('NextSpace'));
     await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
     await user.click(screen.getByRole('radio', { name: /back channel/i }));
     await user.click(screen.getByRole('button', { name: /next/i }));
@@ -1144,7 +1144,7 @@ describe('EventCreationForm Component', () => {
     await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
     await user.click(screen.getByRole('button', { name: /next/i }));
 
-    await waitFor(() => screen.getByText('Nextspace'));
+    await waitFor(() => screen.getByText('NextSpace'));
     await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
     await user.click(screen.getByRole('radio', { name: /back channel/i }));
     await user.click(screen.getByRole('button', { name: /next/i }));
@@ -1201,7 +1201,7 @@ describe('EventCreationForm Component', () => {
     await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
     await user.click(screen.getByRole('button', { name: /next/i }));
 
-    await waitFor(() => screen.getByText('Nextspace'));
+    await waitFor(() => screen.getByText('NextSpace'));
     await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
     await user.click(screen.getByRole('radio', { name: /back channel/i }));
     await user.click(screen.getByRole('button', { name: /next/i }));
@@ -1256,7 +1256,7 @@ describe('EventCreationForm Component', () => {
     await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
     await user.click(screen.getByRole('button', { name: /next/i }));
 
-    await waitFor(() => screen.getByText('Nextspace'));
+    await waitFor(() => screen.getByText('NextSpace'));
     await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
     await user.click(screen.getByRole('radio', { name: /back channel/i }));
     await user.click(screen.getByRole('button', { name: /next/i }));
@@ -1274,7 +1274,7 @@ describe('EventCreationForm Component', () => {
   const navigateToStep3WithBackChannel = async (user: ReturnType<typeof userEvent.setup>) => {
     await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
     await user.click(screen.getByRole('button', { name: /next/i }));
-    await waitFor(() => screen.getByText('Nextspace'));
+    await waitFor(() => screen.getByText('NextSpace'));
     await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
     await user.click(screen.getByRole('radio', { name: /back channel/i }));
     await user.click(screen.getByRole('button', { name: /next/i }));
@@ -1442,7 +1442,7 @@ describe('EventCreationForm Component', () => {
 
       await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
       await user.click(screen.getByRole('button', { name: /next/i }));
-      await waitFor(() => screen.getByText('Nextspace'));
+      await waitFor(() => screen.getByText('NextSpace'));
       await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
       await user.click(
         screen.getByRole('radio', {
@@ -1472,7 +1472,7 @@ describe('EventCreationForm Component', () => {
 
       await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
       await user.click(screen.getByRole('button', { name: /next/i }));
-      await waitFor(() => screen.getByText('Nextspace'));
+      await waitFor(() => screen.getByText('NextSpace'));
       await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
       // Event Assistant has no features in the mock config
       await user.click(screen.getByRole('radio', { name: /^event assistant$/i }));
@@ -1625,7 +1625,7 @@ describe('EventCreationForm Component', () => {
 
       await user.click(screen.getByRole('button', { name: /next/i }));
 
-      await waitFor(() => screen.getByText('Nextspace'));
+      await waitFor(() => screen.getByText('NextSpace'));
       await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
       await user.click(screen.getByRole('radio', { name: /back channel/i }));
       await user.click(screen.getByRole('button', { name: /next/i }));
@@ -1853,7 +1853,7 @@ describe('EventCreationForm Component', () => {
 
       await user.click(screen.getByRole('button', { name: /next/i }));
 
-      await waitFor(() => screen.getByText('Nextspace'));
+      await waitFor(() => screen.getByText('NextSpace'));
       await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
       await user.click(screen.getByRole('radio', { name: /back channel/i }));
       await user.click(screen.getByRole('button', { name: /next/i }));
@@ -1898,7 +1898,7 @@ describe('EventCreationForm Component', () => {
       await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
       await user.click(screen.getByRole('button', { name: /next/i }));
 
-      await waitFor(() => screen.getByText('Nextspace'));
+      await waitFor(() => screen.getByText('NextSpace'));
       await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
       await user.click(screen.getByRole('radio', { name: /back channel/i }));
       await user.click(screen.getByRole('button', { name: /next/i }));
@@ -1933,7 +1933,7 @@ describe('EventCreationForm Component', () => {
     const navigateToStep5 = async (user: ReturnType<typeof userEvent.setup>) => {
       await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
       await user.click(screen.getByRole('button', { name: /next/i }));
-      await waitFor(() => screen.getByText('Nextspace'));
+      await waitFor(() => screen.getByText('NextSpace'));
       await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
       await user.click(screen.getByRole('radio', { name: /back channel/i }));
       await user.click(screen.getByRole('button', { name: /next/i }));
@@ -2422,7 +2422,7 @@ describe('EventCreationForm Component', () => {
       // Navigate to last step
       await waitFor(() => screen.getByLabelText(/Event Name/i));
       await user.click(screen.getByRole('button', { name: /next/i }));
-      await waitFor(() => screen.getByText('Nextspace'));
+      await waitFor(() => screen.getByText('NextSpace'));
       await user.click(screen.getByRole('button', { name: /next/i }));
       await waitFor(() => screen.getByText('Customize your conversation settings'));
       await user.click(screen.getByRole('button', { name: /next/i }));
@@ -2443,7 +2443,7 @@ describe('EventCreationForm Component', () => {
       // Navigate to last step
       await waitFor(() => screen.getByLabelText(/Event Name/i));
       await user.click(screen.getByRole('button', { name: /next/i }));
-      await waitFor(() => screen.getByText('Nextspace'));
+      await waitFor(() => screen.getByText('NextSpace'));
       await user.click(screen.getByRole('button', { name: /next/i }));
       await waitFor(() => screen.getByText('Customize your conversation settings'));
       await user.click(screen.getByRole('button', { name: /next/i }));
@@ -2483,7 +2483,7 @@ describe('EventCreationForm Component', () => {
       });
       await waitFor(() => screen.getByLabelText(/Event Name/i));
       await user.click(screen.getByRole('button', { name: /next/i }));
-      await waitFor(() => screen.getByText('Nextspace'));
+      await waitFor(() => screen.getByText('NextSpace'));
       await user.click(screen.getByRole('button', { name: /next/i }));
       await waitFor(() => screen.getByText('Customize your conversation settings'));
       await user.click(screen.getByRole('button', { name: /next/i }));
@@ -2501,7 +2501,7 @@ describe('EventCreationForm Component', () => {
       const navigateToStep2 = async (user: ReturnType<typeof userEvent.setup>) => {
         await waitFor(() => screen.getByLabelText(/Event Name/i));
         await user.click(screen.getByRole('button', { name: /next/i }));
-        await waitFor(() => screen.getByText('Nextspace'));
+        await waitFor(() => screen.getByText('NextSpace'));
       };
 
       it('shows hint when the user changes the pre-filled agent type', async () => {
@@ -2576,7 +2576,7 @@ describe('EventCreationForm Component', () => {
         });
         await waitFor(() => screen.getByLabelText(/Event Name/i));
         await user.click(screen.getByRole('button', { name: /next/i }));
-        await waitFor(() => screen.getByText('Nextspace'));
+        await waitFor(() => screen.getByText('NextSpace'));
         await user.click(screen.getByRole('button', { name: /next/i }));
         await waitFor(() => screen.getByText('Customize your conversation settings'));
       };
@@ -2643,7 +2643,7 @@ describe('EventCreationForm Component', () => {
       // Navigate through all steps without enabling any features
       await waitFor(() => screen.getByLabelText(/Event Name/i));
       await user.click(screen.getByRole('button', { name: /next/i }));
-      await waitFor(() => screen.getByText('Nextspace'));
+      await waitFor(() => screen.getByText('NextSpace'));
       await user.click(screen.getByRole('button', { name: /next/i }));
       await waitFor(() => screen.getByText('Customize your conversation settings'));
       await user.click(screen.getByRole('button', { name: /next/i }));
@@ -2688,7 +2688,7 @@ describe('EventCreationForm Component', () => {
         });
         await waitFor(() => screen.getByLabelText(/Event Name/i));
         await user.click(screen.getByRole('button', { name: /next/i }));
-        await waitFor(() => screen.getByText('Nextspace'));
+        await waitFor(() => screen.getByText('NextSpace'));
         await user.click(screen.getByRole('button', { name: /next/i }));
         await waitFor(() => screen.getByText('Customize your conversation settings'));
       };
@@ -2916,7 +2916,7 @@ describe('EventCreationForm Component', () => {
         });
         await waitFor(() => screen.getByLabelText(/Event Name/i));
         await user.click(screen.getByRole('button', { name: /next/i }));
-        await waitFor(() => screen.getByText('Nextspace'));
+        await waitFor(() => screen.getByText('NextSpace'));
         await user.click(screen.getByRole('button', { name: /next/i }));
         await waitFor(() => screen.getByText('Customize your conversation settings'));
       };
@@ -2985,7 +2985,7 @@ describe('EventCreationForm Component', () => {
 
       await waitFor(() => screen.getByLabelText(/Event Name/i));
       await user.click(screen.getByRole('button', { name: /next/i }));
-      await waitFor(() => screen.getByText('Nextspace'));
+      await waitFor(() => screen.getByText('NextSpace'));
       await user.click(screen.getByRole('button', { name: /next/i }));
       await waitFor(() => screen.getByText('Customize your conversation settings'));
       await user.click(screen.getByRole('button', { name: /next/i }));
@@ -3138,7 +3138,7 @@ describe('EventCreationForm Component', () => {
       await user.click(screen.getByRole('button', { name: /next/i }));
 
       await waitFor(() => {
-        expect(screen.getByText('Nextspace')).toBeInTheDocument();
+        expect(screen.getByText('NextSpace')).toBeInTheDocument();
       });
     });
 
@@ -3244,7 +3244,7 @@ describe('EventCreationForm Component', () => {
         await waitFor(() => screen.getByLabelText(/Event Name/i));
         if (step >= 2) {
           await user.click(screen.getByRole('button', { name: /next/i }));
-          await waitFor(() => screen.getByText('Nextspace'));
+          await waitFor(() => screen.getByText('NextSpace'));
         }
         if (step >= 3) {
           await user.click(screen.getByRole('button', { name: /next/i }));
@@ -3264,7 +3264,7 @@ describe('EventCreationForm Component', () => {
       const submitFromStep = async (user: ReturnType<typeof userEvent.setup>, fromStep: 1 | 2 | 3 | 4 | 5) => {
         if (fromStep <= 1) {
           await user.click(screen.getByRole('button', { name: /next/i }));
-          await waitFor(() => screen.getByText('Nextspace'));
+          await waitFor(() => screen.getByText('NextSpace'));
         }
         if (fromStep <= 2) {
           await user.click(screen.getByRole('button', { name: /next/i }));
@@ -3387,7 +3387,7 @@ describe('EventCreationForm Component', () => {
           await user.click(screen.getByRole('button', { name: /next/i }));
 
           // Reached Step 2 (Conversation Setup) without the end-time-required error
-          await waitFor(() => screen.getByText('Nextspace'));
+          await waitFor(() => screen.getByText('NextSpace'));
           expect(screen.queryByText(/Meeting End Time is required when a start time is provided/i)).not.toBeInTheDocument();
         });
 
@@ -3415,7 +3415,7 @@ describe('EventCreationForm Component', () => {
       describe('Step 2 — conversation setup', () => {
         it('includes the updated platforms list in the payload', async () => {
           const user = userEvent.setup();
-          // mockInitialEvent has platforms: ['zoom'] — also enable Nextspace
+          // mockInitialEvent has platforms: ['zoom'] — also enable NextSpace
           await renderAndGoToStep(user, 2);
 
           await user.click(screen.getByRole('checkbox', { name: /nextspace/i }));
@@ -3745,7 +3745,7 @@ describe('EventCreationForm Component', () => {
       await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
       await user.click(screen.getByRole('button', { name: /next/i }));
 
-      await waitFor(() => screen.getByText('Nextspace'));
+      await waitFor(() => screen.getByText('NextSpace'));
       await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
       await user.click(screen.getByRole('radio', { name: /back channel/i }));
       await user.click(screen.getByRole('button', { name: /next/i }));

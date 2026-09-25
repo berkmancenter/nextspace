@@ -28,7 +28,7 @@ describe('CreateAccountPage', () => {
   it('renders the signup form with all fields', async () => {
     render(<CreateAccountPage />);
 
-    expect(screen.getByText('Get started with Nextspace')).toBeInTheDocument();
+    expect(screen.getByText('Get started with NextSpace')).toBeInTheDocument();
     expect(screen.getByLabelText(/Username/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Email Address/i)).toBeInTheDocument();
 

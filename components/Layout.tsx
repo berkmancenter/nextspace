@@ -6,7 +6,7 @@ import { Footer } from './Footer';
 import { AuthType } from '../types.internal';
 
 export const metadata: Metadata = {
-  title: 'Nextspace',
+  title: 'NextSpace',
   description: '',
 };
 

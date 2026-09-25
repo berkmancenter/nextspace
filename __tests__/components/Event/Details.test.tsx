@@ -271,6 +271,12 @@ describe('EventDetails', () => {
       expect(within(header).queryByText('Needs attention')).not.toBeInTheDocument();
     });
 
+    it('lists NextSpace and Zoom as the platforms', () => {
+      renderAt(baseConversationData);
+      expandSection('Platform & format');
+      expect(screen.getByText('NextSpace, Zoom')).toBeInTheDocument();
+    });
+
     it('shows "No meeting link yet" when the Zoom link is missing', () => {
       renderAt(baseConversationData);
       expandSection('Platform & format');
