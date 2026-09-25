@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Head from 'next/head';
 import NextLink from 'next/link';
 import { useRouter } from 'next/router';
-import { Alert, Button, Paper, Typography } from '@mui/material';
+import { Alert, Box, Button, Link, Paper, Typography } from '@mui/material';
 import { PasswordForm } from '../components/PasswordForm';
 import { useQueryToken } from '../hooks/useQueryToken';
 import { ResetPassword } from '../utils/Api';
@@ -44,7 +44,7 @@ export default function ResetPasswordPage() {
     if (tokenState.status === 'missing' || tokenRejected) {
       return (
         <>
-          <Typography variant="h5" component="h1" gutterBottom>
+          <Typography variant="h5" component="h2" gutterBottom sx={{ textAlign: 'center' }}>
             Reset your password
           </Typography>
           <Alert severity="warning" sx={{ mb: 3 }}>
@@ -52,14 +52,30 @@ export default function ResetPasswordPage() {
               ? 'This link has expired or has already been used. Reset links work once and expire after a short time.'
               : 'This link is incomplete. Open the link from your password reset email again, or copy the whole address into your browser.'}
           </Alert>
-          <Button component={NextLink} href="/login" variant="outlined" sx={{ width: { xs: '100%', sm: 'auto' } }}>
-            Go to log in
-          </Button>
+          <Box sx={{ textAlign: 'center' }}>
+            <Button component={NextLink} href="/login" variant="outlined" sx={{ width: 300, maxWidth: '100%' }}>
+              Go to log in
+            </Button>
+          </Box>
         </>
       );
     }
 
-    return <PasswordForm heading="Choose a new password" submitLabel="Reset password" onSubmit={handleSubmit} />;
+    return (
+      <PasswordForm
+        heading="Choose a new password"
+        intro={
+          <>
+            Remembered your password?&nbsp;
+            <Link href="/login" className="text-blue-600 hover:underline">
+              Log in
+            </Link>
+          </>
+        }
+        submitLabel="Reset password"
+        onSubmit={handleSubmit}
+      />
+    );
   };
 
   return (

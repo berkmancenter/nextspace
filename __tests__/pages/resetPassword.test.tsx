@@ -40,6 +40,19 @@ describe('ResetPasswordPage', () => {
     expect(screen.getByRole('heading', { name: 'Choose a new password' })).toBeInTheDocument();
   });
 
+  it('offers a way back to log in from the form', () => {
+    render(<ResetPasswordPage />);
+
+    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login');
+  });
+
+  it('uses a second-level heading on the expired link message', () => {
+    mockTokenState = { status: 'missing' };
+    render(<ResetPasswordPage />);
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Reset your password' })).toBeInTheDocument();
+  });
+
   it('sends the token and new password, then sends the person to log in', async () => {
     mockResetPassword.mockResolvedValue({ status: 'success' });
     render(<ResetPasswordPage />);

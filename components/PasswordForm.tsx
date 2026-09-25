@@ -48,11 +48,11 @@ export function PasswordForm({ heading, intro, submitLabel, onSubmit }: Password
 
   return (
     <Box component="form" noValidate onSubmit={handleSubmit}>
-      <Typography variant="h5" component="h1" gutterBottom>
+      <Typography variant="h5" component="h2" gutterBottom sx={{ textAlign: 'center' }}>
         {heading}
       </Typography>
       {intro && (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
           {intro}
         </Typography>
       )}
@@ -117,10 +117,17 @@ export function PasswordForm({ heading, intro, submitLabel, onSubmit }: Password
         </Box>
       </Box>
 
-      <Box sx={{ mt: 3, textAlign: 'center' }}>
-        <Button type="submit" variant="contained" disabled={submitting} sx={{ width: { xs: '100%', sm: 300 } }}>
+      <Box sx={{ mt: 4, textAlign: 'center' }}>
+        <Button type="submit" variant="outlined" disabled={submitting} sx={{ width: 300, maxWidth: '100%' }}>
           {submitLabel}
         </Button>
+        {submitting && (
+          <svg className="mx-auto w-12 h-5 mt-2.5 block" viewBox="0 0 40 10" fill="currentColor" aria-hidden="true">
+            <circle className="animate-bounce fill-sky-400" cx="5" cy="5" r="4" />
+            <circle className="animate-bounce [animation-delay:-0.2s] fill-medium-slate-blue" cx="20" cy="5" r="4" />
+            <circle className="animate-bounce [animation-delay:-0.4s] fill-purple-500" cx="35" cy="5" r="4" />
+          </svg>
+        )}
       </Box>
     </Box>
   );

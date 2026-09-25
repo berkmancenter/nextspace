@@ -18,6 +18,12 @@ describe('PasswordForm', () => {
     expect(screen.getByText('At least 1 letter and 1 number')).toBeInTheDocument();
   });
 
+  it('uses a second-level heading, since the site header holds the page h1', () => {
+    renderForm();
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Choose a new password' })).toBeInTheDocument();
+  });
+
   it('describes the password field with the rules', () => {
     const { passwordField } = renderForm();
 
