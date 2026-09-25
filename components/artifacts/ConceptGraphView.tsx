@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Button, ButtonGroup, Typography } from '@mui/material';
 import { max } from 'd3-array';
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation } from 'd3-force';
@@ -15,9 +15,13 @@ import {
   selectVisibleLabels,
   sessionIndexById,
   wrapLabel,
+  type GraphRelationship,
+  type GraphSimLink,
   type GraphSimNode,
+  type LabelPosition,
 } from '../../utils/conceptGraph';
 import { ConceptGraphPayload } from '../../types.internal';
+import { trackEvent } from '../../utils/analytics';
 
 /**
  * Props for ConceptGraphView.
@@ -93,6 +97,13 @@ const CONCEPT_LABEL_SIZE = 11.5;
 const SEED_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const SEED_SPACING = 24;
 const CONTRIBUTION_LABEL_SIZE = 9.5;
+/** Smaller than a diamond's own label, which this replaces for a two-concept relationship —
+    it names a line, not a thing, and should read as lighter-weight than either end of it. */
+const RELATIONSHIP_LABEL_SIZE = 8.5;
+/** The invisible stroke a relationship line's click/hover target is actually drawn at — wide
+    enough to hit on a touch screen, where the visible line itself would be hopeless. In data
+    units, so it scales with the graph the same way a node's own hit area (its radius) does. */
+const RELATIONSHIP_HIT_WIDTH = 16;
 
 /**
  * Draws a ConceptGraphArtifact: concepts as circles, contributions as diamonds joining
@@ -131,9 +142,20 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
   /* Positions from the previous payload, so a live revision re-uses them instead of
      re-laying the whole graph out from scratch. */
   const positionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  /* The live simulation, so a pure resize (see the effect below) can retarget it in place
+     instead of the graph-rebuilding effect having to own width/height at all. */
+  const simulationRef = useRef<ReturnType<typeof forceSimulation<GraphSimNode>> | null>(null);
+  /* What the simulation-building effect actually saw width/height as, kept current without
+     being one of that effect's own dependencies — see the same effect for why. */
+  const boxRef = useRef({ width: 720, height: DEFAULT_HEIGHT });
   /* Set once the reader zooms or pans deliberately, after which the view is theirs and
      auto-fit stops touching it. */
   const hasUserZoomedRef = useRef(false);
+  /* The scale a wheel/drag gesture started at, captured on d3-zoom's 'start' so 'end' can
+     tell a scale change (zoom) from a pure translation (pan) — d3-zoom fires the same
+     start/zoom/end lifecycle for both, and only the delta between the two says which one a
+     reader actually did. Cleared once the gesture's 'end' fires. */
+  const gestureStartRef = useRef<{ k: number; sourceType: string } | null>(null);
   /* Mirrors `selectedId` for the simulation's tick/end handlers below, which close over this
      once when the simulation is built rather than re-reading React state every frame — while
      a node is focused, the settling layout's own periodic re-fit must not yank the camera
@@ -241,8 +263,25 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         fontSize,
       });
     }
+    // A two-concept relationship carries the same statement-or-kind content a diamond's
+    // label would have, but keyed by its own id rather than a simNode's, since it has none.
+    for (const link of links) {
+      if (!link.relationship) continue;
+      const fontSize = RELATIONSHIP_LABEL_SIZE;
+      const ratio = 0.62;
+      const text = link.relationship.statement ?? link.relationship.kind;
+      const lines = wrapLabel(text, LABEL_MAX_WIDTH, fontSize, ratio);
+      const lineHeight = fontSize * LABEL_LINE_HEIGHT_FACTOR;
+      info.set(link.relationship.id, {
+        lines,
+        width: Math.max(...lines.map((line) => estimateTextWidth(line, fontSize, ratio))),
+        height: lines.length * lineHeight,
+        lineHeight,
+        fontSize,
+      });
+    }
     return info;
-  }, [simNodes]);
+  }, [simNodes, links]);
 
   const radiusOf = useCallback(
     (node: GraphSimNode): number => {
@@ -278,9 +317,20 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
   // The force simulation. Both link sets are fed to forceLink — origin nodes would have no
   // force acting on them otherwise and would drift off — while sizes come from `degree`,
   // which counts contribution links only.
+  //
+  // Deliberately NOT keyed on width/height — see the resize effect just below this one. A
+  // rebuild here means a brand new simulation object, seeded fresh and re-ignited at full
+  // strength (alpha 1), which is right for an actually new or revised graph but wrong for a
+  // mere resize: a resize this component causes itself (the node-detail card below the
+  // canvas changing height, which can toggle a scrollbar and shrink the tracked width) would
+  // otherwise retrigger this same rebuild on every render it touches, throwing every node
+  // back into motion each time — which is what "jittery, unstable, can't click a node" turned
+  // out to be. `boxRef` is how this effect still gets a real width/height to seed and centre
+  // with, without depending on either.
   useEffect(() => {
     if (isEmpty) return;
 
+    const { width: boxWidth, height: boxHeight } = boxRef.current;
     const positions = positionsRef.current;
     /* A node keeps the place it held in the previous version — ids are stable across
        versions, so a concept that survived a revision is the same node and should not jump.
@@ -297,8 +347,8 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
       if (node.x === undefined || node.y === undefined) {
         const angle = i * SEED_ANGLE;
         const radius = SEED_SPACING * Math.sqrt(i + 0.5);
-        node.x = width / 2 + radius * Math.cos(angle);
-        node.y = height / 2 + radius * Math.sin(angle);
+        node.x = boxWidth / 2 + radius * Math.cos(angle);
+        node.y = boxHeight / 2 + radius * Math.sin(angle);
       }
     });
 
@@ -318,14 +368,14 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         'collide',
         forceCollide<GraphSimNode>().radius((d) => footprintOf(d) + 14),
       )
-      .force('center', forceCenter(width / 2, height / 2))
+      .force('center', forceCenter(boxWidth / 2, boxHeight / 2))
       .on('tick', () => {
         setTick((t) => t + 1);
         /* Keep the graph framed as it settles, rather than framing it once at the end.
            A force layout spreads for a second or two after it starts, and it knows nothing
            about the size of the box it is drawn in, so a graph framed only at the end spends
            that whole time with nodes wandering off the edges — and a simulation that keeps
-           being restarted by a resize or a remount never reaches its end event at all.
+           being restarted by a remount never reaches its end event at all.
 
            Never over someone who has taken hold of the view, though: once the reader has
            zoomed or panned, the view is theirs, and a version arriving mid-inspection must
@@ -342,6 +392,8 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         if (!hasUserZoomedRef.current && !selectedIdRef.current) fitToViewRef.current();
       });
 
+    simulationRef.current = simulation;
+
     return () => {
       for (const node of simNodes) {
         if (node.x !== undefined && node.y !== undefined) {
@@ -349,10 +401,29 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         }
       }
       simulation.stop();
+      simulationRef.current = null;
     };
     // `radiusOf` is derived from simNodes and degree, both already dependencies here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simNodes, links, originLinks, width, height, isEmpty]);
+  }, [simNodes, links, originLinks, isEmpty]);
+
+  // A pure resize retargets the existing simulation instead of the effect above rebuilding
+  // it — see its own comment for why a rebuild is the wrong response to this. A gentle nudge
+  // (not a full alpha-1 restart) is enough to drift an already-settled layout to the new
+  // middle; skipped on the very first run, since the effect above already centred on these
+  // same values when it created the simulation.
+  const boxMounted = useRef(false);
+  useEffect(() => {
+    boxRef.current = { width, height };
+    if (!boxMounted.current) {
+      boxMounted.current = true;
+      return;
+    }
+    const simulation = simulationRef.current;
+    if (!simulation) return;
+    simulation.force('center', forceCenter(width / 2, height / 2));
+    simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart();
+  }, [width, height]);
 
   // Smooth continuous zoom and pan.
   useEffect(() => {
@@ -369,10 +440,25 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         [0, 0],
         [width, height],
       ])
+      .on('start', (event) => {
+        // Only a gesture carries a sourceEvent; fitToView's own transform does not, and isn't
+        // usage worth counting.
+        if (event.sourceEvent) gestureStartRef.current = { k: event.transform.k, sourceType: event.sourceEvent.type };
+      })
       .on('zoom', (event) => {
         // Only a gesture carries a sourceEvent; fitToView's own transform does not.
         if (event.sourceEvent) hasUserZoomedRef.current = true;
         setTransform({ x: event.transform.x, y: event.transform.y, k: event.transform.k });
+      })
+      .on('end', (event) => {
+        // One event per whole gesture rather than per animation frame: d3-zoom already
+        // batches a drag's or a scroll run's many intermediate 'zoom' calls behind a single
+        // 'start'/'end' pair, which is what keeps this from flooding Matomo.
+        const start = gestureStartRef.current;
+        gestureStartRef.current = null;
+        if (!start || !event.sourceEvent) return;
+        const wasZoom = Math.abs(event.transform.k - start.k) > 1e-3;
+        trackEvent('graph', wasZoom ? 'zoom' : 'pan', start.sourceType === 'wheel' ? 'scroll' : 'drag');
       });
 
     zoomRef.current = behavior;
@@ -477,12 +563,23 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
       const behavior = zoomRef.current;
       if (!svg || !behavior) return;
 
+      /* No floor on this one: the whole point of "fit" is that it shows the whole graph, so
+         a graph wide enough to need a scale below MIN_SCALE gets it — the alternative is a
+         fit button that crops what it claims to frame. */
       const fit = computeFitTransform(buildExtents(), width, height, {
         margin: FIT_MARGIN,
-        minScale: MIN_SCALE,
+        minScale: 0,
         maxScale: MAX_SCALE,
       });
       if (!fit) return;
+
+      /* MIN_SCALE remains the floor for a reader's own scroll/pinch/− on an ordinary graph —
+         the everyday case where zooming out past it would just shrink things to dust for no
+         reason. But it must never be tighter than what fit itself just needed, and a reader
+         deliberately zooming out past the whole graph — to get their bearings, or just because
+         they want to — is one step further out than fit, the same as one press of "−" would
+         give them from any other view. */
+      behavior.scaleExtent([Math.min(MIN_SCALE, fit.k / ZOOM_STEP), MAX_SCALE]);
 
       if (animate) animateTo(fit);
       else select(svg).call(behavior.transform, zoomIdentity.translate(fit.x, fit.y).scale(fit.k));
@@ -558,13 +655,53 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
      gestures — which are already continuous — don't need. */
   const zoomBy = (factor: number) => {
     if (!svgRef.current || !zoomRef.current) return;
+    trackEvent('graph', factor > 1 ? 'zoom_in' : 'zoom_out', 'button');
     select(svgRef.current).call(zoomRef.current.scaleBy, factor);
   };
 
+  // A two-concept relationship's id names a link, not a node — kept apart from `nodeById` so
+  // callers needing to know which of the two shapes an id refers to still can, rather than
+  // this silently coercing one into looking like the other.
+  const relationshipById = useMemo(() => {
+    const map = new Map<string, GraphSimLink>();
+    for (const link of links) if (link.relationship) map.set(link.relationship.id, link);
+    return map;
+  }, [links]);
+
+  /**
+   * A relationship link, dressed as the node it would have been before this was a line — same
+   * shape `buildGraph` gave a contribution's own simNode. Shared by the detail card, the
+   * label overlay, and anywhere else that reads "the thing under the cursor" without wanting
+   * to know whether it came from `simNodes` or a link's own metadata.
+   */
+  const relationshipNode = useCallback(
+    (relationship: GraphRelationship): GraphSimNode => ({
+      id: relationship.id,
+      type: 'contribution',
+      label: relationship.statement ?? relationship.kind,
+      kind: relationship.kind,
+      statement: relationship.statement,
+      provenance: relationship.provenance,
+    }),
+    [],
+  );
+
   const activeId = hoverId ?? selectedId;
   const lit = useMemo(() => connectedIds(activeId, links, originLinks), [activeId, links, originLinks]);
-  const activeNode = activeId ? simNodes.find((n) => n.id === activeId) : undefined;
   const nodeById = useMemo(() => new Map(simNodes.map((n) => [n.id, n])), [simNodes]);
+  /**
+   * The hovered or selected node — real, if the id names one of `simNodes`, or synthesised on
+   * the fly from a relationship link's own metadata when it doesn't. Downstream code (the
+   * detail card, the label overlay's `isActive` check) reads this the same way either time;
+   * it never needs to know a relationship link isn't "really" a node.
+   */
+  const activeNode: GraphSimNode | undefined = useMemo(() => {
+    if (!activeId) return undefined;
+    const real = nodeById.get(activeId);
+    if (real) return real;
+    const relationship = relationshipById.get(activeId)?.relationship;
+    return relationship ? relationshipNode(relationship) : undefined;
+  }, [activeId, nodeById, relationshipById, relationshipNode]);
 
   /**
    * Which labels to draw, and where, in screen coordinates.
@@ -608,13 +745,19 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
           // Screen position: the node's place in the graph, put through the current zoom.
           x: screenX,
           y: yBelow,
+          // The node's own centre, and this candidate's un-collided default spot — kept apart
+          // from `x`/`y` above, which get overwritten below with wherever selectVisibleLabels
+          // actually placed it. Comparing the two afterwards is what tells a label drawn at an
+          // alternate spot from one at its own, without selectVisibleLabels having to say so
+          // itself: the position it hands back is always one of these same, un-recomputed
+          // numbers, so comparing by value is exact.
+          nodeScreenX: screenX,
+          nodeScreenY: screenY,
+          defaultX: screenX,
+          defaultY: yBelow,
           /* Not yet worth adding, but worth remembering:
              - Diagonal fallbacks (NE/NW/SE/SW) after these four — a cheap extension of the
-               same mechanism, for a label that still has room but not along an axis.
-             - Leader lines from an offset label back to its node — once a label can land to
-               the side, it can occasionally read as belonging to a neighbour instead in a
-               dense cluster. Would need to stay thin/low-opacity so it doesn't undo the
-               link-visibility fix links themselves just got. */
+               same mechanism, for a label that still has room but not along an axis. */
           alternates: [
             { x: screenX, y: yAbove },
             { x: xRight, y: screenY },
@@ -624,6 +767,8 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
           height: blockHeight,
           priority: degree.get(node.id) ?? 0,
           required: activeId === node.id || (!!lit && lit.has(node.id)),
+          isLit: !!lit && lit.has(node.id),
+          boxed: true,
         };
       })
       .filter((candidate) => {
@@ -634,6 +779,69 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
           candidate.x > -marginX && candidate.x < width + marginX && candidate.y > -marginY && candidate.y < height + marginY
         );
       });
+
+    /* A two-concept relationship has no node of its own to hang a label off, but it still
+       wants one — centred on the line between the two concepts it joins, at the midpoint of
+       wherever the simulation currently has them. No `alternates` offered, unlike a node's
+       label: a line has no natural "above/left/right" to try instead, so a relationship
+       label that loses a collision is simply dropped rather than relocated — the underlying
+       line is still drawn either way, and the reader can still read it from the detail card. */
+    const relationshipCandidates = links
+      .filter((link): link is GraphSimLink & { relationship: GraphRelationship } => !!link.relationship)
+      .map((link) => {
+        const relationship = link.relationship;
+        const source = nodeById.get(linkEndpointId(link.source));
+        const target = nodeById.get(linkEndpointId(link.target));
+        if (!source || !target || source.x === undefined || target.x === undefined) return null;
+        const midX = (source.x + target.x!) / 2;
+        const midY = (source.y! + target.y!) / 2;
+        const screenX = midX * transform.k + transform.x;
+        const screenY = midY * transform.k + transform.y;
+        const info = labelInfo.get(relationship.id);
+        const lines = info?.lines ?? [relationship.kind];
+        const fontSize = info?.fontSize ?? RELATIONSHIP_LABEL_SIZE;
+        const lineHeight = info?.lineHeight ?? fontSize * LABEL_LINE_HEIGHT_FACTOR;
+        const blockWidth = info?.width ?? estimateTextWidth(relationship.kind, fontSize, 0.62);
+        const blockHeight = info?.height ?? lineHeight;
+        // Matches the `hot` rule renderRelationshipLinks already uses for the line itself:
+        // both of a relationship's own concepts lit is what "this is what the reader is
+        // pointing at" means for something that is a line rather than a node — and, since
+        // hovering or selecting the relationship directly always lights both its own
+        // concepts too (see connectedIds), this single check already covers that case as
+        // well, with nothing extra to add for it.
+        const sourceId = linkEndpointId(link.source);
+        const targetId = linkEndpointId(link.target);
+        const isLit = !!lit && lit.has(sourceId) && lit.has(targetId);
+        return {
+          node: relationshipNode(relationship),
+          mono: true,
+          fontSize,
+          lines,
+          lineHeight,
+          isActive: activeId === relationship.id,
+          x: screenX,
+          y: screenY,
+          nodeScreenX: screenX,
+          nodeScreenY: screenY,
+          defaultX: screenX,
+          defaultY: screenY,
+          alternates: [] as LabelPosition[],
+          width: blockWidth,
+          height: blockHeight,
+          priority: 0,
+          required: isLit,
+          isLit,
+          boxed: false,
+        };
+      })
+      .filter((c): c is NonNullable<typeof c> => {
+        if (!c) return false;
+        const marginX = c.width / 2;
+        const marginY = c.height / 2;
+        return c.x > -marginX && c.x < width + marginX && c.y > -marginY && c.y < height + marginY;
+      });
+
+    const allCandidates = [...candidates, ...relationshipCandidates];
 
     /* An origin prompt draws its text inside its own pill, in the zoomed layer, so it is
        never a candidate here — but when shown it is very much in the way. Marking the pills
@@ -678,7 +886,7 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
     const visible = selectVisibleLabels([
       ...pills,
       ...nodeFootprints,
-      ...candidates.map(({ node, x, y, alternates, width: w, height: h, priority, required }) => ({
+      ...allCandidates.map(({ node, x, y, alternates, width: w, height: h, priority, required }) => ({
         id: node.id,
         x,
         y,
@@ -692,14 +900,37 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
 
     // The chosen spot may be the alternate (above) rather than the candidate's own default
     // (below) — `visible` is what selectVisibleLabels actually settled on for each id.
-    return candidates.flatMap((candidate) => {
+    return allCandidates.flatMap((candidate) => {
       const at = visible.get(candidate.node.id);
-      return at ? [{ ...candidate, x: at.x, y: at.y }] : [];
+      if (!at) return [];
+      // Whenever a collision pushed a label off its own default spot, a thin leader line back
+      // to the node is what keeps it readable as *that* node's label rather than a caption
+      // drifting near whichever circle it happens to have landed beside. A relationship's
+      // label offers no alternates (see above), so it is always exactly at its default spot
+      // whenever it survives at all — never offset, never worth a leader line.
+      const isOffset = at.x !== candidate.defaultX || at.y !== candidate.defaultY;
+      return [{ ...candidate, x: at.x, y: at.y, isOffset }];
     });
     // `tick` is in the dependency list because node positions are mutated in place: without
     // it the labels would stay where the nodes started while the nodes themselves moved off.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simNodes, tick, transform, radiusOf, originWidth, degree, activeId, lit, width, height, showOrigins, labelInfo]);
+  }, [
+    simNodes,
+    links,
+    tick,
+    transform,
+    radiusOf,
+    originWidth,
+    degree,
+    activeId,
+    lit,
+    width,
+    height,
+    showOrigins,
+    labelInfo,
+    nodeById,
+    relationshipNode,
+  ]);
 
   const description = useMemo(() => describeGraph(payload), [payload]);
 
@@ -720,6 +951,12 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
       </Box>
     );
   }
+
+  // A spoke (a contribution node's own link to one of its concepts) draws exactly as it
+  // always has; a relationship (a two-concept contribution's stand-in for a diamond) is drawn
+  // and made interactive separately, by renderRelationshipLinks below.
+  const spokeLinks = links.filter((link) => !link.relationship);
+  const relationshipLinks = links.filter((link) => !!link.relationship);
 
   const renderLinks = (linkSet: typeof links, dashed: boolean) =>
     linkSet.map((link, i) => {
@@ -778,6 +1015,59 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
       );
     });
 
+  /* A two-concept relationship draws as a line rather than a diamond — see buildGraph — but
+     it still has to be clickable, hoverable, and named, everything a diamond offered. Drawn
+     straight rather than bowed: the bow on an ordinary spoke exists to keep several of them
+     radiating from one hub from reading as a rigid star, which does not apply here — each of
+     these lines is the only thing between its own two concepts. */
+  const renderRelationshipLinks = () =>
+    relationshipLinks.map((link, i) => {
+      const relationship = link.relationship!;
+      const source = nodeById.get(linkEndpointId(link.source));
+      const target = nodeById.get(linkEndpointId(link.target));
+      if (!source || !target || source.x === undefined || target.x === undefined) return null;
+      const hot = !!lit && lit.has(source.id) && lit.has(target.id);
+      const isActive = activeId === relationship.id;
+      const stroke = hot ? LINK_HOT : CONTRIBUTION;
+      const strokeWidth = hot ? 2.75 : isActive ? 2.25 : 1.5;
+      const strokeOpacity = hot ? 0.95 : 0.8;
+
+      return (
+        <g
+          key={`rel${i}`}
+          data-node-id={relationship.id}
+          onMouseEnter={() => setHoverId(relationship.id)}
+          onMouseLeave={() => setHoverId(null)}
+          onClick={(event) => {
+            event.stopPropagation();
+            setSelectedId((current) => (current === relationship.id ? null : relationship.id));
+          }}
+          style={{ cursor: 'pointer' }}
+        >
+          {/* The actual click/hover target: the visible line below is far too thin to hit
+              reliably, especially on a touch screen, which this has to work on too. */}
+          <line
+            x1={source.x}
+            y1={source.y}
+            x2={target.x!}
+            y2={target.y}
+            stroke="transparent"
+            strokeWidth={RELATIONSHIP_HIT_WIDTH}
+          />
+          <line
+            x1={source.x}
+            y1={source.y}
+            x2={target.x!}
+            y2={target.y}
+            stroke={stroke}
+            strokeWidth={strokeWidth}
+            strokeOpacity={strokeOpacity}
+            style={{ transition: 'stroke 150ms ease, stroke-width 150ms ease, stroke-opacity 150ms ease' }}
+          />
+        </g>
+      );
+    });
+
   return (
     <Box ref={containerRef} sx={{ width: '100%' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mb: 1 }}>
@@ -790,6 +1080,7 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
           </Button>
           <Button
             onClick={() => {
+              trackEvent('graph', 'fit', 'button');
               // A focused node has already claimed the camera; clearing the selection is what
               // hands it back, and the focus effect above animates the actual pan/zoom out.
               // With nothing selected there is no such effect to rely on, so this snaps the
@@ -827,10 +1118,18 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
           ) : (
             <LegendChip color={CONCEPT} shape="circle" label="concept" />
           )}
-          <LegendChip color={CONTRIBUTION} shape="diamond" label="contribution" />
-          <LegendChip color={ORIGIN} shape="pill" label="origin prompt" />
+          <LegendChip color={CONTRIBUTION} shape="diamond" label="relationship" />
+          {/* Unconditional here would legend a shape this graph never draws — the same
+              condition already gates the "Show origin prompts" button above. */}
+          {hasOrigins && <LegendChip color={ORIGIN} shape="pill" label="origin prompt" />}
         </Box>
       </Box>
+
+      {/* The one thing the legend's shapes and colours don't say on their own: size is not
+          decorative, it's the same degree that drives focus and dimming everywhere else. */}
+      <Typography variant="caption" sx={{ display: 'block', color: MUTED, mt: -0.5, mb: 1 }}>
+        Larger nodes have more connections.
+      </Typography>
 
       {/* The graph in sentences, for screen readers and anyone who would rather not parse a
           force layout. The picture above is a drawing of exactly this. */}
@@ -853,7 +1152,7 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         width="100%"
         height={height}
         role="img"
-        aria-label={`Concept graph. Circles are concepts, diamonds are contributions joining them${
+        aria-label={`Concept graph. Circles are concepts, diamonds are relationships joining them${
           hasOrigins ? `, dashed pills are the prompts they came out of${showOrigins ? '' : ' — currently hidden'}` : ''
         }. Scroll or pinch to zoom, drag to pan. Click a node to focus on it and its neighbours, click empty space or press Escape to return to the whole graph.`}
         /* A node's own click stops here before it bubbles, so this only ever fires for a
@@ -878,7 +1177,8 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         </defs>
         <g transform={`translate(${transform.x},${transform.y}) scale(${transform.k})`}>
           {showOrigins && <g>{renderLinks(originLinks, true)}</g>}
-          <g>{renderLinks(links, false)}</g>
+          <g>{renderLinks(spokeLinks, false)}</g>
+          <g>{renderRelationshipLinks()}</g>
           <g>
             {simNodes.map((node) => {
               if (node.x === undefined || node.y === undefined) return null;
@@ -975,25 +1275,63 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
             node happens to sit behind it. */}
         <g>
           {visibleLabels.map(
-            ({ node, x, y, fontSize, mono, isActive, lines, lineHeight, width: blockWidth, height: blockHeight }) => {
-              const dimmed = !!lit && !lit.has(node.id);
+            ({
+              node,
+              x,
+              y,
+              fontSize,
+              mono,
+              isActive,
+              lines,
+              lineHeight,
+              width: blockWidth,
+              height: blockHeight,
+              isOffset,
+              nodeScreenX,
+              nodeScreenY,
+              isLit,
+              boxed,
+            }) => {
+              const dimmed = !!lit && !isLit;
               // The block's own top edge, worked back from its centre `y`; the first line's
               // baseline sits fontSize below that, which is roughly a line's ascent.
               const blockTop = y - blockHeight / 2;
               const firstBaseline = blockTop + fontSize;
               return (
                 <g key={node.id} opacity={dimmed ? 0.25 : 1} style={{ transition: 'opacity 200ms ease' }}>
-                  <rect
-                    x={x - blockWidth / 2 - LABEL_PADDING_X}
-                    y={blockTop - LABEL_PADDING_Y}
-                    width={blockWidth + LABEL_PADDING_X * 2}
-                    height={blockHeight + LABEL_PADDING_Y * 2}
-                    rx={3}
-                    fill={LABEL_BG}
-                    stroke={PANEL_BORDER}
-                    strokeWidth={1}
-                    style={{ pointerEvents: 'none' }}
-                  />
+                  {/* Only drawn once a collision has actually pushed this label off its own
+                      default spot — the ordinary case (a label sitting right below its node)
+                      already reads as attached with no help. A wayfinding aid, not a graph
+                      edge: thin and pale enough to never be mistaken for a link. */}
+                  {isOffset && (
+                    <line
+                      x1={nodeScreenX}
+                      y1={nodeScreenY}
+                      x2={x}
+                      y2={y}
+                      stroke={MUTED}
+                      strokeWidth={1}
+                      strokeOpacity={0.45}
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  )}
+                  {/* A relationship's label is unboxed on purpose — it names a line, not a
+                      thing, and a card of its own would read as another concept the way the
+                      old diamond's boxed label did. Legibility against whatever it crosses
+                      comes from the stroke outline on its own glyphs instead, below. */}
+                  {boxed && (
+                    <rect
+                      x={x - blockWidth / 2 - LABEL_PADDING_X}
+                      y={blockTop - LABEL_PADDING_Y}
+                      width={blockWidth + LABEL_PADDING_X * 2}
+                      height={blockHeight + LABEL_PADDING_Y * 2}
+                      rx={3}
+                      fill={LABEL_BG}
+                      stroke={PANEL_BORDER}
+                      strokeWidth={1}
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  )}
                   {lines.map((line, i) => (
                     <text
                       key={i}
@@ -1002,8 +1340,18 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
                       textAnchor="middle"
                       fontSize={fontSize}
                       fontFamily={mono ? 'ui-monospace, monospace' : 'inherit'}
-                      fill={isActive ? TEXT : LABEL}
-                      style={{ pointerEvents: 'none' }}
+                      fill={isActive ? TEXT : boxed ? LABEL : CONTRIBUTION}
+                      style={
+                        boxed
+                          ? { pointerEvents: 'none' }
+                          : {
+                              pointerEvents: 'none',
+                              paintOrder: 'stroke',
+                              stroke: LABEL_BG,
+                              strokeWidth: 3,
+                              strokeLinejoin: 'round',
+                            }
+                      }
                     >
                       {line}
                     </text>
@@ -1019,20 +1367,75 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         node={activeNode}
         degree={activeNode ? (degree.get(activeNode.id) ?? 0) : 0}
         session={activeNode?.provenance?.conversationId ? sessions.get(activeNode.provenance.conversationId) : undefined}
+        links={links}
+        nodeById={nodeById}
+        sessions={sessions}
+        relationshipNode={relationshipNode}
+        onSelect={setSelectedId}
       />
     </Box>
   );
 };
 
+/** A concept or contribution the detail card can name and jump to. */
+function ConnectionLink({ target, onSelect }: { target: GraphSimNode; onSelect: (id: string) => void }) {
+  return (
+    <Box
+      component="button"
+      type="button"
+      onClick={() => onSelect(target.id)}
+      sx={{
+        font: 'inherit',
+        color: 'inherit',
+        background: 'none',
+        border: 0,
+        p: 0,
+        m: 0,
+        cursor: 'pointer',
+        textDecoration: 'underline',
+        textUnderlineOffset: '2px',
+        '&:hover': { color: CONTRIBUTION },
+      }}
+    >
+      {/* A contribution names itself by its verb here, never its statement — the statement is
+          drawn out in full as its own line wherever this contribution is the thing selected. */}
+      {target.type === 'contribution' ? (target.kind ?? target.label) : target.label}
+    </Box>
+  );
+}
+
 /**
  * The card under the canvas describing whatever node is hovered or selected.
  *
- * It shows the label and the statement and nothing else. A node may carry `provenance` — a
- * pseudonym, a message id — and none of it is drawn here on purpose: these graphs come out
- * of events held under the Chatham House Rule, and anyone reaching this page holds only the
- * artifact passcode. See {@link GraphNodeProvenance}.
+ * Beyond the label and statement, it lists what the node actually connects to — a
+ * relationship's own concepts, or, for a concept, every relationship that names it together
+ * with whatever else that same relationship joins (a concept has no direct link to another
+ * concept in this graph; only a relationship sits between them) — each one clickable, so
+ * reading the card is also a way to walk the graph without hunting for the next node by eye.
+ *
+ * A node may carry `provenance` — a pseudonym, a message id — and none of it is drawn here on
+ * purpose: these graphs come out of events held under the Chatham House Rule, and anyone
+ * reaching this page holds only the artifact passcode. See {@link GraphNodeProvenance}.
  */
-function NodeDetail({ node, degree, session }: { node?: GraphSimNode; degree: number; session?: number }) {
+const NodeDetail = memo(function NodeDetail({
+  node,
+  degree,
+  session,
+  links,
+  nodeById,
+  sessions,
+  relationshipNode,
+  onSelect,
+}: {
+  node?: GraphSimNode;
+  degree: number;
+  session?: number;
+  links: GraphSimLink[];
+  nodeById: Map<string, GraphSimNode>;
+  sessions: Map<string, number>;
+  relationshipNode: (relationship: GraphRelationship) => GraphSimNode;
+  onSelect: (id: string) => void;
+}) {
   if (!node) {
     return (
       <Typography variant="caption" sx={{ display: 'block', mt: 1, color: MUTED }}>
@@ -1041,35 +1444,158 @@ function NodeDetail({ node, degree, session }: { node?: GraphSimNode; degree: nu
     );
   }
 
-  const kindLabel = node.type === 'origin' ? 'origin prompt' : node.type;
+  const kindLabel = node.type === 'origin' ? 'origin prompt' : node.type === 'contribution' ? 'relationship' : node.type;
   const accent = node.type === 'concept' ? CONCEPT : node.type === 'contribution' ? CONTRIBUTION : ORIGIN;
+
+  // A relationship's own concepts. Two shapes to walk, since a relationship joining three or
+  // more concepts is still a node with its own spokes (`link.source === node.id`), while one
+  // joining exactly two is a link directly between them, carrying `node.id` as `relationship.id`
+  // rather than as either endpoint — see buildGraph.
+  const joinedConcepts =
+    node.type === 'contribution'
+      ? links.flatMap((l) => {
+          if (linkEndpointId(l.source) === node.id) {
+            const concept = nodeById.get(linkEndpointId(l.target));
+            return concept ? [concept] : [];
+          }
+          if (l.relationship?.id === node.id) {
+            return [nodeById.get(linkEndpointId(l.source)), nodeById.get(linkEndpointId(l.target))].filter(
+              (n): n is GraphSimNode => !!n,
+            );
+          }
+          return [];
+        })
+      : [];
+
+  // A concept's own relationships: one hop to each relationship that names it, then a second
+  // hop to whatever *else* it joins. For a three-or-more-way relationship that second hop is a
+  // real spoke from the contribution's own node; for a two-way one there is only the link's
+  // other endpoint, so "the contribution" is synthesised from the link itself rather than
+  // looked up — a concept never links straight to another concept here either way, only
+  // through the relationship between them.
+  const relatedVia =
+    node.type === 'concept'
+      ? links.flatMap((l) => {
+          const sourceId = linkEndpointId(l.source);
+          const targetId = linkEndpointId(l.target);
+          if (l.relationship) {
+            if (sourceId !== node.id && targetId !== node.id) return [];
+            const otherId = sourceId === node.id ? targetId : sourceId;
+            const other = nodeById.get(otherId);
+            return [{ contribution: relationshipNode(l.relationship), otherConcepts: other ? [other] : [] }];
+          }
+          if (targetId !== node.id) return [];
+          const contribution = nodeById.get(sourceId);
+          if (!contribution) return [];
+          const otherConcepts = links
+            .filter((l2) => linkEndpointId(l2.source) === contribution.id && linkEndpointId(l2.target) !== node.id)
+            .map((l2) => nodeById.get(linkEndpointId(l2.target)))
+            .filter((n): n is GraphSimNode => !!n);
+          return [{ contribution, otherConcepts }];
+        })
+      : [];
+
+  const eyebrow = (
+    <Typography
+      data-testid="graph-node-detail-eyebrow"
+      variant="caption"
+      sx={{ display: 'block', color: accent, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}
+    >
+      {kindLabel}
+      {node.type !== 'origin' && ` · joins ${degree}`}
+      {session !== undefined && ` · session ${session + 1}`}
+    </Typography>
+  );
 
   return (
     <Box
       data-testid="graph-node-detail"
       sx={{ mt: 1, p: 1.5, border: `1px solid ${PANEL_BORDER}`, borderLeft: `3px solid ${accent}`, borderRadius: 1 }}
     >
-      <Typography
-        variant="caption"
-        sx={{ color: accent, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}
-      >
-        {kindLabel}
-        {node.type !== 'origin' && ` · joins ${degree}`}
-        {session !== undefined && ` · session ${session + 1}`}
-      </Typography>
-      <Typography variant="body2" sx={{ color: TEXT, fontWeight: 500 }}>
-        {/* On the canvas a contribution is labelled by its statement when it has one; here
-            that would repeat the line below, so this always names the relationship itself. */}
-        {node.type === 'contribution' ? (node.kind ?? node.label) : node.label}
-      </Typography>
+      {node.type === 'contribution' ? (
+        // The verb is the actual point of a relationship card — "grounds", "raises a
+        // question about" — so it leads; what kind of node this is and how connected it is
+        // follows as a smaller caption rather than the first thing read.
+        <>
+          <Typography variant="body2" sx={{ color: TEXT, fontWeight: 600 }}>
+            {node.kind ?? node.label}
+          </Typography>
+          {eyebrow}
+        </>
+      ) : (
+        <>
+          {eyebrow}
+          <Typography variant="body2" sx={{ color: TEXT, fontWeight: 500 }}>
+            {node.label}
+          </Typography>
+        </>
+      )}
       {node.statement && (
         <Typography variant="body2" sx={{ color: MUTED, mt: 0.5 }}>
           {node.statement}
         </Typography>
       )}
+      {/* Only a concept ever carries this — a series graph that outgrew its size cap folds a
+          less-connected concept into a related one rather than dropping it, and this is the
+          one place that fold stays visible, on demand, without spending canvas space on it. */}
+      {node.foldedFrom && node.foldedFrom.length > 0 && (
+        <Typography variant="caption" sx={{ display: 'block', color: MUTED, mt: 0.5, fontStyle: 'italic' }}>
+          Also encompasses: {node.foldedFrom.join(', ')}
+        </Typography>
+      )}
+
+      {node.type === 'contribution' && joinedConcepts.length > 0 && (
+        <Box sx={{ mt: 1 }}>
+          <Typography variant="caption" sx={{ display: 'block', color: MUTED }}>
+            Joins:
+          </Typography>
+          <Typography component="div" variant="body2" sx={{ color: TEXT }}>
+            {joinedConcepts.map((concept, i) => (
+              <span key={concept.id}>
+                {i > 0 && ', '}
+                <ConnectionLink target={concept} onSelect={onSelect} />
+              </span>
+            ))}
+          </Typography>
+        </Box>
+      )}
+
+      {node.type === 'concept' && relatedVia.length > 0 && (
+        <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+          {relatedVia.map(({ contribution, otherConcepts }) => {
+            const viaSession = contribution.provenance?.conversationId
+              ? sessions.get(contribution.provenance.conversationId)
+              : undefined;
+            return (
+              <Box key={contribution.id}>
+                <Typography component="div" variant="body2" sx={{ color: TEXT }}>
+                  <ConnectionLink target={contribution} onSelect={onSelect} />
+                  {otherConcepts.length > 0 && (
+                    <>
+                      {' — '}
+                      {otherConcepts.map((concept, i) => (
+                        <span key={concept.id}>
+                          {i > 0 && ', '}
+                          <ConnectionLink target={concept} onSelect={onSelect} />
+                        </span>
+                      ))}
+                    </>
+                  )}
+                  {viaSession !== undefined && ` · session ${viaSession + 1}`}
+                </Typography>
+                {contribution.statement && (
+                  <Typography variant="caption" sx={{ display: 'block', color: MUTED }}>
+                    {contribution.statement}
+                  </Typography>
+                )}
+              </Box>
+            );
+          })}
+        </Box>
+      )}
     </Box>
   );
-}
+});
 
 /** One entry in the shape legend above the canvas. */
 function LegendChip({ color, shape, label }: { color: string; shape: 'circle' | 'diamond' | 'pill'; label: string }) {

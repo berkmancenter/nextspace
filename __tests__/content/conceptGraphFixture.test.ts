@@ -50,7 +50,10 @@ describe.each(fixtures)('%s holds to the guarantees the API makes', (_name, fixt
 
   it('builds without losing or inventing a node', () => {
     const { simNodes } = buildGraph(fixture);
-    expect(simNodes).toHaveLength(concepts.length + contributions.length + originPrompts.length);
+    // A contribution joining exactly two concepts becomes a link rather than a node of its
+    // own — see buildGraph — so it isn't counted here; every other contribution still is.
+    const nodedContributions = contributions.filter((k) => k.concepts.length !== 2).length;
+    expect(simNodes).toHaveLength(concepts.length + nodedContributions + originPrompts.length);
   });
 });
 

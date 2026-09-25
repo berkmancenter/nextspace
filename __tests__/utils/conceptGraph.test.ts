@@ -25,12 +25,15 @@ const payload = {
 };
 
 describe('buildGraph', () => {
-  it('makes a node of every concept, contribution and origin prompt', () => {
+  it('makes a node of every concept and origin prompt, and of a contribution joining three or more', () => {
     const { simNodes } = buildGraph(payload);
 
-    expect(simNodes).toHaveLength(7);
+    // k8 joins exactly two concepts, so it becomes a link rather than a node — see the
+    // 'a two-concept contribution' block below for that case in isolation. k15 joins three,
+    // so it keeps its node here, same as always.
+    expect(simNodes).toHaveLength(6);
     expect(simNodes.filter((n) => n.type === 'concept')).toHaveLength(4);
-    expect(simNodes.filter((n) => n.type === 'contribution')).toHaveLength(2);
+    expect(simNodes.filter((n) => n.type === 'contribution')).toHaveLength(1);
     expect(simNodes.filter((n) => n.type === 'origin')).toHaveLength(1);
   });
 
@@ -109,6 +112,61 @@ describe('buildGraph', () => {
     });
 
     expect(simNodes.find((n) => n.id === 'k1')?.label).toBe('anchors');
+  });
+
+  describe('a two-concept contribution', () => {
+    const twoConcept = {
+      concepts: [
+        { id: 'c1', label: 'One' },
+        { id: 'c2', label: 'Two' },
+      ],
+      contributions: [{ id: 'k1', kind: 'grounds', statement: 'Because of this.', concepts: ['c1', 'c2'] }],
+      originPrompts: [],
+    };
+
+    it('gets no node of its own', () => {
+      const { simNodes } = buildGraph(twoConcept);
+      expect(simNodes.find((n) => n.id === 'k1')).toBeUndefined();
+      expect(simNodes).toHaveLength(2);
+    });
+
+    it('becomes a direct link between the two concepts, carrying itself as that link’s relationship', () => {
+      const { links } = buildGraph(twoConcept);
+
+      expect(links).toHaveLength(1);
+      expect(linkEndpointId(links[0].source)).toBe('c1');
+      expect(linkEndpointId(links[0].target)).toBe('c2');
+      expect(links[0].relationship).toEqual({
+        id: 'k1',
+        kind: 'grounds',
+        statement: 'Because of this.',
+        origin: undefined,
+        provenance: undefined,
+      });
+    });
+
+    it('still counts as one connection for each of its two concepts, same as a node would', () => {
+      const { degree } = buildGraph(twoConcept);
+
+      expect(degree.get('c1')).toBe(1);
+      expect(degree.get('c2')).toBe(1);
+      // Not sized by this — there is no node left to size — but a reader who selects the
+      // relationship should still be told it "joins 2", the same as any other node's degree.
+      expect(degree.get('k1')).toBe(2);
+    });
+
+    it('drops its own origin link rather than pointing one at a node that does not exist', () => {
+      // A known, documented gap (see buildGraph's KNOWN GAP comment): the origin itself is
+      // still on the link's relationship metadata, but there is nothing left for a dashed
+      // attribution line to terminate at.
+      const { originLinks } = buildGraph({
+        ...twoConcept,
+        contributions: [{ ...twoConcept.contributions[0], origin: 'p1' }],
+        originPrompts: [{ id: 'p1', text: 'Why?' }],
+      });
+
+      expect(originLinks).toHaveLength(0);
+    });
   });
 });
 

@@ -2,6 +2,10 @@ jest.mock('../../utils', () => ({
   generateConceptGraph: jest.fn(),
 }));
 
+jest.mock('../../utils/analytics', () => ({
+  trackEvent: jest.fn(),
+}));
+
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
@@ -10,6 +14,7 @@ import {
   seriesConceptGraphFixture,
 } from '../../content/conceptGraphFixture';
 import { generateConceptGraph } from '../../utils';
+import { trackEvent } from '../../utils/analytics';
 import { GenerateGraphButton } from '../../components/artifacts/GenerateGraphButton';
 import { ArtifactList } from '../../components/artifacts/ArtifactList';
 import { ArtifactPasscodePrompt } from '../../components/artifacts/ArtifactPasscodePrompt';
@@ -85,6 +90,30 @@ describe('ConceptGraphView', () => {
     expect(screen.getByRole('button', { name: 'Zoom in' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Fit graph to view' })).toBeInTheDocument();
   });
+
+  it('tracks the zoom and fit controls as graph usage', () => {
+    render(<ConceptGraphView payload={graph} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(trackEvent).toHaveBeenCalledWith('graph', 'zoom_in', 'button');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }));
+    expect(trackEvent).toHaveBeenCalledWith('graph', 'zoom_out', 'button');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fit graph to view' }));
+    expect(trackEvent).toHaveBeenCalledWith('graph', 'fit', 'button');
+  });
+
+  it('tracks a scroll-wheel gesture as a zoom, once per gesture rather than per tick', async () => {
+    render(<ConceptGraphView payload={graph} />);
+
+    // d3-zoom batches a scroll run's many wheel ticks behind one start/end pair and only
+    // fires 'end' after a short pause with no further wheel events (its own wheelDelay) —
+    // this is what actually proves the tracking is gesture-scoped rather than per-event.
+    fireEvent.wheel(screen.getByRole('img'), { deltaY: -100, clientX: 100, clientY: 100 });
+    await waitFor(() => expect(trackEvent).toHaveBeenCalledWith('graph', 'zoom', 'scroll'));
+    expect((trackEvent as jest.Mock).mock.calls.filter(([, action]) => action === 'zoom')).toHaveLength(1);
+  });
 });
 
 describe('ConceptGraphView, against the fixture the preview page draws', () => {
@@ -96,6 +125,17 @@ describe('ConceptGraphView, against the fixture the preview page draws', () => {
 
     // One diamond, not three edges: that is the whole point of a contribution being a node.
     expect(container.querySelectorAll('[data-node-id="k18"]')).toHaveLength(1);
+    expect(container.querySelector('[data-node-id="k18"] rect')).toBeInTheDocument();
+  });
+
+  it('draws a two-concept relationship as a line rather than a diamond', () => {
+    const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
+
+    // k6 ("meets") joins exactly c-assistant and c-skepticism.
+    const handle = container.querySelector('[data-node-id="k6"]')!;
+    expect(handle).toBeInTheDocument();
+    expect(handle.querySelector('rect')).not.toBeInTheDocument();
+    expect(handle.querySelectorAll('line')).toHaveLength(2); // the hit target, and the visible line beneath it.
   });
 
   it('names well-connected concepts on the canvas when there is room to', () => {
@@ -160,6 +200,43 @@ describe('ConceptGraphView, against the fixture the preview page draws', () => {
     expect(detail.getByText(/joins 3/)).toBeInTheDocument();
   });
 
+  it('lists a relationship’s own concepts in its detail card, each a link to focus it', () => {
+    const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
+
+    // k6 ("meets") is a plain two-concept relationship between c-assistant and c-skepticism.
+    fireEvent.click(nodeHandle(container, 'k6')!);
+
+    const detail = within(screen.getByTestId('graph-node-detail'));
+    const assistantLink = detail.getByRole('button', { name: 'The Assistant' });
+    expect(assistantLink).toBeInTheDocument();
+    expect(detail.getByRole('button', { name: 'Skepticism' })).toBeInTheDocument();
+
+    // Clicking one is the same as clicking that concept's own node: focus moves to it.
+    fireEvent.click(assistantLink);
+    expect(within(screen.getByTestId('graph-node-detail')).getByText('The Assistant')).toBeInTheDocument();
+  });
+
+  it('lists a concept’s relationships and whatever else each one joins, every one a link', () => {
+    const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
+
+    // c-skepticism sits on several relationships, k1 ("tempers", to c-trust) and k6 ("meets",
+    // to c-assistant) among them — a concept has no direct link to another concept, only
+    // through these, so both the relationship and whatever else it joins have to come from
+    // that two-hop walk rather than a direct link.
+    fireEvent.click(nodeHandle(container, 'c-skepticism')!);
+
+    const detail = within(screen.getByTestId('graph-node-detail'));
+    expect(detail.getByRole('button', { name: 'tempers' })).toBeInTheDocument();
+    expect(detail.getByRole('button', { name: 'meets' })).toBeInTheDocument();
+    // c-trust is well-connected enough to turn up as the "other concept" on more than one of
+    // c-skepticism's relationships, so this only asserts it is reachable at all.
+    expect(detail.getAllByRole('button', { name: 'Trust' }).length).toBeGreaterThan(0);
+
+    // Clicking the relationship itself focuses it, same as clicking its own diamond.
+    fireEvent.click(detail.getByRole('button', { name: 'tempers' }));
+    expect(within(screen.getByTestId('graph-node-detail-eyebrow')).getByText(/relationship/)).toBeInTheDocument();
+  });
+
   it('may drop even a hovered node’s own label rather than paper it over a neighbour', () => {
     const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
 
@@ -185,6 +262,32 @@ describe('ConceptGraphView, against the fixture the preview page draws', () => {
 
     const detail = within(screen.getByTestId('graph-node-detail'));
     expect(detail.queryByText(/pseudonym|contributed by|said by/i)).not.toBeInTheDocument();
+  });
+
+  it('names what a folded concept encompasses in the detail card, never on the canvas itself', () => {
+    const folded = {
+      ...graph,
+      concepts: [{ ...graph.concepts[0], foldedFrom: ['Registry Interop', 'Cross-Registry Trust'] }, graph.concepts[1]],
+    };
+    const { container } = render(<ConceptGraphView payload={folded} />);
+
+    // No permanent mark on the canvas — the whole point is that this stays out of the way
+    // until asked for, the same as a statement or an origin prompt.
+    expect(screen.queryByText(/Registry Interop/)).not.toBeInTheDocument();
+
+    fireEvent.click(nodeHandle(container, 'c-issuer')!);
+
+    const detail = within(screen.getByTestId('graph-node-detail'));
+    expect(detail.getByText(/Registry Interop/)).toBeInTheDocument();
+    expect(detail.getByText(/Cross-Registry Trust/)).toBeInTheDocument();
+  });
+
+  it('says nothing about folding for an ordinary concept', () => {
+    const { container } = render(<ConceptGraphView payload={graph} />);
+
+    fireEvent.click(nodeHandle(container, 'c-issuer')!);
+
+    expect(within(screen.getByTestId('graph-node-detail')).queryByText(/encompasses/i)).not.toBeInTheDocument();
   });
 });
 
@@ -212,7 +315,9 @@ describe('ConceptGraphView on a series graph', () => {
 
     fireEvent.click(container.querySelector('[data-node-id="s-c-skepticism"]')!);
 
-    expect(within(screen.getByTestId('graph-node-detail')).getByText(/session 2/)).toBeInTheDocument();
+    // Scoped to the eyebrow specifically: the card's drill-down list below may legitimately
+    // name "session 2" again, once per relationship that happens to be from that session too.
+    expect(within(screen.getByTestId('graph-node-detail-eyebrow')).getByText(/session 2/)).toBeInTheDocument();
   });
 
   it('leaves a single event’s graph in one colour, with no session legend', () => {
