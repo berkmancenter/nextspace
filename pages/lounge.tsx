@@ -1,7 +1,6 @@
-import { CSSProperties, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from 'next/font/google';
 import HomeIcon from '@mui/icons-material/Home';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import { Api, RetrieveData } from '../utils';
@@ -10,18 +9,9 @@ import { UserPseudonym } from '../types.internal';
 import { useLoungeRooms, useSessionJoin } from '../hooks';
 import { LoungeRoomRow } from '../components/room/LoungeRoomRow';
 import { RoomMarkIcon } from '../components/room/RoomMarkIcon';
+import { roomFontVariables } from '../components/room/roomFonts';
 import { getRoomInitials } from '../utils/roomAvatarUtils';
 import styles from '../components/room/communityRoom.module.css';
-
-const displayFont = Space_Grotesk({ subsets: ['latin'], weight: ['600', '700'] });
-const bodyFont = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500', '600'] });
-const monoFont = IBM_Plex_Mono({ subsets: ['latin'], weight: ['400', '500', '600'] });
-
-const roomFontVariables = {
-  '--room-font-display': displayFont.style.fontFamily,
-  '--room-font-body': bodyFont.style.fontFamily,
-  '--room-font-mono': monoFont.style.fontFamily,
-} as CSSProperties;
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
