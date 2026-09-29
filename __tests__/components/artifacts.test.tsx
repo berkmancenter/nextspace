@@ -636,6 +636,17 @@ describe('GraphFeedback', () => {
     expect(trackEvent).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the chosen rating visibly selected once the buttons are disabled', async () => {
+    render(<GraphFeedback />);
+
+    await userEvent.click(screen.getByRole('radio', { name: 'OK' }));
+
+    expect(screen.getByRole('radio', { name: 'OK' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'OK' })).toHaveClass('MuiButton-contained');
+    expect(screen.getByRole('radio', { name: 'Meh' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('radio', { name: 'Meh' })).toHaveClass('MuiButton-outlined');
+  });
+
   it('tracks optional free text as its own event, separate from the rating', async () => {
     render(<GraphFeedback />);
 

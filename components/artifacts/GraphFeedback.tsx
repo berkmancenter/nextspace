@@ -47,12 +47,18 @@ export const GraphFeedback = () => {
           <Button
             key={option}
             size="small"
-            variant="outlined"
+            variant={rating === option ? 'contained' : 'outlined'}
             role="radio"
             aria-checked={rating === option}
             disabled={rating !== null}
             onClick={() => handleRate(option)}
-            sx={{ textTransform: 'none' }}
+            sx={{
+              textTransform: 'none',
+              // Disabled buttons default to grey; keep the chosen one in the primary colour and
+              // dim the rest so the selection stays visible after submitting.
+              '&.Mui-disabled':
+                rating === option ? { bgcolor: 'primary.main', color: 'primary.contrastText' } : { opacity: 0.5 },
+            }}
           >
             {option}
           </Button>
