@@ -40,7 +40,7 @@ export const GraphFeedback = () => {
   return (
     <Box sx={{ mt: 2, pt: 1.5, borderTop: `1px solid ${PANEL_BORDER}` }}>
       <Typography variant="caption" id="graph-feedback-label" sx={{ display: 'block', color: MUTED, mb: 0.75 }}>
-        Was this graph clear?
+        Is this graph interesting, useful and clear?
       </Typography>
       <Box role="radiogroup" aria-labelledby="graph-feedback-label" sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
         {RATING_OPTIONS.map((option) => (
