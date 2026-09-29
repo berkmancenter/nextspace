@@ -88,13 +88,6 @@ export default function LoginPage() {
         return;
       }
 
-      // The backend's non-admin role is `participant`, but the session cookie
-      // only accepts guest/user/admin. An account with no role is not an admin.
-      const authType: AuthType = response.user?.role === 'admin' ? 'admin' : 'user';
-
-      // Mark session as authenticated with user info
-      SessionManager.get().markAuthenticated(activePseudonym, userId, authType);
-
       // Set session cookie via local API route, including expiry timestamps
       // so the cookie-based proactive refresh can schedule correctly.
       const sessionReq = await fetch('/api/session', {
@@ -109,7 +102,8 @@ export default function LoginPage() {
           refreshToken: response.tokens.refresh.token,
           accessExpires: response.tokens.access.expires,
           refreshExpires: response.tokens.refresh.expires,
-          authType,
+          // The server looks up whether this account is an admin, so only ask for a logged-in session.
+          authType: 'user',
         }),
       });
       // Check if the session request was successful
@@ -118,6 +112,12 @@ export default function LoginPage() {
         setFormError(errorData.error || 'Failed to set session cookie.');
         return;
       }
+
+      const session = await sessionReq.json();
+      const authType: AuthType = session.authType === 'admin' ? 'admin' : 'user';
+
+      // Mark session as authenticated with user info
+      SessionManager.get().markAuthenticated(activePseudonym, userId, authType);
 
       setFormSuccess(true);
 

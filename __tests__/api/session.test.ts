@@ -32,8 +32,13 @@ jest.mock('../../utils/withEnvValidation', () => ({
   withEnvValidation: (handler: any) => handler,
 }));
 
+jest.mock('../../utils', () => ({
+  RetrieveData: jest.fn(),
+}));
+
 // Import the handler after mocking
 import handler from '../../pages/api/session';
+import { RetrieveData } from '../../utils';
 import { CURRENT_COOKIE_VERSION } from '../../utils/cookieValidator';
 import { jwtDecrypt } from 'jose';
 
@@ -51,6 +56,7 @@ const jose = require('jose');
 const mockEncrypt = jose.__mockEncrypt;
 const mockDecodeJwt = jose.__mockDecodeJwt;
 const mockEncryptJWT = jose.__mockEncryptJWT;
+const mockRetrieveData = RetrieveData as jest.Mock;
 
 describe('SESSION_SECRET validation', () => {
   const originalSecret = process.env.SESSION_SECRET;
@@ -132,6 +138,8 @@ describe('/api/session', () => {
   beforeEach(() => {
     mockEncrypt.mockResolvedValue('encrypted-jwt-token');
     mockEncryptJWT.mockClear();
+    mockRetrieveData.mockReset();
+    mockRetrieveData.mockResolvedValue({ id: 'user-123', role: 'participant' });
     // Default: access token carries no decodable claims, so userId resolution
     // falls through to the body / existing-cookie fallbacks. Individual tests
     // override this to exercise the `sub`-claim path.
@@ -174,6 +182,7 @@ describe('/api/session', () => {
       expect(res._getStatusCode()).toBe(200);
       expect(JSON.parse(res._getData())).toEqual({
         message: 'Successfully set cookie!',
+        authType: 'user',
       });
 
       const setCookieHeader = res._getHeaders()['set-cookie'];
@@ -218,7 +227,90 @@ describe('/api/session', () => {
 
       expect(res._getStatusCode()).toBe(400);
       expect(JSON.parse(res._getData())).toEqual({
-        error: 'authType must be one of: guest, user, admin',
+        error: 'authType must be one of: guest, user',
+      });
+    });
+
+    describe('which auth type the cookie records', () => {
+      function createSession(authType?: string) {
+        return createMocks<NextApiRequest, NextApiResponse>({
+          method: 'POST',
+          body: {
+            username: 'testuser',
+            userId: 'user-123',
+            accessToken: 'access-token',
+            refreshToken: 'refresh-token',
+            ...(authType ? { authType } : {}),
+          },
+        });
+      }
+
+      it('refuses a browser that asks for admin directly', async () => {
+        const { req, res } = createSession('admin');
+
+        await handler(req, res);
+
+        expect(res._getStatusCode()).toBe(400);
+        expect(mockEncryptJWT).not.toHaveBeenCalled();
+      });
+
+      it("records admin when the backend says the account's role is admin", async () => {
+        mockRetrieveData.mockResolvedValue({ id: 'user-123', role: 'admin' });
+        const { req, res } = createSession('user');
+
+        await handler(req, res);
+
+        expect(mockRetrieveData).toHaveBeenCalledWith('users/user/user-123', 'access-token');
+        expect(mockEncryptJWT).toHaveBeenCalledWith(expect.objectContaining({ authType: 'admin' }));
+        expect(JSON.parse(res._getData())).toEqual(expect.objectContaining({ authType: 'admin' }));
+      });
+
+      it('records a participant as a user', async () => {
+        const { req, res } = createSession('user');
+
+        await handler(req, res);
+
+        expect(mockEncryptJWT).toHaveBeenCalledWith(expect.objectContaining({ authType: 'user' }));
+        expect(JSON.parse(res._getData())).toEqual(expect.objectContaining({ authType: 'user' }));
+      });
+
+      it('records an account with no role as a user', async () => {
+        mockRetrieveData.mockResolvedValue({ id: 'user-123' });
+        const { req, res } = createSession('user');
+
+        await handler(req, res);
+
+        expect(mockEncryptJWT).toHaveBeenCalledWith(expect.objectContaining({ authType: 'user' }));
+      });
+
+      it('sets no cookie when the backend refuses the lookup', async () => {
+        mockRetrieveData.mockResolvedValue({ error: true, status: 401, message: {} });
+        const { req, res } = createSession('user');
+
+        await handler(req, res);
+
+        expect(res._getStatusCode()).toBe(502);
+        expect(JSON.parse(res._getData())).toEqual({ error: "Could not confirm this account's role" });
+        expect(res._getHeaders()['set-cookie']).toBeUndefined();
+      });
+
+      it('sets no cookie when the backend cannot be reached', async () => {
+        mockRetrieveData.mockResolvedValue(undefined);
+        const { req, res } = createSession('user');
+
+        await handler(req, res);
+
+        expect(res._getStatusCode()).toBe(502);
+        expect(res._getHeaders()['set-cookie']).toBeUndefined();
+      });
+
+      it('creates a guest session without asking the backend', async () => {
+        const { req, res } = createSession('guest');
+
+        await handler(req, res);
+
+        expect(mockRetrieveData).not.toHaveBeenCalled();
+        expect(mockEncryptJWT).toHaveBeenCalledWith(expect.objectContaining({ authType: 'guest' }));
       });
     });
 

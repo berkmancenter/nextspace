@@ -140,7 +140,7 @@ describe('LoginPage', () => {
     (Authenticate as jest.Mock).mockResolvedValue(mockLoginResponse);
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ message: 'Successfully set cookie!' }),
+      json: async () => ({ message: 'Successfully set cookie!', authType: 'admin' }),
     });
 
     render(<LoginPage />);
@@ -160,7 +160,7 @@ describe('LoginPage', () => {
       expect(mockMarkAuthenticated).toHaveBeenCalledWith('Intuitive Lyra', 'user123', 'admin');
     });
 
-    // Verify session cookie API was called with pseudonym and authType: "admin"
+    // The browser asks for a logged-in session; the server decides whether it's an admin one.
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         '/api/session',
@@ -171,7 +171,7 @@ describe('LoginPage', () => {
             userId: 'user123',
             accessToken: 'access-token-123',
             refreshToken: 'refresh-token-456',
-            authType: 'admin',
+            authType: 'user',
           }),
         }),
       );
@@ -210,7 +210,7 @@ describe('LoginPage', () => {
     (Authenticate as jest.Mock).mockResolvedValue(mockLoginResponse);
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ message: 'Successfully set cookie!' }),
+      json: async () => ({ message: 'Successfully set cookie!', authType: 'admin' }),
     });
 
     render(<LoginPage />);
@@ -255,7 +255,7 @@ describe('LoginPage', () => {
     (Authenticate as jest.Mock).mockResolvedValue(mockLoginResponse);
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ message: 'Successfully set cookie!' }),
+      json: async () => ({ message: 'Successfully set cookie!', authType: 'admin' }),
     });
 
     render(<LoginPage />);
@@ -311,7 +311,7 @@ describe('LoginPage', () => {
       });
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: async () => ({ message: 'Successfully set cookie!' }),
+        json: async () => ({ message: 'Successfully set cookie!', authType: role === 'admin' ? 'admin' : 'user' }),
       });
     }
 
@@ -366,8 +366,8 @@ describe('LoginPage', () => {
     });
   });
 
-  describe('which auth type the session cookie records', () => {
-    function mockLogin(role?: string) {
+  describe('which auth type the session uses', () => {
+    function mockLogin(role: string | undefined, confirmedAuthType: 'user' | 'admin') {
       (Authenticate as jest.Mock).mockResolvedValue({
         user: {
           id: 'user123',
@@ -382,7 +382,7 @@ describe('LoginPage', () => {
       });
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: async () => ({ message: 'Successfully set cookie!' }),
+        json: async () => ({ message: 'Successfully set cookie!', authType: confirmedAuthType }),
       });
     }
 
@@ -394,42 +394,45 @@ describe('LoginPage', () => {
       await user.click(screen.getByRole('button', { name: /Login/i }));
     }
 
-    async function recordedAuthType() {
+    async function requestedAuthType() {
       await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/session', expect.anything()));
       const [, request] = (global.fetch as jest.Mock).mock.calls.find(([url]) => url === '/api/session');
       return JSON.parse(request.body).authType;
     }
 
-    it('records an admin as admin', async () => {
-      mockLogin('admin');
+    it('asks for a logged-in session and leaves the role to the server, even for an admin', async () => {
+      mockLogin('admin', 'admin');
 
       await signIn();
 
-      expect(await recordedAuthType()).toBe('admin');
+      expect(await requestedAuthType()).toBe('user');
     });
 
-    it('records a participant as a user, not an admin', async () => {
-      mockLogin('participant');
-
-      await signIn();
-
-      expect(await recordedAuthType()).toBe('user');
-    });
-
-    it('tells the session manager the auth type it recorded', async () => {
-      mockLogin('admin');
+    it('uses the admin auth type the server confirmed', async () => {
+      mockLogin('admin', 'admin');
 
       await signIn();
 
       await waitFor(() => expect(mockMarkAuthenticated).toHaveBeenCalledWith('Intuitive Lyra', 'user123', 'admin'));
+      expect(mockPush).toHaveBeenCalledWith('/admin/events');
     });
 
-    it('records an account with no role as a user', async () => {
-      mockLogin(undefined);
+    it('treats the account as a user when the server confirms user', async () => {
+      mockLogin('participant', 'user');
 
       await signIn();
 
-      expect(await recordedAuthType()).toBe('user');
+      await waitFor(() => expect(mockMarkAuthenticated).toHaveBeenCalledWith('Intuitive Lyra', 'user123', 'user'));
+      expect(mockPush).toHaveBeenCalledWith('/lounge');
+    });
+
+    it("trusts the server over the login response's role", async () => {
+      mockLogin('admin', 'user');
+
+      await signIn();
+
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/lounge'));
+      expect(mockMarkAuthenticated).toHaveBeenCalledWith('Intuitive Lyra', 'user123', 'user');
     });
   });
 
@@ -594,7 +597,7 @@ describe('LoginPage', () => {
     (Authenticate as jest.Mock).mockResolvedValue(mockLoginResponse);
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ message: 'Successfully set cookie!' }),
+      json: async () => ({ message: 'Successfully set cookie!', authType: 'admin' }),
     });
 
     render(<LoginPage />);
@@ -621,7 +624,7 @@ describe('LoginPage', () => {
             userId: 'auth-user-456',
             accessToken: 'new-auth-access-token',
             refreshToken: 'new-auth-refresh-token',
-            authType: 'admin',
+            authType: 'user',
           }),
         }),
       );
