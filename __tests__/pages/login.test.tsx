@@ -584,4 +584,16 @@ describe('LoginPage', () => {
       expect(screen.queryByText('Username is required')).not.toBeInTheDocument();
     });
   });
+  it('confirms a completed password reset', () => {
+    mockSearchParams = new URLSearchParams('passwordReset=1');
+    render(<LoginPage />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('Your password has been reset. Log in with your new password.');
+  });
+
+  it('does not show the reset confirmation on a normal visit', () => {
+    render(<LoginPage />);
+
+    expect(screen.queryByText(/Your password has been reset/)).not.toBeInTheDocument();
+  });
 });

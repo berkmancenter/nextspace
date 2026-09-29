@@ -8,6 +8,7 @@ export { Layout } from './Layout';
 export { Logo } from './Logo';
 export { MessageFeedback } from './MessageFeedback';
 export { MessageInput } from './MessageInput';
+export { PasswordForm } from './PasswordForm';
 export { AssistantChatPanel } from './AssistantChatPanel';
 export { GroupChatPanel } from './GroupChatPanel';
 export { Transcript } from './Transcript';
