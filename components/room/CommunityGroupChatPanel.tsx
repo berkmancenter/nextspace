@@ -16,6 +16,11 @@ import styles from './communityRoom.module.css';
 interface CommunityGroupChatPanelProps {
   messages: PseudonymousMessage[];
   realName: string;
+  /**
+   * Whether the reader holds the admin role. Needed alongside the messages themselves because a
+   * queued message has not reached the server, so it carries no ownerIsAdmin of its own.
+   */
+  isAdmin?: boolean;
   /** The reader's account id, which decides whose messages are theirs. */
   currentUserId?: string | null;
   botName: string;
@@ -83,6 +88,7 @@ function dayLabel(iso: string): string {
 export function CommunityGroupChatPanel({
   messages,
   realName,
+  isAdmin = false,
   currentUserId,
   botName,
   communityName,
@@ -123,7 +129,13 @@ export function CommunityGroupChatPanel({
       .filter((m) => m.parentMessageId === parentId)
       .map(
         (m) =>
-          ({ id: m.id, pseudonym: realName, body: m.body, pending: m.failed ? 'failed' : 'waiting' }) as PseudonymousMessage,
+          ({
+            id: m.id,
+            pseudonym: realName,
+            ownerIsAdmin: isAdmin,
+            body: m.body,
+            pending: m.failed ? 'failed' : 'waiting',
+          }) as PseudonymousMessage,
       );
 
   const { messagesEndRef, messagesContainerRef, isAtBottom, scrollToBottom } = useAutoScroll(messages);
@@ -346,6 +358,7 @@ export function CommunityGroupChatPanel({
                     key={pending.id}
                     body={pending.body}
                     realName={realName}
+                    isAdmin={isAdmin}
                     failed={pending.failed}
                     failureReason={pending.failureReason}
                     onRetry={onRetryPendingMessage && (() => onRetryPendingMessage(pending.id))}

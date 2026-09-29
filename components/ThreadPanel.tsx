@@ -231,6 +231,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
               {/* Name and timestamp */}
               <div className="text-sm font-bold mb-1 text-left">
                 {normalizeAssistantPseudonym(parentMessage, botName)}
+                {parentMessage.ownerIsAdmin && <span className="text-gray-600 font-normal"> (Admin)</span>}
                 {isReadersMessage(parentMessage, pseudonym, currentUserId) && (
                   <span className="text-gray-600 font-normal"> (You)</span>
                 )}
@@ -286,6 +287,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                 {/* Name and timestamp */}
                 <div className="text-sm font-bold mb-1 text-left">
                   {normalizeAssistantPseudonym(reply, botName)}
+                  {reply.ownerIsAdmin && <span className="text-gray-600 font-normal"> (Admin)</span>}
                   {isReadersMessage(reply, pseudonym, currentUserId) && (
                     <span className="text-gray-600 font-normal"> (You)</span>
                   )}

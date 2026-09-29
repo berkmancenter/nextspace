@@ -361,6 +361,24 @@ describe('CommunityGroupChatPanel', () => {
     });
   });
 
+  // The delivered message will come back carrying ownerIsAdmin, so the bubble standing in for
+  // it has to say the same thing or the label appears to flicker on once the server answers.
+  describe('an admin posting their own message', () => {
+    it('marks the waiting bubble as an admin', () => {
+      render(
+        <CommunityGroupChatPanel {...baseProps} isAdmin pendingMessages={[{ id: 'queued-0', body: 'foo', tab: 'chat' }]} />,
+      );
+
+      expect(screen.getByText('(Admin)')).toBeInTheDocument();
+    });
+
+    it('leaves a member’s waiting bubble unmarked', () => {
+      render(<CommunityGroupChatPanel {...baseProps} pendingMessages={[{ id: 'queued-0', body: 'foo', tab: 'chat' }]} />);
+
+      expect(screen.queryByText('(Admin)')).not.toBeInTheDocument();
+    });
+  });
+
   it('offers a retry on a refused message', async () => {
     const user = userEvent.setup();
     const onRetryPendingMessage = jest.fn();
