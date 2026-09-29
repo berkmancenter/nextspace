@@ -92,6 +92,18 @@ describe('ResetPasswordPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Password must be at least 8 characters.');
   });
 
+  it('falls back to the retry message and re-enables the form when the backend gives no reason', async () => {
+    mockResetPassword.mockResolvedValue({ status: 'rejected', message: '' });
+    render(<ResetPasswordPage />);
+
+    await submitPassword();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "We couldn't reset your password. Check your connection and try again.",
+    );
+    expect(screen.getByRole('button', { name: 'Reset password' })).toBeEnabled();
+  });
+
   it('shows a plain retry message when something else goes wrong', async () => {
     mockResetPassword.mockResolvedValue({ status: 'error' });
     render(<ResetPasswordPage />);

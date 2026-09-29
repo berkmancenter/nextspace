@@ -32,7 +32,7 @@ export default function ResetPasswordPage() {
         setTokenRejected(true);
         return;
       case 'rejected':
-        return result.message;
+        return result.message || GENERIC_ERROR;
       case 'error':
         return GENERIC_ERROR;
     }
