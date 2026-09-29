@@ -21,8 +21,16 @@ import { ConceptGraphPayload } from '../types.internal';
  * - A contribution draws its statement, when it has one, in place of its short `kind` — see
  *   {@link buildGraph} — which is why most of these run long enough that a reader has to
  *   zoom in before one resolves without colliding with whatever is near it. A few carry no
- *   statement at all, since the field is optional: a plain relationship between two concepts,
- *   not any one person's account.
+ *   statement at all, since the field is optional, and that is independent of shape: `k19` is
+ *   a statement-less leaf (a diamond, since it names one concept) and `k20` is a two-concept
+ *   line *with* a statement — the reverse of the usual pairing, where most two-concept links
+ *   lack one. All four combinations of shape (diamond or line) and weight (solid outline for
+ *   a quote, dashed for a summary-only `kind`) are on screen because of these two, so the
+ *   canvas draws every combination the renderer supports even though the legend itself only
+ *   ever shows weight, never shape (see the legend caption in ConceptGraphView, and its own
+ *   comment for why). See the `CONTRIBUTION` comment there for why weight never becomes a
+ *   different colour: every one of these, statement or not, is still a specific thing a
+ *   participant said, never something invented independently of them.
  *
  * Everything here is invented. Statements are written the way the generator's are — the
  * events these graphs come from are held under the Chatham House Rule, so nothing names or
@@ -133,6 +141,25 @@ export const conceptGraphFixture: ConceptGraphPayload = {
       statement:
         "The trust I've built up doesn't come from believing it's always right — it comes from getting fast enough at spotting when it's wrong.",
       origin: 'p1',
+    },
+
+    // A leaf without a statement: no one account carried a quotable sentence for it, the
+    // same reason a two-concept link can lack one, but this one still gets its own diamond
+    // since it names only one concept. Drawn with ConceptGraphView's dashed outline rather
+    // than a different colour — still a participant contribution, just without the quote.
+    { id: 'k19', kind: 'referenced', concepts: ['c-workplace-norms'] },
+
+    // The reverse case: a two-concept relationship that DOES carry a statement, drawn as a
+    // solid-outlined line rather than a diamond. Rarer in practice than a statement-less line
+    // (see the doc comment above), but the legend still has to have something to point at.
+    // c-personalization and c-habit, not c-hallucination: that concept's degree of 1 is what
+    // keeps the min-degree assertion below meaningful, and this must not raise it.
+    {
+      id: 'k20',
+      kind: 'deepens',
+      concepts: ['c-personalization', 'c-habit'],
+      statement:
+        'Once it started tailoring answers to how I like things explained, checking in with it stopped feeling like a decision and just became part of the routine.',
     },
   ],
 };

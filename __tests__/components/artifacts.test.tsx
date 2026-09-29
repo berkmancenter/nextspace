@@ -20,6 +20,7 @@ import { ArtifactList } from '../../components/artifacts/ArtifactList';
 import { ArtifactPasscodePrompt } from '../../components/artifacts/ArtifactPasscodePrompt';
 import { ConceptGraphView } from '../../components/artifacts/ConceptGraphView';
 import { DocumentArtifactView } from '../../components/artifacts/DocumentArtifactView';
+import { GraphFeedback } from '../../components/artifacts/GraphFeedback';
 import { Artifact } from '../../types.internal';
 
 const graph = {
@@ -138,6 +139,68 @@ describe('ConceptGraphView, against the fixture the preview page draws', () => {
     expect(handle.querySelectorAll('line')).toHaveLength(2); // the hit target, and the visible line beneath it.
   });
 
+  it('outlines a diamond with no statement as dashed rather than solid, same colour as one with a quote', () => {
+    const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
+
+    // k18 carries a statement; k19 ("referenced") does not — see the fixture. Both are
+    // diamonds (k19 joins only one concept), so this isolates the statement/no-statement
+    // weight from the diamond/line shape distinction covered above.
+    const quoted = container.querySelector('[data-node-id="k18"] rect')!;
+    const summarized = container.querySelector('[data-node-id="k19"] rect')!;
+
+    expect(quoted.getAttribute('fill')).toBe(summarized.getAttribute('fill')); // amber either way
+    expect(quoted.getAttribute('stroke-dasharray')).toBeNull();
+    expect(summarized.getAttribute('stroke-dasharray')).not.toBeNull();
+  });
+
+  it('outlines a relationship line with no statement as dashed too, same colour as one with a quote', () => {
+    const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
+
+    // k20 ("compounds") carries a statement; k6 ("meets") does not — both are two-concept
+    // relationships, drawn as lines rather than diamonds, so this is the line-shaped
+    // counterpart to the diamond case just above.
+    const quoted = container.querySelector('[data-node-id="k20"] line:not([stroke="transparent"])')!;
+    const summarized = container.querySelector('[data-node-id="k6"] line:not([stroke="transparent"])')!;
+
+    expect(quoted.getAttribute('stroke')).toBe(summarized.getAttribute('stroke')); // amber either way
+    expect(quoted.getAttribute('stroke-dasharray')).toBeNull();
+    expect(summarized.getAttribute('stroke-dasharray')).not.toBeNull();
+  });
+
+  it('keeps a statement-less diamond visibly dashed even once it is selected', () => {
+    const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
+
+    const restDash = container.querySelector('[data-node-id="k19"] rect')!.getAttribute('stroke-dasharray');
+    fireEvent.click(nodeHandle(container, 'k19')!);
+    const selectedDash = container.querySelector('[data-node-id="k19"] rect')!.getAttribute('stroke-dasharray');
+
+    // Selection recolours the stroke to TEXT regardless of statement (see the component), so
+    // an opacity- or colour-based cue used to disappear right when a reader clicked to look
+    // more closely. A dasharray is untouched by that recolouring.
+    expect(selectedDash).toBe(restDash);
+    expect(selectedDash).not.toBeNull();
+  });
+
+  it('legends the quoted/no-quote weight once, not once per shape', () => {
+    // The fixture draws quoted and summary-only contributions as both diamonds (k18/k19) and
+    // lines (k20/k1-k6), but diamond vs. line is a layout detail (see buildGraph), not
+    // information, so it gets one caption sentence rather than its own legend entries.
+    render(<ConceptGraphView payload={conceptGraphFixture} />);
+
+    expect(screen.getByText('participant statement')).toBeInTheDocument();
+    expect(screen.getByText('participant sentiment')).toBeInTheDocument();
+    expect(screen.queryByText(/joining two concepts/)).not.toBeInTheDocument();
+  });
+
+  it('only legends a weight the graph actually draws', () => {
+    // The minimal fixture has one quoted leaf diamond and nothing else — no summarised
+    // contribution of either shape.
+    render(<ConceptGraphView payload={minimalConceptGraphFixture} />);
+
+    expect(screen.getByText('participant statement')).toBeInTheDocument();
+    expect(screen.queryByText('participant sentiment')).not.toBeInTheDocument();
+  });
+
   it('names well-connected concepts on the canvas when there is room to', () => {
     const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
     const drawn = Array.from(container.querySelectorAll('text')).map((t) => t.textContent);
@@ -232,9 +295,10 @@ describe('ConceptGraphView, against the fixture the preview page draws', () => {
     // c-skepticism's relationships, so this only asserts it is reachable at all.
     expect(detail.getAllByRole('button', { name: 'Trust' }).length).toBeGreaterThan(0);
 
-    // Clicking the relationship itself focuses it, same as clicking its own diamond.
+    // Clicking the relationship itself focuses it, same as clicking its own diamond. It carries
+    // no statement (see the fixture), so its eyebrow reads as sentiment rather than statement.
     fireEvent.click(detail.getByRole('button', { name: 'tempers' }));
-    expect(within(screen.getByTestId('graph-node-detail-eyebrow')).getByText(/relationship/)).toBeInTheDocument();
+    expect(within(screen.getByTestId('graph-node-detail-eyebrow')).getByText(/participant sentiment/)).toBeInTheDocument();
   });
 
   it('may drop even a hovered node’s own label rather than paper it over a neighbour', () => {
@@ -548,5 +612,45 @@ describe('GenerateGraphButton', () => {
     await userEvent.click(screen.getByRole('button', { name: /generate concept graph/i }));
 
     expect(await screen.findByText('Forbidden')).toBeInTheDocument();
+  });
+});
+
+describe('GraphFeedback', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('tracks a rating through the same analytics pipeline the canvas itself uses', async () => {
+    render(<GraphFeedback />);
+
+    await userEvent.click(screen.getByRole('radio', { name: 'OK' }));
+
+    expect(trackEvent).toHaveBeenCalledWith('graph', 'feedback_rating', 'OK');
+    expect(screen.getByText('Thanks!')).toBeInTheDocument();
+  });
+
+  it('accepts only one rating', async () => {
+    render(<GraphFeedback />);
+
+    await userEvent.click(screen.getByRole('radio', { name: 'OK' }));
+
+    expect(screen.getByRole('radio', { name: 'WOW!' })).toBeDisabled();
+    expect(trackEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('tracks optional free text as its own event, separate from the rating', async () => {
+    render(<GraphFeedback />);
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Meh' }));
+    await userEvent.type(screen.getByLabelText('Additional feedback'), 'The legend took a while to make sense of.');
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    expect(trackEvent).toHaveBeenCalledWith('graph', 'feedback_rating', 'Meh');
+    expect(trackEvent).toHaveBeenCalledWith('graph', 'feedback_text', 'The legend took a while to make sense of.');
+    expect(screen.getByText('Noted.')).toBeInTheDocument();
+  });
+
+  it('has nothing to send before a rating is picked', () => {
+    render(<GraphFeedback />);
+
+    expect(screen.queryByLabelText('Additional feedback')).not.toBeInTheDocument();
   });
 });

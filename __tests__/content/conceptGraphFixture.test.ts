@@ -80,6 +80,20 @@ describe('conceptGraphFixture exercises the cases worth looking at', () => {
     expect(conceptGraphFixture.contributions.some((k) => !k.statement)).toBe(true);
   });
 
+  it('exercises all four combinations of shape (diamond or line) and weight (quoted or not)', () => {
+    // Concept count decides the shape (see buildGraph); statement presence is independent of
+    // it. Without cases like k19 and k20, some combination always goes undrawn on the preview
+    // page and untested here — most commonly a quoted diamond with no statement-less
+    // counterpart, or a quoted two-concept line, since real data skews heavily toward a
+    // statement on a diamond and none on a line (see the doc comment above).
+    const diamonds = conceptGraphFixture.contributions.filter((k) => k.concepts.length !== 2);
+    const lines = conceptGraphFixture.contributions.filter((k) => k.concepts.length === 2);
+    expect(diamonds.some((k) => k.statement)).toBe(true);
+    expect(diamonds.some((k) => !k.statement)).toBe(true);
+    expect(lines.some((k) => k.statement)).toBe(true);
+    expect(lines.some((k) => !k.statement)).toBe(true);
+  });
+
   it('attributes nothing, as a graph from a Chatham House Rule event must not', () => {
     const nodes = [
       ...conceptGraphFixture.concepts,

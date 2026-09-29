@@ -22,6 +22,7 @@ import {
 } from '../../utils/conceptGraph';
 import { ConceptGraphPayload } from '../../types.internal';
 import { trackEvent } from '../../utils/analytics';
+import { GraphFeedback } from './GraphFeedback';
 
 /**
  * Props for ConceptGraphView.
@@ -42,8 +43,24 @@ const CONCEPT = '#4845D2';
    and beyond falls back to the plain concept colour rather than inventing a hue nobody can
    tell from the last one. */
 const SESSION_COLORS = ['#4845D2', '#0E7490', '#9333EA', '#166534', '#B91C1C'];
+/* Every diamond and connecting line is a participant contribution — what someone in the
+   discussion actually said or argued, never something the model inferred on its own — so
+   all of them stay this one amber, regardless of whether a quotable statement survived. A
+   contribution the model produced no statement for, or whose statement the Chatham House
+   check stripped (see quoteSafety.ts in llm_engine), still comes from the same place; only
+   the outline changes, solid for a quote and dashed for a summary-only `kind` — see
+   {@link contributionDasharray}. A dash pattern rather than a lighter fill or a fainter
+   stroke: both of those get flattened out the moment a reader selects or hovers something
+   that lights this node up, which is exactly the moment they are looking closely enough to
+   want the distinction — a dasharray survives every colour and opacity change untouched.
+   Two different hues would say "two different kinds of thing," which is exactly the false
+   impression this is avoiding. */
 const CONTRIBUTION = '#B45309';
 const CONTRIBUTION_FILL = '#B4530914';
+/** The pattern for a contribution's outline when no statement survived — see
+    {@link contributionDasharray}. Tighter than {@link ORIGIN}'s dashing so the two read as
+    different textures even where an amber diamond and a teal pill end up near each other. */
+const CONTRIBUTION_DASH = '3 2';
 const ORIGIN = '#0E7490';
 const ORIGIN_FILL = '#0E749010';
 /* Darker than the panel border it's close to in hue, and drawn wider below — a link is
@@ -105,6 +122,15 @@ const RELATIONSHIP_LABEL_SIZE = 8.5;
     units, so it scales with the graph the same way a node's own hit area (its radius) does. */
 const RELATIONSHIP_HIT_WIDTH = 16;
 
+/** Solid for a contribution that quotes a participant directly, dashed for one that carries
+    only the process's short `kind` label — same amber either way, since both are equally
+    participant-sourced. Used on the diamond's own outline and on a two-concept relationship's
+    line, and returns `undefined` (a solid line) rather than `'0'` or empty string, since SVG
+    treats an explicit empty dasharray inconsistently across renderers. */
+function contributionDasharray(statement?: string): string | undefined {
+  return statement ? undefined : CONTRIBUTION_DASH;
+}
+
 /**
  * Draws a ConceptGraphArtifact: concepts as circles, contributions as diamonds joining
  * however many concepts they relate, origin prompts as dashed pills attached to what came
@@ -114,12 +140,22 @@ const RELATIONSHIP_HIT_WIDTH = 16;
  * more concepts — see {@link buildGraph}. Node size follows degree, counted over
  * contribution links only, so attribution never inflates a concept.
  *
+ * Circles and diamonds answer different questions about where they came from: a circle is a
+ * label the summary coined for a recurring idea, while every diamond (and every two-concept
+ * relationship line, which is the same kind of node drawn without its own shape — see
+ * buildGraph) is a specific thing a participant said or argued, lifted from the record. That
+ * is true whether or not a quotable statement survived, so it is said once, here and in the
+ * legend, rather than varying with a colour a reader would have to learn.
+ *
  * A contribution's diamond is labelled by its statement when it has one — a leaf's whole
  * content — rather than its short `kind`, which is why a long one may not resolve at low
  * zoom: it collides with whatever is near it under the same label-placement rules as any
  * other crowded label, and reappears once zooming spreads its neighbours far enough apart to
- * read the whole thing. A contribution with no statement, a plain relationship between
- * concepts nobody's account carries alone, is labelled by its `kind` instead.
+ * read the whole thing. A contribution with no statement — the model produced none, or the
+ * Chatham House check in llm_engine's quoteSafety.ts stripped one that risked identifying
+ * someone — is labelled by its `kind` instead, and outlined with {@link contributionDasharray}'s
+ * dashed pattern so a reader can tell a quote from a summary without mistaking either for a
+ * different category of node.
  *
  * Every label wraps to {@link wrapLabel} rather than running as one line — a leaf's statement
  * stays a block near its own node instead of a line long enough to cross the canvas — and
@@ -197,6 +233,21 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
   const { simNodes, links, originLinks, degree } = useMemo(() => buildGraph(payload), [payload]);
   const isEmpty = simNodes.length === 0;
   const hasOrigins = useMemo(() => simNodes.some((n) => n.type === 'origin'), [simNodes]);
+  /* Whether this graph actually has a contribution of each weight — quoted, or summarised
+     down to its bare `kind` — so the legend only shows an entry this graph actually draws.
+     One pair, not one per shape: whether a contribution is a diamond or a two-concept line is
+     a layout detail (see buildGraph), not information, so the legend doesn't spend an entry
+     on it — the caption below covers it in a sentence instead. */
+  const hasQuotedContribution = useMemo(
+    () => simNodes.some((n) => n.type === 'contribution' && !!n.statement) || links.some((l) => !!l.relationship?.statement),
+    [simNodes, links],
+  );
+  const hasSummarizedContribution = useMemo(
+    () =>
+      simNodes.some((n) => n.type === 'contribution' && !n.statement) ||
+      links.some((l) => l.relationship && !l.relationship.statement),
+    [simNodes, links],
+  );
 
   /* A series graph folds in every event under a topic, so which session raised a concept is
      worth seeing; a single event's graph has nothing to distinguish and this is empty. */
@@ -1062,6 +1113,7 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
             stroke={stroke}
             strokeWidth={strokeWidth}
             strokeOpacity={strokeOpacity}
+            strokeDasharray={contributionDasharray(relationship.statement)}
             style={{ transition: 'stroke 150ms ease, stroke-width 150ms ease, stroke-opacity 150ms ease' }}
           />
         </g>
@@ -1118,17 +1170,37 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
           ) : (
             <LegendChip color={CONCEPT} shape="circle" label="concept" />
           )}
-          <LegendChip color={CONTRIBUTION} shape="diamond" label="relationship" />
-          {/* Unconditional here would legend a shape this graph never draws — the same
-              condition already gates the "Show origin prompts" button above. */}
+          {/* Gated the same way the origin chip below already is: legending a weight this
+              graph never actually draws would teach a distinction with nothing to point at.
+              One diamond swatch stands for both diamonds and two-concept lines — see the
+              caption below for the shape itself, which the legend doesn't spend an entry on.
+              "Statement" vs "sentiment" is the same quoted/summarised distinction the code
+              (and NodeDetail's own eyebrow) still calls a contribution either way — see the
+              CONTRIBUTION comment above; these two are user-facing labels for it, not a
+              rename of the underlying concept. */}
+          {hasQuotedContribution && <LegendChip color={CONTRIBUTION} shape="diamond" label="participant statement" />}
+          {hasSummarizedContribution && (
+            <LegendChip color={CONTRIBUTION} shape="diamond" dashed label="participant sentiment" />
+          )}
           {hasOrigins && <LegendChip color={ORIGIN} shape="pill" label="origin prompt" />}
         </Box>
       </Box>
 
-      {/* The one thing the legend's shapes and colours don't say on their own: size is not
-          decorative, it's the same degree that drives focus and dimming everywhere else. */}
-      <Typography variant="caption" sx={{ display: 'block', color: MUTED, mt: -0.5, mb: 1 }}>
+      {/* Two things the legend's shapes and colours don't say on their own: size is not
+          decorative (it's the same degree that drives focus and dimming everywhere else), and
+          where a node comes from. A circle is a label the summary coined for a recurring idea;
+          every diamond — or connecting line, when it joins exactly two concepts rather than
+          getting a diamond of its own; see buildGraph — is something a participant actually
+          said or argued, quoted directly (a statement) or only summarised (a sentiment),
+          never invented independently of them. The legend spends an entry on that quoted/
+          summarised difference, since that's about content, but not on diamond vs. line,
+          since that's only ever a layout choice. */}
+      <Typography variant="caption" sx={{ display: 'block', color: MUTED, mt: -0.5 }}>
         Larger nodes have more connections.
+      </Typography>
+      <Typography variant="caption" sx={{ display: 'block', color: MUTED, mb: 1 }}>
+        Circles are concepts the summary drew out of the discussion. A participant statement or sentiment is a diamond, or —
+        when it joins exactly two concepts — the line between them.
       </Typography>
 
       {/* The graph in sentences, for screen readers and anyone who would rather not parse a
@@ -1152,7 +1224,7 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         width="100%"
         height={height}
         role="img"
-        aria-label={`Concept graph. Circles are concepts, diamonds are relationships joining them${
+        aria-label={`Concept graph. Circles are concepts. Diamonds, and lines connecting two concepts directly, are what someone in the discussion actually said or argued — a participant statement when a direct quote survived, a participant sentiment when only a short label did${
           hasOrigins ? `, dashed pills are the prompts they came out of${showOrigins ? '' : ' — currently hidden'}` : ''
         }. Scroll or pinch to zoom, drag to pan. Click a node to focus on it and its neighbours, click empty space or press Escape to return to the whole graph.`}
         /* A node's own click stops here before it bubbles, so this only ever fires for a
@@ -1224,6 +1296,12 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
                       fill={CONTRIBUTION_FILL}
                       stroke={isActive ? TEXT : CONTRIBUTION}
                       strokeWidth={isActive ? 2 : 1.3}
+                      // Solid for a quote, dashed for a summary-only `kind` — a dasharray
+                      // rather than an opacity or colour difference, because selection
+                      // recolours the stroke to TEXT regardless of statement (the line above),
+                      // which would otherwise erase the distinction at exactly the moment a
+                      // reader is looking closely enough to want it.
+                      strokeDasharray={contributionDasharray(node.statement)}
                       filter={isActive ? 'url(#concept-graph-focus-halo)' : undefined}
                       style={{ transition: 'stroke 150ms ease, stroke-width 150ms ease' }}
                     />
@@ -1373,6 +1451,8 @@ export const ConceptGraphView = ({ payload, height = DEFAULT_HEIGHT }: ConceptGr
         relationshipNode={relationshipNode}
         onSelect={setSelectedId}
       />
+
+      <GraphFeedback />
     </Box>
   );
 };
@@ -1444,7 +1524,14 @@ const NodeDetail = memo(function NodeDetail({
     );
   }
 
-  const kindLabel = node.type === 'origin' ? 'origin prompt' : node.type === 'contribution' ? 'relationship' : node.type;
+  const kindLabel =
+    node.type === 'origin'
+      ? 'origin prompt'
+      : node.type === 'contribution'
+        ? node.statement
+          ? 'participant statement'
+          : 'participant sentiment'
+        : node.type;
   const accent = node.type === 'concept' ? CONCEPT : node.type === 'contribution' ? CONTRIBUTION : ORIGIN;
 
   // A relationship's own concepts. Two shapes to walk, since a relationship joining three or
@@ -1598,7 +1685,21 @@ const NodeDetail = memo(function NodeDetail({
 });
 
 /** One entry in the shape legend above the canvas. */
-function LegendChip({ color, shape, label }: { color: string; shape: 'circle' | 'diamond' | 'pill'; label: string }) {
+function LegendChip({
+  color,
+  shape,
+  label,
+  dashed,
+}: {
+  color: string;
+  shape: 'circle' | 'diamond' | 'pill';
+  label: string;
+  /* Matches the diamond and relationship-line outline for a contribution with no statement —
+     see {@link contributionDasharray} — so the swatch teaches the same solid/dashed
+     distinction the canvas actually draws, rather than a third look a reader would have to
+     learn separately. */
+  dashed?: boolean;
+}) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
       <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
@@ -1613,6 +1714,7 @@ function LegendChip({ color, shape, label }: { color: string; shape: 'circle' | 
             fill={`${color}22`}
             stroke={color}
             strokeWidth="1.4"
+            strokeDasharray={dashed ? CONTRIBUTION_DASH : undefined}
           />
         )}
         {shape === 'pill' && (
