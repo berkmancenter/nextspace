@@ -1,9 +1,10 @@
 import { JWTDecryptResult } from 'jose';
 
 /**
- * Current cookie version - increment this when cookie structure changes
+ * Current cookie version. Increment it to invalidate every existing session,
+ * e.g. when the cookie's structure changes or cookies were written with wrong data.
  */
-export const CURRENT_COOKIE_VERSION = '1';
+export const CURRENT_COOKIE_VERSION = '2';
 
 /**
  * Required fields that must be present in a valid cookie payload
