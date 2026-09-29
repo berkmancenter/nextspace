@@ -366,6 +366,65 @@ describe('LoginPage', () => {
     });
   });
 
+  describe('which auth type the session cookie records', () => {
+    function mockLogin(role?: string) {
+      (Authenticate as jest.Mock).mockResolvedValue({
+        user: {
+          id: 'user123',
+          username: 'testuser',
+          ...(role ? { role } : {}),
+          pseudonyms: [{ pseudonym: 'Intuitive Lyra', active: true }],
+        },
+        tokens: {
+          access: { token: 'access-token-123' },
+          refresh: { token: 'refresh-token-456' },
+        },
+      });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ message: 'Successfully set cookie!' }),
+      });
+    }
+
+    async function signIn() {
+      const user = userEvent.setup();
+      render(<LoginPage />);
+      await user.type(screen.getByLabelText(/Username/i), 'testuser');
+      await user.type(document.querySelector('input[name="password"]')!, 'password123');
+      await user.click(screen.getByRole('button', { name: /Login/i }));
+    }
+
+    async function recordedAuthType() {
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/session', expect.anything()));
+      const [, request] = (global.fetch as jest.Mock).mock.calls.find(([url]) => url === '/api/session');
+      return JSON.parse(request.body).authType;
+    }
+
+    it('records an admin as admin', async () => {
+      mockLogin('admin');
+
+      await signIn();
+
+      expect(await recordedAuthType()).toBe('admin');
+    });
+
+    it('records a participant as a user, not an admin', async () => {
+      mockLogin('participant');
+
+      await signIn();
+
+      expect(await recordedAuthType()).toBe('user');
+    });
+
+    it('records an account with no role as a user', async () => {
+      mockLogin(undefined);
+
+      await signIn();
+
+      expect(await recordedAuthType()).toBe('user');
+    });
+  });
+
   it('handles missing active pseudonym error', async () => {
     const user = userEvent.setup();
     const mockLoginResponse = {
@@ -497,7 +556,7 @@ describe('LoginPage', () => {
             userId: 'legacy-user-id',
             accessToken: 'access-token-123',
             refreshToken: 'refresh-token-456',
-            authType: 'admin',
+            authType: 'user',
           }),
         }),
       );

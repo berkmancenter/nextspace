@@ -4,6 +4,7 @@ import { Alert, Box, Button, IconButton, InputAdornment, Link, Paper, Snackbar, 
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { Api, Authenticate } from '../utils';
 import SessionManager from '../utils/SessionManager';
+import { AuthType } from '../types.internal';
 
 // Only allow same-app relative paths (a single leading slash, not a
 // protocol-relative or backslash-prefixed URL, and no scheme like
@@ -90,6 +91,10 @@ export default function LoginPage() {
       // Mark session as authenticated with user info
       SessionManager.get().markAuthenticated(activePseudonym, userId);
 
+      // The backend's non-admin role is `participant`, but the session cookie
+      // only accepts guest/user/admin. An account with no role is not an admin.
+      const authType: AuthType = response.user?.role === 'admin' ? 'admin' : 'user';
+
       // Set session cookie via local API route, including expiry timestamps
       // so the cookie-based proactive refresh can schedule correctly.
       const sessionReq = await fetch('/api/session', {
@@ -104,7 +109,7 @@ export default function LoginPage() {
           refreshToken: response.tokens.refresh.token,
           accessExpires: response.tokens.access.expires,
           refreshExpires: response.tokens.refresh.expires,
-          authType: 'admin',
+          authType,
         }),
       });
       // Check if the session request was successful
@@ -118,10 +123,9 @@ export default function LoginPage() {
 
       // Send the user back to wherever they were headed (e.g. a link from an
       // email). Failing that, an admin starts on the events page and everyone
-      // else starts in the lounge. An account with no role is not an admin, so
-      // it lands in the lounge too.
+      // else starts in the lounge.
       const redirectTo = searchParams.get('redirectTo');
-      const home = response.user?.role === 'admin' ? '/admin/events' : '/lounge';
+      const home = authType === 'admin' ? '/admin/events' : '/lounge';
       router.push(isSafeRedirect(redirectTo) ? redirectTo : home);
     } catch (error: any) {
       console.error('Login failed:', error);
