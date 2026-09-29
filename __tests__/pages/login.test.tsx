@@ -157,7 +157,7 @@ describe('LoginPage', () => {
 
     // Verify session manager was called with pseudonym
     await waitFor(() => {
-      expect(mockMarkAuthenticated).toHaveBeenCalledWith('Intuitive Lyra', 'user123');
+      expect(mockMarkAuthenticated).toHaveBeenCalledWith('Intuitive Lyra', 'user123', 'admin');
     });
 
     // Verify session cookie API was called with pseudonym and authType: "admin"
@@ -416,6 +416,14 @@ describe('LoginPage', () => {
       expect(await recordedAuthType()).toBe('user');
     });
 
+    it('tells the session manager the auth type it recorded', async () => {
+      mockLogin('admin');
+
+      await signIn();
+
+      await waitFor(() => expect(mockMarkAuthenticated).toHaveBeenCalledWith('Intuitive Lyra', 'user123', 'admin'));
+    });
+
     it('records an account with no role as a user', async () => {
       mockLogin(undefined);
 
@@ -544,7 +552,7 @@ describe('LoginPage', () => {
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(mockMarkAuthenticated).toHaveBeenCalledWith('Legacy User', 'legacy-user-id');
+      expect(mockMarkAuthenticated).toHaveBeenCalledWith('Legacy User', 'legacy-user-id', 'user');
     });
 
     await waitFor(() => {
@@ -599,7 +607,7 @@ describe('LoginPage', () => {
 
     await waitFor(() => {
       // Verify new authenticated tokens were set
-      expect(SessionManager.get().markAuthenticated).toHaveBeenCalledWith('Authenticated Pro', 'auth-user-456');
+      expect(SessionManager.get().markAuthenticated).toHaveBeenCalledWith('Authenticated Pro', 'auth-user-456', 'admin');
     });
 
     // Verify new session cookie was created, replacing any existing one

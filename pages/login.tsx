@@ -88,12 +88,12 @@ export default function LoginPage() {
         return;
       }
 
-      // Mark session as authenticated with user info
-      SessionManager.get().markAuthenticated(activePseudonym, userId);
-
       // The backend's non-admin role is `participant`, but the session cookie
       // only accepts guest/user/admin. An account with no role is not an admin.
       const authType: AuthType = response.user?.role === 'admin' ? 'admin' : 'user';
+
+      // Mark session as authenticated with user info
+      SessionManager.get().markAuthenticated(activePseudonym, userId, authType);
 
       // Set session cookie via local API route, including expiry timestamps
       // so the cookie-based proactive refresh can schedule correctly.

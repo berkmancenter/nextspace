@@ -26,21 +26,21 @@ export const Layout = ({ children, authType = 'guest' }: Readonly<{ children: Re
   // land on) draw their own chrome and fill the viewport, so the app's header and footer
   // would frame a second header and push them into a scroll. A room's asPath carries a
   // room id rather than the literal "conversationId", so the check below can't see it.
-  const isRoomRoute =
+  const drawsOwnChrome =
     router.pathname.startsWith('/room') || router.pathname.startsWith('/lounge') || router.pathname === '/404';
 
   // Pages where footer should be hidden (full-screen chat interfaces)
-  const hideFooter = isRoomRoute || currentUrl.includes('conversationId');
+  const hideFooter = drawsOwnChrome || currentUrl.includes('conversationId');
 
   return (
     <div
       className={`min-h-screen flex flex-col ${
-        isRoomRoute || currentUrl.includes('conversationId')
+        drawsOwnChrome || currentUrl.includes('conversationId')
           ? 'bg-[#FFFFFF]'
           : 'bg-main bg-transparent bg-cover bg-center bg-no-repeat'
       }`}
     >
-      {!isRoomRoute && <Header authType={authType} />}
+      {!drawsOwnChrome && <Header authType={authType} />}
 
       <main className="flex-1">{children}</main>
 

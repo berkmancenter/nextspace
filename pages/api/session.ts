@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { EncryptJWT, jwtDecrypt, decodeJwt } from 'jose';
 import { withEnvValidation } from '../../utils/withEnvValidation';
-import { CURRENT_COOKIE_VERSION } from '../../utils/cookieValidator';
+import { CURRENT_COOKIE_VERSION, validateCookie } from '../../utils/cookieValidator';
 
 /**
  * API route to handle setting and updating the session cookie.
@@ -45,7 +45,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     try {
       // Decrypt existing cookie to get current data
-      const { payload } = await jwtDecrypt(existingCookie, secret);
+      const existing = await jwtDecrypt(existingCookie, secret);
+      const { payload } = existing;
+
+      // Re-stamping the current version onto an older cookie would carry its stale
+      // authType forward and undo a version bump meant to invalidate it.
+      const validation = validateCookie(existing);
+      if (!validation.isValid) {
+        console.warn('Refusing to refresh an invalid session cookie:', validation.error);
+        res.status(401).json({ error: 'Invalid session' });
+        return;
+      }
 
       // Derive the owning user from the access token itself so the cookie's
       // userId can never drift from the tokens stored next to it. The access

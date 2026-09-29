@@ -74,4 +74,41 @@ describe('middleware on admin routes', () => {
 
     expect(response.headers.get('location')).toBe('http://localhost:8080/signup');
   });
+
+  it('clears a cookie from an older version and sends the visitor to sign up', async () => {
+    mockSessionToken = 'encrypted-session';
+    (decryptCookie as jest.Mock).mockResolvedValue({
+      payload: {
+        access: 'access-token',
+        refresh: 'refresh-token',
+        userId: 'user-123',
+        authType: 'admin',
+        version: '1',
+      },
+    });
+
+    const response = await visit('/admin/events');
+
+    expect(response.headers.get('location')).toBe('http://localhost:8080/signup');
+    expect(response.headers.get('set-cookie')).toMatch(/nextspace-session=;.*Max-Age=0/i);
+  });
+});
+
+describe('middleware on other routes', () => {
+  beforeEach(() => {
+    mockSessionToken = undefined;
+    (decryptCookie as jest.Mock).mockReset();
+  });
+
+  it('lets a logged-in non-admin through to the lounge and their rooms', async () => {
+    signInAs('user');
+
+    for (const path of ['/lounge', '/room/abc123']) {
+      const response = await visit(path);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-middleware-rewrite')).toBeNull();
+      expect(response.headers.get('location')).toBeNull();
+    }
+  });
 });

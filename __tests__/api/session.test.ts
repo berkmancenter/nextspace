@@ -34,6 +34,7 @@ jest.mock('../../utils/withEnvValidation', () => ({
 
 // Import the handler after mocking
 import handler from '../../pages/api/session';
+import { CURRENT_COOKIE_VERSION } from '../../utils/cookieValidator';
 import { jwtDecrypt } from 'jose';
 
 const SECRET = 'bri956LLFxctMUwQYElvu8VcM/hIN/4O6dwGnPLd9WM=';
@@ -143,6 +144,7 @@ describe('/api/session', () => {
         userId: 'user-123',
         authType: 'user',
         sub: 'testuser',
+        version: CURRENT_COOKIE_VERSION,
         exp: Math.floor(Date.now() / 1000) + 3600,
       },
       protectedHeader: {
@@ -293,6 +295,7 @@ describe('/api/session', () => {
           userId: 'user-456',
           authType: 'admin',
           sub: 'adminuser',
+          version: CURRENT_COOKIE_VERSION,
           exp: Math.floor(Date.now() / 1000) + 7200,
         },
       } as any);
@@ -397,6 +400,37 @@ describe('/api/session', () => {
       expect(JSON.parse(res._getData())).toEqual({
         error: 'No session found',
       });
+    });
+
+    it('should refuse to refresh a cookie from an older cookie version', async () => {
+      mockJwtDecrypt.mockResolvedValueOnce({
+        payload: {
+          access: 'old-access',
+          refresh: 'old-refresh',
+          userId: 'user-123',
+          authType: 'admin',
+          sub: 'testuser',
+          version: '1',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+        },
+      } as any);
+
+      const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+        method: 'PATCH',
+        body: {
+          accessToken: 'new-access-token',
+          refreshToken: 'new-refresh-token',
+        },
+        cookies: {
+          'nextspace-session': 'version-1-cookie',
+        },
+      });
+
+      await handler(req, res);
+
+      expect(res._getStatusCode()).toBe(401);
+      expect(JSON.parse(res._getData())).toEqual({ error: 'Invalid session' });
+      expect(mockEncryptJWT).not.toHaveBeenCalled();
     });
 
     it('should return 400 if tokens are missing', async () => {
