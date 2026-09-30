@@ -49,12 +49,12 @@ describe('NotFoundPage', () => {
     warn.mockRestore();
   });
 
-  it('offers a community room member a way back to the lounge', () => {
+  it('offers a community room member a way back to the hallway', () => {
     mockAuthType = 'user';
 
     render(<NotFoundPage />);
 
-    expect(screen.getByRole('link', { name: 'Back to the lounge' })).toHaveAttribute('href', '/lounge');
+    expect(screen.getByRole('link', { name: 'Back to the hallway' })).toHaveAttribute('href', '/hallway');
     expect(screen.queryByRole('link', { name: 'Back to events' })).not.toBeInTheDocument();
   });
 
@@ -64,7 +64,7 @@ describe('NotFoundPage', () => {
     render(<NotFoundPage />);
 
     expect(screen.getByRole('link', { name: 'Back to events' })).toHaveAttribute('href', '/admin/events');
-    expect(screen.queryByRole('link', { name: 'Back to the lounge' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Back to the hallway' })).not.toBeInTheDocument();
   });
 
   it('has no detectable accessibility violations', async () => {

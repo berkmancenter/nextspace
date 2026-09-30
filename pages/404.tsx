@@ -26,7 +26,7 @@ export default function NotFoundPage() {
   const home =
     SessionManager.get().getAuthType() === 'admin'
       ? { href: '/admin/events', label: 'Back to events' }
-      : { href: '/lounge', label: 'Back to the lounge' };
+      : { href: '/hallway', label: 'Back to the hallway' };
 
   return (
     <div className={styles.root} style={roomFontVariables}>
