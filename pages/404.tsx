@@ -1,11 +1,28 @@
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import KeyboardReturnIcon from '@mui/icons-material/KeyboardReturn';
 import { BotIcon } from '../components/BotIcon';
 import SessionManager from '../utils/SessionManager';
+import { Api } from '../utils';
 import { roomFontVariables } from '../components/room/roomFonts';
 import styles from '../components/room/communityRoom.module.css';
 
 export default function NotFoundPage() {
+  const [agentName, setAgentName] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Api.get()
+      .GetConfig()
+      .then((config) => {
+        if (!cancelled) setAgentName(config.conversationBotName);
+      })
+      .catch((error) => console.warn('Could not load the agent name for the not-found page:', error));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const home =
     SessionManager.get().getAuthType() === 'admin'
       ? { href: '/admin/events', label: 'Back to events' }
@@ -15,7 +32,7 @@ export default function NotFoundPage() {
     <div className={styles.root} style={roomFontVariables}>
       <div className={styles.notFound}>
         <h1 className={styles.notFoundTitle}>Oops!</h1>
-        <p className={styles.notFoundMessage}>Berkie looked everywhere, but this page doesn&apos;t exist.</p>
+        <p className={styles.notFoundMessage}>{agentName ?? 'We'} looked everywhere, but this page doesn&apos;t exist.</p>
 
         <div className={styles.notFoundArt} aria-hidden="true">
           <svg viewBox="0 0 200 160" className={styles.notFoundBlob}>
