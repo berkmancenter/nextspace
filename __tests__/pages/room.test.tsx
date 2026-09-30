@@ -375,7 +375,7 @@ describe('RoomPage', () => {
 
       await user.click(screen.getByRole('button', { name: 'Menu' }));
 
-      expect(screen.getByRole('link', { name: 'Return to the hallway' })).toHaveAttribute('href', '/lounge');
+      expect(screen.getByRole('link', { name: 'Return to the hallway' })).toHaveAttribute('href', '/hallway');
     });
   });
 

@@ -2,13 +2,13 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
-import LoungePage from '../../pages/lounge';
+import LoungePage from '../../pages/hallway';
 import { LoungeRoom } from '../../types.internal';
 
 const mockRouter = {
   push: jest.fn(),
   isReady: true,
-  pathname: '/lounge',
+  pathname: '/hallway',
 };
 
 jest.mock('next/router', () => ({
@@ -149,6 +149,7 @@ describe('Lounge page', () => {
 
       const lounge = await screen.findByRole('link', { name: 'Hallway' });
       expect(lounge).toHaveAttribute('aria-current', 'page');
+      expect(lounge).toHaveAttribute('href', '/hallway');
     });
 
     it('links to the profile screen', async () => {

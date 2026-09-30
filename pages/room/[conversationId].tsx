@@ -461,7 +461,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
           <button type="button" aria-label="Close menu" className={styles.menuClose} onClick={() => setMenuOpen(false)}>
             <CloseIcon />
           </button>
-          <Link href="/lounge" className={styles.menuItem}>
+          <Link href="/hallway" className={styles.menuItem}>
             Return to the hallway
           </Link>
           <Link href={GIVE_FEEDBACK_URL} target="_blank" rel="noopener noreferrer" className={styles.menuItem}>

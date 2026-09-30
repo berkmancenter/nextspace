@@ -123,9 +123,9 @@ export default function LoginPage() {
 
       // Send the user back to wherever they were headed (e.g. a link from an
       // email). Failing that, an admin starts on the events page and everyone
-      // else starts in the lounge.
+      // else starts in the hallway.
       const redirectTo = searchParams.get('redirectTo');
-      const home = authType === 'admin' ? '/admin/events' : '/lounge';
+      const home = authType === 'admin' ? '/admin/events' : '/hallway';
       router.push(isSafeRedirect(redirectTo) ? redirectTo : home);
     } catch (error: any) {
       console.error('Login failed:', error);

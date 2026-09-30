@@ -45,8 +45,8 @@ describe('Layout', () => {
     expect(screen.getByText('room body')).toBeInTheDocument();
   });
 
-  it('leaves the lounge to draw its own chrome', () => {
-    mockUseRouter.mockReturnValue({ pathname: '/lounge', asPath: '/lounge', isReady: true });
+  it('leaves the hallway to draw its own chrome', () => {
+    mockUseRouter.mockReturnValue({ pathname: '/hallway', asPath: '/hallway', isReady: true });
 
     render(
       <Layout>
