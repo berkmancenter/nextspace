@@ -6,6 +6,10 @@ import { PseudonymousMessage } from '../types.internal';
 import { Api, RetrieveData, SendData } from '../utils';
 import { trackFeatureUsage, trackConversationEvent } from '../utils/analytics';
 import { useVisibilityAwareDuration } from '../hooks/useVisibilityAwareDuration';
+import { BotIcon } from './BotIcon';
+import { getAssistantAvatarStyle } from '../utils/avatarUtils';
+import { normalizeAssistantPseudonym } from '../utils/Helpers';
+import { useBotName } from '../context/ConversationTypeContext';
 
 interface TranscriptProps {
   /** The time range to focus on in the transcript */
@@ -47,7 +51,10 @@ interface TranscriptProps {
  *
  * @param props - Props for the Transcript component
  */
+const botColor = getAssistantAvatarStyle().avatarBg;
+
 export function Transcript(props: TranscriptProps) {
+  const botName = useBotName();
   const [messages, setMessages] = useState<PseudonymousMessage[]>([]);
   const [isOpen, setIsOpen] = useState<boolean>(true);
   const [focusedMessageIds, setFocusedMessageIds] = useState<string[]>([]);
@@ -680,24 +687,39 @@ export function Transcript(props: TranscriptProps) {
           className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col-reverse min-h-0 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[#2D0A4E] [&::-webkit-scrollbar-thumb]:bg-[#6B21A8] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-[#7C3AED]"
         >
           <div ref={topRef} />
-          {messages.map((message, i) => (
-            <div
-              id={`transcript-message-${message.id}`}
-              key={`message-${i}`}
-              className={`mb-4 ${focusedMessageIds.includes(message.id!) ? 'bg-[#4A0979]' : ''}`}
-            >
-              <div className="text-gray-300 text-sm mb-1">
-                {message.createdAt
-                  ? new Date(message.createdAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: true,
-                    })
-                  : ''}
+          {messages.map((message, i) => {
+            const isBot = message.fromAgent;
+
+            return (
+              <div
+                id={`transcript-message-${message.id}`}
+                key={`message-${i}`}
+                className={`mb-4 ${focusedMessageIds.includes(message.id!) ? 'bg-[#4A0979]' : ''}`}
+              >
+                <div className="flex items-center gap-2 text-gray-300 text-sm mb-1">
+                  <span>
+                    {message.createdAt
+                      ? new Date(message.createdAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true,
+                        })
+                      : ''}
+                  </span>
+                  {isBot && (
+                    <span
+                      className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold"
+                      style={{ backgroundColor: `${botColor}66`, color: botColor }}
+                    >
+                      <BotIcon size={12} color={botColor} />
+                      {normalizeAssistantPseudonym(message, botName)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-white text-base">{message.body.text ? message.body.text : message.body}</p>
               </div>
-              <p className="text-white text-base">{message.body.text ? message.body.text : message.body}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
