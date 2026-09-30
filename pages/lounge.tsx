@@ -92,7 +92,7 @@ export default function LoungePage() {
       <nav aria-label="Main sections" className={styles.nav}>
         <Link href="/lounge" aria-current="page" className={`${styles.navButton} ${styles.navButtonActive}`}>
           <HomeIcon sx={{ fontSize: 24 }} style={{ color: 'var(--room-text-primary)' }} />
-          <span className={styles.navLabelActive}>Lounge</span>
+          <span className={styles.navLabelActive}>Hallway</span>
         </Link>
         <Link href="/profile" className={styles.navButton}>
           <PersonOutlineIcon sx={{ fontSize: 24 }} style={{ color: 'var(--room-text-muted)' }} />

@@ -462,7 +462,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
             <CloseIcon />
           </button>
           <Link href="/lounge" className={styles.menuItem}>
-            Return to the lounge
+            Return to the hallway
           </Link>
           <Link href={GIVE_FEEDBACK_URL} target="_blank" rel="noopener noreferrer" className={styles.menuItem}>
             Give Feedback

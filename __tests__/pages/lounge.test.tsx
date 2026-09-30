@@ -147,7 +147,7 @@ describe('Lounge page', () => {
     it('marks the lounge as the current screen', async () => {
       render(<LoungePage />);
 
-      const lounge = await screen.findByRole('link', { name: 'Lounge' });
+      const lounge = await screen.findByRole('link', { name: 'Hallway' });
       expect(lounge).toHaveAttribute('aria-current', 'page');
     });
 

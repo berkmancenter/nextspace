@@ -369,13 +369,13 @@ describe('RoomPage', () => {
       expect(screen.getByRole('dialog', { name: 'Room menu' })).toBeInTheDocument();
     });
 
-    it('offers a way back to the lounge', async () => {
+    it('offers a way back to the hallway', async () => {
       const user = userEvent.setup();
       render(<RoomPage authType="user" />);
 
       await user.click(screen.getByRole('button', { name: 'Menu' }));
 
-      expect(screen.getByRole('link', { name: 'Return to the lounge' })).toHaveAttribute('href', '/lounge');
+      expect(screen.getByRole('link', { name: 'Return to the hallway' })).toHaveAttribute('href', '/lounge');
     });
   });
 
