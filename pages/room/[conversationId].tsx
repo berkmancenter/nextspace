@@ -118,7 +118,11 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
        this one loaded. Re-reading the account tells the two apart without matching the
        server's wording. */
     const account = await RetrieveData(`users/user/${userId}`, Api.get().getAccessToken());
-    const existing = account && !account.error ? realNameFor(account.pseudonyms ?? [], conversationId) : undefined;
+    if (!account || account.error) {
+      console.error('Could not re-read this account after the server turned down its real name:', account?.status);
+      return { ok: false };
+    }
+    const existing = realNameFor(account.pseudonyms ?? [], conversationId);
     if (!existing) return { ok: false, taken: true };
     setRegisteredName(existing);
     return { ok: true };

@@ -94,13 +94,15 @@ jest.mock('../../components/room/CommunityGroupChatPanel', () => ({
 }));
 
 jest.mock('../../components/room/SetRealNameDialog', () => ({
-  SetRealNameDialog: ({ open, onSave, onDismiss }: any) =>
-    open ? (
-      <div data-testid="set-real-name-dialog">
-        <button onClick={() => onSave('Alex Admin')}>Confirm name</button>
+  SetRealNameDialog: function MockSetRealNameDialog({ open, onSave, onDismiss }: any) {
+    const [result, setResult] = jest.requireActual('react').useState(null);
+    return open ? (
+      <div data-testid="set-real-name-dialog" data-save-result={result ? JSON.stringify(result) : ''}>
+        <button onClick={async () => setResult(await onSave('Alex Admin'))}>Confirm name</button>
         <button onClick={onDismiss}>Just reading</button>
       </div>
-    ) : null,
+    ) : null;
+  },
 }));
 
 jest.mock('../../components/room/CommunityAssistantPanel', () => ({
@@ -521,8 +523,33 @@ describe('RoomPage', () => {
         await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
         await user.click(screen.getByText('Confirm name'));
 
-        await waitFor(() => expect(mockSendData).toHaveBeenCalled());
-        expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument();
+        await waitFor(() =>
+          expect(screen.getByTestId('set-real-name-dialog')).toHaveAttribute(
+            'data-save-result',
+            '{"ok":false,"taken":true}',
+          ),
+        );
+      });
+
+      it('reports a failed save rather than a taken name when the account cannot be re-read', async () => {
+        const user = userEvent.setup();
+        let accountReads = 0;
+        mockRetrieveData.mockImplementation((url: string) => {
+          if (!url.startsWith('users/user/')) return Promise.resolve([]);
+          accountReads += 1;
+          return Promise.resolve(
+            accountReads === 1 ? adminAccount(['some-other-room']) : { error: true, status: 500, message: 'Server error' },
+          );
+        });
+        mockSendData.mockResolvedValue({ error: true, status: 409, message: 'Conflict' });
+        render(<RoomPage authType="admin" />);
+
+        await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
+        await user.click(screen.getByText('Confirm name'));
+
+        await waitFor(() =>
+          expect(screen.getByTestId('set-real-name-dialog')).toHaveAttribute('data-save-result', '{"ok":false}'),
+        );
       });
 
       /* A post can leave before the account loads and locks the composer, so a refusal for want
