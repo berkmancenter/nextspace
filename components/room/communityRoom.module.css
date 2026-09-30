@@ -552,9 +552,6 @@
 }
 
 .dayDivider {
-  position: sticky;
-  top: 2px;
-  z-index: 2;
   align-self: center;
   padding: 4px 12px;
   border: 1px solid var(--room-nav-border);
