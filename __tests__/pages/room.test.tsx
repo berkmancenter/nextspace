@@ -60,6 +60,8 @@ jest.mock('../../components/room/CommunityGroupChatPanel', () => ({
     messages,
     realName,
     isAdmin,
+    mustSetRealName,
+    onRequestRealName,
     onSendMessage,
     onRetryPendingMessage,
     pendingMessages = [],
@@ -68,6 +70,7 @@ jest.mock('../../components/room/CommunityGroupChatPanel', () => ({
       data-testid="group-chat-panel"
       data-real-name={realName}
       data-is-admin={isAdmin ? 'true' : 'false'}
+      data-must-set-real-name={mustSetRealName ? 'true' : 'false'}
       data-pending={pendingMessages.map((m: any) => m.body).join('|')}
       data-pending-failed={pendingMessages
         .filter((m: any) => m.failed)
@@ -82,6 +85,7 @@ jest.mock('../../components/room/CommunityGroupChatPanel', () => ({
         <div key={m.id}>{typeof m.body === 'string' ? m.body : m.body?.text}</div>
       ))}
       <button onClick={() => onSendMessage('hello room')}>Send group message</button>
+      <button onClick={onRequestRealName}>Request real name</button>
       <button onClick={() => onRetryPendingMessage?.(pendingMessages.find((m: any) => m.failed)?.id)}>
         Retry group message
       </button>
@@ -100,8 +104,12 @@ jest.mock('../../components/room/SetRealNameDialog', () => ({
 }));
 
 jest.mock('../../components/room/CommunityAssistantPanel', () => ({
-  CommunityAssistantPanel: ({ messages, onSendMessage, pendingMessages = [] }: any) => (
-    <div data-testid="assistant-panel" data-pending={pendingMessages.map((m: any) => m.body).join('|')}>
+  CommunityAssistantPanel: ({ messages, mustSetRealName, onSendMessage, pendingMessages = [] }: any) => (
+    <div
+      data-testid="assistant-panel"
+      data-must-set-real-name={mustSetRealName ? 'true' : 'false'}
+      data-pending={pendingMessages.map((m: any) => m.body).join('|')}
+    >
       {messages.map((m: any) => (
         <div key={m.id}>{typeof m.body === 'string' ? m.body : m.body?.text}</div>
       ))}
@@ -492,8 +500,8 @@ describe('RoomPage', () => {
         expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument();
       });
 
-      /* Dismissing must not be a dead end. An admin who declines and then tries to post is
-         refused, and that refusal is the only thing that can bring the prompt back. */
+      /* A post can leave before the account loads and locks the composer, so a refusal for want
+         of a name still brings the prompt back. */
       it('asks again when a dismissed admin tries to post', async () => {
         const user = userEvent.setup();
         renderWithAccount(adminAccount(['some-other-room']));
@@ -537,6 +545,38 @@ describe('RoomPage', () => {
 
         await waitFor(() => expect(mockSendData).toHaveBeenCalled());
         expect(screen.queryByTestId('set-real-name-dialog')).not.toBeInTheDocument();
+      });
+
+      it('locks both composers for an admin with no name for this room', async () => {
+        const user = userEvent.setup();
+        renderWithAccount(adminAccount(['some-other-room']));
+
+        await waitFor(() =>
+          expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-must-set-real-name', 'true'),
+        );
+
+        await user.click(screen.getByText('Just reading'));
+        await user.click(screen.getByRole('button', { name: 'Berkie' }));
+
+        expect(screen.getByTestId('assistant-panel')).toHaveAttribute('data-must-set-real-name', 'true');
+      });
+
+      it('leaves the composer open for an admin who already has a name for this room', async () => {
+        renderWithAccount(adminAccount(['test-room-id']));
+
+        await waitFor(() => expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-is-admin', 'true'));
+        expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-must-set-real-name', 'false');
+      });
+
+      it('reopens the prompt when a dismissed admin reaches for the locked composer', async () => {
+        const user = userEvent.setup();
+        renderWithAccount(adminAccount(['some-other-room']));
+
+        await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
+        await user.click(screen.getByText('Just reading'));
+        await user.click(screen.getByText('Request real name'));
+
+        expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument();
       });
 
       it('stops asking once the admin says they are only reading', async () => {

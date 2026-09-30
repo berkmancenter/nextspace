@@ -94,8 +94,9 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
 
   const realName = registeredName ?? sessionPseudonym;
 
-  // An admin may decline: reading needs no name, and the server still refuses their posts.
-  const needsRealName = isAdmin && !registeredName && !readingOnly;
+  const missingRealName = isAdmin && !registeredName;
+  // An admin may decline: reading needs no name, and the composer stays locked until they set one.
+  const realNameDialogOpen = missingRealName && !readingOnly;
 
   const saveRealName = async (candidate: string): Promise<SaveRealNameResult> => {
     if (!conversationId) return { ok: false };
@@ -292,11 +293,11 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   );
 
   /**
-   * A post refused for want of a name is the only route back to the naming prompt for an admin
-   * who declined it, since the room offers no other way to set one. Any other refusal leaves the
-   * prompt shut, so a network or moderation failure does not reopen a dialog that cannot help.
-   * Watched here rather than handled inside deliverMessage, which is memoised on its own
-   * dependencies.
+   * The locked composer normally stops an admin with no name from posting, but isAdmin and
+   * registeredName load after the first render, so a post can slip out before the lock does.
+   * A refusal for want of a name reopens the prompt; any other refusal leaves it shut, so a
+   * moderation failure does not reopen a dialog that cannot help. Watched here rather than
+   * handled inside deliverMessage, which is memoised on its own dependencies.
    */
   useEffect(() => {
     if (isAdmin && !registeredName && queuedMessages.some((m) => m.refusedForMissingName)) setReadingOnly(false);
@@ -482,6 +483,8 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
             pendingMessages={queuedAssistantMessages}
             onRetryPendingMessage={retryQueuedMessage}
             offline={isOffline}
+            mustSetRealName={missingRealName}
+            onRequestRealName={() => setReadingOnly(false)}
             waitingForResponse={waitingForAssistantResponse}
             onSendMessage={(message) => sendMessage('assistant', message)}
           />
@@ -497,6 +500,8 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
             pendingMessages={queuedChatMessages}
             onRetryPendingMessage={retryQueuedMessage}
             offline={isOffline}
+            mustSetRealName={missingRealName}
+            onRequestRealName={() => setReadingOnly(false)}
             waitingForResponse={waitingForChatResponse}
             messagesWithUnreadReplies={messagesWithUnreadReplies}
             onSendMessage={(message, parentMessageId) => sendMessage('chat', message, parentMessageId)}
@@ -511,7 +516,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
         )}
       </div>
 
-      <SetRealNameDialog open={needsRealName} onSave={saveRealName} onDismiss={() => setReadingOnly(true)} />
+      <SetRealNameDialog open={realNameDialogOpen} onSave={saveRealName} onDismiss={() => setReadingOnly(true)} />
 
       <CommunityNavigationBar
         activeTab={activeTab as CommunityNavTab}

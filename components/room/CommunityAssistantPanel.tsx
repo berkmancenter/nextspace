@@ -25,6 +25,9 @@ interface CommunityAssistantPanelProps {
   onRetryPendingMessage?: (id: string) => void;
   /** True while the socket is down, which greys out the composer shortcuts. */
   offline?: boolean;
+  /** True while the room has no real name for the reader, which locks the composer. */
+  mustSetRealName?: boolean;
+  onRequestRealName?: () => void;
   waitingForResponse?: boolean;
   onSendMessage: (message: string) => Promise<boolean>;
 }
@@ -51,6 +54,8 @@ export function CommunityAssistantPanel({
   pendingMessages = [],
   onRetryPendingMessage,
   offline = false,
+  mustSetRealName = false,
+  onRequestRealName,
   waitingForResponse = false,
   onSendMessage,
 }: CommunityAssistantPanelProps) {
@@ -225,6 +230,8 @@ export function CommunityAssistantPanel({
           mentionTargets={[]}
           onSendMessage={onSendMessage}
           offline={offline}
+          mustSetRealName={mustSetRealName}
+          onRequestRealName={onRequestRealName}
           waitingForResponse={waitingForResponse}
         />
       </div>

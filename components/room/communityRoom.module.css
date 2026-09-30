@@ -39,6 +39,8 @@
   --room-composer-bg: #f6f5f1;
   --room-composer-border: #dedbd3;
   --room-composer-border-focus: #4845d2;
+  /* Purple on the dark composer is under 3:1, so dark mode swaps in the focus blue. */
+  --room-composer-action: #4845d2;
 
   --room-badge-border: rgba(17, 22, 28, 0.16);
   --room-live-border: rgba(15, 125, 107, 0.34);
@@ -78,6 +80,7 @@
     --room-composer-bg: #111214;
     --room-composer-border: rgba(255, 255, 255, 0.13);
     --room-composer-border-focus: #96aec6;
+    --room-composer-action: #96aec6;
 
     --room-badge-border: rgba(255, 255, 255, 0.16);
 
@@ -114,6 +117,7 @@
   --room-composer-bg: #111214;
   --room-composer-border: rgba(255, 255, 255, 0.13);
   --room-composer-border-focus: #96aec6;
+  --room-composer-action: #96aec6;
 
   --room-badge-border: rgba(255, 255, 255, 0.16);
 
@@ -293,6 +297,50 @@
 
 .composerTextarea::placeholder {
   color: var(--room-text-muted);
+}
+
+.nameGate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+  padding: 2px 8px 0 12px;
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.nameGateIcon {
+  flex: none;
+  color: var(--room-text-muted);
+}
+
+.nameGateHelp {
+  margin: 0;
+  color: var(--room-text-body);
+}
+
+.nameGateAction {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--room-composer-action);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.nameGateAction:hover {
+  text-decoration-thickness: 2px;
+}
+
+.nameGateAction:focus-visible {
+  outline: 2px solid var(--room-composer-action);
+  outline-offset: 2px;
 }
 
 /* space-between is what keeps @ and Ask [botName] on the left edge with send pinned

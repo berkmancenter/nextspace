@@ -23,6 +23,8 @@ interface ThreadPanelProps {
   botName: string;
   feedbackConfig?: FeedbackConfig;
   waitingForResponse?: boolean;
+  /** Shown in place of the reply box when the reader may not reply yet. */
+  replyLock?: React.ReactNode;
 }
 
 export const ThreadPanel: FC<ThreadPanelProps> = ({
@@ -38,6 +40,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
   botName,
   feedbackConfig,
   waitingForResponse = false,
+  replyLock,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -330,7 +333,9 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
 
         {/* Reply action area - directly below messages */}
         <div className="pt-4">
-          {isReplying ? (
+          {replyLock ? (
+            replyLock
+          ) : isReplying ? (
             <div className="border-[1px] border-[#A5B4FC] rounded-lg bg-white transition-all focus-within:border-[#6366f1] focus-within:shadow-md">
               <textarea
                 ref={textareaRef}

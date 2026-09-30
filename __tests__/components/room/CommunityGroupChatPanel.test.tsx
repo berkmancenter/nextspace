@@ -15,6 +15,7 @@ jest.mock('../../../hooks/useAutoScroll', () => ({
 }));
 
 jest.mock('../../../components/room/CommunityMessageInput', () => ({
+  ...jest.requireActual('../../../components/room/CommunityMessageInput'),
   CommunityMessageInput: ({ onSendMessage, tab, isEmptyRoom }: any) => (
     <div data-testid="community-message-input" data-tab={tab} data-empty-room={isEmptyRoom ? 'true' : 'false'}>
       <input
@@ -446,6 +447,34 @@ describe('CommunityGroupChatPanel', () => {
 
     expect(screen.getByText('Reading them tonight.')).toBeInTheDocument();
     expect(screen.getByText('Waiting to send')).toBeInTheDocument();
+  });
+
+  it('locks the thread reply box while the reader has no real name', async () => {
+    const user = userEvent.setup();
+    const onRequestRealName = jest.fn();
+    const parent = {
+      id: 'parent-1',
+      pseudonym: 'Sofia Marchetti',
+      body: 'Both Aadhaar pieces are in the shared folder now.',
+      createdAt: '2026-08-26T09:00:00.000Z',
+    };
+
+    render(
+      <CommunityGroupChatPanel
+        {...baseProps}
+        messages={[parent as any]}
+        mustSetRealName
+        onRequestRealName={onRequestRealName}
+      />,
+    );
+
+    const bubble = screen.getByText('Both Aadhaar pieces are in the shared folder now.');
+    fireEvent.mouseEnter(bubble.parentElement!.parentElement!.parentElement!);
+    fireEvent.click(await screen.findByLabelText('Reply to Sofia Marchetti'));
+
+    expect(screen.queryByPlaceholderText('Reply...')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Set your name' }));
+    expect(onRequestRealName).toHaveBeenCalledTimes(1);
   });
 
   it('has no accessibility violations in the empty state', async () => {

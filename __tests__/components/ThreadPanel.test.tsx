@@ -77,6 +77,14 @@ describe('ThreadPanel Component', () => {
     jest.clearAllMocks();
   });
 
+  it('shows the reply lock in place of the reply box when one is given', () => {
+    render(<ThreadPanel {...defaultProps} replyLock={<button type="button">Set your name first</button>} />);
+
+    expect(screen.getByRole('button', { name: 'Set your name first' })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Reply...')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Send reply')).not.toBeInTheDocument();
+  });
+
   it('renders the thread panel header', () => {
     render(<ThreadPanel {...defaultProps} />);
     expect(screen.getByText('Replies')).toBeInTheDocument();

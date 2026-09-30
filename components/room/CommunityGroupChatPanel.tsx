@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { ThreadedMessage, isReadersMessage } from '../ThreadedMessage';
 import { ThreadPanel } from '../ThreadPanel';
 import { BotIcon } from '../BotIcon';
-import { CommunityMessageInput } from './CommunityMessageInput';
+import { CommunityMessageInput, RealNameGate } from './CommunityMessageInput';
 import { MemberIntroContent, PendingRoomMessage, PseudonymousMessage } from '../../types.internal';
 import { MemberIntroCard } from './MemberIntroCard';
 import { PendingBubble, PendingMessage } from './PendingMessage';
@@ -32,6 +32,9 @@ interface CommunityGroupChatPanelProps {
   onRetryPendingMessage?: (id: string) => void;
   /** True while the socket is down, which greys out the composer shortcuts. */
   offline?: boolean;
+  /** True while the room has no real name for the reader, which locks the composer. */
+  mustSetRealName?: boolean;
+  onRequestRealName?: () => void;
   waitingForResponse?: boolean;
   messagesWithUnreadReplies?: Set<string>;
   onSendMessage: (message: string, parentMessageId?: string) => Promise<boolean>;
@@ -96,6 +99,8 @@ export function CommunityGroupChatPanel({
   pendingMessages = [],
   onRetryPendingMessage,
   offline = false,
+  mustSetRealName = false,
+  onRequestRealName,
   waitingForResponse = false,
   messagesWithUnreadReplies = new Set(),
   onSendMessage,
@@ -397,6 +402,8 @@ export function CommunityGroupChatPanel({
             onSendMessage={onSendMessage}
             isEmptyRoom={isEmptyRoom}
             offline={offline}
+            mustSetRealName={mustSetRealName}
+            onRequestRealName={onRequestRealName}
             waitingForResponse={waitingForResponse && !waitingForThreadedReply}
           />
         </div>
@@ -416,6 +423,13 @@ export function CommunityGroupChatPanel({
             enhancers={[]}
             botName={botName}
             waitingForResponse={!!(waitingForThreadedReply && lastMessage?.parentMessage === selectedThreadId)}
+            replyLock={
+              mustSetRealName ? (
+                <div className={styles.composerBox}>
+                  <RealNameGate onRequestRealName={onRequestRealName} />
+                </div>
+              ) : undefined
+            }
           />
         </div>
       )}
