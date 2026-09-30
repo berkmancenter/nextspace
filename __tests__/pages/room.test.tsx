@@ -488,6 +488,31 @@ describe('RoomPage', () => {
         expect(screen.queryByTestId('set-real-name-dialog')).not.toBeInTheDocument();
       });
 
+      /* The server answers 409 both for a name someone else holds and for an account that
+         already has a name here, which a tab opened before that claim would not know about. */
+      it('picks up the name the account already has here instead of calling it taken', async () => {
+        const user = userEvent.setup();
+        let accountReads = 0;
+        mockRetrieveData.mockImplementation((url: string) => {
+          if (!url.startsWith('users/user/')) return Promise.resolve([]);
+          accountReads += 1;
+          return Promise.resolve(
+            adminAccount(accountReads === 1 ? ['some-other-room'] : ['some-other-room', 'test-room-id']),
+          );
+        });
+        mockSendData.mockResolvedValue({ error: true, status: 409, message: 'Conflict' });
+        render(<RoomPage authType="admin" />);
+
+        await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
+        await user.click(screen.getByText('Confirm name'));
+
+        await waitFor(() =>
+          expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-real-name', 'Chelsea Johnson'),
+        );
+        expect(screen.queryByTestId('set-real-name-dialog')).not.toBeInTheDocument();
+        expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-must-set-real-name', 'false');
+      });
+
       it('keeps the dialog open when the name is already taken here', async () => {
         const user = userEvent.setup();
         mockSendData.mockResolvedValue({ error: true, status: 409, message: 'Conflict' });

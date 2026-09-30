@@ -48,6 +48,10 @@ function isMissingRealNameRefusal(response: { status?: number }): boolean {
   return response.status === 400;
 }
 
+function realNameFor(pseudonyms: UserPseudonym[], conversationId: string): string | undefined {
+  return pseudonyms.find((p) => p.isRealName && p.conversations?.includes(conversationId))?.pseudonym;
+}
+
 export default function RoomPage({ authType }: { authType: AuthType }) {
   const router = useRouter();
   const conversationId = router.query.conversationId as string | undefined;
@@ -81,9 +85,8 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
         console.warn('Could not read this account, so the room falls back to the session pseudonym:', account?.status);
         return;
       }
-      const pseudonyms: UserPseudonym[] = account.pseudonyms ?? [];
-      const registered = pseudonyms.find((p) => p.isRealName && p.conversations?.includes(conversationId));
-      if (registered) setRegisteredName(registered.pseudonym);
+      const registered = realNameFor(account.pseudonyms ?? [], conversationId);
+      if (registered) setRegisteredName(registered);
       setIsAdmin(account.role === 'admin');
     })();
 
@@ -105,9 +108,19 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
       { conversationId, realName: candidate },
       Api.get().getAccessToken(),
     );
-    if (!Array.isArray(response)) return { ok: false, taken: response?.status === 409 };
-    const claimed = (response as UserPseudonym[]).find((p) => p.isRealName && p.conversations?.includes(conversationId));
-    setRegisteredName(claimed?.pseudonym ?? candidate);
+    if (Array.isArray(response)) {
+      setRegisteredName(realNameFor(response, conversationId) ?? candidate);
+      return { ok: true };
+    }
+    if (response?.status !== 409) return { ok: false };
+
+    /* A 409 also means this account already has a name here, claimed from another tab after
+       this one loaded. Re-reading the account tells the two apart without matching the
+       server's wording. */
+    const account = await RetrieveData(`users/user/${userId}`, Api.get().getAccessToken());
+    const existing = account && !account.error ? realNameFor(account.pseudonyms ?? [], conversationId) : undefined;
+    if (!existing) return { ok: false, taken: true };
+    setRegisteredName(existing);
     return { ok: true };
   };
 
