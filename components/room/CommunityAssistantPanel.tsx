@@ -149,7 +149,9 @@ export function CommunityAssistantPanel({
                 <button
                   key={chip}
                   type="button"
+                  disabled={mustSetRealName}
                   onClick={() => onSendMessage(chip)}
+                  className={mustSetRealName ? styles.shortcutIdle : undefined}
                   style={{
                     minHeight: 44,
                     textAlign: 'left',
@@ -161,7 +163,7 @@ export function CommunityAssistantPanel({
                     fontSize: 14,
                     fontWeight: 500,
                     color: 'var(--room-text-primary)',
-                    cursor: 'pointer',
+                    cursor: mustSetRealName ? 'default' : 'pointer',
                   }}
                 >
                   {chip}

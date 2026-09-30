@@ -77,6 +77,17 @@ describe('CommunityAssistantPanel', () => {
     expect(mockOnSendMessage).toHaveBeenCalledWith('What did I miss this week?');
   });
 
+  it('disables the suggestion chips until the reader sets a real name', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    render(<CommunityAssistantPanel {...baseProps} mustSetRealName />);
+
+    const chip = screen.getByRole('button', { name: 'What did I miss this week?' });
+    expect(chip).toBeDisabled();
+    await user.click(chip);
+
+    expect(mockOnSendMessage).not.toHaveBeenCalled();
+  });
+
   it('does not show the empty-state hero once there are messages', () => {
     const messages = [
       {
