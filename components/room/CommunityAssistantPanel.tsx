@@ -64,6 +64,9 @@ export function CommunityAssistantPanel({
 
   const parentMessages = useMemo(() => messages.filter((m) => !m.parentMessage), [messages]);
 
+  const renderNameBadge = (message: PseudonymousMessage) =>
+    message.fromAgent ? <span className={`${styles.agentBadge} ${styles.agentBadgeBesideName}`}>AI Bot</span> : null;
+
   const renderAvatar = (message: PseudonymousMessage) => {
     if (message.fromAgent) {
       return (
@@ -88,9 +91,6 @@ export function CommunityAssistantPanel({
     if (message.fromAgent) {
       return (
         <div style={{ width: '85%' }}>
-          <div className={styles.agentBadge} style={{ marginBottom: 4 }}>
-            AI Bot
-          </div>
           <div
             className="rounded-2xl px-2 py-1"
             style={{
@@ -194,6 +194,7 @@ export function CommunityAssistantPanel({
                   botName={botName}
                   renderAvatar={renderAvatar}
                   renderMessageContent={renderMessageContent}
+                  renderNameBadge={renderNameBadge}
                   showTimestamp={showTimestamp}
                 />
               );

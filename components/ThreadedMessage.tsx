@@ -35,6 +35,8 @@ interface ThreadedMessageProps {
   botName: string;
   renderAvatar: (msg: PseudonymousMessage) => React.ReactNode;
   renderMessageContent: (msg: PseudonymousMessage, isHovered?: boolean) => React.ReactNode;
+  /** Drawn right after a sender's name, such as a bot label. */
+  renderNameBadge?: (msg: PseudonymousMessage) => React.ReactNode;
   feedbackConfig?: FeedbackConfig;
   showTimestamp: boolean;
   isThreadOpen?: boolean;
@@ -51,6 +53,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
   botName,
   renderAvatar,
   renderMessageContent,
+  renderNameBadge,
   feedbackConfig,
   showTimestamp,
   isThreadOpen = false,
@@ -196,6 +199,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
             {displayName}
             {message.ownerIsAdmin && <span className="text-gray-600 font-normal"> (Admin)</span>}
             {isCurrentUser && <span className="text-gray-600 font-normal"> (You)</span>}
+            {renderNameBadge?.(message)}
           </div>
 
           {/* Message bubble wrapper with hover state - extended to include button area */}
@@ -269,6 +273,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                     {isReadersMessage(replies[0], pseudonym, currentUserId) && (
                       <span className="text-gray-600 font-normal"> (You)</span>
                     )}
+                    {renderNameBadge?.(replies[0])}
                   </div>
 
                   {/* Message bubble */}

@@ -211,7 +211,7 @@ describe('CommunityGroupChatPanel', () => {
       },
     ];
     render(<CommunityGroupChatPanel {...baseProps} messages={messages} />);
-    expect(screen.getByText('AI Bot')).toBeInTheDocument();
+    expect(screen.getByText('AI Bot').parentElement).toHaveTextContent('Berkie');
   });
 
   it('sends a typed message through onSendMessage', async () => {

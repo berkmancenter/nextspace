@@ -19,6 +19,8 @@ interface ThreadPanelProps {
   onSendReply: (text: string, parentId: string) => void;
   renderAvatar: (msg: PseudonymousMessage) => React.ReactNode;
   renderMessageContent: (msg: PseudonymousMessage, isHovered?: boolean) => React.ReactNode;
+  /** Drawn right after a sender's name, such as a bot label. */
+  renderNameBadge?: (msg: PseudonymousMessage) => React.ReactNode;
   enhancers: InputEnhancer<any>[];
   botName: string;
   feedbackConfig?: FeedbackConfig;
@@ -36,6 +38,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
   onSendReply,
   renderAvatar,
   renderMessageContent,
+  renderNameBadge,
   enhancers,
   botName,
   feedbackConfig,
@@ -238,6 +241,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                 {isReadersMessage(parentMessage, pseudonym, currentUserId) && (
                   <span className="text-gray-600 font-normal"> (You)</span>
                 )}
+                {renderNameBadge?.(parentMessage)}
                 {parentMessage.createdAt && (
                   <span className="text-xs font-normal text-gray-400 ml-2">
                     {new Date(parentMessage.createdAt).toLocaleTimeString('en-US', {
@@ -294,6 +298,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                   {isReadersMessage(reply, pseudonym, currentUserId) && (
                     <span className="text-gray-600 font-normal"> (You)</span>
                   )}
+                  {renderNameBadge?.(reply)}
                   {reply.createdAt && (
                     <span className="text-xs font-normal text-gray-400 ml-2">
                       {new Date(reply.createdAt).toLocaleTimeString('en-US', {

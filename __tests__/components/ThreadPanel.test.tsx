@@ -85,6 +85,15 @@ describe('ThreadPanel Component', () => {
     expect(screen.queryByLabelText('Send reply')).not.toBeInTheDocument();
   });
 
+  it('draws the name badge beside the sender name, for the opening message and each reply', () => {
+    const badgeFor = (msg: PseudonymousMessage) => <span>{`Badge for ${msg.id}`}</span>;
+    render(<ThreadPanel {...defaultProps} renderNameBadge={badgeFor} />);
+
+    expect(screen.getByText('Badge for parent-123').parentElement).toHaveTextContent('User1');
+    expect(screen.getByText('Badge for reply-1').parentElement).toHaveTextContent('User2');
+    expect(screen.getByText('Badge for reply-2').parentElement).toHaveTextContent('User1');
+  });
+
   it('renders the thread panel header', () => {
     render(<ThreadPanel {...defaultProps} />);
     expect(screen.getByText('Replies')).toBeInTheDocument();
