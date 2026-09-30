@@ -1024,3 +1024,100 @@
   opacity: 0.5;
   cursor: default;
 }
+
+.notFound {
+  /* The room's light bot accent is 4.4:1 on the blob; this darker teal reaches 7:1. */
+  --not-found-art: #0a5a4e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.notFoundTitle {
+  margin: 0;
+  font-family: var(--room-font-display), sans-serif;
+  font-weight: 700;
+  font-size: 44px;
+  line-height: 1.1;
+  color: var(--room-text-primary);
+}
+
+.notFoundMessage {
+  margin: 10px 0 0;
+  max-width: 320px;
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--room-text-body);
+}
+
+.notFoundArt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 220px;
+  height: 176px;
+  margin: 36px 0;
+}
+
+.notFoundBlob {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: var(--room-bot-avatar-bg);
+}
+
+.notFoundBot {
+  position: relative;
+}
+
+.notFoundQuestion {
+  position: absolute;
+  top: 6px;
+  right: 30px;
+  font-family: var(--room-font-display), sans-serif;
+  font-weight: 700;
+  font-size: 40px;
+  color: var(--not-found-art);
+}
+
+@media (prefers-color-scheme: dark) {
+  .root:not([data-theme='light']) .notFound {
+    --not-found-art: var(--room-bot-accent);
+  }
+}
+
+.root[data-theme='dark'] .notFound {
+  --not-found-art: var(--room-bot-accent);
+}
+
+.notFoundLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 2px;
+  border-bottom: 2px solid currentColor;
+  font-family: var(--room-font-body), sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--room-text-primary);
+  text-decoration: none;
+}
+
+/* A color change on hover can't clear 4.5:1 in both themes, so hover thickens the underline. */
+.notFoundLink:hover {
+  border-bottom-width: 4px;
+  padding-bottom: 0;
+}
+
+.notFoundLink:focus-visible {
+  outline: 2px solid var(--room-text-primary);
+  outline-offset: 4px;
+  border-radius: 2px;
+}

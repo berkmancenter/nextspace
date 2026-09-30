@@ -84,7 +84,6 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
       const pseudonyms: UserPseudonym[] = account.pseudonyms ?? [];
       const registered = pseudonyms.find((p) => p.isRealName && p.conversations?.includes(conversationId));
       if (registered) setRegisteredName(registered.pseudonym);
-      // The session cookie calls every signed-in account an admin, so the role must come from here.
       setIsAdmin(account.role === 'admin');
     })();
 

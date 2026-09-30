@@ -58,4 +58,18 @@ describe('Layout', () => {
     expect(screen.queryByTestId('app-footer')).not.toBeInTheDocument();
     expect(screen.getByText('lounge body')).toBeInTheDocument();
   });
+
+  it('leaves the not-found page to draw its own chrome', () => {
+    mockUseRouter.mockReturnValue({ pathname: '/404', asPath: '/admin/events', isReady: true });
+
+    render(
+      <Layout>
+        <p>not found body</p>
+      </Layout>,
+    );
+
+    expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('app-footer')).not.toBeInTheDocument();
+    expect(screen.getByText('not found body')).toBeInTheDocument();
+  });
 });

@@ -1,5 +1,6 @@
 import { Api } from './Helpers';
 import TokenManagerDefault from './TokenManager';
+import { AuthType } from '../types.internal';
 
 type SessionState = 'uninitialized' | 'initializing' | 'guest' | 'authenticated' | 'cleared';
 
@@ -13,6 +14,7 @@ class SessionManager {
   private sessionState: SessionState = 'uninitialized';
   private initializationPromise: Promise<SessionInfo | null> | null = null;
   private currentSession: SessionInfo | null = null;
+  private authType: AuthType = 'guest';
 
   private constructor() {}
 
@@ -25,6 +27,14 @@ class SessionManager {
 
   getState(): SessionState {
     return this.sessionState;
+  }
+
+  /**
+   * The auth type recorded in the session cookie. Only for choosing what to offer in the UI,
+   * since the cookie's value is not proof of a role; the backend enforces that.
+   */
+  getAuthType(): AuthType {
+    return this.authType;
   }
 
   /**
@@ -74,6 +84,7 @@ class SessionManager {
         // Determine if this is a guest or authenticated user using the
         // authType field stored in the cookie (set when the session was created).
         this.sessionState = data.authType && data.authType !== 'guest' ? 'authenticated' : 'guest';
+        this.authType = data.authType || 'guest';
 
         this.currentSession = {
           userId: data.userId,
@@ -184,9 +195,11 @@ class SessionManager {
    * Mark session as authenticated (called after login)
    * @param username - The authenticated user's username
    * @param userId - The authenticated user's ID
+   * @param authType - The auth type written to the session cookie at login
    */
-  markAuthenticated(username?: string, userId?: string): void {
+  markAuthenticated(username?: string, userId?: string, authType?: AuthType): void {
     this.sessionState = 'authenticated';
+    if (authType) this.authType = authType;
 
     // Update session info if provided
     if (username !== undefined && userId !== undefined) {
@@ -202,6 +215,7 @@ class SessionManager {
    */
   markGuest(): void {
     this.sessionState = 'guest';
+    this.authType = 'guest';
   }
 
   /**
@@ -210,6 +224,7 @@ class SessionManager {
   clearSession(): void {
     this.sessionState = 'cleared';
     this.currentSession = null;
+    this.authType = 'guest';
     // ClearTokens() delegates to TokenManager which also cancels the
     // proactive refresh timer and clears the BroadcastChannel state.
     Api.get().ClearTokens();

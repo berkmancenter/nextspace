@@ -140,7 +140,7 @@ describe('LoginPage', () => {
     (Authenticate as jest.Mock).mockResolvedValue(mockLoginResponse);
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ message: 'Successfully set cookie!' }),
+      json: async () => ({ message: 'Successfully set cookie!', authType: 'admin' }),
     });
 
     render(<LoginPage />);
@@ -157,10 +157,10 @@ describe('LoginPage', () => {
 
     // Verify session manager was called with pseudonym
     await waitFor(() => {
-      expect(mockMarkAuthenticated).toHaveBeenCalledWith('Intuitive Lyra', 'user123');
+      expect(mockMarkAuthenticated).toHaveBeenCalledWith('Intuitive Lyra', 'user123', 'admin');
     });
 
-    // Verify session cookie API was called with pseudonym and authType: "admin"
+    // The browser asks for a logged-in session; the server decides whether it's an admin one.
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         '/api/session',
@@ -171,7 +171,7 @@ describe('LoginPage', () => {
             userId: 'user123',
             accessToken: 'access-token-123',
             refreshToken: 'refresh-token-456',
-            authType: 'admin',
+            authType: 'user',
           }),
         }),
       );
@@ -210,7 +210,7 @@ describe('LoginPage', () => {
     (Authenticate as jest.Mock).mockResolvedValue(mockLoginResponse);
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ message: 'Successfully set cookie!' }),
+      json: async () => ({ message: 'Successfully set cookie!', authType: 'admin' }),
     });
 
     render(<LoginPage />);
@@ -255,7 +255,7 @@ describe('LoginPage', () => {
     (Authenticate as jest.Mock).mockResolvedValue(mockLoginResponse);
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ message: 'Successfully set cookie!' }),
+      json: async () => ({ message: 'Successfully set cookie!', authType: 'admin' }),
     });
 
     render(<LoginPage />);
@@ -311,7 +311,7 @@ describe('LoginPage', () => {
       });
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: async () => ({ message: 'Successfully set cookie!' }),
+        json: async () => ({ message: 'Successfully set cookie!', authType: role === 'admin' ? 'admin' : 'user' }),
       });
     }
 
@@ -363,6 +363,76 @@ describe('LoginPage', () => {
       await signIn();
 
       await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/lounge'));
+    });
+  });
+
+  describe('which auth type the session uses', () => {
+    function mockLogin(role: string | undefined, confirmedAuthType: 'user' | 'admin') {
+      (Authenticate as jest.Mock).mockResolvedValue({
+        user: {
+          id: 'user123',
+          username: 'testuser',
+          ...(role ? { role } : {}),
+          pseudonyms: [{ pseudonym: 'Intuitive Lyra', active: true }],
+        },
+        tokens: {
+          access: { token: 'access-token-123' },
+          refresh: { token: 'refresh-token-456' },
+        },
+      });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ message: 'Successfully set cookie!', authType: confirmedAuthType }),
+      });
+    }
+
+    async function signIn() {
+      const user = userEvent.setup();
+      render(<LoginPage />);
+      await user.type(screen.getByLabelText(/Username/i), 'testuser');
+      await user.type(document.querySelector('input[name="password"]')!, 'password123');
+      await user.click(screen.getByRole('button', { name: /Login/i }));
+    }
+
+    async function requestedAuthType() {
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/session', expect.anything()));
+      const [, request] = (global.fetch as jest.Mock).mock.calls.find(([url]) => url === '/api/session');
+      return JSON.parse(request.body).authType;
+    }
+
+    it('asks for a logged-in session and leaves the role to the server, even for an admin', async () => {
+      mockLogin('admin', 'admin');
+
+      await signIn();
+
+      expect(await requestedAuthType()).toBe('user');
+    });
+
+    it('uses the admin auth type the server confirmed', async () => {
+      mockLogin('admin', 'admin');
+
+      await signIn();
+
+      await waitFor(() => expect(mockMarkAuthenticated).toHaveBeenCalledWith('Intuitive Lyra', 'user123', 'admin'));
+      expect(mockPush).toHaveBeenCalledWith('/admin/events');
+    });
+
+    it('treats the account as a user when the server confirms user', async () => {
+      mockLogin('participant', 'user');
+
+      await signIn();
+
+      await waitFor(() => expect(mockMarkAuthenticated).toHaveBeenCalledWith('Intuitive Lyra', 'user123', 'user'));
+      expect(mockPush).toHaveBeenCalledWith('/lounge');
+    });
+
+    it("trusts the server over the login response's role", async () => {
+      mockLogin('admin', 'user');
+
+      await signIn();
+
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/lounge'));
+      expect(mockMarkAuthenticated).toHaveBeenCalledWith('Intuitive Lyra', 'user123', 'user');
     });
   });
 
@@ -485,7 +555,7 @@ describe('LoginPage', () => {
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(mockMarkAuthenticated).toHaveBeenCalledWith('Legacy User', 'legacy-user-id');
+      expect(mockMarkAuthenticated).toHaveBeenCalledWith('Legacy User', 'legacy-user-id', 'user');
     });
 
     await waitFor(() => {
@@ -497,7 +567,7 @@ describe('LoginPage', () => {
             userId: 'legacy-user-id',
             accessToken: 'access-token-123',
             refreshToken: 'refresh-token-456',
-            authType: 'admin',
+            authType: 'user',
           }),
         }),
       );
@@ -527,7 +597,7 @@ describe('LoginPage', () => {
     (Authenticate as jest.Mock).mockResolvedValue(mockLoginResponse);
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ message: 'Successfully set cookie!' }),
+      json: async () => ({ message: 'Successfully set cookie!', authType: 'admin' }),
     });
 
     render(<LoginPage />);
@@ -540,7 +610,7 @@ describe('LoginPage', () => {
 
     await waitFor(() => {
       // Verify new authenticated tokens were set
-      expect(SessionManager.get().markAuthenticated).toHaveBeenCalledWith('Authenticated Pro', 'auth-user-456');
+      expect(SessionManager.get().markAuthenticated).toHaveBeenCalledWith('Authenticated Pro', 'auth-user-456', 'admin');
     });
 
     // Verify new session cookie was created, replacing any existing one
@@ -554,7 +624,7 @@ describe('LoginPage', () => {
             userId: 'auth-user-456',
             accessToken: 'new-auth-access-token',
             refreshToken: 'new-auth-refresh-token',
-            authType: 'admin',
+            authType: 'user',
           }),
         }),
       );

@@ -72,7 +72,25 @@ describe('cookieValidator', () => {
       const result = validateCookie(legacyCookie);
       expect(result.isValid).toBe(false);
       expect(result.error).toContain('Cookie version mismatch');
-      expect(result.error).toContain('expected 1, got 0');
+      expect(result.error).toContain('expected 2, got 0');
+    });
+
+    it('should reject a version 1 cookie, which marked every login as admin', () => {
+      const adminForEveryoneCookie: JWTDecryptResult = {
+        payload: {
+          access: 'valid-access-token',
+          refresh: 'valid-refresh-token',
+          userId: 'user-123',
+          authType: 'admin',
+          version: '1',
+          sub: 'testuser',
+        },
+        protectedHeader: { alg: 'dir', enc: 'A128CBC-HS256' },
+      };
+
+      const result = validateCookie(adminForEveryoneCookie);
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain('expected 2, got 1');
     });
 
     it('should reject cookie with missing access token', () => {
