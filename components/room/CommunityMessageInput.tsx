@@ -22,7 +22,7 @@ interface CommunityMessageInputProps {
   offline?: boolean;
   /**
    * True while the room has no real name for this poster. The text box gives way to an explanation
-   * and a button that opens the naming dialog, and the other controls ask for a name instead of acting.
+   * and a button that opens the naming dialog, and the other controls are disabled.
    */
   mustSetRealName?: boolean;
   onRequestRealName?: () => void;
@@ -149,10 +149,6 @@ export function CommunityMessageInput({
   );
 
   const handleSend = async () => {
-    if (mustSetRealName) {
-      onRequestRealName?.();
-      return;
-    }
     if (!value.trim() || waitingForResponse) return;
     const message = value;
     setValue('');
@@ -197,9 +193,9 @@ export function CommunityMessageInput({
   const placeholder = tab === 'chat' ? (isEmptyRoom ? PLACEHOLDER.chatEmpty : PLACEHOLDER.chat) : PLACEHOLDER.assistant;
   const shortcutsIdle = offline || mustSetRealName;
   const applyShortcut = (text: string) => {
-    if (mustSetRealName) onRequestRealName?.();
-    else if (!offline) insertAtCursor(text);
+    if (!offline) insertAtCursor(text);
   };
+  const controlsDisabled = disabled || mustSetRealName;
   // Until a real name exists, realName holds the session pseudonym, which is not what the room would show.
   const postingAs = mustSetRealName ? null : `You're posting as ${realName}`;
   const disclosure = tab === 'chat' ? postingAs : 'Only you can see this conversation';
@@ -227,8 +223,8 @@ export function CommunityMessageInput({
               <>
                 <IconButton
                   aria-label="Mention a member"
-                  aria-disabled={shortcutsIdle ? 'true' : undefined}
-                  disabled={disabled}
+                  aria-disabled={offline ? 'true' : undefined}
+                  disabled={controlsDisabled}
                   onClick={() => applyShortcut('@')}
                   className={`${styles.mentionButton}${shortcutsIdle ? ` ${styles.shortcutIdle}` : ''}`}
                 >
@@ -238,8 +234,8 @@ export function CommunityMessageInput({
                 </IconButton>
                 <IconButton
                   aria-label={`Ask ${botName}`}
-                  aria-disabled={shortcutsIdle ? 'true' : undefined}
-                  disabled={disabled}
+                  aria-disabled={offline ? 'true' : undefined}
+                  disabled={controlsDisabled}
                   onClick={() => applyShortcut(`@${botName} `)}
                   className={`${styles.askBotButton}${shortcutsIdle ? ` ${styles.shortcutIdle}` : ''}`}
                 >
@@ -252,7 +248,7 @@ export function CommunityMessageInput({
           <IconButton
             aria-label="Send message"
             aria-disabled={!value.trim() || disabled ? 'true' : undefined}
-            disabled={disabled}
+            disabled={controlsDisabled}
             onClick={handleSend}
             className={styles.sendButton}
           >

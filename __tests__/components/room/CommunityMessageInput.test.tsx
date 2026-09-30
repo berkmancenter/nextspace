@@ -241,12 +241,12 @@ describe('CommunityMessageInput', () => {
       expect(screen.getByText('Only you can see this conversation')).toBeInTheDocument();
     });
 
-    it('marks the send and shortcut buttons unavailable', () => {
+    it('disables the send and shortcut buttons', () => {
       render(<CommunityMessageInput tab="chat" {...gatedProps} onSendMessage={noop} onRequestRealName={jest.fn()} />);
 
-      expect(screen.getByRole('button', { name: 'Send message' })).toHaveAttribute('aria-disabled', 'true');
-      expect(screen.getByRole('button', { name: 'Mention a member' })).toHaveAttribute('aria-disabled', 'true');
-      expect(screen.getByRole('button', { name: 'Ask Berkie' })).toHaveAttribute('aria-disabled', 'true');
+      expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Mention a member' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Ask Berkie' })).toBeDisabled();
     });
 
     it('asks for a real name when the button is clicked', async () => {
@@ -274,8 +274,9 @@ describe('CommunityMessageInput', () => {
       expect(onRequestRealName).toHaveBeenCalledTimes(1);
     });
 
-    it('asks for a real name instead of sending when the send button is clicked', async () => {
-      const user = userEvent.setup();
+    it('does nothing when the disabled buttons are clicked', async () => {
+      // Disabled buttons ignore pointer events, which user-event would otherwise refuse to click through.
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
       const onSendMessage = jest.fn().mockResolvedValue(true);
       const onRequestRealName = jest.fn();
       render(
@@ -288,8 +289,10 @@ describe('CommunityMessageInput', () => {
       );
 
       await user.click(screen.getByRole('button', { name: 'Send message' }));
+      await user.click(screen.getByRole('button', { name: 'Mention a member' }));
+      await user.click(screen.getByRole('button', { name: 'Ask Berkie' }));
 
-      expect(onRequestRealName).toHaveBeenCalledTimes(1);
+      expect(onRequestRealName).not.toHaveBeenCalled();
       expect(onSendMessage).not.toHaveBeenCalled();
     });
 
