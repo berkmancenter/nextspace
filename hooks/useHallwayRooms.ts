@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { LoungeRoom, PseudonymousMessage } from '../types.internal';
+import { HallwayRoom, PseudonymousMessage } from '../types.internal';
 import { Api, RetrieveData } from '../utils';
 import { parseMessageBody } from '../utils/Helpers';
 import { getRoomLastReadAt } from '../utils/roomReadState';
 
-export interface UseLoungeRoomsReturn {
-  rooms: LoungeRoom[];
+export interface UseHallwayRoomsReturn {
+  rooms: HallwayRoom[];
   loaded: boolean;
   error: string | null;
 }
@@ -38,8 +38,8 @@ function buildPreview(message: PseudonymousMessage, userId: string): string {
  * @param userId The signed-in member's id, or null while the session is still resolving.
  * @returns The rooms plus load and error state.
  */
-export function useLoungeRooms(userId: string | null): UseLoungeRoomsReturn {
-  const [rooms, setRooms] = useState<LoungeRoom[]>([]);
+export function useHallwayRooms(userId: string | null): UseHallwayRoomsReturn {
+  const [rooms, setRooms] = useState<HallwayRoom[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,7 +90,7 @@ export function useLoungeRooms(userId: string | null): UseLoungeRoomsReturn {
 
     fetchRooms().catch((thrown) => {
       if (cancelled) return;
-      console.error('Could not load the lounge:', thrown);
+      console.error('Could not load the hallway:', thrown);
       setError('Could not load your rooms.');
       setLoaded(true);
     });

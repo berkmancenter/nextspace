@@ -11,7 +11,7 @@ jest.mock('../../utils', () => ({
   RetrieveData: jest.fn(),
 }));
 
-import { useLoungeRooms } from '../../hooks/useLoungeRooms';
+import { useHallwayRooms } from '../../hooks/useHallwayRooms';
 import { RetrieveData } from '../../utils';
 import { markRoomRead } from '../../utils/roomReadState';
 
@@ -42,7 +42,7 @@ function respondWith(conversations: any[], messagesByRoom: Record<string, any[]>
   });
 }
 
-describe('useLoungeRooms', () => {
+describe('useHallwayRooms', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     window.localStorage.clear();
@@ -57,7 +57,7 @@ describe('useLoungeRooms', () => {
         { id: 'back-1', name: 'A Back Channel', conversationType: 'backChannel' },
       ]);
 
-      const { result } = renderHook(() => useLoungeRooms('my-user-id'));
+      const { result } = renderHook(() => useHallwayRooms('my-user-id'));
 
       await waitFor(() => expect(result.current.loaded).toBe(true));
       expect(result.current.rooms).toHaveLength(1);
@@ -76,7 +76,7 @@ describe('useLoungeRooms', () => {
         },
       );
 
-      const { result } = renderHook(() => useLoungeRooms('my-user-id'));
+      const { result } = renderHook(() => useHallwayRooms('my-user-id'));
 
       await waitFor(() => expect(result.current.loaded).toBe(true));
       expect(result.current.rooms.map((room) => room.name)).toEqual(['Busy Room', 'Quiet Room']);
@@ -85,7 +85,7 @@ describe('useLoungeRooms', () => {
     it('reports an error rather than an empty list when the request fails', async () => {
       mockRetrieveData.mockResolvedValue({ error: true, status: 500, message: 'boom' });
 
-      const { result } = renderHook(() => useLoungeRooms('my-user-id'));
+      const { result } = renderHook(() => useHallwayRooms('my-user-id'));
 
       await waitFor(() => expect(result.current.loaded).toBe(true));
       expect(result.current.error).toBe('Could not load your rooms.');
@@ -99,7 +99,7 @@ describe('useLoungeRooms', () => {
         'room-1': [makeMessage()],
       });
 
-      const { result } = renderHook(() => useLoungeRooms('my-user-id'));
+      const { result } = renderHook(() => useHallwayRooms('my-user-id'));
 
       await waitFor(() => expect(result.current.loaded).toBe(true));
       expect(result.current.rooms[0].preview).toBe('Miriam Halevi: Morning all, the DSA transparency reports just dropped.');
@@ -110,7 +110,7 @@ describe('useLoungeRooms', () => {
         'room-1': [makeMessage({ owner: 'my-user-id', pseudonym: 'Priya Raghunathan', body: 'Sent the draft agenda.' })],
       });
 
-      const { result } = renderHook(() => useLoungeRooms('my-user-id'));
+      const { result } = renderHook(() => useHallwayRooms('my-user-id'));
 
       await waitFor(() => expect(result.current.loaded).toBe(true));
       expect(result.current.rooms[0].preview).toBe('You: Sent the draft agenda.');
@@ -121,7 +121,7 @@ describe('useLoungeRooms', () => {
         'room-1': [makeMessage({ body: { type: 'memberIntro', text: 'Say hello to Ada.' } })],
       });
 
-      const { result } = renderHook(() => useLoungeRooms('my-user-id'));
+      const { result } = renderHook(() => useHallwayRooms('my-user-id'));
 
       await waitFor(() => expect(result.current.loaded).toBe(true));
       expect(result.current.rooms[0].preview).toBe('Miriam Halevi: Say hello to Ada.');
@@ -135,7 +135,7 @@ describe('useLoungeRooms', () => {
         ],
       });
 
-      const { result } = renderHook(() => useLoungeRooms('my-user-id'));
+      const { result } = renderHook(() => useHallwayRooms('my-user-id'));
 
       await waitFor(() => expect(result.current.loaded).toBe(true));
       expect(result.current.rooms[0].preview).toBe('Miriam Halevi: Newer');
@@ -151,7 +151,7 @@ describe('useLoungeRooms', () => {
         ],
       });
 
-      const { result } = renderHook(() => useLoungeRooms('my-user-id'));
+      const { result } = renderHook(() => useHallwayRooms('my-user-id'));
 
       await waitFor(() => expect(result.current.loaded).toBe(true));
       expect(result.current.rooms[0].preview).toBe('Miriam Halevi: In the feed');
@@ -162,7 +162,7 @@ describe('useLoungeRooms', () => {
         'room-1': [],
       });
 
-      const { result } = renderHook(() => useLoungeRooms('my-user-id'));
+      const { result } = renderHook(() => useHallwayRooms('my-user-id'));
 
       await waitFor(() => expect(result.current.loaded).toBe(true));
       expect(result.current.rooms[0].preview).toBe('');
@@ -178,7 +178,7 @@ describe('useLoungeRooms', () => {
         return Promise.resolve({ error: true, status: 403, message: 'nope' });
       });
 
-      const { result } = renderHook(() => useLoungeRooms('my-user-id'));
+      const { result } = renderHook(() => useHallwayRooms('my-user-id'));
 
       await waitFor(() => expect(result.current.loaded).toBe(true));
       expect(result.current.rooms[0].name).toBe('BKC Community Room');
@@ -193,7 +193,7 @@ describe('useLoungeRooms', () => {
         'room-1': [makeMessage({ createdAt: '2026-08-28T09:41:00.000Z' })],
       });
 
-      const { result } = renderHook(() => useLoungeRooms('my-user-id'));
+      const { result } = renderHook(() => useHallwayRooms('my-user-id'));
 
       await waitFor(() => expect(result.current.loaded).toBe(true));
       expect(result.current.rooms[0].hasUnread).toBe(true);
@@ -205,7 +205,7 @@ describe('useLoungeRooms', () => {
         'room-1': [makeMessage({ createdAt: '2026-08-28T09:41:00.000Z' })],
       });
 
-      const { result } = renderHook(() => useLoungeRooms('my-user-id'));
+      const { result } = renderHook(() => useHallwayRooms('my-user-id'));
 
       await waitFor(() => expect(result.current.loaded).toBe(true));
       expect(result.current.rooms[0].hasUnread).toBe(false);
@@ -216,7 +216,7 @@ describe('useLoungeRooms', () => {
         'room-1': [makeMessage({ owner: 'my-user-id' })],
       });
 
-      const { result } = renderHook(() => useLoungeRooms('my-user-id'));
+      const { result } = renderHook(() => useHallwayRooms('my-user-id'));
 
       await waitFor(() => expect(result.current.loaded).toBe(true));
       expect(result.current.rooms[0].hasUnread).toBe(false);
@@ -227,7 +227,7 @@ describe('useLoungeRooms', () => {
         'room-1': [makeMessage()],
       });
 
-      const { result } = renderHook(() => useLoungeRooms('my-user-id'));
+      const { result } = renderHook(() => useHallwayRooms('my-user-id'));
 
       await waitFor(() => expect(result.current.loaded).toBe(true));
       expect(result.current.rooms[0].hasUnread).toBe(true);
@@ -237,7 +237,7 @@ describe('useLoungeRooms', () => {
   it('waits for a user id before fetching', async () => {
     respondWith([]);
 
-    const { result } = renderHook(() => useLoungeRooms(null));
+    const { result } = renderHook(() => useHallwayRooms(null));
 
     expect(mockRetrieveData).not.toHaveBeenCalled();
     expect(result.current.loaded).toBe(false);

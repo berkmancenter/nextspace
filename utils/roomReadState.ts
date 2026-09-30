@@ -1,6 +1,6 @@
 /*
  * Per-device record of when the member last opened each community room. The server
- * tracks no read state, so the lounge has nothing else to compare a room's newest
+ * tracks no read state, so the hallway has nothing else to compare a room's newest
  * message against; a member who reads on their phone still sees the dot on their
  * laptop. Every access is wrapped because a browser set to block site data throws
  * on the accessor itself rather than returning null.

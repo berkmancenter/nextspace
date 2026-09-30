@@ -50,13 +50,13 @@ describe('Layout', () => {
 
     render(
       <Layout>
-        <p>lounge body</p>
+        <p>hallway body</p>
       </Layout>,
     );
 
     expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
     expect(screen.queryByTestId('app-footer')).not.toBeInTheDocument();
-    expect(screen.getByText('lounge body')).toBeInTheDocument();
+    expect(screen.getByText('hallway body')).toBeInTheDocument();
   });
 
   it('leaves the not-found page to draw its own chrome', () => {

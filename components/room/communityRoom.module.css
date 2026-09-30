@@ -840,23 +840,23 @@
 
 /* Lines the screen name up under the title rather than under the mark beside it: the
    mark is 18px wide and the title group sets a 9px gap. */
-.loungeSubtitle {
+.hallwaySubtitle {
   padding-left: 27px;
 }
 
-.loungeBody {
+.hallwayBody {
   flex: 1;
   overflow-y: auto;
   padding: 12px 14px 20px;
 }
 
-.loungeList {
+.hallwayList {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.loungeRow {
+.hallwayRow {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -870,12 +870,12 @@
   cursor: pointer;
 }
 
-.loungeRow:focus-visible {
+.hallwayRow:focus-visible {
   outline: 2px solid var(--room-composer-border-focus);
   outline-offset: 2px;
 }
 
-.loungeRowAvatar {
+.hallwayRowAvatar {
   width: 44px;
   height: 44px;
   font-size: 14px;
@@ -883,7 +883,7 @@
   color: var(--room-other-avatar-text);
 }
 
-.loungeRowText {
+.hallwayRowText {
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -891,14 +891,14 @@
   min-width: 0;
 }
 
-.loungeRowTopLine {
+.hallwayRowTopLine {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
 }
 
-.loungeRowName {
+.hallwayRowName {
   font-family: var(--room-font-display), sans-serif;
   font-weight: 600;
   font-size: 14px;
@@ -909,7 +909,7 @@
   text-overflow: ellipsis;
 }
 
-.loungeRowStamp {
+.hallwayRowStamp {
   flex: none;
   font-family: var(--room-font-mono), monospace;
   font-size: 11px;
@@ -917,7 +917,7 @@
   color: var(--room-text-muted);
 }
 
-.loungeRowPreview {
+.hallwayRowPreview {
   font-family: var(--room-font-body), sans-serif;
   font-size: 13px;
   line-height: 1.4;
@@ -929,21 +929,21 @@
 
 /* Holds the dot's width whether or not it is drawn, so every name and preview in
    the list starts and ends on the same vertical line. */
-.loungeUnreadSlot {
+.hallwayUnreadSlot {
   flex: none;
   width: 9px;
   display: flex;
   justify-content: center;
 }
 
-.loungeUnreadDot {
+.hallwayUnreadDot {
   width: 9px;
   height: 9px;
   border-radius: 999px;
   background: var(--room-you-bg);
 }
 
-.loungeNotice {
+.hallwayNotice {
   margin: 16px 4px;
   font-family: var(--room-font-body), sans-serif;
   font-size: 13px;

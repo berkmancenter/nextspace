@@ -265,13 +265,13 @@ export interface PendingRoomMessage {
 }
 
 /**
- * One row in the lounge: a community room the member belongs to, with just enough
+ * One row in the hallway: a community room the member belongs to, with just enough
  * of its latest activity to render a preview.
  * @property {string} preview - "Sender: message text", empty for a room with no messages.
  * @property {string | null} lastMessageAt - ISO timestamp of the newest message, null if there is none.
  * @property {boolean} hasUnread - Whether messages arrived since this device last opened the room.
  */
-export interface LoungeRoom {
+export interface HallwayRoom {
   id: string;
   name: string;
   preview: string;

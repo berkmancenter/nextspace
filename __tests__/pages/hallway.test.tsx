@@ -2,8 +2,8 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
-import LoungePage from '../../pages/hallway';
-import { LoungeRoom } from '../../types.internal';
+import HallwayPage from '../../pages/hallway';
+import { HallwayRoom } from '../../types.internal';
 
 const mockRouter = {
   push: jest.fn(),
@@ -20,9 +20,9 @@ jest.mock('../../hooks/useSessionJoin', () => ({
   useSessionJoin: (...args: any[]) => mockUseSessionJoin(...args),
 }));
 
-const mockUseLoungeRooms = jest.fn();
-jest.mock('../../hooks/useLoungeRooms', () => ({
-  useLoungeRooms: (...args: any[]) => mockUseLoungeRooms(...args),
+const mockUseHallwayRooms = jest.fn();
+jest.mock('../../hooks/useHallwayRooms', () => ({
+  useHallwayRooms: (...args: any[]) => mockUseHallwayRooms(...args),
 }));
 
 const mockRetrieveData = jest.fn();
@@ -38,7 +38,7 @@ jest.mock('../../utils', () => ({
   RetrieveData: (...args: any[]) => mockRetrieveData(...args),
 }));
 
-function makeRoom(overrides: Partial<LoungeRoom> = {}): LoungeRoom {
+function makeRoom(overrides: Partial<HallwayRoom> = {}): HallwayRoom {
   return {
     id: 'room-1',
     name: 'BKC Community Room',
@@ -49,7 +49,7 @@ function makeRoom(overrides: Partial<LoungeRoom> = {}): LoungeRoom {
   };
 }
 
-const fourRooms: LoungeRoom[] = [
+const fourRooms: HallwayRoom[] = [
   makeRoom(),
   makeRoom({
     id: 'room-2',
@@ -70,18 +70,18 @@ const fourRooms: LoungeRoom[] = [
   }),
 ];
 
-describe('Lounge page', () => {
+describe('Hallway page', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetTokens.mockReturnValue({ access: 'token' });
     mockRetrieveData.mockResolvedValue({ pseudonyms: [{ pseudonym: 'Priya Raghunathan', isRealName: true }] });
     mockUseSessionJoin.mockReturnValue({ pseudonym: 'Trendy Impala', userId: 'my-user-id' });
-    mockUseLoungeRooms.mockReturnValue({ rooms: fourRooms, loaded: true, error: null });
+    mockUseHallwayRooms.mockReturnValue({ rooms: fourRooms, loaded: true, error: null });
   });
 
   describe('the room list', () => {
     it('lists every room the member belongs to', async () => {
-      render(<LoungePage />);
+      render(<HallwayPage />);
 
       expect(await screen.findByRole('button', { name: /BKC Community Room/ })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Algorithmic Accountability WG/ })).toBeInTheDocument();
@@ -90,7 +90,7 @@ describe('Lounge page', () => {
     });
 
     it('opens a room when its row is tapped', async () => {
-      render(<LoungePage />);
+      render(<HallwayPage />);
 
       await userEvent.click(await screen.findByRole('button', { name: /BKC Community Room/ }));
 
@@ -98,14 +98,14 @@ describe('Lounge page', () => {
     });
 
     it('says so when the member has no rooms', async () => {
-      mockUseLoungeRooms.mockReturnValue({ rooms: [], loaded: true, error: null });
-      render(<LoungePage />);
+      mockUseHallwayRooms.mockReturnValue({ rooms: [], loaded: true, error: null });
+      render(<HallwayPage />);
 
       expect(await screen.findByText('You are not in any rooms yet.')).toBeInTheDocument();
     });
 
     it('offers no way to browse or join a room, since rooms arrive by invitation', async () => {
-      render(<LoungePage />);
+      render(<HallwayPage />);
 
       await screen.findByRole('button', { name: /BKC Community Room/ });
       expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
@@ -113,8 +113,8 @@ describe('Lounge page', () => {
     });
 
     it('shows a message when the rooms could not be loaded', async () => {
-      mockUseLoungeRooms.mockReturnValue({ rooms: [], loaded: true, error: 'Could not load your rooms.' });
-      render(<LoungePage />);
+      mockUseHallwayRooms.mockReturnValue({ rooms: [], loaded: true, error: 'Could not load your rooms.' });
+      render(<HallwayPage />);
 
       expect(await screen.findByRole('alert')).toHaveTextContent('Could not load your rooms.');
     });
@@ -122,14 +122,14 @@ describe('Lounge page', () => {
 
   describe('the header', () => {
     it('names the space, with the screen named below it', async () => {
-      render(<LoungePage />);
+      render(<HallwayPage />);
 
       expect(await screen.findByRole('heading', { name: 'Community Rooms' })).toBeInTheDocument();
       expect(screen.getByText('Your rooms')).toBeInTheDocument();
     });
 
     it("shows the member's own initials", async () => {
-      render(<LoungePage />);
+      render(<HallwayPage />);
 
       expect(await screen.findByRole('button', { name: 'Your account, Priya Raghunathan' })).toBeInTheDocument();
       expect(screen.getByText('PR')).toBeInTheDocument();
@@ -137,30 +137,30 @@ describe('Lounge page', () => {
 
     it('falls back to the session name when the account cannot be read', async () => {
       mockRetrieveData.mockResolvedValue({ error: true, status: 403 });
-      render(<LoungePage />);
+      render(<HallwayPage />);
 
       expect(await screen.findByRole('button', { name: 'Your account, Trendy Impala' })).toBeInTheDocument();
     });
   });
 
   describe('the bottom navigation', () => {
-    it('marks the lounge as the current screen', async () => {
-      render(<LoungePage />);
+    it('marks the hallway as the current screen', async () => {
+      render(<HallwayPage />);
 
-      const lounge = await screen.findByRole('link', { name: 'Hallway' });
-      expect(lounge).toHaveAttribute('aria-current', 'page');
-      expect(lounge).toHaveAttribute('href', '/hallway');
+      const hallway = await screen.findByRole('link', { name: 'Hallway' });
+      expect(hallway).toHaveAttribute('aria-current', 'page');
+      expect(hallway).toHaveAttribute('href', '/hallway');
     });
 
     it('links to the profile screen', async () => {
-      render(<LoungePage />);
+      render(<HallwayPage />);
 
       expect(await screen.findByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/profile');
     });
   });
 
   it('has no accessibility violations', async () => {
-    const { container } = render(<LoungePage />);
+    const { container } = render(<HallwayPage />);
 
     await screen.findByRole('heading', { name: 'Community Rooms' });
     await waitFor(async () => {
