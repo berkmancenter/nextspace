@@ -49,23 +49,17 @@ describe('NotFoundPage', () => {
     warn.mockRestore();
   });
 
-  it('offers a community room member a way back to the hallway', () => {
-    mockAuthType = 'user';
+  it.each(['guest', 'user', 'admin'] as AuthType[])(
+    'offers the way back to the hallway when signed in as %s',
+    (authType) => {
+      mockAuthType = authType;
 
-    render(<NotFoundPage />);
+      render(<NotFoundPage />);
 
-    expect(screen.getByRole('link', { name: 'Back to the hallway' })).toHaveAttribute('href', '/hallway');
-    expect(screen.queryByRole('link', { name: 'Back to events' })).not.toBeInTheDocument();
-  });
-
-  it('offers an admin a way back to the events page instead', () => {
-    mockAuthType = 'admin';
-
-    render(<NotFoundPage />);
-
-    expect(screen.getByRole('link', { name: 'Back to events' })).toHaveAttribute('href', '/admin/events');
-    expect(screen.queryByRole('link', { name: 'Back to the hallway' })).not.toBeInTheDocument();
-  });
+      expect(screen.getByRole('link', { name: 'Back to the hallway' })).toHaveAttribute('href', '/hallway');
+      expect(screen.queryByRole('link', { name: 'Back to events' })).not.toBeInTheDocument();
+    },
+  );
 
   it('has no detectable accessibility violations', async () => {
     const { container } = render(<NotFoundPage />);
