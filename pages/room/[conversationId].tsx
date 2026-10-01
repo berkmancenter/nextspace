@@ -37,15 +37,15 @@ function describeRefusal(response: { status?: number; message?: unknown }): stri
 }
 
 /**
- * Whether the refusal is the one the naming prompt can fix. The caller has already established
- * that the poster is an admin with no name for this room, and the server resolves that name
- * before anything else it could reject a message for: a rejected message answers 422 and an
- * unregistered member 403, so a 400 to this poster is the missing name. Deliberately not
- * matched against the server's wording, which would leave an admin with no way back to the
- * prompt the day someone rewrites that sentence.
+ * Fixed strings llm_engine puts in a refusal's `reason` field, which tell apart refusals that
+ * share a status: a 400 can be any bad request, and a 409 on a real name can mean either case.
  */
-function isMissingRealNameRefusal(response: { status?: number }): boolean {
-  return response.status === 400;
+const REAL_NAME_REQUIRED = 'real_name_required';
+const REAL_NAME_ALREADY_SET = 'real_name_already_set';
+const REAL_NAME_TAKEN = 'real_name_taken';
+
+function isMissingRealNameRefusal(response: { reason?: string }): boolean {
+  return response.reason === REAL_NAME_REQUIRED;
 }
 
 function realNameFor(pseudonyms: UserPseudonym[], conversationId: string): string | undefined {
@@ -112,18 +112,17 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
       setRegisteredName(realNameFor(response, conversationId) ?? candidate);
       return { ok: true };
     }
-    if (response?.status !== 409) return { ok: false };
+    if (response?.reason === REAL_NAME_TAKEN) return { ok: false, taken: true };
+    if (response?.reason !== REAL_NAME_ALREADY_SET) return { ok: false };
 
-    /* A 409 also means this account already has a name here, claimed from another tab after
-       this one loaded. Re-reading the account tells the two apart without matching the
-       server's wording. */
+    // Claimed from another tab after this one loaded. The refusal doesn't carry the name, so read it.
     const account = await RetrieveData(`users/user/${userId}`, Api.get().getAccessToken());
     if (!account || account.error) {
       console.error('Could not re-read this account after the server turned down its real name:', account?.status);
       return { ok: false };
     }
     const existing = realNameFor(account.pseudonyms ?? [], conversationId);
-    if (!existing) return { ok: false, taken: true };
+    if (!existing) return { ok: false };
     setRegisteredName(existing);
     return { ok: true };
   };

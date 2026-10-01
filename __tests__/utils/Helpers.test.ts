@@ -5,6 +5,7 @@ import {
   parseMessageBody,
   createConversationFromData,
   GetChannelPasscode,
+  SendData,
   Api,
 } from '../../utils/Helpers';
 
@@ -372,5 +373,60 @@ describe('GetChannelPasscode', () => {
     const result = GetChannelPasscode('chat', {}, noopError);
     expect(result).toBeNull();
     expect(noopError).toHaveBeenCalledWith('Please provide channels.');
+  });
+});
+
+describe('SendData', () => {
+  const originalFetch = global.fetch;
+  const respondWith = (status: number, statusText: string, json: () => Promise<unknown>) => {
+    global.fetch = jest.fn().mockResolvedValue({
+      status,
+      ok: status < 400,
+      statusText,
+      headers: new Headers(),
+      json,
+    } as unknown as Response);
+  };
+
+  beforeEach(() => {
+    jest.spyOn(Api.get(), 'GetTokens').mockReturnValue({ access: 'access-token', refresh: null } as any);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    global.fetch = originalFetch;
+  });
+
+  it("passes the server's reason through on a 400", async () => {
+    respondWith(400, 'Bad Request', () =>
+      Promise.resolve({ code: 400, message: 'Set your real name first.', reason: 'real_name_required' }),
+    );
+
+    const response = await SendData('messages', {});
+
+    expect(response).toEqual({
+      error: true,
+      status: 400,
+      message: 'Set your real name first.',
+      reason: 'real_name_required',
+    });
+  });
+
+  it("passes the server's reason through on other refusals", async () => {
+    respondWith(409, 'Conflict', () =>
+      Promise.resolve({ code: 409, message: 'That name is taken.', reason: 'real_name_taken' }),
+    );
+
+    const response = await SendData('users/pseudonyms/real-name', {});
+
+    expect(response).toEqual({ error: true, status: 409, message: 'Conflict', reason: 'real_name_taken' });
+  });
+
+  it('leaves the reason out when the refusal has no readable body', async () => {
+    respondWith(502, 'Bad Gateway', () => Promise.reject(new SyntaxError('Unexpected token <')));
+
+    const response = await SendData('messages', {});
+
+    expect(response).toEqual({ error: true, status: 502, message: 'Bad Gateway' });
   });
 });

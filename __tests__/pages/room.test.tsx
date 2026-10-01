@@ -490,8 +490,8 @@ describe('RoomPage', () => {
         expect(screen.queryByTestId('set-real-name-dialog')).not.toBeInTheDocument();
       });
 
-      /* The server answers 409 both for a name someone else holds and for an account that
-         already has a name here, which a tab opened before that claim would not know about. */
+      /* A tab opened before the name was claimed in another tab doesn't know about that claim,
+         and only the account record holds the name itself. */
       it('picks up the name the account already has here instead of calling it taken', async () => {
         const user = userEvent.setup();
         let accountReads = 0;
@@ -502,7 +502,12 @@ describe('RoomPage', () => {
             adminAccount(accountReads === 1 ? ['some-other-room'] : ['some-other-room', 'test-room-id']),
           );
         });
-        mockSendData.mockResolvedValue({ error: true, status: 409, message: 'Conflict' });
+        mockSendData.mockResolvedValue({
+          error: true,
+          status: 409,
+          message: 'Conflict',
+          reason: 'real_name_already_set',
+        });
         render(<RoomPage authType="admin" />);
 
         await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
@@ -517,7 +522,7 @@ describe('RoomPage', () => {
 
       it('keeps the dialog open when the name is already taken here', async () => {
         const user = userEvent.setup();
-        mockSendData.mockResolvedValue({ error: true, status: 409, message: 'Conflict' });
+        mockSendData.mockResolvedValue({ error: true, status: 409, message: 'Conflict', reason: 'real_name_taken' });
         renderWithAccount(adminAccount(['some-other-room']));
 
         await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
@@ -528,6 +533,21 @@ describe('RoomPage', () => {
             'data-save-result',
             '{"ok":false,"taken":true}',
           ),
+        );
+        const accountReads = mockRetrieveData.mock.calls.filter(([url]) => String(url).startsWith('users/user/'));
+        expect(accountReads).toHaveLength(1);
+      });
+
+      it('reports a failed save when the server refuses a name without saying why', async () => {
+        const user = userEvent.setup();
+        mockSendData.mockResolvedValue({ error: true, status: 409, message: 'Conflict' });
+        renderWithAccount(adminAccount(['some-other-room']));
+
+        await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
+        await user.click(screen.getByText('Confirm name'));
+
+        await waitFor(() =>
+          expect(screen.getByTestId('set-real-name-dialog')).toHaveAttribute('data-save-result', '{"ok":false}'),
         );
       });
 
@@ -541,7 +561,12 @@ describe('RoomPage', () => {
             accountReads === 1 ? adminAccount(['some-other-room']) : { error: true, status: 500, message: 'Server error' },
           );
         });
-        mockSendData.mockResolvedValue({ error: true, status: 409, message: 'Conflict' });
+        mockSendData.mockResolvedValue({
+          error: true,
+          status: 409,
+          message: 'Conflict',
+          reason: 'real_name_already_set',
+        });
         render(<RoomPage authType="admin" />);
 
         await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
@@ -566,10 +591,25 @@ describe('RoomPage', () => {
           error: true,
           status: 400,
           message: 'Set your real name for this conversation before posting.',
+          reason: 'real_name_required',
         });
         await user.click(screen.getByText('Send group message'));
 
         await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
+      });
+
+      it('stays shut when a dismissed admin gets a 400 for some other reason', async () => {
+        const user = userEvent.setup();
+        renderWithAccount(adminAccount(['some-other-room']));
+
+        await waitFor(() => expect(screen.getByTestId('set-real-name-dialog')).toBeInTheDocument());
+        await user.click(screen.getByText('Just reading'));
+
+        mockSendData.mockResolvedValue({ error: true, status: 400, message: 'That message is too long.' });
+        await user.click(screen.getByText('Send group message'));
+
+        await waitFor(() => expect(mockSendData).toHaveBeenCalled());
+        expect(screen.queryByTestId('set-real-name-dialog')).not.toBeInTheDocument();
       });
 
       /* Only a refusal the prompt can fix may reopen it. A moderation refusal answers 422, and
