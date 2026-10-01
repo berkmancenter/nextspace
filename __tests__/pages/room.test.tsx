@@ -205,18 +205,18 @@ describe('RoomPage', () => {
     expect(account).toHaveTextContent('PR');
   });
 
-  it('switches to the assistant panel when the Berkie tab is clicked', async () => {
+  it('switches to the assistant panel when the Private Chat tab is clicked', async () => {
     const user = userEvent.setup();
     render(<RoomPage authType="guest" />);
-    await user.click(screen.getByRole('button', { name: 'Berkie' }));
+    await user.click(screen.getByRole('button', { name: 'Private Chat' }));
     expect(screen.getByTestId('assistant-panel')).toBeInTheDocument();
     expect(screen.queryByTestId('group-chat-panel')).not.toBeInTheDocument();
   });
 
-  it('shows a PRIVATE badge and the bot name in the header on the Berkie tab', async () => {
+  it('shows a PRIVATE badge and the bot name in the header on the Private Chat tab', async () => {
     const user = userEvent.setup();
     render(<RoomPage authType="guest" />);
-    await user.click(screen.getByRole('button', { name: 'Berkie' }));
+    await user.click(screen.getByRole('button', { name: 'Private Chat' }));
     expect(screen.getByText('PRIVATE')).toBeInTheDocument();
     expect(screen.getByText('Private to you')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Berkie' })).toBeInTheDocument();
@@ -250,7 +250,7 @@ describe('RoomPage', () => {
   it("sends an assistant message through SendData on the user's direct channel with the agent", async () => {
     const user = userEvent.setup();
     render(<RoomPage authType="guest" />);
-    await user.click(screen.getByRole('button', { name: 'Berkie' }));
+    await user.click(screen.getByRole('button', { name: 'Private Chat' }));
     await user.click(screen.getByText('Send assistant message'));
     await waitFor(() =>
       expect(mockSendData).toHaveBeenCalledWith(
@@ -889,7 +889,7 @@ describe('RoomPage', () => {
       mockUseSessionJoin.mockReturnValue(disconnectedSession);
       render(<RoomPage authType="guest" />);
 
-      await user.click(screen.getByRole('button', { name: 'Berkie' }));
+      await user.click(screen.getByRole('button', { name: 'Private Chat' }));
       await user.click(screen.getByText('Send assistant message'));
 
       expect(mockSendData).not.toHaveBeenCalled();

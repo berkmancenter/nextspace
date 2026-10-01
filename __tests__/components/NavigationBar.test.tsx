@@ -25,7 +25,7 @@ describe('NavigationBar', () => {
     render(<NavigationBar {...baseProps} />);
 
     // Both desktop and mobile navs render, so use getAllByLabelText
-    expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText('Group Chat').length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText('Transcript').length).toBeGreaterThan(0);
     expect(screen.queryByLabelText('Resources')).not.toBeInTheDocument();
@@ -35,7 +35,7 @@ describe('NavigationBar', () => {
     render(<NavigationBar {...baseProps} showChat={false} />);
 
     expect(screen.queryByLabelText('Group Chat')).not.toBeInTheDocument();
-    expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText('Transcript').length).toBeGreaterThan(0);
   });
 
@@ -43,14 +43,14 @@ describe('NavigationBar', () => {
     render(<NavigationBar {...baseProps} showTranscript={false} />);
 
     expect(screen.queryByLabelText('Transcript')).not.toBeInTheDocument();
-    expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText('Group Chat').length).toBeGreaterThan(0);
   });
 
-  it('only renders Event Bot tab when showChat and showTranscript are false', () => {
+  it('only renders the Private Chat tab when showChat and showTranscript are false', () => {
     render(<NavigationBar {...baseProps} showChat={false} showTranscript={false} />);
 
-    expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0);
     expect(screen.queryByLabelText('Group Chat')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Transcript')).not.toBeInTheDocument();
   });
@@ -90,7 +90,7 @@ describe('NavigationBar', () => {
   it("marks the active tab with aria-current='page'", () => {
     render(<NavigationBar {...baseProps} activeTab="assistant" />);
 
-    const activeBtns = screen.getAllByLabelText('Berkie').filter((btn) => btn.getAttribute('aria-current') === 'page');
+    const activeBtns = screen.getAllByLabelText('Private Chat').filter((btn) => btn.getAttribute('aria-current') === 'page');
     expect(activeBtns.length).toBeGreaterThan(0);
 
     // Inactive tabs should not have aria-current
@@ -121,12 +121,12 @@ describe('NavigationBar', () => {
     expect(onTabChange).toHaveBeenCalledWith('transcript');
   });
 
-  it("calls onTabChange with 'assistant' when Event Bot tab clicked", async () => {
+  it("calls onTabChange with 'assistant' when Private Chat tab clicked", async () => {
     const user = userEvent.setup();
     const onTabChange = jest.fn();
     render(<NavigationBar {...baseProps} activeTab="chat" onTabChange={onTabChange} />);
 
-    const assistantBtns = screen.getAllByLabelText('Berkie');
+    const assistantBtns = screen.getAllByLabelText('Private Chat');
     await user.click(assistantBtns[0]);
 
     expect(onTabChange).toHaveBeenCalledWith('assistant');
@@ -148,7 +148,7 @@ describe('NavigationBar', () => {
     const boldLabels = Array.from(container.querySelectorAll('span')).filter((span) => span.style.fontWeight === '700');
     // Should have labels for both desktop and mobile
     expect(boldLabels.length).toBeGreaterThan(0);
-    expect(boldLabels[0].textContent).toBe('Berkie');
+    expect(boldLabels[0].textContent).toBe('Private Chat');
   });
 
   it('renders both desktop nav and mobile nav', () => {
