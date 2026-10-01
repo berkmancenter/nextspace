@@ -296,8 +296,10 @@ export function CommunityGroupChatPanel({
                 <p
                   style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 13, color: 'var(--room-text-muted)' }}
                 >
-                  {botName} is here too. It stays quiet unless you put{' '}
-                  <span style={{ fontWeight: 600, color: 'var(--room-text-primary)' }}>@{botName}</span> in a message.
+                  {botName} is here too. Put{' '}
+                  <span style={{ fontWeight: 600, color: 'var(--room-text-primary)' }}>@{botName}</span> in a message to ask
+                  it something. It may also reply on its own when a message seems meant for it or asks something it can
+                  answer.
                 </p>
               </div>
             ) : (

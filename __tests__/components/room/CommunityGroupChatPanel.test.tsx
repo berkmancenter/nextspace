@@ -123,6 +123,16 @@ describe('CommunityGroupChatPanel', () => {
     expect(screen.getByText("Nothing has been said yet. You're first.")).toBeInTheDocument();
   });
 
+  it('says Berkie answers mentions and may also join in on its own', () => {
+    render(<CommunityGroupChatPanel {...baseProps} messages={[]} />);
+    const berkieNote = screen.getByText(
+      (_, element) => element?.tagName === 'P' && /is here too/.test(element.textContent ?? ''),
+    );
+    expect(berkieNote).toHaveTextContent(
+      'Berkie is here too. Put @Berkie in a message to ask it something. It may also reply on its own when a message seems meant for it or asks something it can answer.',
+    );
+  });
+
   it('tells the composer the room is empty so it can adjust its placeholder', () => {
     render(<CommunityGroupChatPanel {...baseProps} />);
     expect(screen.getByTestId('community-message-input')).toHaveAttribute('data-empty-room', 'true');

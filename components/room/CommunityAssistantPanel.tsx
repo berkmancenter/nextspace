@@ -142,7 +142,7 @@ export function CommunityAssistantPanel({
               </h2>
             </div>
             <p style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 14, color: 'var(--room-text-body)' }}>
-              Everything posted in Group Chat is what I know. Nothing you say here is visible to anyone else in the room.
+              {"I've read everything posted in Group Chat. Nothing you say here is visible to anyone else in the room."}
             </p>
             <div className="flex flex-col gap-2">
               {SUGGESTION_CHIPS.map((chip) => (
@@ -172,7 +172,7 @@ export function CommunityAssistantPanel({
             </div>
             <p style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 12, color: 'var(--room-text-muted)' }}>
               {
-                "I can be wrong, and I can't see anything outside this room: no email, no publications, no other NextSpace events."
+                "I can be wrong. Depending on how I'm set up, I may also look beyond this room, for example on the web or in past NextSpace events."
               }
             </p>
           </div>

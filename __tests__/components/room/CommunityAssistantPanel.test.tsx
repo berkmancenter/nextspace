@@ -49,7 +49,7 @@ describe('CommunityAssistantPanel', () => {
     expect(screen.getByText("I read the room, so you don't have to.")).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Everything posted in Group Chat is what I know. Nothing you say here is visible to anyone else in the room.',
+        "I've read everything posted in Group Chat. Nothing you say here is visible to anyone else in the room.",
       ),
     ).toBeInTheDocument();
   });
@@ -65,7 +65,7 @@ describe('CommunityAssistantPanel', () => {
     render(<CommunityAssistantPanel {...baseProps} />);
     expect(
       screen.getByText(
-        "I can be wrong, and I can't see anything outside this room: no email, no publications, no other NextSpace events.",
+        "I can be wrong. Depending on how I'm set up, I may also look beyond this room, for example on the web or in past NextSpace events.",
       ),
     ).toBeInTheDocument();
   });
