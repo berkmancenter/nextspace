@@ -249,6 +249,24 @@ describe('CommunityMessageInput', () => {
       expect(screen.getByRole('button', { name: 'Ask Berkie' })).toBeDisabled();
     });
 
+    it('moves focus into the message box once a name is set', () => {
+      const { rerender } = render(
+        <CommunityMessageInput tab="chat" {...gatedProps} onSendMessage={noop} onRequestRealName={jest.fn()} />,
+      );
+
+      rerender(
+        <CommunityMessageInput
+          tab="chat"
+          {...gatedProps}
+          mustSetRealName={false}
+          onSendMessage={noop}
+          onRequestRealName={jest.fn()}
+        />,
+      );
+
+      expect(screen.getByRole('textbox')).toHaveFocus();
+    });
+
     it('asks for a real name when the button is clicked', async () => {
       const user = userEvent.setup();
       const onRequestRealName = jest.fn();

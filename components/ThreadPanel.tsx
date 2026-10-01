@@ -61,6 +61,18 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
     }
   }, [isReplying]);
 
+  const locked = Boolean(replyLock);
+  const wasLocked = useRef(locked);
+  const unlockAskedHere = useRef(false);
+
+  /* Only when the name was asked for from this thread, so it doesn't pull focus away from the main
+     message box. This runs after that box's own focus effect, so the thread wins when it asked. */
+  useEffect(() => {
+    if (wasLocked.current && !locked && unlockAskedHere.current) textareaRef.current?.focus();
+    if (!locked) unlockAskedHere.current = false;
+    wasLocked.current = locked;
+  }, [locked]);
+
   // Auto-scroll to bottom when new replies come in
   useEffect(() => {
     if (threadContentRef.current) {
@@ -339,7 +351,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
         {/* Reply action area - directly below messages */}
         <div className="pt-4">
           {replyLock ? (
-            replyLock
+            <div onClickCapture={() => (unlockAskedHere.current = true)}>{replyLock}</div>
           ) : isReplying ? (
             <div className="border-[1px] border-[#A5B4FC] rounded-lg bg-white transition-all focus-within:border-[#6366f1] focus-within:shadow-md">
               <textarea

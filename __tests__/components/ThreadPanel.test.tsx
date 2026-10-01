@@ -85,6 +85,25 @@ describe('ThreadPanel Component', () => {
     expect(screen.queryByLabelText('Send reply')).not.toBeInTheDocument();
   });
 
+  it('focuses the reply box when the lock it was unlocked from lifts', () => {
+    const lock = <button type="button">Set your name first</button>;
+    const { rerender } = render(<ThreadPanel {...defaultProps} replyLock={lock} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Set your name first' }));
+    rerender(<ThreadPanel {...defaultProps} />);
+
+    expect(screen.getByPlaceholderText('Reply...')).toHaveFocus();
+  });
+
+  it('leaves focus alone when the lock lifts after a name was set from somewhere else', () => {
+    const lock = <button type="button">Set your name first</button>;
+    const { rerender } = render(<ThreadPanel {...defaultProps} replyLock={lock} />);
+
+    rerender(<ThreadPanel {...defaultProps} />);
+
+    expect(screen.getByPlaceholderText('Reply...')).not.toHaveFocus();
+  });
+
   it('draws the name badge beside the sender name, for the opening message and each reply', () => {
     const badgeFor = (msg: PseudonymousMessage) => <span>{`Badge for ${msg.id}`}</span>;
     render(<ThreadPanel {...defaultProps} renderNameBadge={badgeFor} />);

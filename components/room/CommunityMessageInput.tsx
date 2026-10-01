@@ -91,6 +91,13 @@ export function CommunityMessageInput({
   const [value, setValue] = useState('');
   const [activeEnhancer, setActiveEnhancer] = useState<ActiveEnhancerState<any> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const wasLocked = useRef(mustSetRealName);
+
+  // The naming dialog hands focus back to the "Set your name" button, which is gone once the lock lifts.
+  useEffect(() => {
+    if (wasLocked.current && !mustSetRealName) textareaRef.current?.focus();
+    wasLocked.current = mustSetRealName;
+  }, [mustSetRealName]);
 
   const enhancers = useMemo(
     () => (tab === 'chat' ? [createMentionsEnhancer([...mentionTargets, botName])] : []),
