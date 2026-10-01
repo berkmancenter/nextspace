@@ -39,7 +39,7 @@ interface NavigationBarProps {
  *  - Mobile: fixed bottom bar, horizontal layout
  *  - Desktop: left sidebar, vertical layout
  *
- * Four items: Event Bot, Group Chat, Transcript, Resources.
+ * Four items: Private Chat, Group Chat, Transcript, Resources.
  * Icons are black when selected, grey when unselected, on a light purple background.
  */
 export function NavigationBar({
@@ -59,7 +59,7 @@ export function NavigationBar({
     [
       {
         id: 'assistant' as NavTab,
-        label: botName,
+        label: 'Private Chat',
         ActiveIcon: null,
         InactiveIcon: null,
         show: true,

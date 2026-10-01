@@ -382,7 +382,7 @@ describe('EventAssistantRoom', () => {
     });
 
     await act(async () => {
-      await userEvent.click(screen.getAllByRole('button', { name: 'Berkie' })[0]);
+      await userEvent.click(screen.getAllByRole('button', { name: 'Private Chat' })[0]);
     });
 
     await waitFor(() => {
@@ -569,7 +569,7 @@ describe('EventAssistantRoom', () => {
       const user = userEvent.setup();
 
       // Switch to the Event Bot (assistant) tab — nav bar shows both desktop + mobile, use first
-      const assistantTabs = screen.getAllByLabelText('Berkie');
+      const assistantTabs = screen.getAllByLabelText('Private Chat');
       await user.click(assistantTabs[0]);
 
       // Wait for AssistantChatPanel input to be present
@@ -633,7 +633,7 @@ describe('EventAssistantRoom', () => {
       const user = userEvent.setup();
 
       // Click on the Event Bot nav item to switch from Chat (default) to Assistant
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       const input = screen.getByPlaceholderText('Enter your message here');
@@ -703,7 +703,7 @@ describe('EventAssistantRoom', () => {
 
       const user = userEvent.setup();
 
-      const assistantTabs = screen.getAllByLabelText('Berkie');
+      const assistantTabs = screen.getAllByLabelText('Private Chat');
       await user.click(assistantTabs[0]);
 
       await waitFor(() => {
@@ -795,8 +795,8 @@ describe('EventAssistantRoom', () => {
         expect(createConversationFromData).toHaveBeenCalled();
       });
 
-      // "Berkie" comes from the mocked config.conversationBotName
-      expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
+      // The nav tab is always labeled "Private Chat", regardless of the configured bot name
+      expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0);
     });
 
     it("overrides botName from first agent's agentConfig.botName", async () => {
@@ -819,8 +819,15 @@ describe('EventAssistantRoom', () => {
         expect(createConversationFromData).toHaveBeenCalled();
       });
 
-      // botName should be overridden to "EventBot"
-      expect(screen.getAllByLabelText('EventBot').length).toBeGreaterThan(0);
+      // The nav tab is always labeled "Private Chat", regardless of the overridden bot name,
+      // but the override still surfaces in the assistant panel's own copy.
+      const assistantTabs = screen.getAllByLabelText('Private Chat');
+      expect(assistantTabs.length).toBeGreaterThan(0);
+      await userEvent.click(assistantTabs[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Ask EventBot any questions about the event/)).toBeInTheDocument();
+      });
     });
 
     it('falls back to config.conversationBotName when agentConfig.botName is not a string', async () => {
@@ -843,8 +850,15 @@ describe('EventAssistantRoom', () => {
         expect(createConversationFromData).toHaveBeenCalled();
       });
 
-      // Falls back to "Berkie" from config
-      expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
+      // The nav tab is always labeled "Private Chat", regardless of the configured bot name,
+      // but the fallback still surfaces in the assistant panel's own copy.
+      const assistantTabs = screen.getAllByLabelText('Private Chat');
+      expect(assistantTabs.length).toBeGreaterThan(0);
+      await userEvent.click(assistantTabs[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Ask Berkie any questions about the event/)).toBeInTheDocument();
+      });
     });
 
     it('falls back to config.conversationBotName when there are no agents', async () => {
@@ -864,7 +878,7 @@ describe('EventAssistantRoom', () => {
       });
 
       await act(async () => {
-        await userEvent.click(screen.getAllByRole('button', { name: 'Berkie' })[0]);
+        await userEvent.click(screen.getAllByRole('button', { name: 'Private Chat' })[0]);
       });
 
       // Inactive notice is shown because there's no event assistant agent, using default botName "Berkie"
@@ -1416,8 +1430,8 @@ describe('EventAssistantRoom', () => {
         render(<EventAssistantRoom authType={'guest'} />);
       });
 
-      await waitFor(() => expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0));
-      await user.click(screen.getAllByLabelText('Berkie')[0]);
+      await waitFor(() => expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0));
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
 
       await waitFor(() => {
         expect(screen.getByText('An SLO is a reliability target.')).toBeInTheDocument();
@@ -1453,8 +1467,8 @@ describe('EventAssistantRoom', () => {
         .at(0)!;
 
       const user = userEvent.setup();
-      await waitFor(() => expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0));
-      await user.click(screen.getAllByLabelText('Berkie')[0]);
+      await waitFor(() => expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0));
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
 
       // A real socket broadcasts 'message:new' to every registered listener. The
       // assistant page AND the Transcript sidebar (mounted because the route has
@@ -1521,8 +1535,8 @@ describe('EventAssistantRoom', () => {
         render(<EventAssistantRoom authType={'guest'} />);
       });
 
-      await waitFor(() => expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0));
-      await user.click(screen.getAllByLabelText('Berkie')[0]);
+      await waitFor(() => expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0));
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
 
       await waitFor(() => {
         expect(screen.getByText('A clarification from jargon agent')).toBeInTheDocument();
@@ -1680,10 +1694,10 @@ describe('EventAssistantRoom', () => {
 
       // Wait for the page to load and click on the assistant tab
       await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
+        expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0);
       });
 
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       await waitFor(() => {
@@ -1773,10 +1787,10 @@ describe('EventAssistantRoom', () => {
 
       // Wait for the page to load and click on the assistant tab
       await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
+        expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0);
       });
 
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       await waitFor(() => {
@@ -1856,10 +1870,10 @@ describe('EventAssistantRoom', () => {
 
       // Wait for the page to load and click on the assistant tab
       await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
+        expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0);
       });
 
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       await waitFor(() => {
@@ -1924,7 +1938,7 @@ describe('EventAssistantRoom', () => {
       await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
 
       // Switch to assistant tab to see the intro message
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       await waitFor(() => {
@@ -2023,7 +2037,7 @@ describe('EventAssistantRoom', () => {
       });
 
       // Switch to assistant tab to see what was rendered
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       // Regular message should be visible
@@ -2139,7 +2153,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
 
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       // Wait for both messages to render (both fromAgent: true → AssistantMessage mock)
@@ -2239,7 +2253,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
 
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       await waitFor(() => {

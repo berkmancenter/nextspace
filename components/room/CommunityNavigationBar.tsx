@@ -15,7 +15,7 @@ interface CommunityNavigationBarProps {
 }
 
 /**
- * The community room's two-tab bottom nav (Group Chat / Bot). Unlike the
+ * The community room's two-tab bottom nav (Group Chat / Private Chat). Unlike the
  * shared NavigationBar, this stays a bottom bar at every viewport width per
  * the Solar Signal design, and marks unread bot messages with three
  * non-color cues: a dot, a bold/mono label swap, and an aria-label count.
@@ -29,8 +29,8 @@ export function CommunityNavigationBar({
   const assistantHasUnread = unreadAssistantCount > 0 && activeTab !== 'assistant';
 
   const assistantLabel = assistantHasUnread
-    ? `${botName}, ${unreadAssistantCount} unread message${unreadAssistantCount === 1 ? '' : 's'}`
-    : botName;
+    ? `Private Chat, ${unreadAssistantCount} unread message${unreadAssistantCount === 1 ? '' : 's'}`
+    : 'Private Chat';
 
   return (
     <nav aria-label="Room sections" className={styles.nav}>
@@ -63,7 +63,7 @@ export function CommunityNavigationBar({
           {assistantHasUnread && <span aria-hidden="true" className={styles.unreadDot} />}
         </span>
         <span className={activeTab === 'assistant' || assistantHasUnread ? styles.navLabelActive : styles.navLabelIdle}>
-          {botName}
+          Private Chat
         </span>
       </button>
     </nav>
