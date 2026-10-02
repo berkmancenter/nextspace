@@ -198,13 +198,23 @@ export const GetChannelPasscode = (channel: string, query: ParsedUrlQuery, setEr
   return passcodeParam;
 };
 
+/** A proxy or gateway can answer with an HTML page, so a body that isn't JSON reads as none. */
+async function readErrorBody(response: Response): Promise<{ message?: string; reason?: unknown } | null> {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Sends data to the API
  * @param urlSuffix - The endpoint suffix to send data to.
  * @param payload - The data payload to send in the request body.
  * @param accessToken - Optional access token to use for authorization.
  * @param fetchOptions - Optional fetch options to customize the request.
- * @returns The response data from the API, or error information.
+ * @returns The response data from the API, or error information. A refusal carries the server's
+ *   `reason` when the server gives one, a fixed string that tells apart refusals sharing a status.
  */
 export const SendData = async (
   urlSuffix: string,
@@ -240,24 +250,16 @@ export const SendData = async (
       !accessToken, // Use stored tokens if no explicit accessToken provided
     );
 
-    // Handle 400
-    if (response.status === 400) {
-      const errorData = await response.json();
-      return {
-        error: true,
-        status: 400,
-        message: errorData.message || 'Bad Request',
-      };
-    }
-
-    // Fallback
     if (!response.ok) {
+      const errorData = await readErrorBody(response);
+      const reason = typeof errorData?.reason === 'string' ? { reason: errorData.reason } : {};
+
+      if (response.status === 400) {
+        return { error: true, status: 400, message: errorData?.message || 'Bad Request', ...reason };
+      }
+
       console.error('Error:', response);
-      return {
-        error: true,
-        status: response.status,
-        message: response.statusText,
-      };
+      return { error: true, status: response.status, message: response.statusText, ...reason };
     }
 
     // Handle responses with no content (204 or empty body)

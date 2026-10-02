@@ -77,6 +77,42 @@ describe('ThreadPanel Component', () => {
     jest.clearAllMocks();
   });
 
+  it('shows the reply lock in place of the reply box when one is given', () => {
+    render(<ThreadPanel {...defaultProps} replyLock={<button type="button">Set your name first</button>} />);
+
+    expect(screen.getByRole('button', { name: 'Set your name first' })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Reply...')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Send reply')).not.toBeInTheDocument();
+  });
+
+  it('focuses the reply box when the lock it was unlocked from lifts', () => {
+    const lock = <button type="button">Set your name first</button>;
+    const { rerender } = render(<ThreadPanel {...defaultProps} replyLock={lock} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Set your name first' }));
+    rerender(<ThreadPanel {...defaultProps} />);
+
+    expect(screen.getByPlaceholderText('Reply...')).toHaveFocus();
+  });
+
+  it('leaves focus alone when the lock lifts after a name was set from somewhere else', () => {
+    const lock = <button type="button">Set your name first</button>;
+    const { rerender } = render(<ThreadPanel {...defaultProps} replyLock={lock} />);
+
+    rerender(<ThreadPanel {...defaultProps} />);
+
+    expect(screen.getByPlaceholderText('Reply...')).not.toHaveFocus();
+  });
+
+  it('draws the name badge beside the sender name, for the opening message and each reply', () => {
+    const badgeFor = (msg: PseudonymousMessage) => <span>{`Badge for ${msg.id}`}</span>;
+    render(<ThreadPanel {...defaultProps} renderNameBadge={badgeFor} />);
+
+    expect(screen.getByText('Badge for parent-123').parentElement).toHaveTextContent('User1');
+    expect(screen.getByText('Badge for reply-1').parentElement).toHaveTextContent('User2');
+    expect(screen.getByText('Badge for reply-2').parentElement).toHaveTextContent('User1');
+  });
+
   it('renders the thread panel header', () => {
     render(<ThreadPanel {...defaultProps} />);
     expect(screen.getByText('Replies')).toBeInTheDocument();

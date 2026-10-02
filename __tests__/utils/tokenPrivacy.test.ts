@@ -14,7 +14,7 @@ describe('scrubTokenFromUrl', () => {
   });
 
   it('leaves URLs without a token alone', () => {
-    expect(scrubTokenFromUrl('/login?redirectTo=/lounge')).toBe('/login?redirectTo=/lounge');
+    expect(scrubTokenFromUrl('/login?redirectTo=/hallway')).toBe('/login?redirectTo=/hallway');
   });
 
   it('does not touch parameters that only end in "token"', () => {

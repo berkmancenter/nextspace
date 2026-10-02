@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import KeyboardReturnIcon from '@mui/icons-material/KeyboardReturn';
 import { BotIcon } from '../components/BotIcon';
-import SessionManager from '../utils/SessionManager';
 import { Api } from '../utils';
 import { roomFontVariables } from '../components/room/roomFonts';
 import styles from '../components/room/communityRoom.module.css';
@@ -23,11 +22,6 @@ export default function NotFoundPage() {
     };
   }, []);
 
-  const home =
-    SessionManager.get().getAuthType() === 'admin'
-      ? { href: '/admin/events', label: 'Back to events' }
-      : { href: '/lounge', label: 'Back to the lounge' };
-
   return (
     <div className={styles.root} style={roomFontVariables}>
       <div className={styles.notFound}>
@@ -42,9 +36,9 @@ export default function NotFoundPage() {
           <span className={styles.notFoundQuestion}>?</span>
         </div>
 
-        <Link href={home.href} className={styles.notFoundLink}>
+        <Link href="/hallway" className={styles.notFoundLink}>
           <KeyboardReturnIcon sx={{ fontSize: 18 }} aria-hidden="true" />
-          {home.label}
+          Back to the hallway
         </Link>
       </div>
     </div>

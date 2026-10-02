@@ -323,12 +323,12 @@ describe('LoginPage', () => {
       await user.click(screen.getByRole('button', { name: /Login/i }));
     }
 
-    it('sends a participant to the lounge', async () => {
+    it('sends a participant to the hallway', async () => {
       mockLogin('participant');
 
       await signIn();
 
-      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/lounge'));
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/hallway'));
     });
 
     it('sends an admin to the events page', async () => {
@@ -339,12 +339,12 @@ describe('LoginPage', () => {
       await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/admin/events'));
     });
 
-    it('sends an account with no role to the lounge rather than the admin pages', async () => {
+    it('sends an account with no role to the hallway rather than the admin pages', async () => {
       mockLogin(undefined);
 
       await signIn();
 
-      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/lounge'));
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/hallway'));
     });
 
     it('still honours a safe redirectTo for a participant', async () => {
@@ -356,13 +356,13 @@ describe('LoginPage', () => {
       await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/room/abc123'));
     });
 
-    it('falls back to the lounge when a participant arrives with an unsafe redirectTo', async () => {
+    it('falls back to the hallway when a participant arrives with an unsafe redirectTo', async () => {
       mockSearchParams = new URLSearchParams({ redirectTo: 'https://evil.com' });
       mockLogin('participant');
 
       await signIn();
 
-      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/lounge'));
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/hallway'));
     });
   });
 
@@ -423,7 +423,7 @@ describe('LoginPage', () => {
       await signIn();
 
       await waitFor(() => expect(mockMarkAuthenticated).toHaveBeenCalledWith('Intuitive Lyra', 'user123', 'user'));
-      expect(mockPush).toHaveBeenCalledWith('/lounge');
+      expect(mockPush).toHaveBeenCalledWith('/hallway');
     });
 
     it("trusts the server over the login response's role", async () => {
@@ -431,7 +431,7 @@ describe('LoginPage', () => {
 
       await signIn();
 
-      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/lounge'));
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/hallway'));
       expect(mockMarkAuthenticated).toHaveBeenCalledWith('Intuitive Lyra', 'user123', 'user');
     });
   });

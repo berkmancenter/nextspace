@@ -49,7 +49,7 @@ describe('CommunityAssistantPanel', () => {
     expect(screen.getByText("I read the room, so you don't have to.")).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Everything posted in Group Chat is what I know. Nothing you say here is visible to anyone else in the room.',
+        "I've read everything posted in Group Chat. Nothing you say here is visible to anyone else in the room.",
       ),
     ).toBeInTheDocument();
   });
@@ -65,7 +65,7 @@ describe('CommunityAssistantPanel', () => {
     render(<CommunityAssistantPanel {...baseProps} />);
     expect(
       screen.getByText(
-        "I can be wrong, and I can't see anything outside this room: no email, no publications, no other NextSpace events.",
+        "I can be wrong. Depending on how I'm set up, I may also look beyond this room, for example on the web or in past NextSpace events.",
       ),
     ).toBeInTheDocument();
   });
@@ -75,6 +75,17 @@ describe('CommunityAssistantPanel', () => {
     render(<CommunityAssistantPanel {...baseProps} />);
     await user.click(screen.getByRole('button', { name: 'What did I miss this week?' }));
     expect(mockOnSendMessage).toHaveBeenCalledWith('What did I miss this week?');
+  });
+
+  it('disables the suggestion chips until the reader sets a real name', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    render(<CommunityAssistantPanel {...baseProps} mustSetRealName />);
+
+    const chip = screen.getByRole('button', { name: 'What did I miss this week?' });
+    expect(chip).toBeDisabled();
+    await user.click(chip);
+
+    expect(mockOnSendMessage).not.toHaveBeenCalled();
   });
 
   it('does not show the empty-state hero once there are messages', () => {
@@ -132,7 +143,7 @@ describe('CommunityAssistantPanel', () => {
     render(<CommunityAssistantPanel {...baseProps} messages={messages} />);
     expect(screen.getByText('What did I miss?')).toBeInTheDocument();
     expect(screen.getByText('Three new members joined this week.')).toBeInTheDocument();
-    expect(screen.getByText('AI Bot')).toBeInTheDocument();
+    expect(screen.getByText('AI Bot').parentElement).toHaveTextContent('Berkie');
   });
 
   it('passes the assistant tab to the composer', () => {

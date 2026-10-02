@@ -6,8 +6,8 @@ import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import { Api, RetrieveData } from '../utils';
 import { CheckAuthHeader } from '../utils/Helpers';
 import { UserPseudonym } from '../types.internal';
-import { useLoungeRooms, useSessionJoin } from '../hooks';
-import { LoungeRoomRow } from '../components/room/LoungeRoomRow';
+import { useHallwayRooms, useSessionJoin } from '../hooks';
+import { HallwayRoomRow } from '../components/room/HallwayRoomRow';
 import { RoomMarkIcon } from '../components/room/RoomMarkIcon';
 import { roomFontVariables } from '../components/room/roomFonts';
 import { getRoomInitials } from '../utils/roomAvatarUtils';
@@ -20,10 +20,10 @@ export const getServerSideProps = async (context: { req: any }) => {
 /**
  * Rooms arrive by invitation, so there is nothing to browse or join from this screen.
  */
-export default function LoungePage() {
+export default function HallwayPage() {
   const router = useRouter();
   const { pseudonym: sessionPseudonym, userId } = useSessionJoin(false);
-  const { rooms, loaded, error } = useLoungeRooms(userId);
+  const { rooms, loaded, error } = useHallwayRooms(userId);
   const [accountName, setAccountName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export default function LoungePage() {
       const account = await RetrieveData(`users/user/${userId}`, Api.get().getAccessToken());
       if (cancelled) return;
       if (!account || account.error) {
-        console.warn('Could not read this account, so the lounge falls back to the session name:', account?.status);
+        console.warn('Could not read this account, so the hallway falls back to the session name:', account?.status);
         return;
       }
       // Every room registers the same real name for a member, so any entry names them.
@@ -60,7 +60,7 @@ export default function LoungePage() {
             </span>
             <h1 className={styles.headerTitle}>Community Rooms</h1>
           </div>
-          <div className={`${styles.headerSubtitle} ${styles.loungeSubtitle}`}>Your rooms</div>
+          <div className={`${styles.headerSubtitle} ${styles.hallwaySubtitle}`}>Your rooms</div>
         </div>
         <div className={styles.headerActions}>
           {displayName && (
@@ -73,26 +73,26 @@ export default function LoungePage() {
         </div>
       </header>
 
-      <div className={styles.loungeBody}>
+      <div className={styles.hallwayBody}>
         {error && (
-          <p role="alert" className={styles.loungeNotice}>
+          <p role="alert" className={styles.hallwayNotice}>
             {error}
           </p>
         )}
 
-        <div className={styles.loungeList}>
+        <div className={styles.hallwayList}>
           {rooms.map((room) => (
-            <LoungeRoomRow key={room.id} room={room} onOpen={(roomId) => router.push(`/room/${roomId}`)} />
+            <HallwayRoomRow key={room.id} room={room} onOpen={(roomId) => router.push(`/room/${roomId}`)} />
           ))}
         </div>
 
-        {loaded && !error && !rooms.length && <p className={styles.loungeNotice}>You are not in any rooms yet.</p>}
+        {loaded && !error && !rooms.length && <p className={styles.hallwayNotice}>You are not in any rooms yet.</p>}
       </div>
 
       <nav aria-label="Main sections" className={styles.nav}>
-        <Link href="/lounge" aria-current="page" className={`${styles.navButton} ${styles.navButtonActive}`}>
+        <Link href="/hallway" aria-current="page" className={`${styles.navButton} ${styles.navButtonActive}`}>
           <HomeIcon sx={{ fontSize: 24 }} style={{ color: 'var(--room-text-primary)' }} />
-          <span className={styles.navLabelActive}>Lounge</span>
+          <span className={styles.navLabelActive}>Hallway</span>
         </Link>
         <Link href="/profile" className={styles.navButton}>
           <PersonOutlineIcon sx={{ fontSize: 24 }} style={{ color: 'var(--room-text-muted)' }} />

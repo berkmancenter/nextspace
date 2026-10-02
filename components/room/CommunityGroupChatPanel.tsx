@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { ThreadedMessage, isReadersMessage } from '../ThreadedMessage';
 import { ThreadPanel } from '../ThreadPanel';
 import { BotIcon } from '../BotIcon';
-import { CommunityMessageInput } from './CommunityMessageInput';
+import { CommunityMessageInput, RealNameGate } from './CommunityMessageInput';
 import { MemberIntroContent, PendingRoomMessage, PseudonymousMessage } from '../../types.internal';
 import { MemberIntroCard } from './MemberIntroCard';
 import { PendingBubble, PendingMessage } from './PendingMessage';
@@ -32,6 +32,9 @@ interface CommunityGroupChatPanelProps {
   onRetryPendingMessage?: (id: string) => void;
   /** True while the socket is down, which greys out the composer shortcuts. */
   offline?: boolean;
+  /** True while the room has no real name for the reader, which locks the composer. */
+  mustSetRealName?: boolean;
+  onRequestRealName?: () => void;
   waitingForResponse?: boolean;
   messagesWithUnreadReplies?: Set<string>;
   onSendMessage: (message: string, parentMessageId?: string) => Promise<boolean>;
@@ -96,6 +99,8 @@ export function CommunityGroupChatPanel({
   pendingMessages = [],
   onRetryPendingMessage,
   offline = false,
+  mustSetRealName = false,
+  onRequestRealName,
   waitingForResponse = false,
   messagesWithUnreadReplies = new Set(),
   onSendMessage,
@@ -164,6 +169,9 @@ export function CommunityGroupChatPanel({
   const lastMessage = messages[messages.length - 1];
   const waitingForThreadedReply = waitingForResponse && lastMessage?.parentMessage;
 
+  const renderNameBadge = (message: PseudonymousMessage) =>
+    message.fromAgent ? <span className={`${styles.agentBadge} ${styles.agentBadgeBesideName}`}>AI Bot</span> : null;
+
   const renderAvatar = (message: PseudonymousMessage) => {
     const isCurrentUser = isReadersMessage(message, realName, currentUserId);
     const isAssistant = message.fromAgent;
@@ -209,9 +217,6 @@ export function CommunityGroupChatPanel({
     if (isAssistant) {
       return (
         <div style={{ width: '85%' }}>
-          <div className={styles.agentBadge} style={{ marginBottom: 4 }}>
-            AI Bot
-          </div>
           <div
             className="rounded-2xl px-2 py-1"
             style={{
@@ -291,8 +296,10 @@ export function CommunityGroupChatPanel({
                 <p
                   style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 13, color: 'var(--room-text-muted)' }}
                 >
-                  {botName} is here too. It stays quiet unless you put{' '}
-                  <span style={{ fontWeight: 600, color: 'var(--room-text-primary)' }}>@{botName}</span> in a message.
+                  {botName} is here too. Put{' '}
+                  <span style={{ fontWeight: 600, color: 'var(--room-text-primary)' }}>@{botName}</span> in a message to ask
+                  it something. It may also reply on its own when a message seems meant for it or asks something it can
+                  answer.
                 </p>
               </div>
             ) : (
@@ -345,6 +352,7 @@ export function CommunityGroupChatPanel({
                         botName={botName}
                         renderAvatar={renderAvatar}
                         renderMessageContent={renderMessageContent}
+                        renderNameBadge={renderNameBadge}
                         showTimestamp={showTimestamp}
                         isThreadOpen={selectedThreadId === message.id}
                         hasUnreadReplies={message.id ? messagesWithUnreadReplies.has(message.id) : false}
@@ -397,6 +405,8 @@ export function CommunityGroupChatPanel({
             onSendMessage={onSendMessage}
             isEmptyRoom={isEmptyRoom}
             offline={offline}
+            mustSetRealName={mustSetRealName}
+            onRequestRealName={onRequestRealName}
             waitingForResponse={waitingForResponse && !waitingForThreadedReply}
           />
         </div>
@@ -413,9 +423,17 @@ export function CommunityGroupChatPanel({
             onSendReply={handleSendReply}
             renderAvatar={renderAvatar}
             renderMessageContent={renderMessageContent}
+            renderNameBadge={renderNameBadge}
             enhancers={[]}
             botName={botName}
             waitingForResponse={!!(waitingForThreadedReply && lastMessage?.parentMessage === selectedThreadId)}
+            replyLock={
+              mustSetRealName ? (
+                <div className={styles.composerBox}>
+                  <RealNameGate onRequestRealName={onRequestRealName} />
+                </div>
+              ) : undefined
+            }
           />
         </div>
       )}

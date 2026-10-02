@@ -25,6 +25,9 @@ interface CommunityAssistantPanelProps {
   onRetryPendingMessage?: (id: string) => void;
   /** True while the socket is down, which greys out the composer shortcuts. */
   offline?: boolean;
+  /** True while the room has no real name for the reader, which locks the composer. */
+  mustSetRealName?: boolean;
+  onRequestRealName?: () => void;
   waitingForResponse?: boolean;
   onSendMessage: (message: string) => Promise<boolean>;
 }
@@ -51,6 +54,8 @@ export function CommunityAssistantPanel({
   pendingMessages = [],
   onRetryPendingMessage,
   offline = false,
+  mustSetRealName = false,
+  onRequestRealName,
   waitingForResponse = false,
   onSendMessage,
 }: CommunityAssistantPanelProps) {
@@ -58,6 +63,9 @@ export function CommunityAssistantPanel({
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(messages);
 
   const parentMessages = useMemo(() => messages.filter((m) => !m.parentMessage), [messages]);
+
+  const renderNameBadge = (message: PseudonymousMessage) =>
+    message.fromAgent ? <span className={`${styles.agentBadge} ${styles.agentBadgeBesideName}`}>AI Bot</span> : null;
 
   const renderAvatar = (message: PseudonymousMessage) => {
     if (message.fromAgent) {
@@ -83,9 +91,6 @@ export function CommunityAssistantPanel({
     if (message.fromAgent) {
       return (
         <div style={{ width: '85%' }}>
-          <div className={styles.agentBadge} style={{ marginBottom: 4 }}>
-            AI Bot
-          </div>
           <div
             className="rounded-2xl px-2 py-1"
             style={{
@@ -137,14 +142,16 @@ export function CommunityAssistantPanel({
               </h2>
             </div>
             <p style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 14, color: 'var(--room-text-body)' }}>
-              Everything posted in Group Chat is what I know. Nothing you say here is visible to anyone else in the room.
+              {"I've read everything posted in Group Chat. Nothing you say here is visible to anyone else in the room."}
             </p>
             <div className="flex flex-col gap-2">
               {SUGGESTION_CHIPS.map((chip) => (
                 <button
                   key={chip}
                   type="button"
+                  disabled={mustSetRealName}
                   onClick={() => onSendMessage(chip)}
+                  className={mustSetRealName ? styles.shortcutIdle : undefined}
                   style={{
                     minHeight: 44,
                     textAlign: 'left',
@@ -156,7 +163,7 @@ export function CommunityAssistantPanel({
                     fontSize: 14,
                     fontWeight: 500,
                     color: 'var(--room-text-primary)',
-                    cursor: 'pointer',
+                    cursor: mustSetRealName ? 'default' : 'pointer',
                   }}
                 >
                   {chip}
@@ -165,7 +172,7 @@ export function CommunityAssistantPanel({
             </div>
             <p style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 12, color: 'var(--room-text-muted)' }}>
               {
-                "I can be wrong, and I can't see anything outside this room: no email, no publications, no other NextSpace events."
+                "I can be wrong. Depending on how I'm set up, I may also look beyond this room, for example on the web or in past NextSpace events."
               }
             </p>
           </div>
@@ -189,6 +196,7 @@ export function CommunityAssistantPanel({
                   botName={botName}
                   renderAvatar={renderAvatar}
                   renderMessageContent={renderMessageContent}
+                  renderNameBadge={renderNameBadge}
                   showTimestamp={showTimestamp}
                 />
               );
@@ -225,6 +233,8 @@ export function CommunityAssistantPanel({
           mentionTargets={[]}
           onSendMessage={onSendMessage}
           offline={offline}
+          mustSetRealName={mustSetRealName}
+          onRequestRealName={onRequestRealName}
           waitingForResponse={waitingForResponse}
         />
       </div>

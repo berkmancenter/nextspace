@@ -29,7 +29,7 @@ describe('client Sentry config', () => {
   });
 
   it('records session replays on ordinary pages', () => {
-    const config = loadClientConfig('/lounge');
+    const config = loadClientConfig('/hallway');
 
     expect(config.integrations).toEqual([{ name: 'Replay' }]);
   });

@@ -100,10 +100,10 @@ describe('middleware on other routes', () => {
     (decryptCookie as jest.Mock).mockReset();
   });
 
-  it('lets a logged-in non-admin through to the lounge and their rooms', async () => {
+  it('lets a logged-in non-admin through to the hallway and their rooms', async () => {
     signInAs('user');
 
-    for (const path of ['/lounge', '/room/abc123']) {
+    for (const path of ['/hallway', '/room/abc123']) {
       const response = await visit(path);
 
       expect(response.status).toBe(200);

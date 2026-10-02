@@ -45,18 +45,18 @@ describe('Layout', () => {
     expect(screen.getByText('room body')).toBeInTheDocument();
   });
 
-  it('leaves the lounge to draw its own chrome', () => {
-    mockUseRouter.mockReturnValue({ pathname: '/lounge', asPath: '/lounge', isReady: true });
+  it('leaves the hallway to draw its own chrome', () => {
+    mockUseRouter.mockReturnValue({ pathname: '/hallway', asPath: '/hallway', isReady: true });
 
     render(
       <Layout>
-        <p>lounge body</p>
+        <p>hallway body</p>
       </Layout>,
     );
 
     expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
     expect(screen.queryByTestId('app-footer')).not.toBeInTheDocument();
-    expect(screen.getByText('lounge body')).toBeInTheDocument();
+    expect(screen.getByText('hallway body')).toBeInTheDocument();
   });
 
   it('leaves the not-found page to draw its own chrome', () => {

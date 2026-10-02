@@ -75,6 +75,14 @@ describe('ThreadedMessage Component', () => {
     jest.clearAllMocks();
   });
 
+  it('draws the name badge beside the sender name, for the message and its reply preview', () => {
+    const badgeFor = (msg: PseudonymousMessage) => <span>{`Badge for ${msg.pseudonym}`}</span>;
+    render(<ThreadedMessage {...defaultProps} replies={mockReplies} renderNameBadge={badgeFor} />);
+
+    expect(screen.getByText('Badge for User1').parentElement).toHaveTextContent('User1');
+    expect(screen.getByText('Badge for User2').parentElement).toHaveTextContent('User2');
+  });
+
   it('renders the message content', () => {
     render(<ThreadedMessage {...defaultProps} />);
     expect(screen.getByTestId(`message-${mockMessage.id}`)).toBeInTheDocument();

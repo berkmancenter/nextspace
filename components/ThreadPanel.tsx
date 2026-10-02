@@ -19,10 +19,14 @@ interface ThreadPanelProps {
   onSendReply: (text: string, parentId: string) => void;
   renderAvatar: (msg: PseudonymousMessage) => React.ReactNode;
   renderMessageContent: (msg: PseudonymousMessage, isHovered?: boolean) => React.ReactNode;
+  /** Drawn right after a sender's name, such as a bot label. */
+  renderNameBadge?: (msg: PseudonymousMessage) => React.ReactNode;
   enhancers: InputEnhancer<any>[];
   botName: string;
   feedbackConfig?: FeedbackConfig;
   waitingForResponse?: boolean;
+  /** Shown in place of the reply box when the reader may not reply yet. */
+  replyLock?: React.ReactNode;
 }
 
 export const ThreadPanel: FC<ThreadPanelProps> = ({
@@ -34,10 +38,12 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
   onSendReply,
   renderAvatar,
   renderMessageContent,
+  renderNameBadge,
   enhancers,
   botName,
   feedbackConfig,
   waitingForResponse = false,
+  replyLock,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -54,6 +60,18 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
       textareaRef.current.focus();
     }
   }, [isReplying]);
+
+  const locked = Boolean(replyLock);
+  const wasLocked = useRef(locked);
+  const unlockAskedHere = useRef(false);
+
+  /* Only when the name was asked for from this thread, so it doesn't pull focus away from the main
+     message box. This runs after that box's own focus effect, so the thread wins when it asked. */
+  useEffect(() => {
+    if (wasLocked.current && !locked && unlockAskedHere.current) textareaRef.current?.focus();
+    if (!locked) unlockAskedHere.current = false;
+    wasLocked.current = locked;
+  }, [locked]);
 
   // Auto-scroll to bottom when new replies come in
   useEffect(() => {
@@ -235,6 +253,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                 {isReadersMessage(parentMessage, pseudonym, currentUserId) && (
                   <span className="text-gray-600 font-normal"> (You)</span>
                 )}
+                {renderNameBadge?.(parentMessage)}
                 {parentMessage.createdAt && (
                   <span className="text-xs font-normal text-gray-400 ml-2">
                     {new Date(parentMessage.createdAt).toLocaleTimeString('en-US', {
@@ -291,6 +310,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                   {isReadersMessage(reply, pseudonym, currentUserId) && (
                     <span className="text-gray-600 font-normal"> (You)</span>
                   )}
+                  {renderNameBadge?.(reply)}
                   {reply.createdAt && (
                     <span className="text-xs font-normal text-gray-400 ml-2">
                       {new Date(reply.createdAt).toLocaleTimeString('en-US', {
@@ -330,7 +350,9 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
 
         {/* Reply action area - directly below messages */}
         <div className="pt-4">
-          {isReplying ? (
+          {replyLock ? (
+            <div onClickCapture={() => (unlockAskedHere.current = true)}>{replyLock}</div>
+          ) : isReplying ? (
             <div className="border-[1px] border-[#A5B4FC] rounded-lg bg-white transition-all focus-within:border-[#6366f1] focus-within:shadow-md">
               <textarea
                 ref={textareaRef}
