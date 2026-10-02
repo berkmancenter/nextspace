@@ -6,6 +6,8 @@ import { io } from 'socket.io-client';
 import ModeratorScreen from '../../pages/moderator';
 import { Transcript } from '../../components/Transcript';
 import { GetChannelPasscode, RetrieveData } from '../../utils';
+import { resolveConversationBotName } from '../../utils/Helpers';
+import { ConversationTypeProvider, useBotName } from '../../context/ConversationTypeContext';
 import { channel } from 'diagnostics_channel';
 
 // Mock dependencies
@@ -27,6 +29,7 @@ jest.mock('../../utils', () => ({
       SetTokens: jest.fn(),
       GetTokens: jest.fn().mockReturnValue({ access: 'mock-token' }),
       getAccessToken: jest.fn().mockReturnValue('mock-token'),
+      GetConfig: jest.fn().mockResolvedValue({ conversationBotName: 'Berkie' }),
     }),
   },
   GetChannelPasscode: jest.fn().mockReturnValue('mock-passcode'),
@@ -69,6 +72,7 @@ jest.mock('../../utils/Helpers', () => ({
   createConversationFromData: jest.fn().mockResolvedValue({
     type: { name: 'eventAssistant' },
   }),
+  resolveConversationBotName: jest.fn((_conversation, configBotName) => configBotName),
 }));
 
 // Mock useSessionJoin
@@ -372,6 +376,7 @@ describe('ModeratorScreen', () => {
       SetTokens: jest.fn(),
       GetTokens: mockGetTokens,
       getAccessToken: jest.fn(() => mockGetTokens()?.access ?? ''),
+      GetConfig: jest.fn().mockResolvedValue({ conversationBotName: 'Berkie' }),
     });
 
     await act(async () => {
@@ -400,6 +405,7 @@ describe('ModeratorScreen', () => {
       SetTokens: jest.fn(),
       GetTokens: mockGetTokens,
       getAccessToken: jest.fn(() => mockGetTokens()?.access ?? ''),
+      GetConfig: jest.fn().mockResolvedValue({ conversationBotName: 'Berkie' }),
     });
 
     // Expose lastReconnectTime as a controllable value
@@ -758,5 +764,56 @@ describe('ModeratorScreen', () => {
     });
 
     consoleLogSpy.mockRestore();
+  });
+
+  describe('shared bot name context', () => {
+    function BotNameProbe() {
+      return <div data-testid="bot-name-probe">{useBotName()}</div>;
+    }
+
+    it("sets the shared bot name to the event's resolved bot name, not the 'Berkie' default", async () => {
+      (resolveConversationBotName as jest.Mock).mockImplementationOnce(() => 'CustomBot');
+
+      await act(async () => {
+        render(
+          <ConversationTypeProvider>
+            <ModeratorScreen authType={'user'} />
+            <BotNameProbe />
+          </ConversationTypeProvider>,
+        );
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('bot-name-probe')).toHaveTextContent('CustomBot');
+      });
+    });
+
+    it("resets the shared bot name back to 'Berkie' when ModeratorScreen unmounts", async () => {
+      (resolveConversationBotName as jest.Mock).mockImplementationOnce(() => 'CustomBot');
+
+      const { rerender } = render(
+        <ConversationTypeProvider>
+          <ModeratorScreen authType={'user'} />
+          <BotNameProbe />
+        </ConversationTypeProvider>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('bot-name-probe')).toHaveTextContent('CustomBot');
+      });
+
+      // Re-render the same provider instance without ModeratorScreen, so only its
+      // unmount cleanup runs — a fresh provider would default to 'Berkie' regardless
+      // of whether the cleanup actually fired, which would make this test meaningless.
+      await act(async () => {
+        rerender(
+          <ConversationTypeProvider>
+            <BotNameProbe />
+          </ConversationTypeProvider>,
+        );
+      });
+
+      expect(screen.getByTestId('bot-name-probe')).toHaveTextContent('Berkie');
+    });
   });
 });
