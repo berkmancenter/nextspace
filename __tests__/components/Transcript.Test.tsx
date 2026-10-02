@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Transcript } from '../../components/Transcript';
 import { RetrieveData, SendData } from '../../utils';
 import { trackConversationEvent, trackFeatureUsage } from '../../utils/analytics';
+import { ConversationTypeProvider } from '../../context/ConversationTypeContext';
 
 jest.mock('../../utils', () => ({
   RetrieveData: jest.fn(),
@@ -1539,6 +1540,74 @@ describe('Transcript', () => {
       // The actual debouncing behavior is implemented and tested via the 150ms timeout
       // Testing DOM scroll simulation in jsdom is unreliable, so we verify structure instead
       expect(screen.getByText('LIVE TRANSCRIPT')).toBeInTheDocument();
+    });
+  });
+
+  describe('bot badge', () => {
+    const botMessage = {
+      id: 'bot1',
+      channels: ['transcript'],
+      createdAt: '2025-10-17T12:03:00Z',
+      fromAgent: true,
+      pseudonym: 'Event Assistant',
+      body: { text: 'Bot reply' },
+    };
+
+    const humanMessage = {
+      id: 'human1',
+      channels: ['transcript'],
+      createdAt: '2025-10-17T12:04:00Z',
+      fromAgent: false,
+      pseudonym: 'quiet_heron_09',
+      body: { text: 'Human reply' },
+    };
+
+    beforeEach(() => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith('conversations/')) {
+          return Promise.resolve({ name: 'Test Conversation', transcript: { status: 'active' } });
+        } else if (url.startsWith('messages/')) {
+          return Promise.resolve([botMessage, humanMessage]);
+        }
+        return Promise.resolve(null);
+      });
+    });
+
+    it('labels an agent message with the configured bot name', async () => {
+      render(<Transcript {...baseProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Bot reply')).toBeInTheDocument();
+      });
+
+      // Defaults to "Berkie" when no ConversationTypeProvider sets a different name.
+      expect(screen.getByText('Berkie')).toBeInTheDocument();
+    });
+
+    it('uses the event-configured bot name from context instead of the default', async () => {
+      render(
+        <ConversationTypeProvider initialBotName="Custom Bot">
+          <Transcript {...baseProps} />
+        </ConversationTypeProvider>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Bot reply')).toBeInTheDocument();
+      });
+
+      expect(screen.getByText('Custom Bot')).toBeInTheDocument();
+      expect(screen.queryByText('Berkie')).not.toBeInTheDocument();
+    });
+
+    it('shows no speaker name for a human message', async () => {
+      render(<Transcript {...baseProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Human reply')).toBeInTheDocument();
+      });
+
+      // Human speech all comes through one shared capture feed, so no pseudonym is shown.
+      expect(screen.queryByText('quiet_heron_09')).not.toBeInTheDocument();
     });
   });
 });

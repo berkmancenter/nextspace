@@ -5,11 +5,11 @@ import { PseudonymousMessage, ModeratorInsightsMessage, ModeratorMetricsMessage,
 import { Api, GetChannelPasscode, RetrieveData, QueryParamsError, emitWithTokenRefresh } from '../utils';
 
 import { Errors, ParamErrors, Transcript } from '../components/';
-import { CheckAuthHeader, createConversationFromData } from '../utils/Helpers';
+import { CheckAuthHeader, createConversationFromData, resolveConversationBotName } from '../utils/Helpers';
 import { useSessionJoin } from '../hooks/useSessionJoin';
 import { AuthType } from '../types.internal';
 import { useAnalytics } from '../hooks/useAnalytics';
-import { useSetConversationType } from '../context/ConversationTypeContext';
+import { useSetConversationType, useSetBotName } from '../context/ConversationTypeContext';
 import { trackConversationEvent } from '../utils/analytics';
 
 export const getServerSideProps = async (context: { req: any }) => {
@@ -23,15 +23,22 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
   useAnalytics({ pageType: 'moderator' });
 
   const setConversationType = useSetConversationType();
+  const setBotName = useSetBotName();
 
-  /* Clear the shared conversation type when the event changes so the Quick
-     Guide doesn't show stale commands while the new conversation loads.
+  /* Clear the shared conversation type and bot name when the event changes so the Quick
+     Guide doesn't show stale commands/names while the new conversation loads.
      The cleanup also handles navigating from moderator → participant view:
      both pages share the same conversationId, so the dep-change effect won't
      fire on the new page — unmount cleanup is the only thing that clears it. */
   useEffect(() => {
     setConversationType(null);
-    return () => setConversationType(null);
+    setBotName('Berkie');
+    return () => {
+      setConversationType(null);
+      setBotName('Berkie');
+    };
+    // setConversationType and setBotName are context setters — stable references.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.query.conversationId]);
 
   const [generalError, setGeneralError] = useState<string | null>(null);
@@ -79,6 +86,8 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
     async function fetchConversationData() {
       if (!router.isReady || !Api.get().getAccessToken()) return;
 
+      const config = await Api.get().GetConfig();
+
       const transcriptPasscodeParam = GetChannelPasscode('transcript', router.query, setGeneralError);
       const modPasscodeParam = GetChannelPasscode('moderator', router.query, setGeneralError);
 
@@ -122,6 +131,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
         // the raw API response only carries a type ID, not the resolved object.
         const conversation = await createConversationFromData(conversationResponse);
         setConversationType(conversation.type);
+        setBotName(resolveConversationBotName(conversation, config.conversationBotName));
       }
 
       // Fetch messages
