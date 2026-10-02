@@ -22,12 +22,15 @@ export const Layout = ({ children, authType = 'guest' }: Readonly<{ children: Re
   const router = useRouter();
   const currentUrl = router.isReady ? router.asPath : '';
 
-  // The community room, the hallway, and the not-found page (which community room members
-  // land on) draw their own chrome and fill the viewport, so the app's header and footer
+  // The community room, the hallway, and the invite and not-found pages (which community room
+  // members land on) draw their own chrome and fill the viewport, so the app's header and footer
   // would frame a second header and push them into a scroll. A room's asPath carries a
   // room id rather than the literal "conversationId", so the check below can't see it.
   const drawsOwnChrome =
-    router.pathname.startsWith('/room') || router.pathname.startsWith('/hallway') || router.pathname === '/404';
+    router.pathname.startsWith('/room') ||
+    router.pathname.startsWith('/hallway') ||
+    router.pathname === '/invite' ||
+    router.pathname === '/404';
 
   // Pages where footer should be hidden (full-screen chat interfaces)
   const hideFooter = drawsOwnChrome || currentUrl.includes('conversationId');
