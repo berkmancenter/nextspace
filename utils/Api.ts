@@ -5,7 +5,13 @@
 
 import { Api } from './Helpers';
 import TokenManagerDefault from './TokenManager';
-import { ResetPasswordResult } from '../types.internal';
+import {
+  ConsumeInviteResult,
+  GetInviteResult,
+  RequestPasswordResetResult,
+  ResendInviteResult,
+  ResetPasswordResult,
+} from '../types.internal';
 
 /**
  * Wrapper for fetch that automatically handles token refresh on 401 responses.
@@ -99,6 +105,31 @@ export const Authenticate = async (username: string, password: string) => {
 };
 
 /**
+ * Ask for a password reset email. The backend answers the same way whether or not an account uses the address, so
+ * `sent` only means the request was accepted.
+ * @param email - The address the person typed.
+ * @returns The outcome; never throws.
+ */
+export const RequestPasswordReset = async (email: string): Promise<RequestPasswordResetResult> => {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/forgotPassword`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+
+    if (response.ok) return { status: 'sent' };
+    if (response.status === 400) return { status: 'invalid-email' };
+
+    console.error(`Password reset request failed with status ${response.status}`);
+    return { status: 'error' };
+  } catch (error) {
+    console.error('Password reset request failed:', error instanceof Error ? error.message : error);
+    return { status: 'error' };
+  }
+};
+
+/**
  * Set a new password using the one-time token from a password reset email.
  * @param token - The token from the reset link's query string.
  * @param password - The new password.
@@ -123,6 +154,87 @@ export const ResetPassword = async (token: string, password: string): Promise<Re
     return { status: 'error' };
   } catch (error) {
     console.error('Password reset request failed:', error instanceof Error ? error.message : error);
+    return { status: 'error' };
+  }
+};
+
+/**
+ * Check an invite link and get the one-time nonce its submit must send back. Safe to call on page load: it never uses
+ * up the link, but each call replaces the previous nonce.
+ * @param token - The token from the invite link's query string.
+ * @returns The outcome; never throws.
+ */
+export const GetInvite = async (token: string): Promise<GetInviteResult> => {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/invite?token=${encodeURIComponent(token)}`);
+
+    if (response.status === 410) return { status: 'dead' };
+    if (response.status === 400) return { status: 'incomplete' };
+    if (!response.ok) {
+      console.error(`Invite check failed with status ${response.status}`);
+      return { status: 'error' };
+    }
+
+    const invite = await response.json();
+    // The backend sends a null room when the invite outlived its conversation; nothing can be joined.
+    if (!invite.conversation) return { status: 'dead' };
+    return { status: 'valid', invite };
+  } catch (error) {
+    console.error('Invite check request failed:', error instanceof Error ? error.message : error);
+    return { status: 'error' };
+  }
+};
+
+/**
+ * Use up an invite link: set the account's first password, or log in to the account that already has one.
+ * @param token - The token from the invite link's query string.
+ * @param nonce - The nonce from the latest `GetInvite` call for this token.
+ * @param password - The new password, or the existing account's password.
+ * @returns The outcome; never throws.
+ */
+export const ConsumeInvite = async (token: string, nonce: string, password: string): Promise<ConsumeInviteResult> => {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/invite/consume`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, nonce, password }),
+    });
+
+    if (response.ok) return { status: 'success', session: await response.json() };
+    if (response.status === 401) return { status: 'wrong-password' };
+    if (response.status === 403) return { status: 'stale-nonce' };
+    if (response.status === 410) return { status: 'dead' };
+    if (response.status === 409) {
+      const errorData = await response.json();
+      if (errorData.reason === 'real_name_taken') return { status: 'name-taken' };
+    }
+
+    console.error(`Invite submit failed with status ${response.status}`);
+    return { status: 'error' };
+  } catch (error) {
+    console.error('Invite submit request failed:', error instanceof Error ? error.message : error);
+    return { status: 'error' };
+  }
+};
+
+/**
+ * Ask for a fresh invite to be emailed in place of a dead link. The backend mails only the address on file.
+ * @param token - The token from the dead invite link.
+ * @returns `accepted` whenever the backend received the request, whether or not it sent anything; never throws.
+ */
+export const ResendInvite = async (token: string): Promise<ResendInviteResult> => {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/invite/resend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+
+    if (response.ok) return { status: 'accepted' };
+    console.error(`Invite resend failed with status ${response.status}`);
+    return { status: 'error' };
+  } catch (error) {
+    console.error('Invite resend request failed:', error instanceof Error ? error.message : error);
     return { status: 'error' };
   }
 };
