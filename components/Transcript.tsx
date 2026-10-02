@@ -709,9 +709,9 @@ export function Transcript(props: TranscriptProps) {
                   {isBot && (
                     <span
                       className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold"
-                      style={{ backgroundColor: `${botColor}66`, color: botColor }}
+                      style={{ backgroundColor: `${botColor}66`, color: '#FFFFFF' }}
                     >
-                      <BotIcon size={12} color={botColor} />
+                      <BotIcon size={12} color="#FFFFFF" />
                       {normalizeAssistantPseudonym(message, botName)}
                     </span>
                   )}
