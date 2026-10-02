@@ -302,7 +302,7 @@ export const EventDetails: React.FC<{
           </div>
           <div>
             <FieldLabel>Platform</FieldLabel>
-            <FieldValue>Nextspace, Zoom</FieldValue>
+            <FieldValue>NextSpace, Zoom</FieldValue>
           </div>
           <div className="min-w-0">
             <FieldLabel>Meeting link</FieldLabel>
