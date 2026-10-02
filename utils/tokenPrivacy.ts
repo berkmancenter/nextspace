@@ -1,5 +1,5 @@
 /** Pages whose URL carries a one-time token in the `token` query parameter. */
-const TOKEN_PAGES = ['/reset-password'];
+const TOKEN_PAGES = ['/reset-password', '/invite'];
 
 const REDACTED = 'REDACTED';
 const TOKEN_PARAM_PATTERN = /((?:^|[?&])token=)[^&#\s"']*/g;
