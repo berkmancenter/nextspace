@@ -19,10 +19,10 @@ type FeatureConfig = components['schemas']['FeatureConfig'] & {
 type GuideData = paths['/conversations/{conversationId}/features']['get']['responses']['200']['content']['application/json'];
 type PillState = 'active' | 'configurable' | 'unavailable';
 
-function tabLabel(tab: string, botName: string): string {
+function tabLabel(tab: string): string {
   switch (tab) {
     case 'assistant':
-      return botName;
+      return 'Private Chat';
     case 'group-chat':
       return 'Group Chat';
     case 'resources':
@@ -92,10 +92,10 @@ const TIER_LABEL_SX = {
   fontWeight: 700,
 } as const;
 
-function tabDescription(tab: string, botName: string): string | null {
+function tabDescription(tab: string): string | null {
   switch (tab) {
     case 'assistant':
-      return `The ${botName} tab is a 1:1 chat — ask questions or follow up on topics from the event.`;
+      return `The Private Chat tab is a 1:1 chat — ask questions or follow up on topics from the event.`;
     case 'group-chat':
       return `A chat with other event participants.`;
     default:
@@ -300,9 +300,9 @@ function SlashCommandRow({ f }: { f: FeatureConfig }) {
 
 function TabSection({ tab, features, botName }: { tab: string; features: FeatureConfig[]; botName: string }) {
   const { color, border, bg } = tabAccent(tab);
-  const label = tabLabel(tab, botName);
+  const label = tabLabel(tab);
   const icon = tabIcon(tab);
-  const description = tabDescription(tab, botName);
+  const description = tabDescription(tab);
   const actionTip = tabActionTip(tab, botName);
 
   const slashCommands = features.filter((f) => f.slashCommand);
