@@ -4,7 +4,8 @@ import { CheckCircleOutline, RadioButtonUnchecked, Visibility, VisibilityOff } f
 import { PASSWORD_RULES, unmetPasswordRules } from '../utils/passwordRules';
 import { PasswordFormProps } from '../types.internal';
 
-export function PasswordForm({ heading, intro, submitLabel, onSubmit }: PasswordFormProps) {
+export function PasswordForm({ heading, intro, submitLabel, onSubmit, purpose = 'new' }: PasswordFormProps) {
+  const choosingPassword = purpose === 'new';
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +15,7 @@ export function PasswordForm({ heading, intro, submitLabel, onSubmit }: Password
   const id = useId();
   const rulesId = `${id}-rules`;
   const errorId = `${id}-error`;
-  const describedBy = error ? `${errorId} ${rulesId}` : rulesId;
+  const describedBy = [error && errorId, choosingPassword && rulesId].filter(Boolean).join(' ') || undefined;
 
   const showError = (message: string) => {
     setError(message);
@@ -24,7 +25,12 @@ export function PasswordForm({ heading, intro, submitLabel, onSubmit }: Password
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const unmetRules = unmetPasswordRules(password);
+    if (!choosingPassword && !password) {
+      showError('Enter your password.');
+      return;
+    }
+
+    const unmetRules = choosingPassword ? unmetPasswordRules(password) : [];
     if (unmetRules.length > 0) {
       showError(`Password needs: ${unmetRules.map((rule) => rule.label.toLowerCase()).join(', ')}.`);
       return;
@@ -58,10 +64,10 @@ export function PasswordForm({ heading, intro, submitLabel, onSubmit }: Password
       )}
 
       <TextField
-        label="New password"
+        label={choosingPassword ? 'New password' : 'Password'}
         name="password"
         type={showPassword ? 'text' : 'password'}
-        autoComplete="new-password"
+        autoComplete={choosingPassword ? 'new-password' : 'current-password'}
         value={password}
         onChange={(event) => setPassword(event.target.value)}
         error={Boolean(error)}
@@ -93,29 +99,31 @@ export function PasswordForm({ heading, intro, submitLabel, onSubmit }: Password
         </Typography>
       )}
 
-      <Box id={rulesId} sx={{ mt: 2 }}>
-        <Typography variant="body2">Your password needs:</Typography>
-        <Box component="ul" sx={{ mt: 1, pl: 0, listStyle: 'none' }}>
-          {PASSWORD_RULES.map((rule) => {
-            const met = rule.isMet(password);
-            return (
-              <Box
-                component="li"
-                key={rule.id}
-                sx={{ display: 'flex', alignItems: 'center', gap: 1, typography: 'body2', mb: 0.5 }}
-              >
-                {met ? (
-                  <CheckCircleOutline fontSize="small" color="success" aria-hidden />
-                ) : (
-                  <RadioButtonUnchecked fontSize="small" color="disabled" aria-hidden />
-                )}
-                <span>{rule.label}</span>
-                {met && <span className="sr-only">(done)</span>}
-              </Box>
-            );
-          })}
+      {choosingPassword && (
+        <Box id={rulesId} sx={{ mt: 2 }}>
+          <Typography variant="body2">Your password needs:</Typography>
+          <Box component="ul" sx={{ mt: 1, pl: 0, listStyle: 'none' }}>
+            {PASSWORD_RULES.map((rule) => {
+              const met = rule.isMet(password);
+              return (
+                <Box
+                  component="li"
+                  key={rule.id}
+                  sx={{ display: 'flex', alignItems: 'center', gap: 1, typography: 'body2', mb: 0.5 }}
+                >
+                  {met ? (
+                    <CheckCircleOutline fontSize="small" color="success" aria-hidden />
+                  ) : (
+                    <RadioButtonUnchecked fontSize="small" color="disabled" aria-hidden />
+                  )}
+                  <span>{rule.label}</span>
+                  {met && <span className="sr-only">(done)</span>}
+                </Box>
+              );
+            })}
+          </Box>
         </Box>
-      </Box>
+      )}
 
       <Box sx={{ mt: 4, textAlign: 'center' }}>
         <Button type="submit" variant="outlined" disabled={submitting} sx={{ width: 300, maxWidth: '100%' }}>

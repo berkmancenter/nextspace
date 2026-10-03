@@ -1170,3 +1170,206 @@
   outline-offset: 4px;
   border-radius: 2px;
 }
+
+/* The invite page. Most members open it on a phone, so the card fills the width there
+   and stops growing at a comfortable reading width. */
+.invite {
+  display: flex;
+  justify-content: center;
+  padding: 24px 16px 48px;
+}
+
+.inviteCard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 440px;
+  padding: 28px 20px;
+  border: 1px solid var(--room-chrome-border);
+  border-radius: 16px;
+  background: var(--room-chrome-bg);
+  color: var(--room-text-primary);
+  font-family: var(--room-font-body), sans-serif;
+}
+
+@media (min-width: 640px) {
+  .invite {
+    padding-top: 56px;
+  }
+
+  .inviteCard {
+    padding: 32px 28px;
+  }
+}
+
+.inviteHeading {
+  margin: 0;
+  font-family: var(--room-font-display), sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--room-text-primary);
+}
+
+/* Focus lands here from code, only to tell a screen reader the content changed; a heading
+   is not something a person operates, so it needs no ring. */
+.inviteHeading:focus {
+  outline: none;
+}
+
+.inviteText,
+.inviteHint,
+.inviteStatus {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--room-text-body);
+}
+
+.inviteHint {
+  font-size: 13px;
+  color: var(--room-text-muted);
+}
+
+.inviteStatus {
+  font-weight: 600;
+}
+
+.inviteStatus:focus {
+  outline: none;
+}
+
+.inviteError {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--room-error);
+}
+
+.inviteLink {
+  font-weight: 600;
+  color: var(--room-text-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.inviteLink:hover {
+  text-decoration-thickness: 2px;
+}
+
+.inviteLink:focus-visible {
+  outline: 2px solid var(--room-text-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.inviteForgot {
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
+}
+
+.invitePrimaryButton {
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid var(--room-you-bg);
+  border-radius: 999px;
+  background: var(--room-you-bg);
+  color: var(--room-you-text);
+  font-family: var(--room-font-body), sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.invitePrimaryButton:focus-visible {
+  outline: 2px solid var(--room-text-primary);
+  outline-offset: 2px;
+}
+
+.invitePrimaryButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* PasswordForm is built from MUI parts styled for the main NextSpace pages, with dark text
+   that disappears on the room's dark theme. These rules repaint it in room tokens. The
+   selectors repeat MUI's own state classes so they outrank its focus and error rules. */
+.inviteCard :global(.MuiTypography-root),
+.inviteCard :global(.MuiInputBase-root),
+.inviteCard :global(.MuiInputLabel-root),
+.inviteCard :global(.MuiButton-root) {
+  font-family: var(--room-font-body), sans-serif;
+}
+
+.inviteCard :global(h2.MuiTypography-root) {
+  font-family: var(--room-font-display), sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--room-text-primary);
+}
+
+.inviteCard :global(.MuiTypography-root) {
+  color: var(--room-text-body);
+}
+
+.inviteCard :global(.MuiInputBase-input) {
+  color: var(--room-text-primary);
+}
+
+.inviteCard :global(.MuiInputLabel-root),
+.inviteCard :global(.MuiIconButton-root),
+.inviteCard :global(.MuiSvgIcon-colorDisabled) {
+  color: var(--room-text-muted);
+}
+
+.inviteCard :global(.MuiInputLabel-root.Mui-focused) {
+  color: var(--room-composer-border-focus);
+}
+
+/* The darker border token reaches the 3:1 WCAG asks of a control's edge on the card. */
+.inviteCard :global(.MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline) {
+  border-color: var(--room-pending-border);
+}
+
+.inviteCard :global(.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline) {
+  border-color: var(--room-composer-border-focus);
+}
+
+.inviteCard :global(.MuiInputLabel-root.Mui-error),
+.inviteCard :global([role='alert'].MuiTypography-root) {
+  color: var(--room-error);
+}
+
+.inviteCard :global(.MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline) {
+  border-color: var(--room-error);
+}
+
+.inviteCard :global(.MuiSvgIcon-colorSuccess) {
+  color: var(--room-bot-accent);
+}
+
+.inviteCard :global(.MuiButton-root) {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--room-you-bg);
+  border-radius: 999px;
+  background: var(--room-you-bg);
+  color: var(--room-you-text);
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.inviteCard :global(.MuiButton-root:focus-visible) {
+  outline: 2px solid var(--room-text-primary);
+  outline-offset: 2px;
+}
+
+.inviteCard :global(.MuiButton-root.Mui-disabled) {
+  border-color: var(--room-you-bg);
+  color: var(--room-you-text);
+  opacity: 0.5;
+}

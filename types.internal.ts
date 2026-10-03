@@ -418,6 +418,55 @@ export type ResetPasswordResult =
   | { status: 'error' };
 
 /**
+ * What `GET /auth/invite` returns for a live invite link. The backend never sends the invited email address.
+ * `hasAccount` is true when that address already has an account with a password, so the page asks for it.
+ */
+export interface InviteDetails {
+  nonce: string;
+  member: { name: string; hasAccount: boolean };
+  conversation: { id: string; name: string };
+}
+
+/**
+ * Outcome of checking an invite link on page load.
+ * `dead` covers an expired, used, replaced, or unknown link. `incomplete` means the backend could not read a token.
+ */
+export type GetInviteResult =
+  | { status: 'valid'; invite: InviteDetails }
+  | { status: 'dead' }
+  | { status: 'incomplete' }
+  | { status: 'error' };
+
+/** What `POST /auth/invite/consume` returns: the same `user` and `tokens` as `/auth/login`, plus the invite's room. */
+export interface InviteSession {
+  user: { id: string; pseudonyms: { pseudonym: string; active: boolean }[] };
+  tokens: {
+    access: { token: string; expires: string };
+    refresh: { token: string; expires: string };
+  };
+  conversationId: string;
+}
+
+/**
+ * Outcome of submitting a password with an invite link.
+ * `stale-nonce` means the one-time value from the page load expired or was replaced; fetching a new one and resubmitting
+ * is safe. `name-taken` means another member of the room is listed under the same real name.
+ */
+export type ConsumeInviteResult =
+  | { status: 'success'; session: InviteSession }
+  | { status: 'wrong-password' }
+  | { status: 'stale-nonce' }
+  | { status: 'name-taken' }
+  | { status: 'dead' }
+  | { status: 'error' };
+
+/** The resend endpoint answers the same way whether or not it sent anything, so success only means it was received. */
+export type ResendInviteResult = { status: 'accepted' } | { status: 'error' };
+
+/** Outcome of asking for a password reset email. `sent` does not mean an account uses the address. */
+export type RequestPasswordResetResult = { status: 'sent' } | { status: 'invalid-email' } | { status: 'error' };
+
+/**
  * Props for the PasswordForm component
  * @property {string} heading - Page heading shown above the form.
  * @property {ReactNode} [intro] - Optional text under the heading.
@@ -425,10 +474,13 @@ export type ResetPasswordResult =
  * @property {(password: string) => Promise<string | void>} onSubmit - Called with a password that meets the rules.
  *   Resolve with a message to show it as an error on the field and re-enable the form. Resolve with nothing when the
  *   caller has handled the result itself (for example by navigating away); the submit button then stays disabled.
+ * @property {'new' | 'current'} [purpose] - `new` (the default) chooses a password and enforces the rules. `current`
+ *   asks for an existing account's password and leaves checking it to the server.
  */
 export interface PasswordFormProps {
   heading: string;
   intro?: ReactNode;
   submitLabel: string;
   onSubmit: (password: string) => Promise<string | void>;
+  purpose?: 'new' | 'current';
 }

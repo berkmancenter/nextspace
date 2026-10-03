@@ -1,4 +1,14 @@
-import { fetchWithTokenRefresh, RefreshToken, ResetPassword, RetrieveData, Request } from '../../utils/Api';
+import {
+  ConsumeInvite,
+  fetchWithTokenRefresh,
+  GetInvite,
+  RefreshToken,
+  RequestPasswordReset,
+  ResendInvite,
+  ResetPassword,
+  RetrieveData,
+  Request,
+} from '../../utils/Api';
 import { Api } from '../../utils/Helpers';
 
 // ─── Mock TokenManager ──────────────────────────────────────────────────────
@@ -521,5 +531,208 @@ describe('ResetPassword', () => {
     const logged = JSON.stringify((console.error as jest.Mock).mock.calls);
     expect(logged).not.toContain('reset-token');
     expect(logged).not.toContain('newpass123');
+  });
+});
+
+describe('invite requests', () => {
+  const invite = {
+    nonce: 'nonce-1',
+    member: { name: 'Ada Lovelace', hasAccount: false },
+    conversation: { id: 'room-1', name: 'Lantern Lounge' },
+  };
+  const respond = (status: number, body: unknown = {}) =>
+    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: status < 300, status, json: async () => body });
+
+  beforeEach(() => {
+    (global.fetch as jest.Mock).mockReset();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  describe('GetInvite', () => {
+    it('sends the token as an encoded query parameter', async () => {
+      respond(200, invite);
+
+      await GetInvite('a+b/c=');
+
+      expect(global.fetch).toHaveBeenCalledWith(`${process.env.NEXT_PUBLIC_API_URL}/auth/invite?token=a%2Bb%2Fc%3D`);
+    });
+
+    it('returns the invite when the link is live', async () => {
+      respond(200, invite);
+
+      expect(await GetInvite('invite-token')).toEqual({ status: 'valid', invite });
+    });
+
+    it('reports a dead link when the backend answers 410', async () => {
+      respond(410, { code: 410, message: 'Invite link is invalid or has expired' });
+
+      expect(await GetInvite('invite-token')).toEqual({ status: 'dead' });
+    });
+
+    it('reports a dead link when the room no longer exists', async () => {
+      respond(200, { ...invite, conversation: null });
+
+      expect(await GetInvite('invite-token')).toEqual({ status: 'dead' });
+    });
+
+    it('reports an incomplete link when the backend answers 400', async () => {
+      respond(400);
+
+      expect(await GetInvite('invite-token')).toEqual({ status: 'incomplete' });
+    });
+
+    it('reports a generic error for any other status or a network failure', async () => {
+      respond(500);
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      expect(await GetInvite('invite-token')).toEqual({ status: 'error' });
+      expect(await GetInvite('invite-token')).toEqual({ status: 'error' });
+    });
+  });
+
+  describe('ConsumeInvite', () => {
+    const session = {
+      user: { id: 'user-1', pseudonyms: [{ pseudonym: 'Bold Aardvark', active: true }] },
+      tokens: {
+        access: { token: 'access', expires: '2026-10-02T12:00:00.000Z' },
+        refresh: { token: 'refresh', expires: '2026-11-02T12:00:00.000Z' },
+      },
+      conversationId: 'room-1',
+    };
+
+    it('posts the token, nonce, and password, and nothing else', async () => {
+      respond(200, session);
+
+      await ConsumeInvite('invite-token', 'nonce-1', 'newpass123');
+
+      expect(global.fetch).toHaveBeenCalledWith(`${process.env.NEXT_PUBLIC_API_URL}/auth/invite/consume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'invite-token', nonce: 'nonce-1', password: 'newpass123' }),
+      });
+    });
+
+    it('returns the session when the backend accepts the password', async () => {
+      respond(200, session);
+
+      expect(await ConsumeInvite('invite-token', 'nonce-1', 'newpass123')).toEqual({ status: 'success', session });
+    });
+
+    it.each([
+      [401, {}, 'wrong-password'],
+      [403, {}, 'stale-nonce'],
+      [410, {}, 'dead'],
+      [409, { reason: 'real_name_taken' }, 'name-taken'],
+      [409, {}, 'error'],
+      [400, {}, 'error'],
+      [500, {}, 'error'],
+    ])('maps a %i response with body %j to %s', async (status, body, outcome) => {
+      respond(status, { code: status, message: 'anything', ...body });
+
+      expect(await ConsumeInvite('invite-token', 'nonce-1', 'newpass123')).toEqual({ status: outcome });
+    });
+
+    it('reports a generic error when the request never reaches the backend', async () => {
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      expect(await ConsumeInvite('invite-token', 'nonce-1', 'newpass123')).toEqual({ status: 'error' });
+    });
+
+    it('never logs the token, nonce, or password', async () => {
+      respond(500);
+
+      await ConsumeInvite('invite-token', 'nonce-1', 'newpass123');
+
+      const logged = JSON.stringify((console.error as jest.Mock).mock.calls);
+      expect(logged).not.toContain('invite-token');
+      expect(logged).not.toContain('nonce-1');
+      expect(logged).not.toContain('newpass123');
+    });
+  });
+
+  describe('ResendInvite', () => {
+    it('posts only the token from the dead link', async () => {
+      respond(202, { message: 'accepted' });
+
+      await ResendInvite('dead-token');
+
+      expect(global.fetch).toHaveBeenCalledWith(`${process.env.NEXT_PUBLIC_API_URL}/auth/invite/resend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'dead-token' }),
+      });
+    });
+
+    it('reports the request as accepted on a 202', async () => {
+      respond(202, { message: 'accepted' });
+
+      expect(await ResendInvite('dead-token')).toEqual({ status: 'accepted' });
+    });
+
+    it('reports an error when the backend fails or cannot be reached', async () => {
+      respond(500);
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      expect(await ResendInvite('dead-token')).toEqual({ status: 'error' });
+      expect(await ResendInvite('dead-token')).toEqual({ status: 'error' });
+    });
+  });
+});
+
+describe('RequestPasswordReset', () => {
+  const respond = (status: number) =>
+    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: status < 300, status, json: async () => ({}) });
+
+  beforeEach(() => {
+    (global.fetch as jest.Mock).mockReset();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('posts the email address to the forgot password endpoint', async () => {
+    respond(204);
+
+    await RequestPasswordReset('ada@example.com');
+
+    expect(global.fetch).toHaveBeenCalledWith(`${process.env.NEXT_PUBLIC_API_URL}/auth/forgotPassword`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'ada@example.com' }),
+    });
+  });
+
+  it('reports the request as sent whenever the backend accepts it', async () => {
+    respond(204);
+
+    expect(await RequestPasswordReset('ada@example.com')).toEqual({ status: 'sent' });
+  });
+
+  it('reports an invalid address when the backend answers 400', async () => {
+    respond(400);
+
+    expect(await RequestPasswordReset('not an email')).toEqual({ status: 'invalid-email' });
+  });
+
+  it('reports a generic error for any other failure', async () => {
+    respond(500);
+    (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    expect(await RequestPasswordReset('ada@example.com')).toEqual({ status: 'error' });
+    expect(await RequestPasswordReset('ada@example.com')).toEqual({ status: 'error' });
+  });
+
+  it('never logs the email address', async () => {
+    respond(500);
+
+    await RequestPasswordReset('ada@example.com');
+
+    expect(JSON.stringify((console.error as jest.Mock).mock.calls)).not.toContain('ada@example.com');
   });
 });

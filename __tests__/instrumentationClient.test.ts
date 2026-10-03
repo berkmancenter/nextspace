@@ -39,4 +39,17 @@ describe('client Sentry config', () => {
 
     expect(config.integrations).toEqual([]);
   });
+
+  it('does not record session replays on the invite page', () => {
+    const config = loadClientConfig('/invite?token=secret');
+
+    expect(config.integrations).toEqual([]);
+  });
+
+  it('redacts invite tokens from errors', () => {
+    const config = loadClientConfig('/');
+    const url = 'https://app.example.com/invite?token=secret';
+
+    expect(config.beforeSend({ request: { url } }).request.url).not.toContain('secret');
+  });
 });

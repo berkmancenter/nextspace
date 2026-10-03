@@ -75,6 +75,10 @@ describe('isTokenPage', () => {
     expect(isTokenPage('/reset-password')).toBe(true);
   });
 
+  it('matches the invite page', () => {
+    expect(isTokenPage('/invite')).toBe(true);
+  });
+
   it('does not match other pages', () => {
     expect(isTokenPage('/login')).toBe(false);
   });

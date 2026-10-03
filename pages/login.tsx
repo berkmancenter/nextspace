@@ -221,6 +221,12 @@ export default function LoginPage() {
           }}
         />
 
+        <Typography variant="body2" sx={{ mt: 1, textAlign: 'right' }}>
+          <Link href="/forgot-password" className="text-blue-600 hover:underline">
+            Forgot password?
+          </Link>
+        </Typography>
+
         <Box sx={{ mt: 4, textAlign: 'center' }}>
           <Button
             type="submit"

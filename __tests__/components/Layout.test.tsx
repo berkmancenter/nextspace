@@ -72,4 +72,18 @@ describe('Layout', () => {
     expect(screen.queryByTestId('app-footer')).not.toBeInTheDocument();
     expect(screen.getByText('not found body')).toBeInTheDocument();
   });
+
+  it('leaves the invite page to draw its own chrome', () => {
+    mockUseRouter.mockReturnValue({ pathname: '/invite', asPath: '/invite', isReady: true });
+
+    render(
+      <Layout>
+        <p>invite body</p>
+      </Layout>,
+    );
+
+    expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('app-footer')).not.toBeInTheDocument();
+    expect(screen.getByText('invite body')).toBeInTheDocument();
+  });
 });
