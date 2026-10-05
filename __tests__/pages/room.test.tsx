@@ -648,7 +648,7 @@ describe('RoomPage', () => {
         );
 
         await user.click(screen.getByText('Just reading'));
-        await user.click(screen.getByRole('button', { name: 'Berkie' }));
+        await user.click(screen.getByRole('button', { name: 'Private Chat' }));
 
         expect(screen.getByTestId('assistant-panel')).toHaveAttribute('data-must-set-real-name', 'true');
       });
