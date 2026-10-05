@@ -1344,8 +1344,7 @@ describe('Events Page - Event Ownership', () => {
         owner: mockUserId,
       };
 
-      // Mock report generation failure
-      const alertMock = jest.spyOn(window, 'alert').mockImplementation(() => {});
+      // Mock report generation failure — only userMetrics fails, directMessages still succeeds
       (generateAndDownloadUserMetricsReport as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       (Request as jest.Mock).mockResolvedValue([inactiveEvent]);
@@ -1367,11 +1366,12 @@ describe('Events Page - Event Ownership', () => {
       await userEvent.click(screen.getByRole('button', { name: 'actions-menu-1' }));
       await userEvent.click(screen.getByText('Download Reports'));
 
+      // The direct messages report still downloads despite userMetrics failing, and the
+      // error banner names the real reason for the one that didn't.
       await waitFor(() => {
-        expect(alertMock).toHaveBeenCalledWith('Failed to generate report. Please try again.');
+        expect(generateAndDownloadDirectMessageResponsesReport).toHaveBeenCalled();
+        expect(screen.getByText('Failed to generate report — User Metrics (Network error)')).toBeInTheDocument();
       });
-
-      alertMock.mockRestore();
     });
   });
 });
