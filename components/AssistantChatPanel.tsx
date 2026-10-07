@@ -2,12 +2,13 @@ import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTheme, useMediaQuery, IconButton, Tooltip } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import { AssistantMessage, UserMessage, JargonClarificationMessage } from '../components/messages';
+import { AssistantMessage, UserMessage } from '../components/messages';
 import { MessageInput } from './MessageInput';
 import { SlashCommand, createSlashCommandEnhancer } from './enhancers/slashCommandEnhancer';
 import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
 import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { useAutoScroll } from '../hooks/useAutoScroll';
+import { isStructuredJargonMessage } from '../hooks/useJargonTerms';
 import { parseMessageBody } from '../utils/Helpers';
 import { BotIcon } from './BotIcon';
 import { MediaLightbox } from './MediaLightbox';
@@ -146,12 +147,16 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     return typeof msg.body === 'object' && msg.body !== null && (msg.body as any).command === 'escalate';
   };
 
-  // Organize messages into threads
+  // Organize messages into threads. Only the clean, structured jargon_clarification shape is
+  // surfaced via the notification banner/sheet instead — anything else (including today's real
+  // backend shape, which bundles multiple terms into one shared text block) is left alone here
+  // and falls through to render as an ordinary assistant message below.
   const parentMessages = messages
     .filter((m) => !m.parentMessage)
     .filter((m) => !isPromptResponse(m))
     .filter((m) => !isModeratorSubmitted(m))
-    .filter((m) => !isEscalateCommand(m));
+    .filter((m) => !isEscalateCommand(m))
+    .filter((m) => !isStructuredJargonMessage(m));
 
   // Auto-scroll based on parent messages only (not threaded replies)
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(parentMessages);
@@ -160,6 +165,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   messages
     .filter((m) => m.parentMessage)
     .filter((m) => !isPromptResponse(m))
+    .filter((m) => !isStructuredJargonMessage(m))
     .forEach((reply) => {
       const parentId = reply.parentMessage!;
       if (!threadMap.has(parentId)) {
@@ -224,7 +230,6 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     const isAssistant = msg.fromAgent;
     const isCurrentUser = msg.pseudonym === pseudonym;
     const parsed = parseMessageBody(msg.body);
-    const messageType = parsed.type;
     const style = isAssistant ? getAssistantAvatarStyle() : getAvatarStyle(msg.pseudonym, isCurrentUser);
 
     const hasPromptOptions = msg.prompt?.options && msg.prompt.options.length > 0 && msg.prompt.type === 'singleChoice';
@@ -241,11 +246,6 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
           return sourceText.length > 60 ? sourceText.substring(0, 60) + '...' : sourceText;
         })()
       : null;
-
-    // Jargon clarification messages
-    if (messageType === 'jargon_clarification') {
-      return <JargonClarificationMessage message={msg} />;
-    }
 
     // Assistant messages
     if (isAssistant) {

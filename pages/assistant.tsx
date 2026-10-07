@@ -15,6 +15,8 @@ import { trackConversationEvent, setUserId } from '../utils/analytics';
 import { Errors, ParamErrors, Transcript } from '../components/';
 import { NavigationBar } from '../components/NavigationBar';
 import { PreferencesPanel } from '../components/PreferencesPanel';
+import { NotificationBanner, Notification } from '../components/NotificationBanner';
+import { JargonTermsSheet } from '../components/JargonTermsSheet';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
 import { CheckAuthHeader } from '../utils/Helpers';
 import TokenManagerDefault from '../utils/TokenManager';
@@ -27,6 +29,8 @@ import {
   useConversationSetup,
   useSessionJoin,
   useTabNavigation,
+  useJargonTerms,
+  summarizeJargonTerms,
 } from '../hooks';
 
 type Resource = components['schemas']['Resource'];
@@ -154,6 +158,29 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     assistantIntroRef,
     conversationId: router.query.conversationId as string | undefined,
   });
+
+  const {
+    batchTerms: jargonBatchTerms,
+    seen: jargonSeen,
+    active: jargonActive,
+    markSeen: markJargonSeen,
+    dismiss: dismissJargon,
+  } = useJargonTerms(assistantMessages);
+  const [jargonSheetOpen, setJargonSheetOpen] = useState(false);
+
+  const jargonNotification: Notification | null = jargonActive
+    ? {
+        id: 'jargon-terms',
+        kind: 'jargonTerms',
+        summary: summarizeJargonTerms(jargonBatchTerms),
+        seen: jargonSeen,
+        onOpen: () => {
+          markJargonSeen();
+          setJargonSheetOpen(true);
+        },
+        onDismiss: dismissJargon,
+      }
+    : null;
 
   const [waitingForResponse, setWaitingForResponse] = useState(false);
   const [waitingForChatResponse, setWaitingForChatResponse] = useState(false);
@@ -571,155 +598,176 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
               botName={botName}
             />
 
-            {/* ── Main content area ── */}
-            <div className="flex-1 flex flex-row overflow-hidden">
-              {/* Transcript — always mounted so it doesn't re-fetch on tab/view switch.
+            {/* ── Main content area ──
+                Wrapped in its own flex-col so the jargon notification banner/sheet can sit
+                above the Transcript-vs-tabs split and persist across every tab, including
+                Transcript — which otherwise renders full-screen as its own sibling below,
+                outside the per-tab content wrapper the resources reminder banner lives in. */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <NotificationBanner notification={jargonNotification} />
+              <div className="flex-1 flex flex-row overflow-hidden">
+                {/* Transcript — always mounted so it doesn't re-fetch on tab/view switch.
                   Full-screen when transcript tab is active; sidebar on large screens otherwise;
                   hidden when preferences is open or on small screens in sidebar mode. */}
-              {transcriptPasscode && (
-                <div
-                  className={
-                    router.query.view === 'preferences'
-                      ? 'hidden'
-                      : activeTab === 'transcript'
-                        ? 'flex-1 overflow-hidden'
-                        : 'hidden lg:block lg:order-2'
-                  }
-                >
-                  <Transcript
-                    category="assistant"
-                    socket={socket}
-                    conversationId={router.query.conversationId as string}
-                    transcriptPasscode={transcriptPasscode}
-                    lastReconnectTime={lastReconnectTime}
-                    hideToggle={router.query.view !== 'preferences' && activeTab === 'transcript'}
-                  />
-                </div>
-              )}
-              {activeTab !== 'transcript' ? (
-                <>
-                  {/* Chat / Assistant / Resources / Preferences panel */}
-                  <div className="flex-1 flex flex-col relative overflow-hidden">
-                    {/* Show dismissable resources reminder if active  */}
-                    {resourcesReminderActive && (
-                      <div className="absolute top-0 w-full z-10 bg-yellow-100 p-4 rounded shadow-2xl animate-slide-in">
-                        <div className="flex justify-between font-bold">
-                          <p>
-                            {resourcesNavBadgeDismissed
-                              ? "This event ends soon. Don't forget to review Resources and bookmark or save them for your reference."
-                              : "This event ends soon. Don't forget to check the Resources tab for follow-up readings worth bookmarking."}
-                          </p>
-                          <Button
-                            aria-label="Dismiss resources reminder"
-                            className="ml-4 px-2 py-2"
-                            onClick={() => setResourcesReminderActive(false)}
-                            color="error"
-                          >
-                            <CloseIcon />
-                          </Button>
-                        </div>
-                        <button
-                          className="mt-2 px-3 py-1 bg-yellow-200 hover:bg-yellow-300 rounded"
-                          onClick={() => {
-                            handleTabChange('resources');
-                            setResourcesReminderActive(false);
-                          }}
-                        >
-                          View Resources
-                        </button>
-                      </div>
-                    )}
-                    {router.query.view === 'preferences' ? (
-                      <PreferencesPanel botName={botName} />
-                    ) : isConnected || eventStatus == 'ended' ? (
-                      activeTab === 'chat' ? (
-                        <GroupChatPanel
-                          messages={chatMessages}
-                          pseudonym={pseudonym}
-                          pseudonymFunFact={pseudonymFunFact}
-                          eventName={eventName}
-                          botName={botName}
-                          inputValue={chatInputValue}
-                          onInputChange={setChatInputValue}
-                          onSendMessage={async (msg, parentMessageId) => {
-                            const mentionsBot = msg.includes(`@${botName}`);
-                            const success = await sendMessage(msg, mentionsBot, parentMessageId);
-                            return success;
-                          }}
-                          controlledMode={controlledMode}
-                          onExitControlledMode={exitControlledMode}
-                          feedbackConfig={chatFeedbackConfig}
-                          messagesWithUnreadReplies={messagesWithUnreadReplies}
-                          waitingForResponse={waitingForChatResponse}
-                          onMarkAsRead={(messageId) => {
-                            setMessagesWithUnreadReplies((prev) => {
-                              const newSet = new Set(prev);
-                              newSet.delete(messageId);
-                              return newSet;
-                            });
-                          }}
-                          pollCounts={pollCounts}
-                          inactive={eventStatus !== 'active'}
-                        />
-                      ) : activeTab === 'resources' ? (
-                        <ResourcesPanel
-                          resources={resources}
-                          eventDescription={eventDescription}
-                          speakers={speakers}
-                          moderators={moderators}
-                          eventName={eventName}
-                          unseenReadingsCount={unseenResourcesCount}
-                          onMarkReadingsAsSeen={handleMarkReadingsAsSeen}
-                          newResourceIds={newResourceIds}
-                        />
-                      ) : (
-                        <AssistantChatPanel
-                          messages={assistantMessages}
-                          pseudonym={pseudonym}
-                          pseudonymFunFact={pseudonymFunFact}
-                          waitingForResponse={waitingForResponse}
-                          controlledMode={controlledMode}
-                          slashCommands={slashCommands}
-                          eventName={eventName}
-                          botName={botName}
-                          inputValue={assistantInputValue}
-                          onInputChange={setAssistantInputValue}
-                          onSendMessage={async (msg, parentMessageId) => {
-                            const success = await sendMessage(msg, true, parentMessageId);
-                            return success;
-                          }}
-                          onExitControlledMode={exitControlledMode}
-                          onPromptSelect={handlePromptSelect}
-                          userId={userId}
-                          feedbackConfig={assistantFeedbackConfig}
-                          inactive={!agentActive || eventStatus !== 'active'}
-                          messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
-                          onMarkAsRead={(messageId) => {
-                            setAssistantMessagesWithUnreadReplies((prev) => {
-                              const newSet = new Set(prev);
-                              newSet.delete(messageId);
-                              return newSet;
-                            });
-                          }}
-                        />
-                      )
-                    ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <svg className="mx-auto w-12 h-5" viewBox="0 0 40 10" fill="currentColor">
-                          <circle className="animate-bounce fill-sky-400" cx="5" cy="5" r="4" />
-                          <circle
-                            className="animate-bounce [animation-delay:-0.2s] fill-medium-slate-blue"
-                            cx="20"
-                            cy="5"
-                            r="4"
-                          />
-                          <circle className="animate-bounce [animation-delay:-0.4s] fill-purple-500" cx="35" cy="5" r="4" />
-                        </svg>
-                      </div>
-                    )}
+                {transcriptPasscode && (
+                  <div
+                    className={
+                      router.query.view === 'preferences'
+                        ? 'hidden'
+                        : activeTab === 'transcript'
+                          ? 'flex-1 overflow-hidden'
+                          : 'hidden lg:block lg:order-2'
+                    }
+                  >
+                    <Transcript
+                      category="assistant"
+                      socket={socket}
+                      conversationId={router.query.conversationId as string}
+                      transcriptPasscode={transcriptPasscode}
+                      lastReconnectTime={lastReconnectTime}
+                      hideToggle={router.query.view !== 'preferences' && activeTab === 'transcript'}
+                    />
                   </div>
-                </>
-              ) : null}
+                )}
+                {activeTab !== 'transcript' ? (
+                  <>
+                    {/* Chat / Assistant / Resources / Preferences panel */}
+                    <div className="flex-1 flex flex-col relative overflow-hidden">
+                      {/* Show dismissable resources reminder if active  */}
+                      {resourcesReminderActive && (
+                        <div className="absolute top-0 w-full z-10 bg-yellow-100 p-4 rounded shadow-2xl animate-slide-in">
+                          <div className="flex justify-between font-bold">
+                            <p>
+                              {resourcesNavBadgeDismissed
+                                ? "This event ends soon. Don't forget to review Resources and bookmark or save them for your reference."
+                                : "This event ends soon. Don't forget to check the Resources tab for follow-up readings worth bookmarking."}
+                            </p>
+                            <Button
+                              aria-label="Dismiss resources reminder"
+                              className="ml-4 px-2 py-2"
+                              onClick={() => setResourcesReminderActive(false)}
+                              color="error"
+                            >
+                              <CloseIcon />
+                            </Button>
+                          </div>
+                          <button
+                            className="mt-2 px-3 py-1 bg-yellow-200 hover:bg-yellow-300 rounded"
+                            onClick={() => {
+                              handleTabChange('resources');
+                              setResourcesReminderActive(false);
+                            }}
+                          >
+                            View Resources
+                          </button>
+                        </div>
+                      )}
+                      {router.query.view === 'preferences' ? (
+                        <PreferencesPanel botName={botName} />
+                      ) : isConnected || eventStatus == 'ended' ? (
+                        activeTab === 'chat' ? (
+                          <GroupChatPanel
+                            messages={chatMessages}
+                            pseudonym={pseudonym}
+                            pseudonymFunFact={pseudonymFunFact}
+                            eventName={eventName}
+                            botName={botName}
+                            inputValue={chatInputValue}
+                            onInputChange={setChatInputValue}
+                            onSendMessage={async (msg, parentMessageId) => {
+                              const mentionsBot = msg.includes(`@${botName}`);
+                              const success = await sendMessage(msg, mentionsBot, parentMessageId);
+                              return success;
+                            }}
+                            controlledMode={controlledMode}
+                            onExitControlledMode={exitControlledMode}
+                            feedbackConfig={chatFeedbackConfig}
+                            messagesWithUnreadReplies={messagesWithUnreadReplies}
+                            waitingForResponse={waitingForChatResponse}
+                            onMarkAsRead={(messageId) => {
+                              setMessagesWithUnreadReplies((prev) => {
+                                const newSet = new Set(prev);
+                                newSet.delete(messageId);
+                                return newSet;
+                              });
+                            }}
+                            pollCounts={pollCounts}
+                            inactive={eventStatus !== 'active'}
+                          />
+                        ) : activeTab === 'resources' ? (
+                          <ResourcesPanel
+                            resources={resources}
+                            eventDescription={eventDescription}
+                            speakers={speakers}
+                            moderators={moderators}
+                            eventName={eventName}
+                            unseenReadingsCount={unseenResourcesCount}
+                            onMarkReadingsAsSeen={handleMarkReadingsAsSeen}
+                            newResourceIds={newResourceIds}
+                          />
+                        ) : (
+                          <AssistantChatPanel
+                            messages={assistantMessages}
+                            pseudonym={pseudonym}
+                            pseudonymFunFact={pseudonymFunFact}
+                            waitingForResponse={waitingForResponse}
+                            controlledMode={controlledMode}
+                            slashCommands={slashCommands}
+                            eventName={eventName}
+                            botName={botName}
+                            inputValue={assistantInputValue}
+                            onInputChange={setAssistantInputValue}
+                            onSendMessage={async (msg, parentMessageId) => {
+                              const success = await sendMessage(msg, true, parentMessageId);
+                              return success;
+                            }}
+                            onExitControlledMode={exitControlledMode}
+                            onPromptSelect={handlePromptSelect}
+                            userId={userId}
+                            feedbackConfig={assistantFeedbackConfig}
+                            inactive={!agentActive || eventStatus !== 'active'}
+                            messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
+                            onMarkAsRead={(messageId) => {
+                              setAssistantMessagesWithUnreadReplies((prev) => {
+                                const newSet = new Set(prev);
+                                newSet.delete(messageId);
+                                return newSet;
+                              });
+                            }}
+                          />
+                        )
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <svg className="mx-auto w-12 h-5" viewBox="0 0 40 10" fill="currentColor">
+                            <circle className="animate-bounce fill-sky-400" cx="5" cy="5" r="4" />
+                            <circle
+                              className="animate-bounce [animation-delay:-0.2s] fill-medium-slate-blue"
+                              cx="20"
+                              cy="5"
+                              r="4"
+                            />
+                            <circle
+                              className="animate-bounce [animation-delay:-0.4s] fill-purple-500"
+                              cx="35"
+                              cy="5"
+                              r="4"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+              <JargonTermsSheet
+                open={jargonSheetOpen}
+                onClose={() => setJargonSheetOpen(false)}
+                terms={jargonBatchTerms}
+                onManagePreferences={() => {
+                  setJargonSheetOpen(false);
+                  router.push({ pathname: router.pathname, query: { ...router.query, view: 'preferences' } });
+                }}
+              />
             </div>
           </>
         )}

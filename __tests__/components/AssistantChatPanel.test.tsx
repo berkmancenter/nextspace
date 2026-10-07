@@ -12,15 +12,6 @@ jest.mock('../../components/messages', () => ({
     const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
     return <div data-testid="user-message">{messageText}</div>;
   },
-  JargonClarificationMessage: ({ message }: any) => {
-    const body = typeof message.body === 'object' ? message.body : {};
-    return (
-      <div data-testid="jargon-clarification-message">
-        {body.sourceText && <div>{body.sourceText}</div>}
-        {body.text && <div>{body.text}</div>}
-      </div>
-    );
-  },
 }));
 
 // Mock ModSuggestButton so we can inspect submitted/onSubmit props
@@ -190,6 +181,58 @@ describe('AssistantChatPanel', () => {
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
     expect(screen.queryByText('Your message has been submitted.')).not.toBeInTheDocument();
+  });
+
+  describe('jargon_clarification messages', () => {
+    const baseJargonMsg = {
+      id: 'jargon-1',
+      pseudonym: 'Jargon Filter',
+      createdAt: '2025-10-17T12:00:00Z',
+      channels: ['direct-user-1-jargon-agent'],
+      conversation: 'conv-1',
+      pseudonymId: 'jargon-1',
+      fromAgent: true,
+      pause: false,
+      visible: true,
+      upVotes: [],
+      downVotes: [],
+    };
+
+    it('excludes the structured per-term-object shape from the rendered stream (surfaced via the notification banner instead)', () => {
+      const messages = [
+        {
+          ...baseJargonMsg,
+          body: {
+            type: 'jargon_clarification',
+            terms: [{ term: 'SLO', text: 'An SLO is a reliability target.' }],
+          },
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.queryByText('An SLO is a reliability target.')).not.toBeInTheDocument();
+    });
+
+    it("renders today's actual backend shape (flat term-name array + shared text) as an ordinary assistant message", () => {
+      const messages = [
+        {
+          ...baseJargonMsg,
+          body: {
+            type: 'jargon_clarification',
+            terms: ['SLO', 'MTTR'],
+            text: 'An SLO is a reliability target. MTTR is mean time to repair.',
+            sourceText: '...we track SLOs and MTTR...',
+          },
+        },
+      ];
+
+      render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+      expect(screen.getByTestId('assistant-message')).toHaveTextContent(
+        'An SLO is a reliability target. MTTR is mean time to repair.',
+      );
+    });
   });
 
   describe('Moderator suggest button', () => {
@@ -648,7 +691,6 @@ describe('AssistantChatPanel', () => {
         const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
         return <div data-testid="user-message">{messageText}</div>;
       },
-      JargonClarificationMessage: () => null,
     }));
 
     const messages = [
@@ -933,7 +975,6 @@ describe('AssistantChatPanel', () => {
           const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
           return <div data-testid="user-message">{messageText}</div>;
         },
-        JargonClarificationMessage: () => null,
       }));
 
       const messages = [

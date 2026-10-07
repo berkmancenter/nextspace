@@ -163,15 +163,6 @@ jest.mock('../../components/messages', () => ({
     const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
     return <div data-testid="user-message">{messageText}</div>;
   },
-  JargonClarificationMessage: ({ message }: any) => {
-    const body = typeof message.body === 'object' ? message.body : {};
-    return (
-      <div data-testid="jargon-clarification-message">
-        {body.sourceText && <div>{body.sourceText}</div>}
-        {body.text && <div>{body.text}</div>}
-      </div>
-    );
-  },
 }));
 
 // Mock CheckAuthHeader and createConversationFromData
@@ -1395,10 +1386,13 @@ describe('EventAssistantRoom', () => {
       });
     });
 
-    it('displays messages from any agent direct channel in the assistant panel', async () => {
+    it('surfaces messages from any agent direct channel via the jargon notification banner, not inline', async () => {
       const secondaryAgentMessage = {
         id: 'secondary-msg-1',
-        body: { type: 'jargon_clarification', text: 'An SLO is a reliability target.', sourceText: 'Our SLOs...' },
+        body: {
+          type: 'jargon_clarification',
+          terms: [{ term: 'SLO', text: 'An SLO is a reliability target.', sourceText: 'Our SLOs...' }],
+        },
         bodyType: 'json',
         fromAgent: true,
         channels: ['direct-user-123-jargon-agent-456'],
@@ -1432,6 +1426,11 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0));
       await user.click(screen.getAllByLabelText('Private Chat')[0]);
+
+      const banner = await screen.findByRole('button', { name: /new term/i });
+      expect(screen.queryByText('An SLO is a reliability target.')).not.toBeInTheDocument();
+
+      await user.click(banner);
 
       await waitFor(() => {
         expect(screen.getByText('An SLO is a reliability target.')).toBeInTheDocument();
@@ -1483,7 +1482,10 @@ describe('EventAssistantRoom', () => {
         messageHandlers.forEach((handler) =>
           handler({
             id: 'msg-jargon-1',
-            body: { type: 'jargon_clarification', text: 'An SLO is a reliability target.', sourceText: 'Our SLOs...' },
+            body: {
+              type: 'jargon_clarification',
+              terms: [{ term: 'SLO', text: 'An SLO is a reliability target.', sourceText: 'Our SLOs...' }],
+            },
             bodyType: 'json',
             fromAgent: true,
             channels: ['direct-user-123-jargon-agent-456'],
@@ -1495,6 +1497,11 @@ describe('EventAssistantRoom', () => {
           }),
         );
       });
+
+      const banner = await screen.findByRole('button', { name: /new term/i });
+      expect(screen.queryByText('An SLO is a reliability target.')).not.toBeInTheDocument();
+
+      await user.click(banner);
 
       await waitFor(() => {
         expect(screen.getByText('An SLO is a reliability target.')).toBeInTheDocument();
