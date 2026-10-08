@@ -185,7 +185,7 @@ jest.mock('../../utils/Helpers', () => ({
 describe('EventAssistantRoom', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockPush.mockReset();
+    mockPush.mockReset().mockResolvedValue(true);
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
     });
@@ -2889,6 +2889,74 @@ describe('EventAssistantRoom', () => {
         expect(screen.queryByRole('dialog', { name: 'Exit presentation view?' })).not.toBeInTheDocument();
       });
       expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('moves focus into the composer when it opens, and back to "Write a message" when hidden', async () => {
+      await renderPresentation();
+
+      await userEvent.click(await screen.findByRole('button', { name: /write a message/i }));
+      expect(screen.getByPlaceholderText('Enter your message here')).toHaveFocus();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Hide composer' }));
+      expect(screen.queryByPlaceholderText('Enter your message here')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /write a message/i })).toHaveFocus();
+    });
+
+    it('does not move focus into the composer in the normal participant view', async () => {
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      expect(await screen.findByPlaceholderText('Enter your message here')).not.toHaveFocus();
+    });
+
+    it('keeps the exit reachable before the event starts, showing the notice in the page instead of a dialog', async () => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        name: 'Legal Telescopes',
+        active: false,
+      });
+
+      await renderPresentation();
+
+      expect(await screen.findByText('Event Not Started')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Exit presentation view' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Go to participant view' }));
+      expect(mockPush).toHaveBeenCalledWith({ pathname: '/assistant/', query: mockRouter.query });
+    });
+
+    it('shows the ended notice in the page with no composer once the event is over', async () => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        name: 'Legal Telescopes',
+        active: false,
+        endTime: '2024-06-01T12:00:00Z',
+      });
+
+      await renderPresentation();
+
+      expect(await screen.findByText('Event Has Ended')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(await screen.findByText('This event is not active.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /write a message/i })).not.toBeInTheDocument();
+    });
+
+    it('logs a failed exit rather than failing silently', async () => {
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      mockPush.mockRejectedValueOnce(new Error('navigation cancelled'));
+      await renderPresentation();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Exit presentation view' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Go to participant view' }));
+
+      await waitFor(() => {
+        expect(consoleError).toHaveBeenCalledWith('Failed to leave the presentation view:', expect.any(Error));
+      });
+      consoleError.mockRestore();
     });
 
     it('opens the participant view with the same event and passcodes on confirming exit', async () => {

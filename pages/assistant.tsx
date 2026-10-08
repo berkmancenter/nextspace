@@ -36,11 +36,6 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
-/**
- * The participant's view of an event. With `presentation`, the same room is laid out for a shared
- * screen: its own header with an exit, no Private Chat tab, the transcript only as a tab, larger
- * message text, and a collapsed composer.
- */
 export function EventAssistantRoom({
   authType: _authType,
   presentation = false,
@@ -50,7 +45,7 @@ export function EventAssistantRoom({
 }) {
   const router = useRouter();
 
-  // A projector is not an audience member, so the presentation view stays out of the participant count.
+  // A projector is not an audience member, so the presentation view stays out of Matomo's audience sessions.
   useAnalytics({ pageType: presentation ? 'presentation' : 'assistant' });
 
   const {
@@ -508,14 +503,44 @@ export function EventAssistantRoom({
     onSendRating: sendFeedbackRating,
   };
 
+  const eventStatusNotice = (
+    <div className="flex flex-col items-center gap-4">
+      <h2 id="event-status-dialog-title" className="text-2xl font-bold text-gray-900 flex items-center justify-center">
+        <Info className="inline-block mr-2" />
+        {eventStatus === 'ended' ? 'Event Has Ended' : 'Event Not Started'}
+      </h2>
+      <p id="event-status-dialog-description" className="text-gray-600 text-base leading-relaxed">
+        {eventStatus === 'ended' ? (
+          <span>
+            This event has ended and the assistant is no longer available. You can still view the transcript and resources,
+            but you will not be able to send new messages.
+          </span>
+        ) : (
+          <span>This event has not started yet. You will be able to interact with the assistant once the event begins.</span>
+        )}
+      </p>
+      {eventStatus === 'ended' && (
+        <div className="flex flex-col gap-3 w-full mt-2">
+          <Button
+            aria-label={`Close event ${eventStatus === 'ended' ? 'has ended' : 'not started'} dialog`}
+            onClick={() => setShowEventStatusDialog(false)}
+          >
+            Ok
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+
+  const exitPresentation = () => {
+    router
+      .push({ pathname: '/assistant/', query: router.query })
+      .catch((error) => console.error('Failed to leave the presentation view:', error));
+  };
+
   return (
     <>
-      {presentation && (
-        <PresentationHeader
-          eventName={eventName}
-          onExit={() => router.push({ pathname: '/assistant/', query: router.query })}
-        />
-      )}
+      {presentation && <PresentationHeader eventName={eventName} onExit={exitPresentation} />}
       {/* On mobile we add bottom padding so the fixed nav bar doesn't cover content */}
       <div
         className={`flex flex-row overflow-hidden pb-[60px] lg:pb-0 ${
@@ -527,9 +552,10 @@ export function EventAssistantRoom({
           <Errors generalError={generalError} sessionError={sessionError} setGeneralError={setGeneralError} />
         )}
 
-        {/* Dialog for when the event has ended or has not started yet; if in future, this is non-dismissable */}
+        {/* Dialog for when the event has ended or has not started yet; if in future, this is non-dismissable.
+            The presentation view shows the same notice in the page instead, so its exit stays reachable. */}
         <Dialog
-          open={showEventStatusDialog}
+          open={showEventStatusDialog && !presentation}
           onClose={eventStatus === 'ended' ? () => setShowEventStatusDialog(false) : () => {}}
           aria-labelledby="event-status-dialog-title"
           aria-describedby="event-status-dialog-description"
@@ -544,34 +570,7 @@ export function EventAssistantRoom({
             },
           }}
         >
-          <div className="flex flex-col items-center gap-4">
-            <h2 id="event-status-dialog-title" className="text-2xl font-bold text-gray-900 flex items-center justify-center">
-              <Info className="inline-block mr-2" />
-              {eventStatus === 'ended' ? 'Event Has Ended' : 'Event Not Started'}
-            </h2>
-            <p id="event-status-dialog-description" className="text-gray-600 text-base leading-relaxed">
-              {eventStatus === 'ended' ? (
-                <span>
-                  This event has ended and the assistant is no longer available. You can still view the transcript and
-                  resources, but you will not be able to send new messages.
-                </span>
-              ) : (
-                <span>
-                  This event has not started yet. You will be able to interact with the assistant once the event begins.
-                </span>
-              )}
-            </p>
-            {eventStatus === 'ended' && (
-              <div className="flex flex-col gap-3 w-full mt-2">
-                <Button
-                  aria-label={`Close event ${eventStatus === 'ended' ? 'has ended' : 'not started'} dialog`}
-                  onClick={() => setShowEventStatusDialog(false)}
-                >
-                  Ok
-                </Button>
-              </div>
-            )}
-          </div>
+          {eventStatusNotice}
         </Dialog>
 
         {/* Display parameter errors if present */}
@@ -629,6 +628,14 @@ export function EventAssistantRoom({
                 <>
                   {/* Chat / Assistant / Resources / Preferences panel */}
                   <div className="flex-1 flex flex-col relative overflow-hidden">
+                    {presentation && showEventStatusDialog && (
+                      <div
+                        role="status"
+                        className="absolute inset-x-0 top-6 z-10 mx-auto w-full max-w-md rounded-2xl bg-white px-6 py-8 text-center shadow-2xl"
+                      >
+                        {eventStatusNotice}
+                      </div>
+                    )}
                     {/* Show dismissable resources reminder if active  */}
                     {resourcesReminderActive && (
                       <div className="absolute top-0 w-full z-10 bg-yellow-100 p-4 rounded shadow-2xl animate-slide-in">
