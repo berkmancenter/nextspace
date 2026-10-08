@@ -25,7 +25,7 @@ export function PasswordForm({ heading, intro, submitLabel, onSubmit, purpose = 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!choosingPassword && !password) {
+    if (!choosingPassword && !password.trim()) {
       showError('Enter your password.');
       return;
     }

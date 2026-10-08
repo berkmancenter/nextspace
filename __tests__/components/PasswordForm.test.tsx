@@ -179,6 +179,17 @@ describe('PasswordForm', () => {
       expect(passwordField).toHaveFocus();
     });
 
+    it('asks for the password instead of submitting a field of only spaces', async () => {
+      const user = userEvent.setup();
+      const { onSubmit, passwordField } = renderLoginForm();
+
+      await user.type(passwordField, '   ');
+      await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert')).toHaveTextContent('Enter your password.');
+    });
+
     it('has no accessibility violations while showing an error', async () => {
       const user = userEvent.setup();
       const { container } = renderLoginForm();
