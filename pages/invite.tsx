@@ -137,33 +137,32 @@ export default function InvitePage() {
   const [invite, setInvite] = useState<InviteDetails | null>(null);
   // Every check of the invite replaces its nonce, so a submit must send the one from the latest check.
   const nonceRef = useRef<string | null>(null);
+  // Bumped when a check starts and when the token changes or the page unmounts, so a slow check can't overwrite a newer one.
+  const latestCheckRef = useRef(0);
 
-  const checkInvite = useCallback(
-    async (isCancelled: () => boolean = () => false) => {
-      if (!token) return;
-      setScreen('checking');
-      const result = await GetInvite(token);
-      if (isCancelled()) return;
+  const checkInvite = useCallback(async () => {
+    if (!token) return;
+    const checkId = ++latestCheckRef.current;
+    setScreen('checking');
+    const result = await GetInvite(token);
+    if (checkId !== latestCheckRef.current) return;
 
-      if (result.status === 'valid') {
-        nonceRef.current = result.invite.nonce;
-        setInvite(result.invite);
-        setScreen('form');
-        return;
-      }
-      setScreen(result.status === 'error' ? 'load-error' : result.status);
-    },
-    [token],
-  );
+    if (result.status === 'valid') {
+      nonceRef.current = result.invite.nonce;
+      setInvite(result.invite);
+      setScreen('form');
+      return;
+    }
+    setScreen(result.status === 'error' ? 'load-error' : result.status);
+  }, [token]);
 
   useEffect(() => {
     if (tokenState.status === 'missing') setScreen('incomplete');
     if (tokenState.status !== 'present') return;
 
-    let cancelled = false;
-    checkInvite(() => cancelled);
+    checkInvite();
     return () => {
-      cancelled = true;
+      latestCheckRef.current += 1;
     };
   }, [tokenState.status, checkInvite]);
 
@@ -179,6 +178,7 @@ export default function InvitePage() {
       }
       if (refreshed.status !== 'valid') return GENERIC_ERROR;
       nonceRef.current = refreshed.invite.nonce;
+      setInvite(refreshed.invite);
       result = await ConsumeInvite(token, refreshed.invite.nonce, password);
     }
 
@@ -227,7 +227,7 @@ export default function InvitePage() {
           <>
             <NoticeHeading>We couldn&apos;t open your invite</NoticeHeading>
             <p className={styles.inviteText}>Check your connection, then try again.</p>
-            <button type="button" className={styles.invitePrimaryButton} onClick={() => checkInvite()}>
+            <button type="button" className={styles.invitePrimaryButton} onClick={checkInvite}>
               Try again
             </button>
           </>

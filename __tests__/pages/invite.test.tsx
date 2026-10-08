@@ -151,6 +151,29 @@ describe('InvitePage', () => {
       expect(await screen.findByRole('button', { name: 'Join the room' })).toBeInTheDocument();
       expect(mockGetInvite).toHaveBeenCalledTimes(2);
     });
+
+    it('ignores a retried check that finishes after the page has moved on to a newer link', async () => {
+      let finishRetry: (result: unknown) => void = () => {};
+      mockGetInvite
+        .mockResolvedValueOnce({ status: 'error' })
+        .mockReturnValueOnce(new Promise((resolve) => (finishRetry = resolve)))
+        .mockResolvedValueOnce({
+          status: 'valid',
+          invite: { ...newMemberInvite, conversation: { id: 'room-2', name: 'Willow Room' } },
+        });
+      const { rerender } = render(<InvitePage />);
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Try again' }));
+
+      mockTokenState = { status: 'present', token: 'newer-invite-token' };
+      rerender(<InvitePage />);
+      await screen.findByRole('heading', { level: 1, name: 'Willow Room' });
+      finishRetry({ status: 'valid', invite: newMemberInvite });
+
+      await waitFor(() => expect(mockGetInvite).toHaveBeenCalledTimes(3));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(screen.getByRole('heading', { level: 1, name: 'Willow Room' })).toBeInTheDocument();
+    });
   });
 
   describe('for someone without an account', () => {
@@ -311,6 +334,20 @@ describe('InvitePage', () => {
 
       await waitFor(() => expect(mockConsumeInvite).toHaveBeenCalledTimes(3));
       expect(mockConsumeInvite).toHaveBeenLastCalledWith('invite-token', 'nonce-2', 'wrongpass');
+    });
+
+    it('shows the invite details from the fresh check after a stale nonce', async () => {
+      mockConsumeInvite.mockResolvedValueOnce({ status: 'stale-nonce' }).mockResolvedValueOnce({ status: 'wrong-password' });
+      await renderPage(returningMemberInvite);
+      mockGetInvite.mockResolvedValueOnce({
+        status: 'valid',
+        invite: { ...returningMemberInvite, nonce: 'nonce-2', conversation: { id: 'room-1', name: 'Lantern Hall' } },
+      });
+
+      await submit('wrongpass', 'Password');
+
+      await screen.findByRole('alert');
+      expect(screen.getByRole('heading', { level: 1, name: 'Lantern Hall' })).toBeInTheDocument();
     });
 
     it("handles the retry's own failure", async () => {
