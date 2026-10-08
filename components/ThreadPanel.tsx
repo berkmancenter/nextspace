@@ -355,7 +355,9 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
         {waitingForResponse && (
           <div className="flex items-center gap-1 mt-4">
             <BotIcon size={32} color="#4b5563" bouncing={true} />
-            <span className="text-xs text-gray-500 italic">thinking...</span>
+            <span className="text-xs text-gray-500 italic" style={metaStyle}>
+              thinking...
+            </span>
           </div>
         )}
 

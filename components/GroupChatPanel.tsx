@@ -1,4 +1,4 @@
-import React, { FC, useMemo, useRef, useState } from 'react';
+import React, { FC, useEffect, useMemo, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { MessageInput } from './MessageInput';
@@ -72,7 +72,7 @@ interface GroupChatPanelProps {
   pollCounts?: Record<string, Record<string, number>>;
   /** Whether the event is inactive (ended) */
   inactive?: boolean;
-  /** Shared-screen layout: 2rem message text, and a composer that starts collapsed. */
+  /** Shared-screen layout: presentation text sizes, and a composer that starts collapsed. */
   presentation?: boolean;
 }
 
@@ -140,6 +140,25 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   const { messagesEndRef, messagesContainerRef, isAtBottom, scrollToBottom } = useAutoScroll(messages);
 
   const messageInputRef = useRef<HTMLDivElement>(null);
+  const writeMessageButtonRef = useRef<HTMLButtonElement>(null);
+  const focusAfterComposerToggle = useRef(false);
+
+  // Each presentation composer button disappears when clicked, so focus has to be moved on purpose
+  // or it falls back to the top of the page (WCAG 2.4.3).
+  useEffect(() => {
+    if (!focusAfterComposerToggle.current) return;
+    focusAfterComposerToggle.current = false;
+    if (inputHidden) {
+      writeMessageButtonRef.current?.focus();
+      return;
+    }
+    messageInputRef.current?.querySelector<HTMLElement>('textarea')?.focus();
+  }, [inputHidden]);
+
+  const toggleComposer = (hidden: boolean) => {
+    focusAfterComposerToggle.current = true;
+    setInputHidden(hidden);
+  };
 
   /* Move focus into the message input after jumping to the bottom so keyboard
      users don't lose their place (WCAG 2.4.3). */
@@ -201,7 +220,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             }}
           >
             {parsed.text && renderAssistantMessage(parsed.text)}
-            <PollMessage body={pollBody} counts={counts} />
+            <PollMessage body={pollBody} counts={counts} presentation={presentation} />
           </div>
         </div>
       );
@@ -220,6 +239,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
         {sourceContextText && (
           <div
             className="text-xs text-gray-600 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded"
+            style={presentation ? PRESENTATION_TEXT.meta : undefined}
             role="note"
             aria-label="Voice reply context"
           >
@@ -406,8 +426,9 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
               inputHidden && (
                 <div className="flex justify-center bg-gray-100 px-4 pt-2.5 pb-4">
                   <button
+                    ref={writeMessageButtonRef}
                     type="button"
-                    onClick={() => setInputHidden(false)}
+                    onClick={() => toggleComposer(false)}
                     aria-expanded="false"
                     className="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white py-2 pl-4 pr-3.5 text-[15px] font-semibold text-gray-600 shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:border-[#A5B4FC] hover:text-medium-slate-blue"
                   >
@@ -442,7 +463,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                 inputValue={inputValue}
                 onInputChange={onInputChange}
                 disableWhileWaiting={false}
-                onHide={presentation ? () => setInputHidden(true) : undefined}
+                onHide={presentation ? () => toggleComposer(true) : undefined}
                 shownOnScreen={presentation}
               />
             )}

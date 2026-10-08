@@ -37,8 +37,8 @@ jest.mock('../../components/MessageInput', () => ({
 
 // Mock PollMessage component
 jest.mock('../../components/messages/PollMessage', () => ({
-  PollMessage: ({ body, counts }: any) => (
-    <div data-testid="poll-message">
+  PollMessage: ({ body, counts, presentation }: any) => (
+    <div data-testid="poll-message" data-presentation={presentation ? 'true' : 'false'}>
       <div data-testid="poll-title">{body.title}</div>
       <div data-testid="poll-counts">{JSON.stringify(counts)}</div>
     </div>
@@ -2189,6 +2189,11 @@ describe('GroupChatPanel', () => {
       const counts = { Red: 3, Blue: 7, Green: 1 };
       render(<GroupChatPanel {...baseProps} messages={[pollMessage]} pollCounts={{ 'poll-1': counts }} />);
       expect(screen.getByTestId('poll-counts')).toHaveTextContent(JSON.stringify(counts));
+    });
+
+    it('lays the poll out for the shared screen in the presentation view', () => {
+      render(<GroupChatPanel {...baseProps} messages={[pollMessage]} presentation />);
+      expect(screen.getByTestId('poll-message')).toHaveAttribute('data-presentation', 'true');
     });
 
     it('passes null counts when pollId is not in pollCounts', () => {

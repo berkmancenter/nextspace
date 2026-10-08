@@ -1,6 +1,7 @@
 import { FC, useState } from 'react';
 import { Check } from '@mui/icons-material';
 import { respondToPoll } from '../../utils/pollHelpers';
+import { PRESENTATION_TEXT } from '../../utils/presentationText';
 
 export interface PollMessageBody {
   type: 'poll';
@@ -17,9 +18,15 @@ export interface PollMessageBody {
 interface PollMessageProps {
   body: PollMessageBody;
   counts: Record<string, number> | null;
+  /** Enlarges the question, choices and counts for the presentation view. */
+  presentation?: boolean;
 }
 
-export const PollMessage: FC<PollMessageProps> = ({ body, counts }) => {
+export const PollMessage: FC<PollMessageProps> = ({ body, counts, presentation = false }) => {
+  // The poll sets its own sizes, so it can't inherit the presentation view's larger message text.
+  const titleSize = presentation ? PRESENTATION_TEXT.message.fontSize : '0.9375rem';
+  const choiceSize = presentation ? PRESENTATION_TEXT.name.fontSize : '0.9375rem';
+  const metaSize = presentation ? PRESENTATION_TEXT.meta.fontSize : '0.8125rem';
   const { pollId, title, choices = [], multiSelect, whenResultsVisible } = body;
   const isAlwaysReveal = whenResultsVisible === 'always';
 
@@ -71,9 +78,9 @@ export const PollMessage: FC<PollMessageProps> = ({ body, counts }) => {
           borderBottom: '1px solid rgba(0,0,0,0.07)',
         }}
       >
-        <p style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#1f2937', margin: 0, lineHeight: 1.4 }}>{title}</p>
+        <p style={{ fontSize: titleSize, fontWeight: 600, color: '#1f2937', margin: 0, lineHeight: 1.4 }}>{title}</p>
         {!hasVoted && (
-          <p style={{ fontSize: '0.8125rem', color: '#9ca3af', margin: '2px 0 0', lineHeight: 1 }}>
+          <p style={{ fontSize: metaSize, color: '#9ca3af', margin: '2px 0 0', lineHeight: 1 }}>
             {multiSelect ? 'Select all that apply' : 'Select one'}
           </p>
         )}
@@ -129,7 +136,7 @@ export const PollMessage: FC<PollMessageProps> = ({ body, counts }) => {
                   </div>
                   <span
                     style={{
-                      fontSize: '0.9375rem',
+                      fontSize: choiceSize,
                       color: isSelected ? '#1f2937' : '#374151',
                       fontWeight: isSelected ? 600 : 400,
                       lineHeight: 1.35,
@@ -144,7 +151,7 @@ export const PollMessage: FC<PollMessageProps> = ({ body, counts }) => {
                   <span
                     style={{
                       flexShrink: 0,
-                      fontSize: '0.8125rem',
+                      fontSize: metaSize,
                       fontWeight: isSelected ? 600 : 400,
                       color: isSelected ? '#4845D2' : '#6b7280',
                     }}
@@ -168,15 +175,15 @@ export const PollMessage: FC<PollMessageProps> = ({ body, counts }) => {
           justifyContent: 'space-between',
         }}
       >
-        <span style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>
+        <span style={{ fontSize: metaSize, color: '#9ca3af' }}>
           {showResults ? `${totalVotes} vote${totalVotes !== 1 ? 's' : ''}` : hasVoted ? 'Vote recorded' : ''}
         </span>
         {!isAlwaysReveal && hasVoted && (
-          <span style={{ fontSize: '0.8125rem', color: '#9ca3af', fontStyle: 'italic' }}>Results visible later</span>
+          <span style={{ fontSize: metaSize, color: '#9ca3af', fontStyle: 'italic' }}>Results visible later</span>
         )}
       </div>
 
-      {error && <p style={{ fontSize: '0.8125rem', color: '#ef4444', padding: '0 0.875rem 0.5rem', margin: 0 }}>{error}</p>}
+      {error && <p style={{ fontSize: metaSize, color: '#ef4444', padding: '0 0.875rem 0.5rem', margin: 0 }}>{error}</p>}
     </div>
   );
 };
