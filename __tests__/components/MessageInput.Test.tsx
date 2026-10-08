@@ -46,6 +46,28 @@ describe('MessageInput Component', () => {
       expect(screen.getByPlaceholderText('Enter your message here')).toBeInTheDocument();
     });
 
+    it('reminds the writer that the message is shown on screen in the presentation view', () => {
+      render(<MessageInput {...defaultProps} shownOnScreen />);
+
+      expect(screen.getByText(/Writing as TestUser · shown on screen/i)).toBeInTheDocument();
+    });
+
+    it('offers a Hide button that collapses the composer when onHide is given', async () => {
+      const onHide = jest.fn();
+      render(<MessageInput {...defaultProps} onHide={onHide} />);
+
+      const hideButton = screen.getByRole('button', { name: /hide/i });
+      expect(hideButton).toHaveAttribute('aria-expanded', 'true');
+      await userEvent.click(hideButton);
+      expect(onHide).toHaveBeenCalledTimes(1);
+    });
+
+    it('has no Hide button outside the presentation view', () => {
+      render(<MessageInput {...defaultProps} />);
+
+      expect(screen.queryByRole('button', { name: /hide/i })).not.toBeInTheDocument();
+    });
+
     it('does not render when pseudonym is null', () => {
       const { container } = render(<MessageInput {...defaultProps} pseudonym={null} />);
 
@@ -173,7 +195,12 @@ describe('MessageInput Component', () => {
 
     it('clears input immediately on send before server responds', async () => {
       let resolveSend!: (value: boolean) => void;
-      const slowSend = jest.fn(() => new Promise<boolean>((resolve) => { resolveSend = resolve; }));
+      const slowSend = jest.fn(
+        () =>
+          new Promise<boolean>((resolve) => {
+            resolveSend = resolve;
+          }),
+      );
 
       const user = userEvent.setup();
       render(<MessageInput {...defaultProps} onSendMessage={slowSend} />);
@@ -189,7 +216,12 @@ describe('MessageInput Component', () => {
 
     it('does not send duplicate when Enter is pressed twice rapidly', async () => {
       let resolveFirst!: (value: boolean) => void;
-      const slowSend = jest.fn(() => new Promise<boolean>((resolve) => { resolveFirst = resolve; }));
+      const slowSend = jest.fn(
+        () =>
+          new Promise<boolean>((resolve) => {
+            resolveFirst = resolve;
+          }),
+      );
 
       const user = userEvent.setup();
       render(<MessageInput {...defaultProps} onSendMessage={slowSend} />);
