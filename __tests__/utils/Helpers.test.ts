@@ -327,6 +327,19 @@ describe('generateEventUrls (via createConversationFromData)', () => {
     ]);
   });
 
+  it('builds no presentation URL for a backChannel conversation, which has no presentation view', async () => {
+    const data = {
+      ...baseConversation,
+      conversationType: 'backChannel',
+      channels: [
+        { name: 'participant', passcode: 'part-pass' },
+        { name: 'moderator', passcode: 'mod-pass' },
+      ],
+    };
+    const result = await createConversationFromData(data as any);
+    expect(result.eventUrls.presentation).toEqual([]);
+  });
+
   it('includes a moderator URL when  moderator channel exists', async () => {
     const data = {
       ...baseConversation,

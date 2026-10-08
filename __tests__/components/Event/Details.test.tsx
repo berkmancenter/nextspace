@@ -36,7 +36,7 @@ describe('EventDetails', () => {
     followers: [],
     enableDMs: [],
     experiments: [],
-    eventUrls: { moderator: [], participant: [] },
+    eventUrls: { moderator: [], participant: [], presentation: [] },
     type: {
       name: 'eventAssistant',
       label: 'Event Assistant',

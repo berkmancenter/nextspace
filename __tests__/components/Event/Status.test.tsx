@@ -117,6 +117,11 @@ describe('EventStatus (pending state)', () => {
       expect(presentation.compareDocumentPosition(zoom)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     });
 
+    it('shows no presentation link chip when the event has no presentation link', () => {
+      renderStatus();
+      expect(screen.queryByRole('button', { name: /presentation link/i })).not.toBeInTheDocument();
+    });
+
     it('disables the presentation link chip in the pending state, like the participant chip', () => {
       renderStatus({
         eventUrls: {
