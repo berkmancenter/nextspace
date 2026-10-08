@@ -86,4 +86,16 @@ describe('Layout', () => {
     expect(screen.queryByTestId('app-footer')).not.toBeInTheDocument();
     expect(screen.getByText('invite body')).toBeInTheDocument();
   });
+
+  it('keeps the app header on a page whose path only begins with the same letters as the room page', () => {
+    mockUseRouter.mockReturnValue({ pathname: '/roomy', asPath: '/roomy', isReady: true });
+
+    render(
+      <Layout>
+        <p>page body</p>
+      </Layout>,
+    );
+
+    expect(screen.getByTestId('app-header')).toBeInTheDocument();
+  });
 });
