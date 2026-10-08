@@ -2852,6 +2852,32 @@ describe('EventAssistantRoom', () => {
       expect(await screen.findByRole('heading', { level: 1, name: 'Legal Telescopes' })).toBeInTheDocument();
     });
 
+    it('joins as a shared screen with the group chat but no private assistant channel', async () => {
+      await renderPresentation();
+
+      await waitFor(() => {
+        expect(mockSocket.emit).toHaveBeenCalledWith('conversation:join', {
+          conversationId: 'test-conversation-id',
+          token: 'mock-access-token',
+          channels: [{ name: 'chat', passcode: 'chat-pass', direct: false }],
+          presentation: true,
+        });
+      });
+    });
+
+    it('does not load private assistant messages, since the screen has no Private Chat', async () => {
+      await renderPresentation();
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          'messages/test-conversation-id?channel=chat,chat-pass',
+          'mock-access-token',
+        );
+      });
+      const requestedPaths = (RetrieveData as jest.Mock).mock.calls.map(([path]) => String(path));
+      expect(requestedPaths.filter((path) => path.includes('channel=direct-'))).toEqual([]);
+    });
+
     it('offers Group Chat, Transcript, and Resources tabs but no Private Chat', async () => {
       await renderPresentation();
 

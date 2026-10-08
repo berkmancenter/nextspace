@@ -36,6 +36,8 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
+const NO_AGENT_IDS: string[] = [];
+
 export function EventAssistantRoom({
   authType: _authType,
   presentation = false,
@@ -124,6 +126,9 @@ export function EventAssistantRoom({
     markEventEnded,
   } = useConversationSetup({ socket, userId, router, setConversationType, setBotNameContext, setResources });
 
+  // A shared screen has no Private Chat, and the backend counts attendees by their private assistant channels.
+  const privateChatAgentIds = presentation ? NO_AGENT_IDS : agentIds;
+
   // Enable socket connection only when the event status is loaded and active.
   // conversation:stopped flips eventStatus to 'ended' which disconnects the
   // socket here. If the event later restarts, a page refresh re-runs the
@@ -155,7 +160,7 @@ export function EventAssistantRoom({
     userId,
     pseudonym,
     agentId,
-    agentIds,
+    agentIds: privateChatAgentIds,
     chatPasscode,
     initialJoinComplete,
     chatIntroRef,
@@ -277,10 +282,10 @@ export function EventAssistantRoom({
     }
 
     const agentChannels =
-      agentIds.length > 0
+      privateChatAgentIds.length > 0
         ? buildDirectChannels(
             userId,
-            agentIds.map((id) => ({ agentId: id })),
+            privateChatAgentIds.map((id) => ({ agentId: id })),
           )
         : [];
 
@@ -307,6 +312,7 @@ export function EventAssistantRoom({
           conversationId: router.query.conversationId,
           token: Api.get().getAccessToken(),
           channels,
+          ...(presentation && { presentation: true }),
         },
         (response) => {
           console.log('Successfully joined conversation');
@@ -349,7 +355,7 @@ export function EventAssistantRoom({
     // chatIntroRef, assistantIntroRef, hasJoinedConvRef are refs; the remaining omitted values
     // are stable setters from hooks. This matches the original join effect behavior.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, agentId, agentActive, agentIds, userId, chatPasscode, router.query.conversationId]);
+  }, [socket, agentId, agentActive, privateChatAgentIds, presentation, userId, chatPasscode, router.query.conversationId]);
 
   // Re-fetch all message history when the socket reconnects after a significant gap.
   // Cross-cutting: uses messages (fetchChatMessages, fetchAllAssistantMessages) + resources (setResources)
