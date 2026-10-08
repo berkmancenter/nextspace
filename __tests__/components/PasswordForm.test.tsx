@@ -134,4 +134,69 @@ describe('PasswordForm', () => {
 
     expect(await axe(container)).toHaveNoViolations();
   });
+
+  describe('for an existing password', () => {
+    const renderLoginForm = (onSubmit = jest.fn().mockResolvedValue(undefined)) => {
+      const result = render(
+        <PasswordForm purpose="current" heading="Log in to join the room" submitLabel="Log in" onSubmit={onSubmit} />,
+      );
+      return { ...result, onSubmit, passwordField: screen.getByLabelText('Password', { selector: 'input' }) };
+    };
+
+    it('marks the field for password managers to fill a saved password', () => {
+      const { passwordField } = renderLoginForm();
+
+      expect(passwordField).toHaveAttribute('autocomplete', 'current-password');
+      expect(passwordField).toHaveAttribute('type', 'password');
+    });
+
+    it('does not list the rules for choosing a password', () => {
+      const { passwordField } = renderLoginForm();
+
+      expect(screen.queryByText('Your password needs:')).not.toBeInTheDocument();
+      expect(passwordField).not.toHaveAccessibleDescription(/At least 8 characters/);
+    });
+
+    it('submits a password that would break the rules for a new one', async () => {
+      const user = userEvent.setup();
+      const { onSubmit, passwordField } = renderLoginForm();
+
+      await user.type(passwordField, 'short');
+      await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+      expect(onSubmit).toHaveBeenCalledWith('short');
+    });
+
+    it('asks for the password instead of submitting an empty field', async () => {
+      const user = userEvent.setup();
+      const { onSubmit, passwordField } = renderLoginForm();
+
+      await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert')).toHaveTextContent('Enter your password.');
+      expect(passwordField).toHaveAccessibleDescription('Enter your password.');
+      expect(passwordField).toHaveFocus();
+    });
+
+    it('asks for the password instead of submitting a field of only spaces', async () => {
+      const user = userEvent.setup();
+      const { onSubmit, passwordField } = renderLoginForm();
+
+      await user.type(passwordField, '   ');
+      await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert')).toHaveTextContent('Enter your password.');
+    });
+
+    it('has no accessibility violations while showing an error', async () => {
+      const user = userEvent.setup();
+      const { container } = renderLoginForm();
+
+      await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
 });

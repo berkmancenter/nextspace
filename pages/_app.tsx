@@ -11,6 +11,7 @@ import SessionManager from '../utils/SessionManager';
 import { validateEnv } from '../utils/validateEnv';
 import { useSessionTracking } from '../hooks/useAnalytics';
 import { AuthType } from '../types.internal';
+import { isTokenPage } from '../utils/tokenPrivacy';
 
 // Pages that don't require session creation
 // Add more pages here as needed (e.g., "/about", "/privacy", "/terms")
@@ -21,14 +22,15 @@ const SESSION_BLOCKLIST = [
   '/login', // Login page
   '/signup', // Signup page
   '/logout',
-  '/reset-password',
+  '/forgot-password',
 ];
 
 /**
  * Check if current route should skip session creation
  */
 function shouldSkipSession(pathname: string): boolean {
-  return SESSION_BLOCKLIST.includes(pathname);
+  // Mail scanners open emailed links before the person does, and each visit would otherwise create a guest account.
+  return SESSION_BLOCKLIST.includes(pathname) || isTokenPage(pathname);
 }
 
 // Validate environment variables on app initialization

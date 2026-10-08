@@ -59,6 +59,12 @@ describe('LoginPage', () => {
     expect(screen.getByText(/Don't have an account/i)).toBeInTheDocument();
   });
 
+  it('links to the page for requesting a password reset', () => {
+    render(<LoginPage />);
+
+    expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute('href', '/forgot-password');
+  });
+
   it('validates username is required', async () => {
     const user = userEvent.setup();
     render(<LoginPage />);
