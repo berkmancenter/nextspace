@@ -154,8 +154,8 @@ const ChecklistRow: React.FC<{
  * EventStatus component
  *
  * The operational half of the event view page (Details.tsx holds the read-only configuration). Shows
- * the lifecycle status pill, the moderator/participant/presentation/Zoom link chips, and the primary action
- * (Edit, or Create a new event when missed). In the `pending` state it also renders a readiness
+ * the lifecycle status pill, the moderator/participant/presentation/Zoom link chips, and the primary
+ * action (Edit, or Create a new event when missed). In the `pending` state it also renders a readiness
  * banner: a checklist of details that still need confirming before the event can start, where each
  * row asks the parent page to jump to the relevant Details card via `onJumpToSection`.
  * @param conversationData - The conversation data object containing details about the event.

@@ -1,9 +1,9 @@
 import type { CSSProperties } from 'react';
 
 /**
- * Text sizes for the presentation view, which is read from across a room. Message text is at least
- * 24pt (2rem); names and timestamps grow less so more of each message fits on screen. rem rather than
- * px so the sizes still follow the browser's text-size setting.
+ * Text sizes for the presentation view, which is read from across a room. Message text is 2rem (24pt
+ * at the default browser size); names and timestamps grow less so more of each message fits. rem
+ * rather than px so the sizes still follow the browser's text-size setting.
  */
 export const PRESENTATION_TEXT: Record<'message' | 'name' | 'meta', CSSProperties> = {
   message: { fontSize: '2rem', lineHeight: 1.45 },
