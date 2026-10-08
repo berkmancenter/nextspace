@@ -61,6 +61,7 @@ const ORGANIZER_FEATURES: { name: string; label: string; defaultEnabled: boolean
   { name: 'catalyst', label: 'Catalyst', defaultEnabled: true },
   { name: 'librarian', label: 'Reading Recommendations', defaultEnabled: true },
   { name: 'seriesHistory', label: 'Series History', defaultEnabled: false },
+  { name: 'voiceOutput', label: 'Voice Responses', defaultEnabled: false },
 ];
 
 /**
