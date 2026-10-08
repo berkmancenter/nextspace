@@ -15,6 +15,7 @@ import { trackConversationEvent, setUserId } from '../utils/analytics';
 import { Errors, ParamErrors, Transcript } from '../components/';
 import { NavigationBar } from '../components/NavigationBar';
 import { PreferencesPanel } from '../components/PreferencesPanel';
+import { PresentationHeader } from '../components/PresentationHeader';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
 import { CheckAuthHeader } from '../utils/Helpers';
 import TokenManagerDefault from '../utils/TokenManager';
@@ -35,10 +36,22 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
-function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
+/**
+ * The participant's view of an event. With `presentation`, the same room is laid out for a shared
+ * screen: its own header with an exit, no Private Chat tab, the transcript only as a tab, larger
+ * message text, and a collapsed composer.
+ */
+export function EventAssistantRoom({
+  authType: _authType,
+  presentation = false,
+}: {
+  authType: AuthType;
+  presentation?: boolean;
+}) {
   const router = useRouter();
 
-  useAnalytics({ pageType: 'assistant' });
+  // A projector is not an audience member, so the presentation view stays out of the participant count.
+  useAnalytics({ pageType: presentation ? 'presentation' : 'assistant' });
 
   const {
     resources,
@@ -497,8 +510,18 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   return (
     <>
+      {presentation && (
+        <PresentationHeader
+          eventName={eventName}
+          onExit={() => router.push({ pathname: '/assistant/', query: router.query })}
+        />
+      )}
       {/* On mobile we add bottom padding so the fixed nav bar doesn't cover content */}
-      <div className="flex flex-row h-[calc(100vh-96px)] overflow-hidden pb-[60px] lg:pb-0">
+      <div
+        className={`flex flex-row overflow-hidden pb-[60px] lg:pb-0 ${
+          presentation ? 'h-[calc(100vh-72px)]' : 'h-[calc(100vh-96px)]'
+        }`}
+      >
         {/* Error messages */}
         {(generalError || sessionError) && !paramsError && (
           <Errors generalError={generalError} sessionError={sessionError} setGeneralError={setGeneralError} />
@@ -569,21 +592,26 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
               showTranscript={!!transcriptPasscode}
               showResources={true}
               botName={botName}
+              presentation={presentation}
             />
 
             {/* ── Main content area ── */}
             <div className="flex-1 flex flex-row overflow-hidden">
               {/* Transcript — always mounted so it doesn't re-fetch on tab/view switch.
                   Full-screen when transcript tab is active; sidebar on large screens otherwise;
-                  hidden when preferences is open or on small screens in sidebar mode. */}
+                  hidden when preferences is open or on small screens in sidebar mode. The
+                  presentation view has no sidebar: the chat needs that width on a shared screen. */}
               {transcriptPasscode && (
                 <div
+                  hidden={presentation && activeTab !== 'transcript'}
                   className={
                     router.query.view === 'preferences'
                       ? 'hidden'
                       : activeTab === 'transcript'
                         ? 'flex-1 overflow-hidden'
-                        : 'hidden lg:block lg:order-2'
+                        : presentation
+                          ? undefined
+                          : 'hidden lg:block lg:order-2'
                   }
                 >
                   <Transcript
@@ -592,7 +620,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                     conversationId={router.query.conversationId as string}
                     transcriptPasscode={transcriptPasscode}
                     lastReconnectTime={lastReconnectTime}
-                    hideToggle={router.query.view !== 'preferences' && activeTab === 'transcript'}
+                    hideToggle={presentation || (router.query.view !== 'preferences' && activeTab === 'transcript')}
+                    presentation={presentation}
                   />
                 </div>
               )}
@@ -660,6 +689,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                           }}
                           pollCounts={pollCounts}
                           inactive={eventStatus !== 'active'}
+                          presentation={presentation}
                         />
                       ) : activeTab === 'resources' ? (
                         <ResourcesPanel

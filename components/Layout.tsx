@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: '',
 };
 
-const OWN_CHROME_ROUTES = ['/room', '/hallway', '/invite', '/404'];
+const OWN_CHROME_ROUTES = ['/room', '/hallway', '/invite', '/404', '/present'];
 
 /**
  * Layout component
@@ -24,10 +24,10 @@ export const Layout = ({ children, authType = 'guest' }: Readonly<{ children: Re
   const router = useRouter();
   const currentUrl = router.isReady ? router.asPath : '';
 
-  // The community room, the hallway, and the invite and not-found pages (which community room
-  // members land on) draw their own chrome and fill the viewport, so the app's header and footer
-  // would frame a second header and push them into a scroll. A room's asPath carries a
-  // room id rather than the literal "conversationId", so the check below can't see it.
+  // The community room, the hallway, the presentation view, and the invite and not-found pages
+  // (which community room members land on) draw their own chrome and fill the viewport, so the
+  // app's header and footer would frame a second header and push them into a scroll. A room's
+  // asPath carries a room id rather than the literal "conversationId", so the check below can't see it.
   const drawsOwnChrome = OWN_CHROME_ROUTES.some(
     (route) => router.pathname === route || router.pathname.startsWith(`${route}/`),
   );

@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EventAssistantRoom from '../../pages/assistant';
+import PresentationRoom from '../../pages/present';
 import { RetrieveData, SendData, getPollResponseCounts, inspectPoll } from '../../utils';
 import { createConversationFromData, GetChannelPasscode } from '../../utils/Helpers';
 import { ConversationTypeProvider } from '../../context/ConversationTypeContext';
@@ -2826,6 +2827,77 @@ describe('EventAssistantRoom', () => {
           ),
         ).not.toBeInTheDocument();
       });
+    });
+  });
+
+  describe('presentation view', () => {
+    beforeEach(() => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        name: 'Legal Telescopes',
+      });
+    });
+
+    const renderPresentation = async () => {
+      await act(async () => {
+        render(<PresentationRoom authType={'guest'} />);
+      });
+    };
+
+    it('labels the screen as the presentation view and names the event', async () => {
+      await renderPresentation();
+
+      expect(screen.getByText('Presentation view')).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { level: 1, name: 'Legal Telescopes' })).toBeInTheDocument();
+    });
+
+    it('offers Group Chat, Transcript, and Resources tabs but no Private Chat', async () => {
+      await renderPresentation();
+
+      expect(screen.queryByLabelText('Private Chat')).not.toBeInTheDocument();
+      expect(screen.getAllByLabelText('Group Chat').length).toBeGreaterThan(0);
+      expect(screen.getAllByLabelText('Transcript').length).toBeGreaterThan(0);
+      expect(screen.getAllByLabelText('Resources').length).toBeGreaterThan(0);
+    });
+
+    it('keeps the transcript off the main screen until its tab is chosen', async () => {
+      await renderPresentation();
+
+      expect(screen.getByRole('heading', { name: 'LIVE TRANSCRIPT', hidden: true })).not.toBeVisible();
+
+      await userEvent.click(screen.getAllByLabelText('Transcript')[0]);
+
+      expect(screen.getByRole('heading', { name: 'LIVE TRANSCRIPT' })).toBeVisible();
+    });
+
+    it('starts with the composer collapsed', async () => {
+      await renderPresentation();
+
+      expect(await screen.findByRole('button', { name: /write a message/i })).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('Enter your message here')).not.toBeInTheDocument();
+    });
+
+    it('asks before exiting, and stays put on "Keep presenting"', async () => {
+      await renderPresentation();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Exit presentation view' }));
+      expect(screen.getByRole('dialog', { name: 'Exit presentation view?' })).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Keep presenting' }));
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Exit presentation view?' })).not.toBeInTheDocument();
+      });
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('opens the participant view with the same event and passcodes on confirming exit', async () => {
+      await renderPresentation();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Exit presentation view' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Go to participant view' }));
+
+      expect(mockPush).toHaveBeenCalledWith({ pathname: '/assistant/', query: mockRouter.query });
     });
   });
 
