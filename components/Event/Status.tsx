@@ -53,10 +53,10 @@ const ChipDot: React.FC<{ disabled: boolean; color: string }> = ({ disabled, col
 );
 
 /**
- * A copy-to-clipboard chip in the operations bar (moderator and participant links, which the
- * organizer shares). Disabled while the event is unconfirmed, since its links aren't ready to share
- * yet. Kept focusable via aria-disabled rather than the native `disabled` attribute so assistive
- * tech still announces the link exists.
+ * A copy-to-clipboard chip in the operations bar (moderator, participant and presentation links,
+ * which the organizer shares). Disabled while the event is unconfirmed, since its links aren't ready
+ * to share yet. Kept focusable via aria-disabled rather than the native `disabled` attribute so
+ * assistive tech still announces the link exists.
  */
 const LinkChip: React.FC<{
   label: string;
@@ -154,7 +154,7 @@ const ChecklistRow: React.FC<{
  * EventStatus component
  *
  * The operational half of the event view page (Details.tsx holds the read-only configuration). Shows
- * the lifecycle status pill, the moderator/participant/Zoom link chips, and the primary action
+ * the lifecycle status pill, the moderator/participant/presentation/Zoom link chips, and the primary action
  * (Edit, or Create a new event when missed). In the `pending` state it also renders a readiness
  * banner: a checklist of details that still need confirming before the event can start, where each
  * row asks the parent page to jump to the relevant Details card via `onJumpToSection`.
@@ -186,6 +186,7 @@ export const EventStatus: React.FC<{
 
   const moderatorUrl = conversationData.eventUrls.moderator[0]?.url;
   const participantUrl = conversationData.eventUrls.participant[0]?.url;
+  const presentationUrl = conversationData.eventUrls.presentation[0]?.url;
   const zoomUrl = conversationData.eventUrls.zoom?.url;
 
   // The meeting link only counts as confirmed when it's a valid Zoom URL, matching the backend's
@@ -270,6 +271,15 @@ export const EventStatus: React.FC<{
               label="Participant link"
               url={participantUrl}
               dotColor="#7C3AED"
+              icon={<ContentCopyOutlined fontSize="inherit" />}
+              disabled={unconfirmed}
+            />
+          )}
+          {!isMissed && presentationUrl && (
+            <LinkChip
+              label="Presentation link"
+              url={presentationUrl}
+              dotColor="#4A0979"
               icon={<ContentCopyOutlined fontSize="inherit" />}
               disabled={unconfirmed}
             />

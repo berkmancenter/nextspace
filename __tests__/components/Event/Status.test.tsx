@@ -63,6 +63,7 @@ describe('EventStatus (pending state)', () => {
     eventUrls: {
       moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/assistant/?conversationId=conv-123' }],
       participant: [{ label: 'Participant link', url: 'http://localhost:8080/fake/?conversationId=conv-123' }],
+      presentation: [],
     },
     type: {
       name: 'eventAssistant',
@@ -99,6 +100,31 @@ describe('EventStatus (pending state)', () => {
       expect(screen.getByRole('button', { name: /moderator link/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /participant link/i })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /zoom/i })).toBeInTheDocument();
+    });
+
+    it('places the presentation link chip after the participant chip and before Zoom', () => {
+      renderStatus({
+        eventUrls: {
+          ...baseConversationData.eventUrls,
+          presentation: [{ label: 'Presentation view', url: 'http://localhost:8080/present/?conversationId=conv-123' }],
+          zoom: { label: 'Zoom', url: 'https://zoom.us/j/123456789' },
+        },
+      });
+      const participant = screen.getByRole('button', { name: /participant link/i });
+      const presentation = screen.getByRole('button', { name: /presentation link/i });
+      const zoom = screen.getByRole('link', { name: /zoom/i });
+      expect(participant.compareDocumentPosition(presentation)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(presentation.compareDocumentPosition(zoom)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+
+    it('disables the presentation link chip in the pending state, like the participant chip', () => {
+      renderStatus({
+        eventUrls: {
+          ...baseConversationData.eventUrls,
+          presentation: [{ label: 'Presentation view', url: 'http://localhost:8080/present/?conversationId=conv-123' }],
+        },
+      });
+      expect(screen.getByRole('button', { name: /presentation link/i })).toHaveAttribute('aria-disabled', 'true');
     });
 
     it('disables the link chips in the pending state', () => {
@@ -251,6 +277,7 @@ describe('EventStatus (missed state)', () => {
     eventUrls: {
       moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/mod' }],
       participant: [{ label: 'Participant link', url: 'http://localhost:8080/part' }],
+      presentation: [],
     },
     type: { name: 'eventAssistant', label: 'Event Assistant', description: '', platforms: [], properties: [] },
   } as unknown as Conversation;
@@ -354,16 +381,18 @@ describe('EventStatus (missed state)', () => {
     expect(screen.queryByText(/almost ready/i)).not.toBeInTheDocument();
   });
 
-  it('hides the moderator, participant, and zoom link chips, which point at a session that never happened', () => {
+  it('hides the moderator, participant, presentation, and zoom link chips, which point at a session that never happened', () => {
     renderMissed({
       eventUrls: {
         moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/mod' }],
         participant: [{ label: 'Participant link', url: 'http://localhost:8080/part' }],
+        presentation: [{ label: 'Presentation view', url: 'http://localhost:8080/present' }],
         zoom: { label: 'Zoom', url: 'https://zoom.us/j/1' },
       },
     } as Partial<Conversation>);
     expect(screen.queryByRole('button', { name: /moderator link/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /participant link/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /presentation link/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /zoom/i })).not.toBeInTheDocument();
   });
 });
@@ -385,6 +414,7 @@ describe('EventStatus (live state)', () => {
     eventUrls: {
       moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/mod' }],
       participant: [{ label: 'Participant link', url: 'http://localhost:8080/part' }],
+      presentation: [{ label: 'Presentation view', url: 'http://localhost:8080/present' }],
       zoom: { label: 'Zoom', url: 'https://harvard.zoom.us/j/81244556677' },
     },
     type: { name: 'eventAssistant', label: 'Event Assistant', description: '', platforms: [], properties: [] },
@@ -429,6 +459,15 @@ describe('EventStatus (live state)', () => {
     renderLive();
     await user.click(screen.getByRole('button', { name: /moderator link/i }));
     expect(await screen.findByText(/copied/i)).toBeInTheDocument();
+  });
+
+  it('copies the presentation link like the participant link, rather than opening it', async () => {
+    const user = userEvent.setup();
+    renderLive();
+    const presentationChip = screen.getByRole('button', { name: /presentation link/i });
+    expect(presentationChip).toHaveAttribute('aria-disabled', 'false');
+    await user.click(presentationChip);
+    expect(await within(presentationChip).findByText(/copied/i)).toBeInTheDocument();
   });
 
   it('offers an "Edit" action rather than "Create a new event"', () => {
@@ -516,6 +555,7 @@ describe('EventStatus (scheduled state)', () => {
     eventUrls: {
       moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/mod' }],
       participant: [{ label: 'Participant link', url: 'http://localhost:8080/part' }],
+      presentation: [],
       zoom: { label: 'Zoom', url: 'https://harvard.zoom.us/j/81244556677' },
     },
     type: { name: 'eventAssistant', label: 'Event Assistant', description: '', platforms: [], properties: [] },
@@ -601,6 +641,7 @@ describe('EventStatus (past state)', () => {
     eventUrls: {
       moderator: [{ label: 'Moderator link', url: 'http://localhost:8080/mod' }],
       participant: [{ label: 'Participant link', url: 'http://localhost:8080/part' }],
+      presentation: [],
       zoom: { label: 'Zoom', url: 'https://harvard.zoom.us/j/81244556677' },
     },
     type: { name: 'eventAssistant', label: 'Event Assistant', description: '', platforms: [], properties: [] },

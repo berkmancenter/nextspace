@@ -175,6 +175,31 @@ describe('Events Page', () => {
     );
   });
 
+  it('lists the presentation link in its own column after the participant links', async () => {
+    (Request as jest.Mock).mockResolvedValue([mockConversations[0]]);
+    (getConversation as jest.Mock).mockResolvedValueOnce({
+      ...mockConversations[0],
+      platformTypes: availablePlatforms1,
+      types: conversationTypes1,
+      eventUrls: {
+        moderator: [],
+        participant: [{ label: 'Berkie', url: 'https://example.com/assistant/?conversationId=1' }],
+        presentation: [{ label: 'Presentation view', url: 'https://example.com/present/?conversationId=1' }],
+      },
+    });
+
+    await act(async () => {
+      render(<EventsPage authType={'user'} />);
+    });
+
+    const presentationLink = await screen.findByRole('link', { name: 'Presentation view' });
+    expect(presentationLink).toHaveAttribute('href', 'https://example.com/present/?conversationId=1');
+    expect(screen.getByText('Presentation Links')).toBeInTheDocument();
+    expect(screen.getByText('Participant Links').compareDocumentPosition(screen.getByText('Presentation Links'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
   it('should display an error message if fetching conversations fails', async () => {
     const errorMessage = 'Failed to fetch conversations.';
     global.fetch = jest.fn().mockResolvedValue({

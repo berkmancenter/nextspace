@@ -309,6 +309,24 @@ describe('generateEventUrls (via createConversationFromData)', () => {
     expect(url).toContain('channel=chat,chat-pass');
   });
 
+  it('builds a presentation URL with the same channels as the participant URL', async () => {
+    const data = {
+      ...baseConversation,
+      channels: [
+        { name: 'transcript', passcode: 'tx-pass' },
+        { name: 'chat', passcode: 'chat-pass' },
+        { name: 'moderator', passcode: 'mod-pass' },
+      ],
+    };
+    const result = await createConversationFromData(data as any);
+    expect(result.eventUrls.presentation).toEqual([
+      {
+        label: 'Presentation view',
+        url: 'https://example.com/present/?conversationId=conv-123&channel=transcript,tx-pass&channel=chat,chat-pass',
+      },
+    ]);
+  });
+
   it('includes a moderator URL when  moderator channel exists', async () => {
     const data = {
       ...baseConversation,
@@ -338,6 +356,7 @@ describe('generateEventUrls (via createConversationFromData)', () => {
     };
     const result = await createConversationFromData(data as any);
     expect(result.eventUrls.participant).toEqual([{ label: 'Community Room', url: 'https://example.com/room/conv-123' }]);
+    expect(result.eventUrls.presentation).toEqual([]);
   });
 });
 
