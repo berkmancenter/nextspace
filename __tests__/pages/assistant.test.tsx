@@ -2971,7 +2971,7 @@ describe('EventAssistantRoom', () => {
       expect(screen.queryByRole('button', { name: /write a message/i })).not.toBeInTheDocument();
     });
 
-    it('logs a failed exit rather than failing silently', async () => {
+    it('tells the presenter when leaving fails and lets them try again or keep presenting', async () => {
       const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
       mockPush.mockRejectedValueOnce(new Error('navigation cancelled'));
       await renderPresentation();
@@ -2979,8 +2979,12 @@ describe('EventAssistantRoom', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Exit presentation view' }));
       await userEvent.click(screen.getByRole('button', { name: 'Go to participant view' }));
 
+      expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't open the participant view. Try again.");
+      expect(consoleError).toHaveBeenCalledWith('Failed to leave the presentation view:', expect.any(Error));
+      expect(screen.getByRole('button', { name: 'Go to participant view' })).toBeEnabled();
+      await userEvent.click(screen.getByRole('button', { name: 'Keep presenting' }));
       await waitFor(() => {
-        expect(consoleError).toHaveBeenCalledWith('Failed to leave the presentation view:', expect.any(Error));
+        expect(screen.queryByRole('dialog', { name: 'Exit presentation view?' })).not.toBeInTheDocument();
       });
       consoleError.mockRestore();
     });

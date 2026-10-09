@@ -538,11 +538,7 @@ export function EventAssistantRoom({
     </div>
   );
 
-  const exitPresentation = () => {
-    router
-      .push({ pathname: '/assistant/', query: router.query })
-      .catch((error) => console.error('Failed to leave the presentation view:', error));
-  };
+  const exitPresentation = () => router.push({ pathname: '/assistant/', query: router.query });
 
   return (
     <>

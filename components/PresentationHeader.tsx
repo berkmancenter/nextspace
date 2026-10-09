@@ -5,8 +5,8 @@ import { Logo } from './Logo';
 
 interface PresentationHeaderProps {
   eventName: string;
-  /** Called once the exit has been confirmed. */
-  onExit: () => void;
+  /** Called once the exit has been confirmed. If it rejects, the dialog stays open and shows an error. */
+  onExit: () => Promise<unknown>;
 }
 
 /**
@@ -15,6 +15,22 @@ interface PresentationHeaderProps {
  */
 export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProps) => {
   const [confirmingExit, setConfirmingExit] = useState(false);
+  const [exitFailed, setExitFailed] = useState(false);
+
+  const closeDialog = () => {
+    setConfirmingExit(false);
+    setExitFailed(false);
+  };
+
+  const confirmExit = async () => {
+    setExitFailed(false);
+    try {
+      await onExit();
+    } catch (error) {
+      console.error('Failed to leave the presentation view:', error);
+      setExitFailed(true);
+    }
+  };
 
   return (
     <header className="relative z-[1] flex h-[72px] flex-shrink-0 items-center gap-3.5 border-b border-gray-200 bg-white px-7 shadow-sm">
@@ -39,7 +55,7 @@ export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProp
 
       <Dialog
         open={confirmingExit}
-        onClose={() => setConfirmingExit(false)}
+        onClose={closeDialog}
         aria-labelledby="exit-presentation-title"
         aria-describedby="exit-presentation-description"
         slotProps={{ paper: { sx: { borderRadius: '12px', padding: '24px', maxWidth: '440px' } } }}
@@ -51,17 +67,22 @@ export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProp
           This window will open the participant view of this event. To present again, open the presentation link from the
           event&apos;s admin page.
         </p>
+        {exitFailed && (
+          <p role="alert" className="mt-3 text-sm font-semibold text-red-700">
+            Couldn&apos;t open the participant view. Try again.
+          </p>
+        )}
         <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
-            onClick={() => setConfirmingExit(false)}
+            onClick={closeDialog}
             className="whitespace-nowrap rounded-md border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100"
           >
             Keep presenting
           </button>
           <button
             type="button"
-            onClick={onExit}
+            onClick={confirmExit}
             className="whitespace-nowrap rounded-md bg-medium-slate-blue px-3.5 py-2 text-sm font-semibold text-white hover:bg-[#3b38b8]"
           >
             Go to participant view
