@@ -77,6 +77,19 @@ describe('ThreadPanel Component', () => {
     jest.clearAllMocks();
   });
 
+  it('sets message text to 2rem and enlarges sender names in the presentation view', () => {
+    render(<ThreadPanel {...defaultProps} presentation />);
+
+    expect(screen.getByTestId('thread-message-list')).toHaveStyle({ fontSize: '2rem' });
+    expect(screen.getByText('User2').closest('div')).toHaveStyle({ fontSize: '1.5rem' });
+  });
+
+  it('keeps the default message size outside the presentation view', () => {
+    render(<ThreadPanel {...defaultProps} />);
+
+    expect(screen.getByTestId('thread-message-list')).not.toHaveStyle({ fontSize: '2rem' });
+  });
+
   it('shows the reply lock in place of the reply box when one is given', () => {
     render(<ThreadPanel {...defaultProps} replyLock={<button type="button">Set your name first</button>} />);
 

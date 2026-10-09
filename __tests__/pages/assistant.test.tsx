@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EventAssistantRoom from '../../pages/assistant';
+import PresentationRoom from '../../pages/present';
 import { RetrieveData, SendData, getPollResponseCounts, inspectPoll } from '../../utils';
 import { createConversationFromData, GetChannelPasscode } from '../../utils/Helpers';
 import { ConversationTypeProvider } from '../../context/ConversationTypeContext';
@@ -184,7 +185,7 @@ jest.mock('../../utils/Helpers', () => ({
 describe('EventAssistantRoom', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockPush.mockReset();
+    mockPush.mockReset().mockResolvedValue(true);
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
     });
@@ -2826,6 +2827,175 @@ describe('EventAssistantRoom', () => {
           ),
         ).not.toBeInTheDocument();
       });
+    });
+  });
+
+  describe('presentation view', () => {
+    beforeEach(() => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        name: 'Legal Telescopes',
+      });
+    });
+
+    const renderPresentation = async () => {
+      await act(async () => {
+        render(<PresentationRoom authType={'guest'} />);
+      });
+    };
+
+    it('labels the screen as the presentation view and names the event', async () => {
+      await renderPresentation();
+
+      expect(screen.getByText('Presentation view')).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { level: 1, name: 'Legal Telescopes' })).toBeInTheDocument();
+    });
+
+    it('joins as a shared screen with the group chat but no private assistant channel', async () => {
+      await renderPresentation();
+
+      await waitFor(() => {
+        expect(mockSocket.emit).toHaveBeenCalledWith('conversation:join', {
+          conversationId: 'test-conversation-id',
+          token: 'mock-access-token',
+          channels: [{ name: 'chat', passcode: 'chat-pass', direct: false }],
+          observer: true,
+        });
+      });
+    });
+
+    it('does not load private assistant messages, since the screen has no Private Chat', async () => {
+      await renderPresentation();
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          'messages/test-conversation-id?channel=chat,chat-pass',
+          'mock-access-token',
+        );
+      });
+      const requestedPaths = (RetrieveData as jest.Mock).mock.calls.map(([path]) => String(path));
+      expect(requestedPaths.filter((path) => path.includes('channel=direct-'))).toEqual([]);
+    });
+
+    it('offers Group Chat, Transcript, and Resources tabs but no Private Chat', async () => {
+      await renderPresentation();
+
+      expect(screen.queryByLabelText('Private Chat')).not.toBeInTheDocument();
+      expect(screen.getAllByLabelText('Group Chat').length).toBeGreaterThan(0);
+      expect(screen.getAllByLabelText('Transcript').length).toBeGreaterThan(0);
+      expect(screen.getAllByLabelText('Resources').length).toBeGreaterThan(0);
+    });
+
+    it('keeps the transcript off the main screen until its tab is chosen', async () => {
+      await renderPresentation();
+
+      expect(screen.getByRole('heading', { name: 'LIVE TRANSCRIPT', hidden: true })).not.toBeVisible();
+
+      await userEvent.click(screen.getAllByLabelText('Transcript')[0]);
+
+      expect(screen.getByRole('heading', { name: 'LIVE TRANSCRIPT' })).toBeVisible();
+    });
+
+    it('starts with the composer collapsed', async () => {
+      await renderPresentation();
+
+      expect(await screen.findByRole('button', { name: /write a message/i })).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('Enter your message here')).not.toBeInTheDocument();
+    });
+
+    it('asks before exiting, and stays put on "Keep presenting"', async () => {
+      await renderPresentation();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Exit presentation view' }));
+      expect(screen.getByRole('dialog', { name: 'Exit presentation view?' })).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Keep presenting' }));
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Exit presentation view?' })).not.toBeInTheDocument();
+      });
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('moves focus into the composer when it opens, and back to "Write a message" when hidden', async () => {
+      await renderPresentation();
+
+      await userEvent.click(await screen.findByRole('button', { name: /write a message/i }));
+      expect(screen.getByPlaceholderText('Enter your message here')).toHaveFocus();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Hide composer' }));
+      expect(screen.queryByPlaceholderText('Enter your message here')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /write a message/i })).toHaveFocus();
+    });
+
+    it('does not move focus into the composer in the normal participant view', async () => {
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      expect(await screen.findByPlaceholderText('Enter your message here')).not.toHaveFocus();
+    });
+
+    it('keeps the exit reachable before the event starts, showing the notice in the page instead of a dialog', async () => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        name: 'Legal Telescopes',
+        active: false,
+      });
+
+      await renderPresentation();
+
+      expect(await screen.findByText('Event Not Started')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Exit presentation view' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Go to participant view' }));
+      expect(mockPush).toHaveBeenCalledWith({ pathname: '/assistant/', query: mockRouter.query });
+    });
+
+    it('shows the ended notice in the page with no composer once the event is over', async () => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        name: 'Legal Telescopes',
+        active: false,
+        endTime: '2024-06-01T12:00:00Z',
+      });
+
+      await renderPresentation();
+
+      expect(await screen.findByText('Event Has Ended')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(await screen.findByText('This event is not active.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /write a message/i })).not.toBeInTheDocument();
+    });
+
+    it('tells the presenter when leaving fails and lets them try again or keep presenting', async () => {
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      mockPush.mockRejectedValueOnce(new Error('navigation cancelled'));
+      await renderPresentation();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Exit presentation view' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Go to participant view' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't open the participant view. Try again.");
+      expect(consoleError).toHaveBeenCalledWith('Failed to leave the presentation view:', expect.any(Error));
+      expect(screen.getByRole('button', { name: 'Go to participant view' })).toBeEnabled();
+      await userEvent.click(screen.getByRole('button', { name: 'Keep presenting' }));
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Exit presentation view?' })).not.toBeInTheDocument();
+      });
+      consoleError.mockRestore();
+    });
+
+    it('opens the participant view with the same event and passcodes on confirming exit', async () => {
+      await renderPresentation();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Exit presentation view' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Go to participant view' }));
+
+      expect(mockPush).toHaveBeenCalledWith({ pathname: '/assistant/', query: mockRouter.query });
     });
   });
 

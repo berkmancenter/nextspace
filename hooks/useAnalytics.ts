@@ -25,8 +25,9 @@ export interface UseAnalyticsOptions {
  * tracked sessions, never tagged with dimension 7, and so never matched by the recap's
  * dimension7==<id> segment. In particular the MODERATOR page is intentionally excluded:
  * moderators are staff, not audience, and counting their visits would muddy the
- * "big audience, few talkers" signal the tracked-session count exists to show. To start
- * counting another participant-facing page, add its pageType here.
+ * "big audience, few talkers" signal the tracked-session count exists to show. The
+ * presentation page is left out for the same reason: a shared screen is not an audience
+ * member. To start counting another participant-facing page, add its pageType here.
  */
 const PARTICIPANT_EVENT_PAGE_TYPES = ['assistant', 'backchannel'];
 

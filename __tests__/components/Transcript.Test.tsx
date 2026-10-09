@@ -102,6 +102,18 @@ describe('Transcript', () => {
     await user.click(toggle);
   };
 
+  it('sets transcript text to 2rem (32px) in the presentation view', async () => {
+    render(<Transcript {...baseProps} presentation />);
+
+    expect(await screen.findByText('Hello world')).toHaveStyle({ fontSize: '2rem' });
+  });
+
+  it('keeps the default transcript text size outside the presentation view', async () => {
+    render(<Transcript {...baseProps} />);
+
+    expect(await screen.findByText('Hello world')).not.toHaveStyle({ fontSize: '2rem' });
+  });
+
   it('starts open and can be toggled closed and open', async () => {
     const user = setupUser();
     render(<Transcript {...baseProps} />);

@@ -1,4 +1,4 @@
-import React, { FC, useMemo, useRef, useState } from 'react';
+import React, { FC, useEffect, useMemo, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { MessageInput } from './MessageInput';
@@ -16,6 +16,8 @@ import { IconButton, Tooltip } from '@mui/material';
 import ArrowCircleDownIcon from '@mui/icons-material/ArrowCircleDown';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import EditIcon from '@mui/icons-material/Edit';
+import { PRESENTATION_TEXT } from '../utils/presentationText';
 
 /**
  * Render assistant message with markdown support
@@ -70,6 +72,8 @@ interface GroupChatPanelProps {
   pollCounts?: Record<string, Record<string, number>>;
   /** Whether the event is inactive (ended) */
   inactive?: boolean;
+  /** Shared-screen layout: presentation text sizes, and a composer that starts collapsed. */
+  presentation?: boolean;
 }
 
 export const GroupChatPanel: FC<GroupChatPanelProps> = ({
@@ -89,10 +93,12 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   onSendMessage,
   pollCounts = {},
   inactive = false,
+  presentation = false,
 }) => {
   // State for tracking which thread is open in split view
   const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(null);
-  const [inputHidden, setInputHidden] = useState(false);
+  // A composer open on a shared screen takes room from the messages, so it starts collapsed there.
+  const [inputHidden, setInputHidden] = useState(presentation);
 
   // Extract unique contributors for mentions
   const contributors = useMemo(
@@ -134,6 +140,25 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   const { messagesEndRef, messagesContainerRef, isAtBottom, scrollToBottom } = useAutoScroll(messages);
 
   const messageInputRef = useRef<HTMLDivElement>(null);
+  const writeMessageButtonRef = useRef<HTMLButtonElement>(null);
+  const focusAfterComposerToggle = useRef(false);
+
+  // Each presentation composer button disappears when clicked, so focus has to be moved on purpose
+  // or it falls back to the top of the page (WCAG 2.4.3).
+  useEffect(() => {
+    if (!focusAfterComposerToggle.current) return;
+    focusAfterComposerToggle.current = false;
+    if (inputHidden) {
+      writeMessageButtonRef.current?.focus();
+      return;
+    }
+    messageInputRef.current?.querySelector<HTMLElement>('textarea')?.focus();
+  }, [inputHidden]);
+
+  const toggleComposer = (hidden: boolean) => {
+    focusAfterComposerToggle.current = true;
+    setInputHidden(hidden);
+  };
 
   /* Move focus into the message input after jumping to the bottom so keyboard
      users don't lose their place (WCAG 2.4.3). */
@@ -195,7 +220,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             }}
           >
             {parsed.text && renderAssistantMessage(parsed.text)}
-            <PollMessage body={pollBody} counts={counts} />
+            <PollMessage body={pollBody} counts={counts} presentation={presentation} />
           </div>
         </div>
       );
@@ -214,6 +239,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
         {sourceContextText && (
           <div
             className="text-xs text-gray-600 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded"
+            style={presentation ? PRESENTATION_TEXT.meta : undefined}
             role="note"
             aria-label="Voice reply context"
           >
@@ -307,7 +333,12 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             ref={messagesContainerRef}
             className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-2 pr-2 md:px-8 pt-2 bg-gray-100"
           >
-            <div className="flex flex-col items-start gap-4 pb-2" aria-live="assertive">
+            <div
+              className="flex flex-col items-start gap-4 pb-2"
+              aria-live="assertive"
+              data-testid="chat-message-list"
+              style={presentation ? PRESENTATION_TEXT.message : undefined}
+            >
               {/* Panel title and subtitle */}
               <div className="w-full pt-4 pb-2">
                 <h2 className="text-xl font-bold uppercase tracking-wide text-gray-900">
@@ -344,6 +375,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                     showTimestamp={showTimestamp}
                     isThreadOpen={selectedThreadId === message.id}
                     hasUnreadReplies={message.id ? messagesWithUnreadReplies.has(message.id) : false}
+                    presentation={presentation}
                   />
                 );
               })}
@@ -352,7 +384,9 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
               {waitingForResponse && !waitingForThreadedReply && parentMessages.length > 0 && (
                 <div className="relative z-10 flex items-center gap-1 mt-2 mb-1">
                   <BotIcon size={32} color="#4b5563" bouncing={true} />
-                  <span className="text-xs text-gray-500 italic">thinking...</span>
+                  <span className="text-xs text-gray-500 italic" style={presentation ? PRESENTATION_TEXT.meta : undefined}>
+                    thinking...
+                  </span>
                 </div>
               )}
               {/* Scroll target */}
@@ -388,17 +422,35 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
           </div>
         ) : (
           <div ref={messageInputRef} className="flex-shrink-0">
-            <div className="flex items-center justify-end border-t border-gray-200 px-2 py-0.5 bg-white">
-              <Tooltip title={inputHidden ? 'Show input' : 'Hide input'}>
-                <IconButton
-                  size="small"
-                  onClick={() => setInputHidden((h) => !h)}
-                  aria-label={inputHidden ? 'Show input' : 'Hide input'}
-                >
-                  {inputHidden ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
-                </IconButton>
-              </Tooltip>
-            </div>
+            {presentation ? (
+              inputHidden && (
+                <div className="flex justify-center bg-gray-100 px-4 pt-2.5 pb-4">
+                  <button
+                    ref={writeMessageButtonRef}
+                    type="button"
+                    onClick={() => toggleComposer(false)}
+                    aria-expanded="false"
+                    className="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white py-2 pl-4 pr-3.5 text-[15px] font-semibold text-gray-600 shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:border-[#A5B4FC] hover:text-medium-slate-blue"
+                  >
+                    <EditIcon sx={{ fontSize: 18 }} />
+                    Write a message
+                    <KeyboardArrowUpIcon sx={{ fontSize: 20 }} />
+                  </button>
+                </div>
+              )
+            ) : (
+              <div className="flex items-center justify-end border-t border-gray-200 px-2 py-0.5 bg-white">
+                <Tooltip title={inputHidden ? 'Show input' : 'Hide input'}>
+                  <IconButton
+                    size="small"
+                    onClick={() => setInputHidden((h) => !h)}
+                    aria-label={inputHidden ? 'Show input' : 'Hide input'}
+                  >
+                    {inputHidden ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
+                  </IconButton>
+                </Tooltip>
+              </div>
+            )}
             {!inputHidden && (
               <MessageInput
                 pseudonym={pseudonym}
@@ -411,6 +463,8 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                 inputValue={inputValue}
                 onInputChange={onInputChange}
                 disableWhileWaiting={false}
+                onHide={presentation ? () => toggleComposer(true) : undefined}
+                shownOnScreen={presentation}
               />
             )}
           </div>
@@ -432,6 +486,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             botName={botName}
             feedbackConfig={feedbackConfig}
             waitingForResponse={!!(waitingForThreadedReply && lastMessage?.parentMessage === selectedThreadId)}
+            presentation={presentation}
           />
         </div>
       )}

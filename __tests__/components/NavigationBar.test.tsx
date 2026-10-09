@@ -31,6 +31,15 @@ describe('NavigationBar', () => {
     expect(screen.queryByLabelText('Resources')).not.toBeInTheDocument();
   });
 
+  it('leaves out the Private Chat tab in the presentation view, since those chats are private to each participant', () => {
+    render(<NavigationBar {...baseProps} activeTab="chat" showResources={true} presentation />);
+
+    expect(screen.queryByLabelText('Private Chat')).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText('Group Chat').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Transcript').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Resources').length).toBeGreaterThan(0);
+  });
+
   it('hides chat tab when showChat is false', () => {
     render(<NavigationBar {...baseProps} showChat={false} />);
 

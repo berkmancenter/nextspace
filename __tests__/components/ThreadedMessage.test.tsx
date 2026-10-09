@@ -83,6 +83,29 @@ describe('ThreadedMessage Component', () => {
     expect(screen.getByText('Badge for User2').parentElement).toHaveTextContent('User2');
   });
 
+  describe('in the presentation view', () => {
+    it('enlarges the sender names and timestamp so they read from across a room', () => {
+      render(<ThreadedMessage {...defaultProps} replies={mockReplies} showTimestamp presentation />);
+
+      expect(screen.getByText('(You)').parentElement).toHaveStyle({ fontSize: '1.5rem' });
+      expect(screen.getByText('User2').closest('div')).toHaveStyle({ fontSize: '1.5rem' });
+      expect(screen.getByText('12:00 PM')).toHaveStyle({ fontSize: '1.125rem' });
+    });
+
+    it('enlarges the "more replies" link', () => {
+      render(<ThreadedMessage {...defaultProps} replies={mockReplies} presentation />);
+
+      expect(screen.getByRole('button', { name: /view 1 more reply/i })).toHaveStyle({ fontSize: '1.125rem' });
+    });
+
+    it('keeps the default sizes outside the presentation view', () => {
+      render(<ThreadedMessage {...defaultProps} showTimestamp />);
+
+      expect(screen.getByText('(You)').parentElement).not.toHaveStyle({ fontSize: '1.5rem' });
+      expect(screen.getByText('12:00 PM')).not.toHaveStyle({ fontSize: '1.125rem' });
+    });
+  });
+
   it('renders the message content', () => {
     render(<ThreadedMessage {...defaultProps} />);
     expect(screen.getByTestId(`message-${mockMessage.id}`)).toBeInTheDocument();

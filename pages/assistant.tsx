@@ -15,6 +15,7 @@ import { trackConversationEvent, setUserId } from '../utils/analytics';
 import { Errors, ParamErrors, Transcript } from '../components/';
 import { NavigationBar } from '../components/NavigationBar';
 import { PreferencesPanel } from '../components/PreferencesPanel';
+import { PresentationHeader } from '../components/PresentationHeader';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
 import { CheckAuthHeader } from '../utils/Helpers';
 import TokenManagerDefault from '../utils/TokenManager';
@@ -35,10 +36,19 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
-function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
+const NO_AGENT_IDS: string[] = [];
+
+export function EventAssistantRoom({
+  authType: _authType,
+  presentation = false,
+}: {
+  authType: AuthType;
+  presentation?: boolean;
+}) {
   const router = useRouter();
 
-  useAnalytics({ pageType: 'assistant' });
+  // A projector is not an audience member, so the presentation view stays out of Matomo's audience sessions.
+  useAnalytics({ pageType: presentation ? 'presentation' : 'assistant' });
 
   const {
     resources,
@@ -116,6 +126,9 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     markEventEnded,
   } = useConversationSetup({ socket, userId, router, setConversationType, setBotNameContext, setResources });
 
+  // A shared screen has no Private Chat, and the backend counts attendees by their private assistant channels.
+  const privateChatAgentIds = presentation ? NO_AGENT_IDS : agentIds;
+
   // Enable socket connection only when the event status is loaded and active.
   // conversation:stopped flips eventStatus to 'ended' which disconnects the
   // socket here. If the event later restarts, a page refresh re-runs the
@@ -147,7 +160,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     userId,
     pseudonym,
     agentId,
-    agentIds,
+    agentIds: privateChatAgentIds,
     chatPasscode,
     initialJoinComplete,
     chatIntroRef,
@@ -269,10 +282,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     }
 
     const agentChannels =
-      agentIds.length > 0
+      privateChatAgentIds.length > 0
         ? buildDirectChannels(
             userId,
-            agentIds.map((id) => ({ agentId: id })),
+            privateChatAgentIds.map((id) => ({ agentId: id })),
           )
         : [];
 
@@ -299,6 +312,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
           conversationId: router.query.conversationId,
           token: Api.get().getAccessToken(),
           channels,
+          ...(presentation && { observer: true }),
         },
         (response) => {
           console.log('Successfully joined conversation');
@@ -341,7 +355,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     // chatIntroRef, assistantIntroRef, hasJoinedConvRef are refs; the remaining omitted values
     // are stable setters from hooks. This matches the original join effect behavior.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, agentId, agentActive, agentIds, userId, chatPasscode, router.query.conversationId]);
+  }, [socket, agentId, agentActive, privateChatAgentIds, presentation, userId, chatPasscode, router.query.conversationId]);
 
   // Re-fetch all message history when the socket reconnects after a significant gap.
   // Cross-cutting: uses messages (fetchChatMessages, fetchAllAssistantMessages) + resources (setResources)
@@ -495,18 +509,55 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     onSendRating: sendFeedbackRating,
   };
 
+  const eventStatusNotice = (
+    <div className="flex flex-col items-center gap-4">
+      <h2 id="event-status-dialog-title" className="text-2xl font-bold text-gray-900 flex items-center justify-center">
+        <Info className="inline-block mr-2" />
+        {eventStatus === 'ended' ? 'Event Has Ended' : 'Event Not Started'}
+      </h2>
+      <p id="event-status-dialog-description" className="text-gray-600 text-base leading-relaxed">
+        {eventStatus === 'ended' ? (
+          <span>
+            This event has ended and the assistant is no longer available. You can still view the transcript and resources,
+            but you will not be able to send new messages.
+          </span>
+        ) : (
+          <span>This event has not started yet. You will be able to interact with the assistant once the event begins.</span>
+        )}
+      </p>
+      {eventStatus === 'ended' && (
+        <div className="flex flex-col gap-3 w-full mt-2">
+          <Button
+            aria-label={`Close event ${eventStatus === 'ended' ? 'has ended' : 'not started'} dialog`}
+            onClick={() => setShowEventStatusDialog(false)}
+          >
+            Ok
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+
+  const exitPresentation = () => router.push({ pathname: '/assistant/', query: router.query });
+
   return (
     <>
+      {presentation && <PresentationHeader eventName={eventName} onExit={exitPresentation} />}
       {/* On mobile we add bottom padding so the fixed nav bar doesn't cover content */}
-      <div className="flex flex-row h-[calc(100vh-96px)] overflow-hidden pb-[60px] lg:pb-0">
+      <div
+        className={`flex flex-row overflow-hidden pb-[60px] lg:pb-0 ${
+          presentation ? 'h-[calc(100vh-72px)]' : 'h-[calc(100vh-96px)]'
+        }`}
+      >
         {/* Error messages */}
         {(generalError || sessionError) && !paramsError && (
           <Errors generalError={generalError} sessionError={sessionError} setGeneralError={setGeneralError} />
         )}
 
-        {/* Dialog for when the event has ended or has not started yet; if in future, this is non-dismissable */}
+        {/* Dialog for when the event has ended or has not started yet; if in future, this is non-dismissable.
+            The presentation view shows the same notice in the page instead, so its exit stays reachable. */}
         <Dialog
-          open={showEventStatusDialog}
+          open={showEventStatusDialog && !presentation}
           onClose={eventStatus === 'ended' ? () => setShowEventStatusDialog(false) : () => {}}
           aria-labelledby="event-status-dialog-title"
           aria-describedby="event-status-dialog-description"
@@ -521,34 +572,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
             },
           }}
         >
-          <div className="flex flex-col items-center gap-4">
-            <h2 id="event-status-dialog-title" className="text-2xl font-bold text-gray-900 flex items-center justify-center">
-              <Info className="inline-block mr-2" />
-              {eventStatus === 'ended' ? 'Event Has Ended' : 'Event Not Started'}
-            </h2>
-            <p id="event-status-dialog-description" className="text-gray-600 text-base leading-relaxed">
-              {eventStatus === 'ended' ? (
-                <span>
-                  This event has ended and the assistant is no longer available. You can still view the transcript and
-                  resources, but you will not be able to send new messages.
-                </span>
-              ) : (
-                <span>
-                  This event has not started yet. You will be able to interact with the assistant once the event begins.
-                </span>
-              )}
-            </p>
-            {eventStatus === 'ended' && (
-              <div className="flex flex-col gap-3 w-full mt-2">
-                <Button
-                  aria-label={`Close event ${eventStatus === 'ended' ? 'has ended' : 'not started'} dialog`}
-                  onClick={() => setShowEventStatusDialog(false)}
-                >
-                  Ok
-                </Button>
-              </div>
-            )}
-          </div>
+          {eventStatusNotice}
         </Dialog>
 
         {/* Display parameter errors if present */}
@@ -569,21 +593,26 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
               showTranscript={!!transcriptPasscode}
               showResources={true}
               botName={botName}
+              presentation={presentation}
             />
 
             {/* ── Main content area ── */}
             <div className="flex-1 flex flex-row overflow-hidden">
               {/* Transcript — always mounted so it doesn't re-fetch on tab/view switch.
                   Full-screen when transcript tab is active; sidebar on large screens otherwise;
-                  hidden when preferences is open or on small screens in sidebar mode. */}
+                  hidden when preferences is open or on small screens in sidebar mode. The
+                  presentation view has no sidebar: the chat needs that width on a shared screen. */}
               {transcriptPasscode && (
                 <div
+                  hidden={presentation && activeTab !== 'transcript'}
                   className={
                     router.query.view === 'preferences'
                       ? 'hidden'
                       : activeTab === 'transcript'
                         ? 'flex-1 overflow-hidden'
-                        : 'hidden lg:block lg:order-2'
+                        : presentation
+                          ? undefined
+                          : 'hidden lg:block lg:order-2'
                   }
                 >
                   <Transcript
@@ -592,7 +621,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                     conversationId={router.query.conversationId as string}
                     transcriptPasscode={transcriptPasscode}
                     lastReconnectTime={lastReconnectTime}
-                    hideToggle={router.query.view !== 'preferences' && activeTab === 'transcript'}
+                    hideToggle={presentation || (router.query.view !== 'preferences' && activeTab === 'transcript')}
+                    presentation={presentation}
                   />
                 </div>
               )}
@@ -600,6 +630,14 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                 <>
                   {/* Chat / Assistant / Resources / Preferences panel */}
                   <div className="flex-1 flex flex-col relative overflow-hidden">
+                    {presentation && showEventStatusDialog && (
+                      <div
+                        role="status"
+                        className="absolute inset-x-0 top-6 z-10 mx-auto w-full max-w-md rounded-2xl bg-white px-6 py-8 text-center shadow-2xl"
+                      >
+                        {eventStatusNotice}
+                      </div>
+                    )}
                     {/* Show dismissable resources reminder if active  */}
                     {resourcesReminderActive && (
                       <div className="absolute top-0 w-full z-10 bg-yellow-100 p-4 rounded shadow-2xl animate-slide-in">
@@ -660,6 +698,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                           }}
                           pollCounts={pollCounts}
                           inactive={eventStatus !== 'active'}
+                          presentation={presentation}
                         />
                       ) : activeTab === 'resources' ? (
                         <ResourcesPanel

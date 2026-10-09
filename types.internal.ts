@@ -33,6 +33,7 @@ export interface EventUrl {
 export interface EventUrls {
   moderator: EventUrl[];
   participant: EventUrl[];
+  presentation: EventUrl[];
   zoom?: EventUrl;
 }
 

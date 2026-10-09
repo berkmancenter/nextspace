@@ -366,6 +366,24 @@ const EventCard = ({
                 ))}
               </div>
             )}
+
+            {event.eventUrls.presentation && event.eventUrls.presentation.length > 0 && (
+              <div className="flex-1">
+                <div className="font-medium">Presentation Links</div>
+                {event.eventUrls.presentation.map((link, i) => (
+                  <div key={i}>
+                    <a href={link.url} className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
+                      {link.label}
+                    </a>
+                    <Tooltip title={copiedLink === link.url ? 'Copied!' : 'Copy link'}>
+                      <IconButton size="small" onClick={() => handleCopyLink(link.url)} className="p-0.5">
+                        <ContentCopyIcon fontSize="small" className="text-gray-500" style={{ fontSize: '14px' }} />
+                      </IconButton>
+                    </Tooltip>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
