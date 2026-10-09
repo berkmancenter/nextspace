@@ -79,17 +79,26 @@ export function summarizeJargonTerms(terms: JargonTerm[]): string {
  * stays bounded by however many terms one backend message bundles, not the whole session's
  * total. Dismissing only suppresses that specific message; a newer one always supersedes it
  * regardless of seen/dismissed state.
+ *
+ * `enabled` gates the user's own jargonClarification preference. The backend always broadcasts
+ * on the shared jargon channel regardless of any individual's preference (simpler than per-socket
+ * delivery filtering), so this hook is what actually respects it: when `false`, it discards
+ * everything outright — not merely hiding the banner — so a disabled preference never processes
+ * or surfaces content the user opted out of, live, in both directions, with no reconnect needed.
  */
-export function useJargonTerms(messages: PseudonymousMessage[]): UseJargonTermsReturn {
+export function useJargonTerms(messages: PseudonymousMessage[], options: { enabled?: boolean } = {}): UseJargonTermsReturn {
+  const { enabled = true } = options;
   const [dismissedMessageId, setDismissedMessageId] = useState<string | null>(null);
   const [seenMessageId, setSeenMessageId] = useState<string | null>(null);
 
   const jargonMessages = useMemo(
     () =>
-      messages
-        .filter(isStructuredJargonMessage)
-        .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()),
-    [messages],
+      !enabled
+        ? []
+        : messages
+            .filter(isStructuredJargonMessage)
+            .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()),
+    [messages, enabled],
   );
 
   const terms = useMemo(() => jargonMessages.flatMap(termsFromMessage), [jargonMessages]);

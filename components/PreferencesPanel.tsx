@@ -1,45 +1,14 @@
-import { useEffect, useState } from 'react';
 import { Switch } from '@mui/material';
-import { Api, RetrieveData, SendData } from '../utils';
-import SessionManager from '../utils/SessionManager';
+import { UserPreferences } from '../hooks/useUserPreferences';
 
 interface PreferencesPanelProps {
   botName: string;
+  preferences: UserPreferences;
+  loading: boolean;
+  onToggle: (key: keyof UserPreferences) => void;
 }
 
-export function PreferencesPanel({ botName }: PreferencesPanelProps) {
-  const [preferences, setPreferences] = useState({ jargonClarification: false, visualResponse: false });
-  const [loading, setLoading] = useState(true);
-
-  const userId = SessionManager.get().getSessionInfo()?.userId;
-
-  useEffect(() => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-    const fetchPreferences = async () => {
-      const result = await RetrieveData(`users/user/${userId}/preferences`, Api.get().getAccessToken());
-      if (!('error' in result) && result && typeof result === 'object' && Object.keys(result).length > 0) {
-        const { jargonClarification, visualResponse } = result as Record<string, boolean>;
-        setPreferences((prev) => ({
-          ...prev,
-          ...(jargonClarification !== undefined && { jargonClarification }),
-          ...(visualResponse !== undefined && { visualResponse }),
-        }));
-      }
-      setLoading(false);
-    };
-    fetchPreferences();
-  }, [userId]);
-
-  const handleToggle = async (key: keyof typeof preferences) => {
-    if (!userId) return;
-    const updated = { ...preferences, [key]: !preferences[key] };
-    setPreferences(updated);
-    await SendData(`users/user/${userId}/preferences`, updated, undefined, undefined, 'PUT');
-  };
-
+export function PreferencesPanel({ botName, preferences, loading, onToggle }: PreferencesPanelProps) {
   const switchSx = {
     '& .MuiSwitch-switchBase.Mui-checked': { color: '#ffffff' },
     '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#4A0979', opacity: 1 },
@@ -51,7 +20,7 @@ export function PreferencesPanel({ botName }: PreferencesPanelProps) {
     description,
     divider = false,
   }: {
-    prefKey: keyof typeof preferences;
+    prefKey: keyof UserPreferences;
     label: string;
     description: string;
     divider?: boolean;
@@ -63,7 +32,7 @@ export function PreferencesPanel({ botName }: PreferencesPanelProps) {
           <div className="font-semibold text-gray-900">{label}</div>
           <div className="text-sm text-gray-500 mt-0.5">{description}</div>
         </div>
-        <Switch checked={preferences[prefKey]} onChange={() => handleToggle(prefKey)} disabled={loading} sx={switchSx} />
+        <Switch checked={preferences[prefKey]} onChange={() => onToggle(prefKey)} disabled={loading} sx={switchSx} />
       </div>
     </>
   );

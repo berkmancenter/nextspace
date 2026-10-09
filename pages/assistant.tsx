@@ -31,6 +31,7 @@ import {
   useTabNavigation,
   useJargonTerms,
   summarizeJargonTerms,
+  useUserPreferences,
 } from '../hooks';
 
 type Resource = components['schemas']['Resource'];
@@ -159,13 +160,15 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     conversationId: router.query.conversationId as string | undefined,
   });
 
+  const { preferences: userPreferences, loading: preferencesLoading, updatePreference } = useUserPreferences(userId, socket);
+
   const {
     batchTerms: jargonBatchTerms,
     seen: jargonSeen,
     active: jargonActive,
     markSeen: markJargonSeen,
     dismiss: dismissJargon,
-  } = useJargonTerms(assistantMessages);
+  } = useJargonTerms(assistantMessages, { enabled: userPreferences.jargonClarification });
   const [jargonSheetOpen, setJargonSheetOpen] = useState(false);
 
   const jargonNotification: Notification | null = jargonActive
@@ -663,7 +666,12 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
                         </div>
                       )}
                       {router.query.view === 'preferences' ? (
-                        <PreferencesPanel botName={botName} />
+                        <PreferencesPanel
+                          botName={botName}
+                          preferences={userPreferences}
+                          loading={preferencesLoading}
+                          onToggle={updatePreference}
+                        />
                       ) : isConnected || eventStatus == 'ended' ? (
                         activeTab === 'chat' ? (
                           <GroupChatPanel

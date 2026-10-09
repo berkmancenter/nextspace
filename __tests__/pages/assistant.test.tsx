@@ -1414,6 +1414,7 @@ describe('EventAssistantRoom', () => {
 
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
         if (path.startsWith('conversations/')) return Promise.resolve({ agents: [] });
+        if (path.includes('/preferences')) return Promise.resolve({ jargonClarification: true });
         if (path.includes('jargon-agent-456')) return Promise.resolve([secondaryAgentMessage]);
         return Promise.resolve([]);
       });
@@ -1448,6 +1449,7 @@ describe('EventAssistantRoom', () => {
 
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
         if (path.startsWith('conversations/')) return Promise.resolve({ agents: [] });
+        if (path.includes('/preferences')) return Promise.resolve({ jargonClarification: true });
         return Promise.resolve([]);
       });
 
@@ -1506,6 +1508,48 @@ describe('EventAssistantRoom', () => {
       await waitFor(() => {
         expect(screen.getByText('An SLO is a reliability target.')).toBeInTheDocument();
       });
+    });
+
+    it('never shows the jargon banner when the user has the Jargon Filter preference off', async () => {
+      const secondaryAgentMessage = {
+        id: 'secondary-msg-1',
+        body: {
+          type: 'jargon_clarification',
+          terms: [{ term: 'SLO', text: 'An SLO is a reliability target.' }],
+        },
+        bodyType: 'json',
+        fromAgent: true,
+        channels: ['direct-user-123-jargon-agent-456'],
+        pseudonym: 'Jargon Filter',
+        createdAt: '2024-01-01T10:00:00Z',
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+      };
+
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [
+          { id: 'agent-123', agentType: 'eventAssistant' },
+          { id: 'jargon-agent-456', agentType: 'jargonFilterAgent' },
+        ],
+        type: { name: 'eventAssistant' },
+      });
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) return Promise.resolve({ agents: [] });
+        if (path.includes('/preferences')) return Promise.resolve({ jargonClarification: false });
+        if (path.includes('jargon-agent-456')) return Promise.resolve([secondaryAgentMessage]);
+        return Promise.resolve([]);
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0));
+
+      expect(screen.queryByRole('button', { name: /new term/i })).not.toBeInTheDocument();
     });
 
     it('routes replies to the channel of the parent message, not the primary agent channel', async () => {
@@ -1916,9 +1960,12 @@ describe('EventAssistantRoom', () => {
       };
 
       const { emitWithTokenRefresh } = require('../../utils');
-      (emitWithTokenRefresh as jest.Mock).mockImplementationOnce(
-        (socket: any, event: string, data: any, onSuccess: Function) => {
-          if (onSuccess) onSuccess({ intros: [introMessage] });
+      // Gate on the event name, not call order: useUserPreferences also calls
+      // emitWithTokenRefresh (for 'user:join'), racing with 'conversation:join' here.
+      (emitWithTokenRefresh as jest.Mock).mockImplementation(
+        (socket: any, event: string, data: any, onSuccess?: Function) => {
+          if (event === 'conversation:join' && onSuccess) onSuccess({ intros: [introMessage] });
+          else if (onSuccess) onSuccess();
           socket.emit(event, data);
         },
       );
@@ -1964,9 +2011,12 @@ describe('EventAssistantRoom', () => {
       };
 
       const { emitWithTokenRefresh } = require('../../utils');
-      (emitWithTokenRefresh as jest.Mock).mockImplementationOnce(
-        (socket: any, event: string, data: any, onSuccess: Function) => {
-          if (onSuccess) onSuccess({ intros: [chatIntro] });
+      // Gate on the event name, not call order: useUserPreferences also calls
+      // emitWithTokenRefresh (for 'user:join'), racing with 'conversation:join' here.
+      (emitWithTokenRefresh as jest.Mock).mockImplementation(
+        (socket: any, event: string, data: any, onSuccess?: Function) => {
+          if (event === 'conversation:join' && onSuccess) onSuccess({ intros: [chatIntro] });
+          else if (onSuccess) onSuccess();
           socket.emit(event, data);
         },
       );
@@ -2121,9 +2171,12 @@ describe('EventAssistantRoom', () => {
       };
 
       const { emitWithTokenRefresh } = require('../../utils');
-      (emitWithTokenRefresh as jest.Mock).mockImplementationOnce(
-        (socket: any, event: string, data: any, onSuccess: Function) => {
-          if (onSuccess) onSuccess({ intros: [introMessage] });
+      // Gate on the event name, not call order: useUserPreferences also calls
+      // emitWithTokenRefresh (for 'user:join'), racing with 'conversation:join' here.
+      (emitWithTokenRefresh as jest.Mock).mockImplementation(
+        (socket: any, event: string, data: any, onSuccess?: Function) => {
+          if (event === 'conversation:join' && onSuccess) onSuccess({ intros: [introMessage] });
+          else if (onSuccess) onSuccess();
           socket.emit(event, data);
         },
       );
@@ -2179,9 +2232,16 @@ describe('EventAssistantRoom', () => {
 
     it('does not fetch messages before conversation:join callback fires', async () => {
       const { emitWithTokenRefresh } = require('../../utils');
-      (emitWithTokenRefresh as jest.Mock).mockImplementationOnce(
-        (socket: any, event: string, data: any, _onSuccess: Function) => {
-          // Intentionally do NOT call onSuccess — simulates join in progress
+      // Gate on the event name, not call order: useUserPreferences also calls
+      // emitWithTokenRefresh (for 'user:join'), which should proceed normally — only
+      // 'conversation:join' is held back here to simulate join-in-progress.
+      (emitWithTokenRefresh as jest.Mock).mockImplementation(
+        (socket: any, event: string, data: any, onSuccess?: Function) => {
+          if (event === 'conversation:join') {
+            socket.emit(event, data);
+            return;
+          }
+          if (onSuccess) onSuccess();
           socket.emit(event, data);
         },
       );
@@ -2229,15 +2289,17 @@ describe('EventAssistantRoom', () => {
       };
 
       const { emitWithTokenRefresh } = require('../../utils');
-      (emitWithTokenRefresh as jest.Mock)
-        .mockImplementationOnce((socket: any, event: string, data: any, onSuccess: Function) => {
-          if (onSuccess) onSuccess({ intros: [introMessage] });
+      // Gate on the event name, not call order/count: useUserPreferences also calls
+      // emitWithTokenRefresh (for 'user:join'), both initially and on its own reconnect —
+      // intros must keep being offered on every 'conversation:join' call specifically
+      // (initial and reconnect alike) for this test to actually exercise the dedup guard.
+      (emitWithTokenRefresh as jest.Mock).mockImplementation(
+        (socket: any, event: string, data: any, onSuccess?: Function) => {
+          if (event === 'conversation:join' && onSuccess) onSuccess({ intros: [introMessage] });
+          else if (onSuccess) onSuccess();
           socket.emit(event, data);
-        })
-        .mockImplementationOnce((socket: any, event: string, data: any, onSuccess: Function) => {
-          if (onSuccess) onSuccess({ intros: [introMessage] });
-          socket.emit(event, data);
-        });
+        },
+      );
 
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
         if (path.startsWith('conversations/')) {
@@ -2267,13 +2329,16 @@ describe('EventAssistantRoom', () => {
         expect(screen.getAllByText('Intro message')).toHaveLength(1);
       });
 
-      // Simulate socket reconnect by invoking the registered "connect" handler
-      const connectHandlerCall = mockSocket.on.mock.calls.find(([event]: [string]) => event === 'connect');
-      const connectHandler = connectHandlerCall?.[1];
-      expect(connectHandler).toBeDefined();
+      // Simulate socket reconnect by invoking every registered "connect" handler — more than
+      // one registers today (conversation:join's rejoin, useUserPreferences's user-room
+      // rejoin), so picking just the first match would silently skip conversation:join's.
+      const connectHandlers = mockSocket.on.mock.calls
+        .filter(([event]: [string]) => event === 'connect')
+        .map(([, handler]: [string, Function]) => handler);
+      expect(connectHandlers.length).toBeGreaterThan(0);
 
       await act(async () => {
-        connectHandler();
+        connectHandlers.forEach((handler) => handler());
       });
 
       // Intro should still only appear once — not duplicated

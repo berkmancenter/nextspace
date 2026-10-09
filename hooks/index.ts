@@ -18,3 +18,5 @@ export { useArtifacts } from './useArtifacts';
 export type { UseArtifactsParams, UseArtifactsReturn } from './useArtifacts';
 export { useJargonTerms, summarizeJargonTerms, isStructuredJargonMessage } from './useJargonTerms';
 export type { JargonTerm, UseJargonTermsReturn } from './useJargonTerms';
+export { useUserPreferences } from './useUserPreferences';
+export type { UserPreferences, UseUserPreferencesReturn } from './useUserPreferences';

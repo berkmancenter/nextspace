@@ -189,6 +189,52 @@ describe('useJargonTerms', () => {
     expect(result.current.terms).toEqual([]);
     expect(result.current.active).toBe(false);
   });
+
+  describe("enabled option (gates the user's jargonClarification preference)", () => {
+    const messages = [
+      jargonMessage('msg-1', '2024-01-01T00:00:00Z', { terms: [{ term: 'fungible', text: 'Interchangeable.' }] }),
+    ];
+
+    it('discards everything, not just hides it, when enabled is false', () => {
+      const { result } = renderHook(() => useJargonTerms(messages, { enabled: false }));
+
+      expect(result.current.terms).toEqual([]);
+      expect(result.current.batchTerms).toEqual([]);
+      expect(result.current.active).toBe(false);
+    });
+
+    it('defaults to enabled when no options are passed', () => {
+      const { result } = renderHook(() => useJargonTerms(messages));
+
+      expect(result.current.active).toBe(true);
+    });
+
+    it('reacts live to enabled flipping from false to true, with no re-mount needed', () => {
+      const { result, rerender } = renderHook(({ enabled }) => useJargonTerms(messages, { enabled }), {
+        initialProps: { enabled: false },
+      });
+
+      expect(result.current.active).toBe(false);
+
+      rerender({ enabled: true });
+
+      expect(result.current.active).toBe(true);
+      expect(result.current.batchTerms.map((t) => t.term)).toEqual(['fungible']);
+    });
+
+    it('reacts live to enabled flipping from true to false', () => {
+      const { result, rerender } = renderHook(({ enabled }) => useJargonTerms(messages, { enabled }), {
+        initialProps: { enabled: true },
+      });
+
+      expect(result.current.active).toBe(true);
+
+      rerender({ enabled: false });
+
+      expect(result.current.active).toBe(false);
+      expect(result.current.terms).toEqual([]);
+    });
+  });
 });
 
 describe('summarizeJargonTerms', () => {
