@@ -312,7 +312,7 @@ export function EventAssistantRoom({
           conversationId: router.query.conversationId,
           token: Api.get().getAccessToken(),
           channels,
-          ...(presentation && { presentation: true }),
+          ...(presentation && { observer: true }),
         },
         (response) => {
           console.log('Successfully joined conversation');

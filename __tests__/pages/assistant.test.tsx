@@ -2860,7 +2860,7 @@ describe('EventAssistantRoom', () => {
           conversationId: 'test-conversation-id',
           token: 'mock-access-token',
           channels: [{ name: 'chat', passcode: 'chat-pass', direct: false }],
-          presentation: true,
+          observer: true,
         });
       });
     });
