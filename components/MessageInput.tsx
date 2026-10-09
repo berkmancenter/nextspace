@@ -266,23 +266,30 @@ export const MessageInput: FC<MessageInputProps> = ({
                   </Typography>
                 )}
               </Popover>
-              {controlledMode && (
-                <IconButton size="small" onClick={onExitControlledMode} sx={{ padding: '4px' }}>
-                  <Close fontSize="small" />
-                </IconButton>
-              )}
-              {onHide && (
-                <button
-                  type="button"
-                  onClick={onHide}
-                  aria-expanded="true"
-                  aria-label="Hide composer"
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] font-semibold text-gray-800 hover:bg-white/60"
-                >
-                  Hide
-                  <KeyboardArrowDown fontSize="small" />
-                </button>
-              )}
+              <div className="flex items-center gap-1">
+                {controlledMode && (
+                  <IconButton
+                    size="small"
+                    onClick={onExitControlledMode}
+                    aria-label={`Exit ${controlledMode.label}`}
+                    sx={{ padding: '4px' }}
+                  >
+                    <Close fontSize="small" />
+                  </IconButton>
+                )}
+                {onHide && (
+                  <button
+                    type="button"
+                    onClick={onHide}
+                    aria-expanded="true"
+                    aria-label="Hide composer"
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] font-semibold text-gray-800 hover:bg-white/60"
+                  >
+                    Hide
+                    <KeyboardArrowDown fontSize="small" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Input field with buttons at bottom */}

@@ -62,6 +62,21 @@ describe('MessageInput Component', () => {
       expect(onHide).toHaveBeenCalledTimes(1);
     });
 
+    it('groups the mode close button with Hide, away from the "Writing as" label', () => {
+      render(
+        <MessageInput
+          {...defaultProps}
+          controlledMode={{ prefix: '/poll', icon: null, label: 'Poll' }}
+          onHide={jest.fn()}
+        />,
+      );
+
+      const closeButton = screen.getByRole('button', { name: 'Exit Poll' });
+      const hideButton = screen.getByRole('button', { name: 'Hide composer' });
+      expect(closeButton.parentElement).toBe(hideButton.parentElement);
+      expect(hideButton.parentElement).not.toContainElement(screen.getByText(/Writing as TestUser/i));
+    });
+
     it('has no Hide button outside the presentation view', () => {
       render(<MessageInput {...defaultProps} />);
 
@@ -479,7 +494,7 @@ describe('MessageInput Component', () => {
 
       render(<MessageInput {...defaultProps} controlledMode={controlledMode} />);
 
-      const closeButton = screen.getByRole('button', { name: '' });
+      const closeButton = screen.getByRole('button', { name: 'Exit Feedback Mode' });
       expect(closeButton).toBeInTheDocument();
     });
 
