@@ -8,7 +8,6 @@ import { SlashCommand, createSlashCommandEnhancer } from './enhancers/slashComma
 import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
 import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { useAutoScroll } from '../hooks/useAutoScroll';
-import { isStructuredJargonMessage } from '../hooks/useJargonTerms';
 import { parseMessageBody } from '../utils/Helpers';
 import { BotIcon } from './BotIcon';
 import { MediaLightbox } from './MediaLightbox';
@@ -147,16 +146,12 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     return typeof msg.body === 'object' && msg.body !== null && (msg.body as any).command === 'escalate';
   };
 
-  // Organize messages into threads. Only the clean, structured jargon_clarification shape is
-  // surfaced via the notification banner/sheet instead — anything else (including today's real
-  // backend shape, which bundles multiple terms into one shared text block) is left alone here
-  // and falls through to render as an ordinary assistant message below.
+  // Organize messages into threads
   const parentMessages = messages
     .filter((m) => !m.parentMessage)
     .filter((m) => !isPromptResponse(m))
     .filter((m) => !isModeratorSubmitted(m))
-    .filter((m) => !isEscalateCommand(m))
-    .filter((m) => !isStructuredJargonMessage(m));
+    .filter((m) => !isEscalateCommand(m));
 
   // Auto-scroll based on parent messages only (not threaded replies)
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(parentMessages);
@@ -165,7 +160,6 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   messages
     .filter((m) => m.parentMessage)
     .filter((m) => !isPromptResponse(m))
-    .filter((m) => !isStructuredJargonMessage(m))
     .forEach((reply) => {
       const parentId = reply.parentMessage!;
       if (!threadMap.has(parentId)) {

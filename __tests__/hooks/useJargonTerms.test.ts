@@ -70,9 +70,7 @@ describe('useJargonTerms', () => {
 
     const { result } = renderHook(() => useJargonTerms(messages));
 
-    // Not combined into a degraded row — simply not recognized by this feature at all, so it
-    // never reaches the banner/sheet/glossary. It's left for AssistantChatPanel to render as an
-    // ordinary message instead (see isStructuredJargonMessage below and AssistantChatPanel.test.tsx).
+    // Older events stored this shape; AssistantChatPanel renders it as an ordinary message.
     expect(result.current.terms).toEqual([]);
     expect(result.current.batchTerms).toEqual([]);
     expect(result.current.active).toBe(false);

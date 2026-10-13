@@ -16,7 +16,7 @@ export { useHallwayRooms } from './useHallwayRooms';
 export type { UseHallwayRoomsReturn } from './useHallwayRooms';
 export { useArtifacts } from './useArtifacts';
 export type { UseArtifactsParams, UseArtifactsReturn } from './useArtifacts';
-export { useJargonTerms, summarizeJargonTerms, isStructuredJargonMessage } from './useJargonTerms';
+export { useJargonTerms, summarizeJargonTerms } from './useJargonTerms';
 export type { JargonTerm, UseJargonTermsReturn } from './useJargonTerms';
 export { useUserPreferences } from './useUserPreferences';
 export type { UserPreferences, UseUserPreferencesReturn } from './useUserPreferences';

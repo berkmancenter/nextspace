@@ -33,13 +33,9 @@ function snippet(text: string | undefined): string {
 }
 
 /**
- * True only for the clean, structured jargon_clarification shape this feature requires:
- * `terms` as an array of per-term objects (`{ term, text, sourceText? }`), not today's actual
- * backend shape (a flat array of term NAME strings sharing one text block and one quote) and
- * not any other legacy shape. Anything that doesn't match this is deliberately left alone by
- * this feature entirely — not degraded into a combined row, just ignored — so it falls through
- * to render as an ordinary assistant message bubble instead. Exported so `AssistantChatPanel`
- * can use the exact same check to decide what to exclude from the chat stream.
+ * True only when `terms` holds per-term objects (`{ term, text, sourceText? }`). Events from
+ * before the jargon channel stored a flat list of term names with one shared definition; those
+ * return false and show as ordinary assistant messages instead.
  */
 export function isStructuredJargonMessage(message: PseudonymousMessage): boolean {
   if (parseMessageBody(message.body).type !== 'jargon_clarification') return false;

@@ -198,23 +198,7 @@ describe('AssistantChatPanel', () => {
       downVotes: [],
     };
 
-    it('excludes the structured per-term-object shape from the rendered stream (surfaced via the notification banner instead)', () => {
-      const messages = [
-        {
-          ...baseJargonMsg,
-          body: {
-            type: 'jargon_clarification',
-            terms: [{ term: 'SLO', text: 'An SLO is a reliability target.' }],
-          },
-        },
-      ];
-
-      render(<AssistantChatPanel {...baseProps} messages={messages} />);
-
-      expect(screen.queryByText('An SLO is a reliability target.')).not.toBeInTheDocument();
-    });
-
-    it("renders today's actual backend shape (flat term-name array + shared text) as an ordinary assistant message", () => {
+    it('renders the older flat jargon shape (term-name array plus shared text) as an ordinary assistant message', () => {
       const messages = [
         {
           ...baseJargonMsg,
