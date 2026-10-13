@@ -1449,12 +1449,15 @@ describe('EventAssistantRoom', () => {
 
     function mockJargonFetches({
       history = [] as any[],
+      assistantHistory = [] as any[],
       jargonClarification = true,
-    }: { history?: any[]; jargonClarification?: boolean } = {}) {
+    }: { history?: any[]; assistantHistory?: any[]; jargonClarification?: boolean } = {}) {
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
         if (path.startsWith('conversations/')) return Promise.resolve({ agents: [] });
         if (path.includes('/preferences')) return Promise.resolve({ jargonClarification });
         if (path === 'messages/test-conversation-id?channel=jargon,jargon-pass') return Promise.resolve(history);
+        if (path === 'messages/test-conversation-id?channel=direct-user-123-agent-123')
+          return Promise.resolve(assistantHistory);
         return Promise.resolve([]);
       });
     }
@@ -1526,6 +1529,40 @@ describe('EventAssistantRoom', () => {
       await screen.findByRole('button', { name: /new term/i });
       const privateChatBadge = screen.getAllByLabelText('Private Chat')[0].querySelector('.MuiBadge-badge');
       expect(privateChatBadge).toHaveClass('MuiBadge-invisible');
+    });
+
+    it('keeps the Private Chat thinking indicator up when a jargon batch arrives mid-wait', async () => {
+      mockJargonFetches({
+        assistantHistory: [
+          {
+            id: 'assistant-msg-1',
+            body: 'Hi, ask me anything.',
+            bodyType: 'text',
+            fromAgent: true,
+            channels: ['direct-user-123-agent-123'],
+            pseudonym: 'Berkie',
+            createdAt: '2024-01-01T09:00:00Z',
+          },
+        ],
+      });
+      (SendData as jest.Mock).mockResolvedValue({});
+      const user = userEvent.setup();
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0));
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
+      await screen.findByText('Hi, ask me anything.');
+
+      await user.type(screen.getByPlaceholderText('Enter your message here'), 'what is an SLO?{Enter}');
+      await screen.findByText('thinking...');
+
+      emitToAllMessageHandlers(jargonMessage);
+
+      await screen.findByRole('button', { name: /new term/i });
+      expect(screen.getByText('thinking...')).toBeInTheDocument();
     });
 
     it('never shows the jargon banner when the user has the Jargon Filter preference off', async () => {
