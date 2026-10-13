@@ -1386,172 +1386,6 @@ describe('EventAssistantRoom', () => {
       });
     });
 
-    it('surfaces messages from any agent direct channel via the jargon notification banner, not inline', async () => {
-      const secondaryAgentMessage = {
-        id: 'secondary-msg-1',
-        body: {
-          type: 'jargon_clarification',
-          terms: [{ term: 'SLO', text: 'An SLO is a reliability target.', sourceText: 'Our SLOs...' }],
-        },
-        bodyType: 'json',
-        fromAgent: true,
-        channels: ['direct-user-123-jargon-agent-456'],
-        pseudonym: 'Jargon Filter',
-        createdAt: '2024-01-01T10:00:00Z',
-        pause: false,
-        visible: true,
-        upVotes: [],
-        downVotes: [],
-      };
-
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [
-          { id: 'agent-123', agentType: 'eventAssistant' },
-          { id: 'jargon-agent-456', agentType: 'jargonFilterAgent' },
-        ],
-        type: { name: 'eventAssistant' },
-      });
-
-      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
-        if (path.startsWith('conversations/')) return Promise.resolve({ agents: [] });
-        if (path.includes('/preferences')) return Promise.resolve({ jargonClarification: true });
-        if (path.includes('jargon-agent-456')) return Promise.resolve([secondaryAgentMessage]);
-        return Promise.resolve([]);
-      });
-
-      const user = userEvent.setup();
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0));
-      await user.click(screen.getAllByLabelText('Private Chat')[0]);
-
-      const banner = await screen.findByRole('button', { name: /new term/i });
-      expect(screen.queryByText('An SLO is a reliability target.')).not.toBeInTheDocument();
-
-      await user.click(banner);
-
-      await waitFor(() => {
-        expect(screen.getByText('An SLO is a reliability target.')).toBeInTheDocument();
-      });
-    });
-
-    it('displays real-time messages from any agent direct channel in the assistant panel', async () => {
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [
-          { id: 'agent-123', agentType: 'eventAssistant' },
-          { id: 'jargon-agent-456', agentType: 'jargonFilterAgent' },
-        ],
-        type: { name: 'eventAssistant' },
-      });
-
-      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
-        if (path.startsWith('conversations/')) return Promise.resolve({ agents: [] });
-        if (path.includes('/preferences')) return Promise.resolve({ jargonClarification: true });
-        return Promise.resolve([]);
-      });
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => expect(mockSocket.on).toHaveBeenCalledWith('message:new', expect.any(Function)));
-
-      const messageHandler: Function = mockSocket.on.mock.calls
-        .filter(([event]: [string]) => event === 'message:new')
-        .map(([, handler]: [string, Function]) => {
-          // Need function named "messageHandler"
-          if (handler.name === 'messageHandler') return handler;
-        })
-        .at(0)!;
-
-      const user = userEvent.setup();
-      await waitFor(() => expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0));
-      await user.click(screen.getAllByLabelText('Private Chat')[0]);
-
-      // A real socket broadcasts 'message:new' to every registered listener. The
-      // assistant page AND the Transcript sidebar (mounted because the route has
-      // a transcript passcode) each register one, so we must invoke all of them
-      // rather than guessing which registration is the assistant page's. Capture
-      // after the click so any re-registrations have settled.
-      const messageHandlers: Function[] = mockSocket.on.mock.calls
-        .filter(([event]: [string]) => event === 'message:new')
-        .map(([, handler]: [string, Function]) => handler);
-
-      act(() => {
-        messageHandlers.forEach((handler) =>
-          handler({
-            id: 'msg-jargon-1',
-            body: {
-              type: 'jargon_clarification',
-              terms: [{ term: 'SLO', text: 'An SLO is a reliability target.', sourceText: 'Our SLOs...' }],
-            },
-            bodyType: 'json',
-            fromAgent: true,
-            channels: ['direct-user-123-jargon-agent-456'],
-            pseudonym: 'Jargon Filter Agent',
-            pause: false,
-            visible: true,
-            upVotes: [],
-            downVotes: [],
-          }),
-        );
-      });
-
-      const banner = await screen.findByRole('button', { name: /new term/i });
-      expect(screen.queryByText('An SLO is a reliability target.')).not.toBeInTheDocument();
-
-      await user.click(banner);
-
-      await waitFor(() => {
-        expect(screen.getByText('An SLO is a reliability target.')).toBeInTheDocument();
-      });
-    });
-
-    it('never shows the jargon banner when the user has the Jargon Filter preference off', async () => {
-      const secondaryAgentMessage = {
-        id: 'secondary-msg-1',
-        body: {
-          type: 'jargon_clarification',
-          terms: [{ term: 'SLO', text: 'An SLO is a reliability target.' }],
-        },
-        bodyType: 'json',
-        fromAgent: true,
-        channels: ['direct-user-123-jargon-agent-456'],
-        pseudonym: 'Jargon Filter',
-        createdAt: '2024-01-01T10:00:00Z',
-        pause: false,
-        visible: true,
-        upVotes: [],
-        downVotes: [],
-      };
-
-      (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [
-          { id: 'agent-123', agentType: 'eventAssistant' },
-          { id: 'jargon-agent-456', agentType: 'jargonFilterAgent' },
-        ],
-        type: { name: 'eventAssistant' },
-      });
-
-      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
-        if (path.startsWith('conversations/')) return Promise.resolve({ agents: [] });
-        if (path.includes('/preferences')) return Promise.resolve({ jargonClarification: false });
-        if (path.includes('jargon-agent-456')) return Promise.resolve([secondaryAgentMessage]);
-        return Promise.resolve([]);
-      });
-
-      await act(async () => {
-        render(<EventAssistantRoom authType={'guest'} />);
-      });
-
-      await waitFor(() => expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0));
-
-      expect(screen.queryByRole('button', { name: /new term/i })).not.toBeInTheDocument();
-    });
-
     it('routes replies to the channel of the parent message, not the primary agent channel', async () => {
       const secondaryAgentMessage = {
         id: 'jargon-msg-1',
@@ -1592,6 +1426,123 @@ describe('EventAssistantRoom', () => {
       await waitFor(() => {
         expect(screen.getByText('A clarification from jargon agent')).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Shared jargon channel', () => {
+    const jargonMessage = {
+      id: 'jargon-msg-1',
+      body: {
+        type: 'jargon_clarification',
+        terms: [{ term: 'SLO', text: 'An SLO is a reliability target.', sourceText: 'Our SLOs...' }],
+      },
+      bodyType: 'json',
+      fromAgent: true,
+      channels: ['jargon'],
+      pseudonym: 'Jargon Filter',
+      createdAt: '2024-01-01T10:00:00Z',
+      pause: false,
+      visible: true,
+      upVotes: [],
+      downVotes: [],
+    };
+
+    function mockJargonFetches({
+      history = [] as any[],
+      jargonClarification = true,
+    }: { history?: any[]; jargonClarification?: boolean } = {}) {
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) return Promise.resolve({ agents: [] });
+        if (path.includes('/preferences')) return Promise.resolve({ jargonClarification });
+        if (path === 'messages/test-conversation-id?channel=jargon,jargon-pass') return Promise.resolve(history);
+        return Promise.resolve([]);
+      });
+    }
+
+    function emitToAllMessageHandlers(message: any) {
+      // The Transcript sidebar registers its own message:new listener, so call every one, like a real socket would.
+      const handlers: Function[] = mockSocket.on.mock.calls
+        .filter(([event]: [string]) => event === 'message:new')
+        .map(([, handler]: [string, Function]) => handler);
+      act(() => handlers.forEach((handler) => handler(message)));
+    }
+
+    beforeEach(() => {
+      mockRouter.query = {
+        conversationId: 'test-conversation-id',
+        channel: ['transcript,MJqaT2ii', 'chat,chat-pass', 'jargon,jargon-pass'],
+      };
+    });
+
+    it('joins the jargon channel when the link carries a jargon passcode', async () => {
+      mockJargonFetches();
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => {
+        expect(mockSocket.emit).toHaveBeenCalledWith(
+          'conversation:join',
+          expect.objectContaining({
+            channels: expect.arrayContaining([{ name: 'jargon', passcode: 'jargon-pass', direct: false }]),
+          }),
+        );
+      });
+    });
+
+    it('shows earlier jargon from the channel history in the banner, not inline', async () => {
+      mockJargonFetches({ history: [jargonMessage] });
+      const user = userEvent.setup();
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0));
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
+
+      const banner = await screen.findByRole('button', { name: /new term/i });
+      expect(screen.queryByText('An SLO is a reliability target.')).not.toBeInTheDocument();
+
+      await user.click(banner);
+
+      await waitFor(() => {
+        expect(screen.getByText('An SLO is a reliability target.')).toBeInTheDocument();
+      });
+    });
+
+    it('shows a live jargon message in the banner without flagging Private Chat as unread', async () => {
+      mockJargonFetches();
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0));
+
+      emitToAllMessageHandlers(jargonMessage);
+
+      await screen.findByRole('button', { name: /new term/i });
+      const privateChatBadge = screen.getAllByLabelText('Private Chat')[0].querySelector('.MuiBadge-badge');
+      expect(privateChatBadge).toHaveClass('MuiBadge-invisible');
+    });
+
+    it('never shows the jargon banner when the user has the Jargon Filter preference off', async () => {
+      mockJargonFetches({ history: [jargonMessage], jargonClarification: false });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          'messages/test-conversation-id?channel=jargon,jargon-pass',
+          'mock-access-token',
+        );
+      });
+
+      expect(screen.queryByRole('button', { name: /new term/i })).not.toBeInTheDocument();
     });
   });
 

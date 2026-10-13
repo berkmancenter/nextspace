@@ -109,6 +109,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     feedbackFrequency,
     transcriptPasscode,
     chatPasscode,
+    jargonPasscode,
     initialJoinComplete,
     setInitialJoinComplete,
     chatIntroRef,
@@ -138,6 +139,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     setAssistantMessages,
     chatMessages,
     setChatMessages,
+    jargonMessages,
+    setJargonMessages,
     pollCounts,
     setPollCounts,
     unreadChatReplyCount,
@@ -148,12 +151,14 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     setAssistantMessagesWithUnreadReplies,
     fetchAllAssistantMessages,
     fetchChatMessages,
+    fetchJargonMessages,
   } = useConversationMessages({
     userId,
     pseudonym,
     agentId,
     agentIds,
     chatPasscode,
+    jargonPasscode,
     initialJoinComplete,
     chatIntroRef,
     assistantIntroRef,
@@ -168,7 +173,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     active: jargonActive,
     markSeen: markJargonSeen,
     dismiss: dismissJargon,
-  } = useJargonTerms(assistantMessages, { enabled: userPreferences.jargonClarification });
+  } = useJargonTerms(jargonMessages, { enabled: userPreferences.jargonClarification });
   const [jargonSheetOpen, setJargonSheetOpen] = useState(false);
 
   const jargonNotification: Notification | null = jargonActive
@@ -234,6 +239,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         if (activeTabRef.current !== 'chat') {
           setUnseenChatCount((prev) => prev + 1);
         }
+      } else if (data.channels && data.channels.includes('jargon')) {
+        setJargonMessages((prev) => [...prev, data]);
       } else if (!data.channels || !data.channels.includes('transcript')) {
         setAssistantMessages((prev) => [...prev, data]);
         if (activeTabRef.current !== 'assistant') {
@@ -314,6 +321,13 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
         direct: false,
       });
     }
+    if (jargonPasscode) {
+      channels.push({
+        name: 'jargon',
+        passcode: jargonPasscode,
+        direct: false,
+      });
+    }
     if (channels.length === 0) {
       return;
     }
@@ -371,7 +385,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     // chatIntroRef, assistantIntroRef, hasJoinedConvRef are refs; the remaining omitted values
     // are stable setters from hooks. This matches the original join effect behavior.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, agentId, agentActive, agentIds, userId, chatPasscode, router.query.conversationId]);
+  }, [socket, agentId, agentActive, agentIds, userId, chatPasscode, jargonPasscode, router.query.conversationId]);
 
   // Re-fetch all message history when the socket reconnects after a significant gap.
   // Cross-cutting: uses messages (fetchChatMessages, fetchAllAssistantMessages) + resources (setResources)
@@ -400,7 +414,8 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
     fetchAllAssistantMessages();
     fetchChatMessages();
-    // fetchAllAssistantMessages, fetchChatMessages, setResources are stable (useCallback / setState).
+    fetchJargonMessages();
+    // fetchAllAssistantMessages, fetchChatMessages, fetchJargonMessages, setResources are stable (useCallback / setState).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastReconnectTime, router.query.conversationId, chatPasscode, initialJoinComplete, eventStatus]);
 

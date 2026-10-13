@@ -395,6 +395,16 @@ describe('useConversationSetup', () => {
       expect(mockGetChannelPasscode).toHaveBeenCalledWith('chat', expect.any(Object), expect.any(Function));
     });
 
+    it('resolves the jargon passcode when the link carries one', async () => {
+      mockGetChannelPasscode.mockImplementation((channel: string) => (channel === 'jargon' ? 'jargon-pass' : null));
+
+      const { result } = renderSetup({ query: { conversationId: 'test-conversation-id', channel: 'jargon,jargon-pass' } });
+
+      await waitFor(() => {
+        expect(result.current.jargonPasscode).toBe('jargon-pass');
+      });
+    });
+
     it('does not look up passcodes when there is no channel query param', async () => {
       const { result } = renderSetup();
 

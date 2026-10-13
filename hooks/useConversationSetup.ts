@@ -36,6 +36,7 @@ export interface UseConversationSetupReturn {
   feedbackFrequency: number;
   transcriptPasscode: string;
   chatPasscode: string;
+  jargonPasscode: string;
   initialJoinComplete: boolean;
   eventStatusLoaded: boolean;
   eventStatus: 'active' | 'future' | 'ended';
@@ -76,6 +77,7 @@ export function useConversationSetup({
   const [feedbackFrequency, setFeedbackFrequency] = useState<number>(1);
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>('');
   const [chatPasscode, setChatPasscode] = useState<string>('');
+  const [jargonPasscode, setJargonPasscode] = useState<string>('');
   const [initialJoinComplete, setInitialJoinComplete] = useState(false);
 
   const [eventStatusLoaded, setEventStatusLoaded] = useState<boolean>(false);
@@ -157,6 +159,9 @@ export function useConversationSetup({
 
           const chatPasscodeParam = GetChannelPasscode('chat', router.query, setGeneralError);
           if (chatPasscodeParam) setChatPasscode(chatPasscodeParam);
+
+          const jargonPasscodeParam = GetChannelPasscode('jargon', router.query, setGeneralError);
+          if (jargonPasscodeParam) setJargonPasscode(jargonPasscodeParam);
         }
 
         const eventAsstAgent = conversation.agents.find(
@@ -217,6 +222,7 @@ export function useConversationSetup({
     feedbackFrequency,
     transcriptPasscode,
     chatPasscode,
+    jargonPasscode,
     initialJoinComplete,
     setInitialJoinComplete,
     chatIntroRef,

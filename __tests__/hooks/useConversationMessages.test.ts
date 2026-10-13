@@ -42,6 +42,7 @@ function renderMessages(overrides: Partial<UseConversationMessagesParams> = {}) 
     agentId: 'agent-1',
     agentIds: ['agent-1'],
     chatPasscode: 'chat-pass',
+    jargonPasscode: '',
     initialJoinComplete: false,
     chatIntroRef,
     assistantIntroRef,
@@ -106,7 +107,10 @@ describe('useConversationMessages', () => {
       });
 
       const introMessage = makeMessage({ id: 'assistant-intro', body: { type: 'intro' } });
-      const { result } = renderMessages({ agentIds: ['agent-1', 'agent-2'], assistantIntroRef: { current: [introMessage as any] } });
+      const { result } = renderMessages({
+        agentIds: ['agent-1', 'agent-2'],
+        assistantIntroRef: { current: [introMessage as any] },
+      });
 
       await act(async () => {
         await result.current.fetchAllAssistantMessages();
@@ -130,12 +134,12 @@ describe('useConversationMessages', () => {
     it('fetches and merges replies for messages with a replyCount', async () => {
       mockRetrieveData.mockImplementation((url: string) => {
         if (url === 'messages/conv-1?channel=direct-user-1-agent-1') {
-          return Promise.resolve([
-            makeMessage({ id: 'a1', createdAt: '2026-01-01T00:00:01.000Z', replyCount: 1 }),
-          ]);
+          return Promise.resolve([makeMessage({ id: 'a1', createdAt: '2026-01-01T00:00:01.000Z', replyCount: 1 })]);
         }
         if (url === 'messages/a1/replies') {
-          return Promise.resolve([makeMessage({ id: 'reply-1', parentMessage: 'a1', createdAt: '2026-01-01T00:00:02.000Z' })]);
+          return Promise.resolve([
+            makeMessage({ id: 'reply-1', parentMessage: 'a1', createdAt: '2026-01-01T00:00:02.000Z' }),
+          ]);
         }
         return Promise.resolve([]);
       });
@@ -245,6 +249,52 @@ describe('useConversationMessages', () => {
     });
   });
 
+  describe('fetchJargonMessages', () => {
+    it('fetches the shared jargon channel history into its own list', async () => {
+      mockRetrieveData.mockImplementation((url: string) => {
+        if (url === 'messages/conv-1?channel=jargon,jargon-pass') {
+          return Promise.resolve([makeMessage({ id: 'j1', body: { type: 'jargon_clarification', terms: [] } })]);
+        }
+        return Promise.resolve([]);
+      });
+
+      const { result } = renderMessages({ jargonPasscode: 'jargon-pass' });
+
+      await act(async () => {
+        await result.current.fetchJargonMessages();
+      });
+
+      expect(result.current.jargonMessages.map((m: any) => m.id)).toEqual(['j1']);
+      expect(result.current.assistantMessages).toEqual([]);
+    });
+
+    it('does not fetch when there is no jargon passcode', async () => {
+      const { result } = renderMessages({ jargonPasscode: '' });
+
+      await act(async () => {
+        await result.current.fetchJargonMessages();
+      });
+
+      expect(mockRetrieveData).not.toHaveBeenCalled();
+    });
+
+    it('logs and swallows errors instead of throwing', async () => {
+      const consoleError = jest.spyOn(console, 'error').mockImplementation();
+      mockRetrieveData.mockRejectedValue(new Error('network fail'));
+
+      const { result } = renderMessages({ jargonPasscode: 'jargon-pass' });
+
+      await act(async () => {
+        await result.current.fetchJargonMessages();
+      });
+
+      expect(consoleError).toHaveBeenCalledWith('Error fetching jargon messages:', expect.any(Error));
+      expect(result.current.jargonMessages).toEqual([]);
+
+      consoleError.mockRestore();
+    });
+  });
+
   describe('auto-fetch effects driven by initialJoinComplete', () => {
     it('does not fetch on mount while initialJoinComplete is false', async () => {
       renderMessages({ initialJoinComplete: false });
@@ -263,6 +313,7 @@ describe('useConversationMessages', () => {
         agentId: 'agent-1',
         agentIds: ['agent-1'],
         chatPasscode: 'chat-pass',
+        jargonPasscode: '',
         initialJoinComplete: true,
         chatIntroRef: { current: [] } as any,
         assistantIntroRef: { current: [] } as any,
@@ -273,10 +324,17 @@ describe('useConversationMessages', () => {
         expect(mockRetrieveData).toHaveBeenCalledWith('messages/conv-1?channel=chat,chat-pass', 'mock-access-token');
       });
 
-      expect(mockRetrieveData).toHaveBeenCalledWith(
-        'messages/conv-1?channel=direct-user-1-agent-1',
-        'mock-access-token',
-      );
+      expect(mockRetrieveData).toHaveBeenCalledWith('messages/conv-1?channel=direct-user-1-agent-1', 'mock-access-token');
+    });
+  });
+
+  describe('auto-fetch of jargon history', () => {
+    it('fetches jargon history once the join completes when the link carries a jargon passcode', async () => {
+      renderMessages({ jargonPasscode: 'jargon-pass', initialJoinComplete: true });
+
+      await waitFor(() => {
+        expect(mockRetrieveData).toHaveBeenCalledWith('messages/conv-1?channel=jargon,jargon-pass', 'mock-access-token');
+      });
     });
   });
 

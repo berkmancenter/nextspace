@@ -17,6 +17,8 @@ export interface UseConversationMessagesParams {
   agentIds: string[];
   /** The passcode for accessing chat messages in the conversation. */
   chatPasscode: string;
+  /** The passcode for the shared jargon channel. Empty when the participant link has none. */
+  jargonPasscode: string;
   /** Whether the user has completed the initial join process for the conversation. */
   initialJoinComplete: boolean;
   /** A mutable reference to an array of introductory chat messages, used to prepend to fetched chat messages. */
@@ -36,6 +38,8 @@ export interface UseConversationMessagesReturn {
   setAssistantMessages: React.Dispatch<React.SetStateAction<PseudonymousMessage[]>>;
   chatMessages: PseudonymousMessage[];
   setChatMessages: React.Dispatch<React.SetStateAction<PseudonymousMessage[]>>;
+  jargonMessages: PseudonymousMessage[];
+  setJargonMessages: React.Dispatch<React.SetStateAction<PseudonymousMessage[]>>;
   pollCounts: Record<string, Record<string, number>>;
   setPollCounts: React.Dispatch<React.SetStateAction<Record<string, Record<string, number>>>>;
   unreadChatReplyCount: number;
@@ -46,6 +50,7 @@ export interface UseConversationMessagesReturn {
   setAssistantMessagesWithUnreadReplies: React.Dispatch<React.SetStateAction<Set<string>>>;
   fetchAllAssistantMessages: () => Promise<void>;
   fetchChatMessages: () => Promise<void>;
+  fetchJargonMessages: () => Promise<void>;
 }
 /**
  * Fetches replies for the given pseudonymous messages and inserts them into the message array, maintaining chronological order.
@@ -96,6 +101,7 @@ export function useConversationMessages({
   agentId,
   agentIds,
   chatPasscode,
+  jargonPasscode,
   initialJoinComplete,
   chatIntroRef,
   assistantIntroRef,
@@ -103,6 +109,7 @@ export function useConversationMessages({
 }: UseConversationMessagesParams): UseConversationMessagesReturn {
   const [assistantMessages, setAssistantMessages] = useState<PseudonymousMessage[]>([]);
   const [chatMessages, setChatMessages] = useState<PseudonymousMessage[]>([]);
+  const [jargonMessages, setJargonMessages] = useState<PseudonymousMessage[]>([]);
   const [pollCounts, setPollCounts] = useState<Record<string, Record<string, number>>>({});
   const [chatPreviousReplyCounts, setChatPreviousReplyCounts] = useState<Map<string, number>>(new Map());
   const [assistantPreviousReplyCounts, setAssistantPreviousReplyCounts] = useState<Map<string, number>>(new Map());
@@ -206,6 +213,21 @@ export function useConversationMessages({
     }
   }, [conversationId, chatPasscode, chatIntroRef]);
 
+  const fetchJargonMessages = useCallback(async (): Promise<void> => {
+    if (!jargonPasscode || !conversationId) return;
+
+    try {
+      const fetched = await RetrieveData(
+        `messages/${conversationId}?channel=jargon,${jargonPasscode}`,
+        Api.get().getAccessToken(),
+      );
+
+      if (Array.isArray(fetched)) setJargonMessages(fetched);
+    } catch (error) {
+      console.error('Error fetching jargon messages:', error);
+    }
+  }, [conversationId, jargonPasscode]);
+
   useEffect(() => {
     const { newReplyCounts, updatedUnreadSet } = trackReplyCountChanges(
       chatMessages,
@@ -242,6 +264,11 @@ export function useConversationMessages({
   }, [chatPasscode, conversationId, fetchChatMessages, initialJoinComplete]);
 
   useEffect(() => {
+    if (!jargonPasscode || !conversationId || !initialJoinComplete) return;
+    fetchJargonMessages();
+  }, [jargonPasscode, conversationId, fetchJargonMessages, initialJoinComplete]);
+
+  useEffect(() => {
     if (!initialJoinComplete) return;
     fetchAllAssistantMessages();
   }, [fetchAllAssistantMessages, initialJoinComplete]);
@@ -251,6 +278,8 @@ export function useConversationMessages({
     setAssistantMessages,
     chatMessages,
     setChatMessages,
+    jargonMessages,
+    setJargonMessages,
     pollCounts,
     setPollCounts,
     unreadChatReplyCount: messagesWithUnreadReplies.size,
@@ -261,5 +290,6 @@ export function useConversationMessages({
     setAssistantMessagesWithUnreadReplies,
     fetchAllAssistantMessages,
     fetchChatMessages,
+    fetchJargonMessages,
   };
 }
