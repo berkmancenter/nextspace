@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { PseudonymousMessage } from '../types.internal';
 import { parseMessageBody } from '../utils/Helpers';
+import { getJargonLastSeenAt, markJargonSeen } from '../utils/jargonReadState';
 
 export interface JargonTerm {
   id: string;
@@ -13,7 +14,7 @@ export interface JargonTerm {
 export interface UseJargonTermsReturn {
   /** Full, un-windowed history of every term seen this session — for a future Resources-tab glossary. */
   terms: JargonTerm[];
-  /** Terms from only the latest jargon_clarification message, unless that message was dismissed. */
+  /** Terms from only the latest jargon_clarification message, unless the person already cleared it. */
   batchTerms: JargonTerm[];
   seen: boolean;
   active: boolean;
@@ -73,8 +74,8 @@ export function summarizeJargonTerms(terms: JargonTerm[]): string {
  * Resources-tab glossary. The banner/sheet only ever reflect the single most recent message's
  * batch — a new message replaces what's shown rather than accumulating onto it, so the count
  * stays bounded by however many terms one backend message bundles, not the whole session's
- * total. Dismissing only suppresses that specific message; a newer one always supersedes it
- * regardless of seen/dismissed state.
+ * total. Dismissing saves the latest message's creation time per event in localStorage, so the
+ * banner stays gone after a refresh until a newer message arrives.
  *
  * `enabled` gates the user's own jargonClarification preference. The backend always broadcasts
  * on the shared jargon channel regardless of any individual's preference (simpler than per-socket
@@ -82,10 +83,23 @@ export function summarizeJargonTerms(terms: JargonTerm[]): string {
  * everything outright — not merely hiding the banner — so a disabled preference never processes
  * or surfaces content the user opted out of, live, in both directions, with no reconnect needed.
  */
-export function useJargonTerms(messages: PseudonymousMessage[], options: { enabled?: boolean } = {}): UseJargonTermsReturn {
-  const { enabled = true } = options;
-  const [dismissedMessageId, setDismissedMessageId] = useState<string | null>(null);
+export function useJargonTerms(
+  messages: PseudonymousMessage[],
+  options: { enabled?: boolean; conversationId?: string } = {},
+): UseJargonTermsReturn {
+  const { enabled = true, conversationId } = options;
   const [seenMessageId, setSeenMessageId] = useState<string | null>(null);
+  const [savedSeen, setSavedSeen] = useState(() => ({
+    conversationId,
+    lastSeenAt: conversationId ? getJargonLastSeenAt(conversationId) : null,
+  }));
+
+  let lastSeenAt = savedSeen.lastSeenAt;
+  // Re-read during render, not in an effect, so a new event never renders with the old event's saved time.
+  if (savedSeen.conversationId !== conversationId) {
+    lastSeenAt = conversationId ? getJargonLastSeenAt(conversationId) : null;
+    setSavedSeen({ conversationId, lastSeenAt });
+  }
 
   const jargonMessages = useMemo(
     () =>
@@ -101,9 +115,11 @@ export function useJargonTerms(messages: PseudonymousMessage[], options: { enabl
 
   const latestMessage = jargonMessages[jargonMessages.length - 1];
 
+  const latestIsUnseen = !!latestMessage && (!lastSeenAt || new Date(latestMessage.createdAt!) > new Date(lastSeenAt));
+
   const batchTerms = useMemo(
-    () => (latestMessage && latestMessage.id !== dismissedMessageId ? termsFromMessage(latestMessage) : []),
-    [latestMessage, dismissedMessageId],
+    () => (latestMessage && latestIsUnseen ? termsFromMessage(latestMessage) : []),
+    [latestMessage, latestIsUnseen],
   );
 
   const seen = !latestMessage || latestMessage.id === seenMessageId;
@@ -113,8 +129,15 @@ export function useJargonTerms(messages: PseudonymousMessage[], options: { enabl
   }, [latestMessage]);
 
   const dismiss = useCallback(() => {
-    if (latestMessage) setDismissedMessageId(latestMessage.id!);
-  }, [latestMessage]);
+    if (!latestMessage || !latestIsUnseen) return;
+    const seenAt = latestMessage.createdAt;
+    if (!seenAt) {
+      console.warn('Cannot clear jargon batch: latest message has no createdAt', latestMessage.id);
+      return;
+    }
+    if (conversationId) markJargonSeen(conversationId, seenAt);
+    setSavedSeen({ conversationId, lastSeenAt: seenAt });
+  }, [latestMessage, latestIsUnseen, conversationId]);
 
   return {
     terms,

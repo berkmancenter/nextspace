@@ -19,6 +19,10 @@ function jargonMessage(id: string, createdAt: string, body: object): Pseudonymou
 }
 
 describe('useJargonTerms', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it('returns no terms and is inactive when there are no jargon_clarification messages', () => {
     const { result } = renderHook(() => useJargonTerms([]));
 
@@ -171,6 +175,50 @@ describe('useJargonTerms', () => {
     rerender({ messages: second });
     expect(result.current.active).toBe(true);
     expect(result.current.batchTerms.map((t) => t.term)).toEqual(['verticals']);
+  });
+
+  describe('saved "seen" time across refreshes', () => {
+    const first = [
+      jargonMessage('msg-1', '2024-01-01T00:00:00Z', { terms: [{ term: 'fungible', text: 'Interchangeable.' }] }),
+    ];
+
+    it('keeps a dismissed batch hidden after a remount for the same event', () => {
+      const firstMount = renderHook(() => useJargonTerms(first, { conversationId: 'conv-1' }));
+      act(() => firstMount.result.current.dismiss());
+      firstMount.unmount();
+
+      const { result } = renderHook(() => useJargonTerms(first, { conversationId: 'conv-1' }));
+
+      expect(result.current.active).toBe(false);
+    });
+
+    it('shows the latest batch on load when it is newer than the saved time', () => {
+      window.localStorage.setItem('nextspace.jargon.lastSeen.conv-1', '2023-12-31T00:00:00Z');
+
+      const { result } = renderHook(() => useJargonTerms(first, { conversationId: 'conv-1' }));
+
+      expect(result.current.batchTerms.map((t) => t.term)).toEqual(['fungible']);
+    });
+
+    it('hides the latest batch on load when the saved time is the same as or later than it', () => {
+      window.localStorage.setItem('nextspace.jargon.lastSeen.conv-1', '2024-01-01T00:00:00Z');
+
+      const { result } = renderHook(() => useJargonTerms(first, { conversationId: 'conv-1' }));
+
+      expect(result.current.active).toBe(false);
+    });
+
+    it("reads the new event's saved time when the conversation changes", () => {
+      window.localStorage.setItem('nextspace.jargon.lastSeen.conv-1', '2024-01-01T00:00:00Z');
+      const { result, rerender } = renderHook(({ conversationId }) => useJargonTerms(first, { conversationId }), {
+        initialProps: { conversationId: 'conv-1' },
+      });
+      expect(result.current.active).toBe(false);
+
+      rerender({ conversationId: 'conv-2' });
+
+      expect(result.current.active).toBe(true);
+    });
   });
 
   it('ignores non-jargon messages', () => {

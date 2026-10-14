@@ -173,7 +173,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
     active: jargonActive,
     markSeen: markJargonSeen,
     dismiss: dismissJargon,
-  } = useJargonTerms(jargonMessages, { enabled: userPreferences.jargonClarification });
+  } = useJargonTerms(jargonMessages, {
+    enabled: userPreferences.jargonClarification,
+    conversationId: router.query.conversationId as string | undefined,
+  });
   const [jargonSheetOpen, setJargonSheetOpen] = useState(false);
 
   const jargonNotification: Notification | null = jargonActive

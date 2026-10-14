@@ -1471,6 +1471,7 @@ describe('EventAssistantRoom', () => {
     }
 
     beforeEach(() => {
+      window.localStorage.clear();
       mockRouter.query = {
         conversationId: 'test-conversation-id',
         channel: ['transcript,MJqaT2ii', 'chat,chat-pass', 'jargon,jargon-pass'],
@@ -1529,6 +1530,25 @@ describe('EventAssistantRoom', () => {
       await screen.findByRole('button', { name: /new term/i });
       const privateChatBadge = screen.getAllByLabelText('Private Chat')[0].querySelector('.MuiBadge-badge');
       expect(privateChatBadge).toHaveClass('MuiBadge-invisible');
+    });
+
+    it('keeps the banner hidden after a refresh once the latest batch was cleared', async () => {
+      window.localStorage.setItem('nextspace.jargon.lastSeen.test-conversation-id', jargonMessage.createdAt);
+      mockJargonFetches({ history: [jargonMessage] });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          'messages/test-conversation-id?channel=jargon,jargon-pass',
+          'mock-access-token',
+        );
+      });
+      await act(async () => {});
+
+      expect(screen.queryByRole('button', { name: /new term/i })).not.toBeInTheDocument();
     });
 
     it('keeps the Private Chat thinking indicator up when a jargon batch arrives mid-wait', async () => {
