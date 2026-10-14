@@ -122,6 +122,15 @@ describe('EventStatus (pending state)', () => {
       expect(screen.queryByRole('button', { name: /presentation link/i })).not.toBeInTheDocument();
     });
 
+    it('renders without a presentation chip for an event saved before presentation links existed', () => {
+      const { presentation: _presentation, ...olderEventUrls } = baseConversationData.eventUrls;
+
+      renderStatus({ eventUrls: olderEventUrls as typeof baseConversationData.eventUrls });
+
+      expect(screen.getByRole('button', { name: /participant link/i })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /presentation link/i })).not.toBeInTheDocument();
+    });
+
     it('disables the presentation link chip in the pending state, like the participant chip', () => {
       renderStatus({
         eventUrls: {

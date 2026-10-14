@@ -186,7 +186,7 @@ export const EventStatus: React.FC<{
 
   const moderatorUrl = conversationData.eventUrls.moderator[0]?.url;
   const participantUrl = conversationData.eventUrls.participant[0]?.url;
-  const presentationUrl = conversationData.eventUrls.presentation[0]?.url;
+  const presentationUrl = conversationData.eventUrls.presentation?.[0]?.url;
   const zoomUrl = conversationData.eventUrls.zoom?.url;
 
   // The meeting link only counts as confirmed when it's a valid Zoom URL, matching the backend's
