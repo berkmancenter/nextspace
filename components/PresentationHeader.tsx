@@ -5,8 +5,11 @@ import { Logo } from './Logo';
 
 interface PresentationHeaderProps {
   eventName: string;
-  /** Called once the exit has been confirmed. If it rejects, the dialog stays open and shows an error. */
-  onExit: () => Promise<unknown>;
+  /**
+   * Called once the exit has been confirmed. Resolves to false when navigation was blocked; that
+   * or a rejection keeps the dialog open with an error.
+   */
+  onExit: () => Promise<boolean>;
 }
 
 /**
@@ -25,7 +28,10 @@ export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProp
   const confirmExit = async () => {
     setExitFailed(false);
     try {
-      await onExit();
+      if ((await onExit()) === false) {
+        console.error('Failed to leave the presentation view: navigation was blocked');
+        setExitFailed(true);
+      }
     } catch (error) {
       console.error('Failed to leave the presentation view:', error);
       setExitFailed(true);
