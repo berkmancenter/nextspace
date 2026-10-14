@@ -173,34 +173,21 @@ describe('ThreadPanel Component', () => {
     expect(youLabels.length).toBeGreaterThan(0);
   });
 
-  it('displays timestamps for parent message and replies', () => {
-    const fixedDate = new Date('2024-01-15T14:30:00');
-    const parentWithTimestamp = {
-      ...mockParentMessage,
-      createdAt: fixedDate.toISOString(),
-    };
-    const repliesWithTimestamps = mockReplies.map((reply, idx) => ({
-      ...reply,
-      createdAt: new Date(fixedDate.getTime() + (idx + 1) * 60000).toISOString(),
-    }));
+  it('shows a reply timestamp only once 5 minutes have passed since the last one shown', () => {
+    const parentTime = new Date('2024-01-15T14:30:00');
+    const minutesAfterParent = (minutes: number) => new Date(parentTime.getTime() + minutes * 60 * 1000);
+    const formatTime = (date: Date) => date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const parentWithTimestamp = { ...mockParentMessage, createdAt: parentTime.toISOString() };
+    const repliesWithTimestamps = [
+      { ...mockReplies[0], createdAt: minutesAfterParent(2).toISOString() },
+      { ...mockReplies[1], createdAt: minutesAfterParent(6).toISOString() },
+    ];
 
     render(<ThreadPanel {...defaultProps} parentMessage={parentWithTimestamp} replies={repliesWithTimestamps} />);
 
-    // Check parent message timestamp
-    const parentTimestamp = fixedDate.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    expect(screen.getByText(parentTimestamp)).toBeInTheDocument();
-
-    // Check reply timestamps
-    repliesWithTimestamps.forEach((reply) => {
-      const replyTimestamp = new Date(reply.createdAt).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      expect(screen.getByText(replyTimestamp)).toBeInTheDocument();
-    });
+    expect(screen.getByText(formatTime(parentTime))).toBeInTheDocument();
+    expect(screen.queryByText(formatTime(minutesAfterParent(2)))).not.toBeInTheDocument();
+    expect(screen.getByText(formatTime(minutesAfterParent(6)))).toBeInTheDocument();
   });
 
   it('renders reply input box by default', () => {
