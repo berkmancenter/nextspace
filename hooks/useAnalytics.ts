@@ -21,9 +21,9 @@ export interface UseAnalyticsOptions {
  * tag the visit-scope conversation_id (dimension 7), so the Vibes Analyst tracked-session
  * count reflects the audience.
  *
- * This is an allowlist by design: any page type NOT listed here is dropped entirely from
- * tracked sessions, never tagged with dimension 7, and so never matched by the recap's
- * dimension7==<id> segment. In particular the MODERATOR page is intentionally excluded:
+ * This is an allowlist by design: any page type NOT listed here still records page views but
+ * is never tagged with dimension 7, and so never matched by the recap's dimension7==<id>
+ * segment. In particular the MODERATOR page is intentionally excluded:
  * moderators are staff, not audience, and counting their visits would muddy the
  * "big audience, few talkers" signal the tracked-session count exists to show. The
  * presentation page is left out for the same reason: a shared screen is not an audience
@@ -56,8 +56,8 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
     /*
      * Tag the whole visit with the event's conversation id (visit-scope dimension 7) before
      * the page view fires, so every participant is counted, not only those who interact.
-     * Only participant pages are tagged: moderator (and any non-participant) visits are
-     * dropped entirely from tracked sessions on purpose. See PARTICIPANT_EVENT_PAGE_TYPES.
+     * Only participant pages are tagged: moderator (and any non-participant) visits still record
+     * page views but stay out of the recap's audience count on purpose. See PARTICIPANT_EVENT_PAGE_TYPES.
      */
     if (router.query.conversationId && pageType && PARTICIPANT_EVENT_PAGE_TYPES.includes(pageType)) {
       tagEventVisit(router.query.conversationId as string);

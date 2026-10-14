@@ -47,7 +47,7 @@ export function EventAssistantRoom({
 }) {
   const router = useRouter();
 
-  // A projector is not an audience member, so the presentation view stays out of Matomo's audience sessions.
+  // A projector is not an audience member: Matomo still logs its page views, but the recap's audience count skips them.
   useAnalytics({ pageType: presentation ? 'presentation' : 'assistant' });
 
   const {
