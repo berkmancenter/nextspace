@@ -29,7 +29,6 @@ describe('useJargonTerms', () => {
     expect(result.current.terms).toEqual([]);
     expect(result.current.batchTerms).toEqual([]);
     expect(result.current.active).toBe(false);
-    expect(result.current.seen).toBe(true);
   });
 
   it('flattens a message using the proposed per-term-object shape into one JargonTerm each', () => {
@@ -114,40 +113,6 @@ describe('useJargonTerms', () => {
     expect(result.current.batchTerms.map((t) => t.term)).toEqual(['verticals']);
     // Full history still has both, for a future glossary.
     expect(result.current.terms.map((t) => t.term)).toEqual(['fungible', 'verticals']);
-  });
-
-  it('marks the batch seen without clearing it', () => {
-    const messages = [
-      jargonMessage('msg-1', '2024-01-01T00:00:00Z', { terms: [{ term: 'fungible', text: 'Interchangeable.' }] }),
-    ];
-    const { result } = renderHook(() => useJargonTerms(messages));
-
-    expect(result.current.seen).toBe(false);
-
-    act(() => result.current.markSeen());
-
-    expect(result.current.seen).toBe(true);
-    expect(result.current.batchTerms.map((t) => t.term)).toEqual(['fungible']);
-  });
-
-  it('a newer message un-seens the batch again, even after markSeen', () => {
-    const first = [
-      jargonMessage('msg-1', '2024-01-01T00:00:00Z', { terms: [{ term: 'fungible', text: 'Interchangeable.' }] }),
-    ];
-    const { result, rerender } = renderHook(({ messages }) => useJargonTerms(messages), {
-      initialProps: { messages: first },
-    });
-
-    act(() => result.current.markSeen());
-    expect(result.current.seen).toBe(true);
-
-    const second = [
-      ...first,
-      jargonMessage('msg-2', '2024-01-02T00:00:00Z', { terms: [{ term: 'verticals', text: 'Industry sectors.' }] }),
-    ];
-    rerender({ messages: second });
-
-    expect(result.current.seen).toBe(false);
   });
 
   it('dismiss clears the current batch until a newer message arrives', () => {

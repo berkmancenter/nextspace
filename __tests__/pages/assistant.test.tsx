@@ -1532,6 +1532,46 @@ describe('EventAssistantRoom', () => {
       expect(privateChatBadge).toHaveClass('MuiBadge-invisible');
     });
 
+    async function openJargonSheet() {
+      mockJargonFetches({ history: [jargonMessage] });
+      const user = userEvent.setup();
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await user.click(await screen.findByRole('button', { name: /new term/i }));
+      await screen.findByText('An SLO is a reliability target.');
+      return user;
+    }
+
+    it('keeps the banner visible while the sheet is open', async () => {
+      await openJargonSheet();
+
+      expect(screen.getByRole('button', { name: /new term/i, hidden: true })).toBeInTheDocument();
+    });
+
+    it('clears the banner when the sheet is closed', async () => {
+      const user = await openJargonSheet();
+
+      await user.click(screen.getByRole('button', { name: 'Close' }));
+
+      await waitFor(() => {
+        expect(screen.queryByRole('button', { name: /new term/i, hidden: true })).not.toBeInTheDocument();
+      });
+      expect(window.localStorage.getItem('nextspace.jargon.lastSeen.test-conversation-id')).toBe(jargonMessage.createdAt);
+    });
+
+    it('clears the banner when the sheet is left through Manage term alerts', async () => {
+      const user = await openJargonSheet();
+
+      await user.click(screen.getByText('Manage term alerts in Preferences'));
+
+      await waitFor(() => {
+        expect(screen.queryByRole('button', { name: /new term/i, hidden: true })).not.toBeInTheDocument();
+      });
+    });
+
     it('keeps the banner hidden after a refresh once the latest batch was cleared', async () => {
       window.localStorage.setItem('nextspace.jargon.lastSeen.test-conversation-id', jargonMessage.createdAt);
       mockJargonFetches({ history: [jargonMessage] });

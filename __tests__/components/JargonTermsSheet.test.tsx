@@ -42,6 +42,27 @@ describe('JargonTermsSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('calls onClose when the backdrop is tapped', async () => {
+    const user = userEvent.setup();
+    const onClose = jest.fn();
+    render(<JargonTermsSheet open={true} onClose={onClose} terms={terms} onManagePreferences={jest.fn()} />);
+
+    await user.click(document.querySelector('.MuiBackdrop-root')!);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps showing the terms while it slides closed after the batch is cleared', () => {
+    const { rerender } = render(
+      <JargonTermsSheet open={true} onClose={jest.fn()} terms={terms} onManagePreferences={jest.fn()} />,
+    );
+
+    rerender(<JargonTermsSheet open={false} onClose={jest.fn()} terms={[]} onManagePreferences={jest.fn()} />);
+
+    expect(screen.getByText('fungible')).toBeInTheDocument();
+    expect(screen.getByText('New terms (2)')).toBeInTheDocument();
+  });
+
   it('calls onManagePreferences from the footer link', async () => {
     const user = userEvent.setup();
     const onManagePreferences = jest.fn();

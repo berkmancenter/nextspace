@@ -169,9 +169,7 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
 
   const {
     batchTerms: jargonBatchTerms,
-    seen: jargonSeen,
     active: jargonActive,
-    markSeen: markJargonSeen,
     dismiss: dismissJargon,
   } = useJargonTerms(jargonMessages, {
     enabled: userPreferences.jargonClarification,
@@ -179,16 +177,17 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
   });
   const [jargonSheetOpen, setJargonSheetOpen] = useState(false);
 
+  const closeJargonSheet = () => {
+    setJargonSheetOpen(false);
+    dismissJargon();
+  };
+
   const jargonNotification: Notification | null = jargonActive
     ? {
         id: 'jargon-terms',
         kind: 'jargonTerms',
         summary: summarizeJargonTerms(jargonBatchTerms),
-        seen: jargonSeen,
-        onOpen: () => {
-          markJargonSeen();
-          setJargonSheetOpen(true);
-        },
+        onOpen: () => setJargonSheetOpen(true),
         onDismiss: dismissJargon,
       }
     : null;
@@ -787,10 +786,10 @@ function EventAssistantRoom({ authType: _authType }: { authType: AuthType }) {
               </div>
               <JargonTermsSheet
                 open={jargonSheetOpen}
-                onClose={() => setJargonSheetOpen(false)}
+                onClose={closeJargonSheet}
                 terms={jargonBatchTerms}
                 onManagePreferences={() => {
-                  setJargonSheetOpen(false);
+                  closeJargonSheet();
                   router.push({ pathname: router.pathname, query: { ...router.query, view: 'preferences' } });
                 }}
               />

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { IconButton, SwipeableDrawer } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { JargonTerm } from '../hooks/useJargonTerms';
@@ -10,13 +11,14 @@ interface JargonTermsSheetProps {
 }
 
 /**
- * Bottom sheet listing the terms from the notification banner's current batch. `onClose` only
- * hides the sheet — dragging it down, tapping the backdrop, or its own header close button all
- * route here, never to the banner's dismiss action. `terms` is bound live to the banner's current
- * batch rather than a snapshot, so a newer message superseding the batch while the sheet happens
- * to be open is reflected immediately.
+ * Bottom sheet for the banner's current batch. Every close route (button, backdrop, swipe) calls
+ * `onClose`, where the page clears the banner. `terms` updates live while open, but the last list
+ * stays put while the sheet slides shut so clearing the batch doesn't empty it mid-animation.
  */
 export function JargonTermsSheet({ open, onClose, terms, onManagePreferences }: JargonTermsSheetProps) {
+  const [shownTerms, setShownTerms] = useState(terms);
+  if (open && shownTerms !== terms) setShownTerms(terms);
+
   return (
     <SwipeableDrawer
       anchor="bottom"
@@ -45,7 +47,7 @@ export function JargonTermsSheet({ open, onClose, terms, onManagePreferences }: 
 
       <div className="flex items-center justify-between px-4 pt-1.5 pb-2.5 border-b border-[#efeaf7]">
         <h3 className="text-[15px] font-bold" style={{ color: '#241b38' }}>
-          New terms ({terms.length})
+          New terms ({shownTerms.length})
         </h3>
         <IconButton aria-label="Close" size="small" onClick={onClose}>
           <CloseIcon sx={{ fontSize: 16 }} />
@@ -53,7 +55,7 @@ export function JargonTermsSheet({ open, onClose, terms, onManagePreferences }: 
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pt-1 pb-2">
-        {terms.map((t) => (
+        {shownTerms.map((t) => (
           <div key={t.id} className="py-2.5 border-b border-[#f2eef9] last:border-none">
             <div className="text-[13px] font-bold" style={{ color: '#241b38' }}>
               {t.term}

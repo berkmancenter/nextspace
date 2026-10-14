@@ -16,9 +16,8 @@ export interface UseJargonTermsReturn {
   terms: JargonTerm[];
   /** Terms from only the latest jargon_clarification message, unless the person already cleared it. */
   batchTerms: JargonTerm[];
-  seen: boolean;
   active: boolean;
-  markSeen: () => void;
+  /** Clears the current batch on this browser until a newer message arrives. */
   dismiss: () => void;
 }
 
@@ -88,7 +87,6 @@ export function useJargonTerms(
   options: { enabled?: boolean; conversationId?: string } = {},
 ): UseJargonTermsReturn {
   const { enabled = true, conversationId } = options;
-  const [seenMessageId, setSeenMessageId] = useState<string | null>(null);
   const [savedSeen, setSavedSeen] = useState(() => ({
     conversationId,
     lastSeenAt: conversationId ? getJargonLastSeenAt(conversationId) : null,
@@ -122,12 +120,6 @@ export function useJargonTerms(
     [latestMessage, latestIsUnseen],
   );
 
-  const seen = !latestMessage || latestMessage.id === seenMessageId;
-
-  const markSeen = useCallback(() => {
-    if (latestMessage) setSeenMessageId(latestMessage.id!);
-  }, [latestMessage]);
-
   const dismiss = useCallback(() => {
     if (!latestMessage || !latestIsUnseen) return;
     const seenAt = latestMessage.createdAt;
@@ -142,9 +134,7 @@ export function useJargonTerms(
   return {
     terms,
     batchTerms,
-    seen,
     active: batchTerms.length > 0,
-    markSeen,
     dismiss,
   };
 }

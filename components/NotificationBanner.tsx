@@ -11,7 +11,6 @@ export interface Notification {
   id: string;
   kind: string;
   summary: string;
-  seen: boolean;
   onOpen: () => void;
   onDismiss: () => void;
 }
@@ -23,14 +22,10 @@ interface NotificationBannerProps {
 export function NotificationBanner({ notification }: NotificationBannerProps) {
   if (!notification) return null;
 
-  const { summary, seen, onOpen, onDismiss } = notification;
+  const { summary, onOpen, onDismiss } = notification;
 
   return (
-    <div
-      className={`flex items-center gap-2.5 w-full border-b px-3.5 py-2.5 ${
-        seen ? 'bg-white border-[#EDE7F6]' : 'bg-[#F3F0FF] border-[#D1C4E9]'
-      }`}
-    >
+    <div className="flex items-center gap-2.5 w-full border-b px-3.5 py-2.5 bg-[#F3F0FF] border-[#D1C4E9]">
       <button
         type="button"
         onClick={onOpen}
@@ -44,8 +39,8 @@ export function NotificationBanner({ notification }: NotificationBannerProps) {
         >
           Aa
         </span>
-        <span className={`flex-1 min-w-0 truncate text-[13px] ${seen ? 'text-gray-600' : 'text-[#2d2440]'}`}>
-          <span className={seen ? 'font-normal' : 'font-bold'}>{summary}</span>
+        <span className="flex-1 min-w-0 truncate text-[13px] text-[#2d2440]">
+          <span className="font-bold">{summary}</span>
         </span>
         <KeyboardArrowDownIcon className="text-mediumslateblue" sx={{ fontSize: 18, flexShrink: 0 }} />
       </button>

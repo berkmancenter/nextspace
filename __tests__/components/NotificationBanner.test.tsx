@@ -7,7 +7,6 @@ function makeNotification(overrides: Partial<Notification> = {}): Notification {
     id: 'jargon-terms',
     kind: 'jargonTerms',
     summary: '2 new terms: fungible, verticals',
-    seen: false,
     onOpen: jest.fn(),
     onDismiss: jest.fn(),
     ...overrides,
