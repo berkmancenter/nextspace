@@ -1262,7 +1262,7 @@ describe('AssistantChatPanel', () => {
       expect(timestamps.length).toBe(1);
     });
 
-    it('shows timestamp when minute changes', () => {
+    it('hides the timestamp on a message less than 5 minutes after the last one shown', () => {
       const messages = [
         {
           id: '1',
@@ -1296,12 +1296,11 @@ describe('AssistantChatPanel', () => {
 
       const { container } = render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-      // Should show two timestamps (one for each different minute)
       const timestamps = container.querySelectorAll('.text-gray-400');
-      expect(timestamps.length).toBe(2);
+      expect(timestamps.length).toBe(1);
     });
 
-    it('shows timestamp when hour changes', () => {
+    it('shows the timestamp on a message 5 minutes after the last one shown', () => {
       const messages = [
         {
           id: '1',
@@ -1320,7 +1319,7 @@ describe('AssistantChatPanel', () => {
         {
           id: '2',
           pseudonym: 'test-user',
-          createdAt: '2025-10-17T13:00:00Z',
+          createdAt: '2025-10-17T13:04:00Z',
           body: 'Second message',
           channels: ['user'],
           conversation: 'conv-1',
@@ -1335,7 +1334,6 @@ describe('AssistantChatPanel', () => {
 
       const { container } = render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-      // Should show two timestamps (one for each different hour)
       const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(2);
     });

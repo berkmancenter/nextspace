@@ -947,7 +947,7 @@ describe('GroupChatPanel', () => {
       expect(timestamps.length).toBe(1);
     });
 
-    it('shows timestamp when minute changes', () => {
+    it('hides the timestamp on a message less than 5 minutes after the last one shown', () => {
       const messages = [
         {
           id: '1',
@@ -981,12 +981,11 @@ describe('GroupChatPanel', () => {
 
       const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-      // Should show two timestamps (one for each different minute)
       const timestamps = container.querySelectorAll('.text-gray-400');
-      expect(timestamps.length).toBe(2);
+      expect(timestamps.length).toBe(1);
     });
 
-    it('shows timestamp when hour changes', () => {
+    it('shows the timestamp on a message 5 minutes after the last one shown', () => {
       const messages = [
         {
           id: '1',
@@ -1005,7 +1004,7 @@ describe('GroupChatPanel', () => {
         {
           id: '2',
           pseudonym: 'Bob',
-          createdAt: '2025-10-17T13:00:00Z',
+          createdAt: '2025-10-17T13:04:00Z',
           body: { text: 'Second message' },
           channels: ['chat'],
           conversation: 'conv-1',
@@ -1020,7 +1019,6 @@ describe('GroupChatPanel', () => {
 
       const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-      // Should show two timestamps (one for each different hour)
       const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(2);
     });
@@ -1064,7 +1062,7 @@ describe('GroupChatPanel', () => {
       expect(timestamps.length).toBe(1);
     });
 
-    it('shows timestamp for Event Assistant messages when minute changes', () => {
+    it('shows timestamp for Event Assistant messages once 5 minutes have passed', () => {
       const messages = [
         {
           id: '1',
@@ -1083,7 +1081,7 @@ describe('GroupChatPanel', () => {
         {
           id: '2',
           pseudonym: 'Event Assistant',
-          createdAt: '2025-10-17T12:01:00Z',
+          createdAt: '2025-10-17T12:05:00Z',
           body: { text: 'Assistant response' },
           channels: ['chat'],
           conversation: 'conv-1',
@@ -1098,7 +1096,6 @@ describe('GroupChatPanel', () => {
 
       const { container } = render(<GroupChatPanel {...baseProps} messages={messages} />);
 
-      // Should show two timestamps (one for each different minute)
       const timestamps = container.querySelectorAll('.text-gray-400');
       expect(timestamps.length).toBe(2);
     });

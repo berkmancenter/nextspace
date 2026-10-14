@@ -8,7 +8,7 @@ import { SlashCommand, createSlashCommandEnhancer } from './enhancers/slashComma
 import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
 import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { useAutoScroll } from '../hooks/useAutoScroll';
-import { parseMessageBody } from '../utils/Helpers';
+import { getTimestampVisibility, parseMessageBody } from '../utils/Helpers';
 import { BotIcon } from './BotIcon';
 import { MediaLightbox } from './MediaLightbox';
 import { ThreadedMessage } from './ThreadedMessage';
@@ -152,6 +152,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     .filter((m) => !isPromptResponse(m))
     .filter((m) => !isModeratorSubmitted(m))
     .filter((m) => !isEscalateCommand(m));
+  const timestampVisibility = getTimestampVisibility(parentMessages);
 
   // Auto-scroll based on parent messages only (not threaded replies)
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(parentMessages);
@@ -353,15 +354,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
 
             {parentMessages.map((message, i) => {
               const replies = threadMap.get(message.id!) || [];
-              // Calculate if we should show timestamp
-              const showTimestamp = (() => {
-                // Some messages, like intros, may not have createdAt - in that case, don't show timestamp
-                if (!message.createdAt) return false;
-                if (i === 0) return true;
-                const prevDate = new Date(parentMessages[i - 1].createdAt!);
-                const currDate = new Date(message.createdAt!);
-                return prevDate.getHours() !== currDate.getHours() || prevDate.getMinutes() !== currDate.getMinutes();
-              })();
+              const showTimestamp = timestampVisibility[i];
 
               return (
                 <ThreadedMessage
