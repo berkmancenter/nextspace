@@ -60,6 +60,14 @@ describe('useAnalytics visit tagging', () => {
     expect(tagEventVisit).not.toHaveBeenCalled();
   });
 
+  it('does NOT tag the visit on the presentation page', () => {
+    mockRouter.query = { conversationId: 'conv-123' };
+
+    renderHook(() => useAnalytics({ pageType: 'presentation' }));
+
+    expect(tagEventVisit).not.toHaveBeenCalled();
+  });
+
   it('does NOT tag a visit when there is no conversation id (e.g. home)', () => {
     mockRouter.query = {};
 

@@ -309,6 +309,7 @@ function generateEventUrls(conversationData: Conversation, botName: string): Eve
   const urlPrefix = `${window.location.protocol}//${window.location.host}`;
   const moderator: EventUrl[] = [];
   const participant: EventUrl[] = [];
+  const presentation: EventUrl[] = [];
 
   const zoomAdapter = conversationData.adapters.find((adapter) => adapter.type === 'zoom');
   const zoom = zoomAdapter ? { label: 'Zoom', url: zoomAdapter.config?.meetingUrl as string } : undefined;
@@ -345,13 +346,12 @@ function generateEventUrls(conversationData: Conversation, botName: string): Eve
       });
     }
   } else if (convType && convType.name === 'eventAssistant') {
-    const eventAssistantUrl = {
-      label: botName,
-      url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
-        hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ''
-      }${hasChat ? `&channel=chat,${chatPasscode}` : ''}`,
-    };
-    participant.push(eventAssistantUrl);
+    // The presentation view joins as a participant, so it carries exactly the participant's channels.
+    const participantChannels = `?conversationId=${conversationData.id}${
+      hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ''
+    }${hasChat ? `&channel=chat,${chatPasscode}` : ''}`;
+    participant.push({ label: botName, url: `${urlPrefix}/assistant/${participantChannels}` });
+    presentation.push({ label: 'Presentation view', url: `${urlPrefix}/present/${participantChannels}` });
     if (modPasscode) {
       moderator.push({
         label: botName,
@@ -370,6 +370,7 @@ function generateEventUrls(conversationData: Conversation, botName: string): Eve
   return {
     moderator,
     participant,
+    presentation,
     zoom,
   };
 }

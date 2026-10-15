@@ -9,6 +9,7 @@ import { useVisibilityAwareDuration } from '../hooks/useVisibilityAwareDuration'
 import { BotIcon } from './BotIcon';
 import { getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { normalizeAssistantPseudonym } from '../utils/Helpers';
+import { PRESENTATION_TEXT } from '../utils/presentationText';
 import { useBotName } from '../context/ConversationTypeContext';
 
 interface TranscriptProps {
@@ -32,6 +33,8 @@ interface TranscriptProps {
   showControls?: boolean;
   /** When true, hides the open/close toggle and fills the available container width */
   hideToggle?: boolean;
+  /** Sets transcript text to the presentation view's size, for reading on a shared screen */
+  presentation?: boolean;
   /**
    * Pass the `lastReconnectTime` value from `useSessionJoin`. When this
    * changes to a non-null value the transcript will re-fetch its message
@@ -696,7 +699,10 @@ export function Transcript(props: TranscriptProps) {
                 key={`message-${i}`}
                 className={`mb-4 ${focusedMessageIds.includes(message.id!) ? 'bg-[#4A0979]' : ''}`}
               >
-                <div className="flex items-center gap-2 text-gray-300 text-sm mb-1">
+                <div
+                  className="flex items-center gap-2 text-gray-300 text-sm mb-1"
+                  style={props.presentation ? PRESENTATION_TEXT.meta : undefined}
+                >
                   <span>
                     {message.createdAt
                       ? new Date(message.createdAt).toLocaleTimeString([], {
@@ -716,7 +722,9 @@ export function Transcript(props: TranscriptProps) {
                     </span>
                   )}
                 </div>
-                <p className="text-white text-base">{message.body.text ? message.body.text : message.body}</p>
+                <p className="text-white text-base" style={props.presentation ? PRESENTATION_TEXT.message : undefined}>
+                  {message.body.text ? message.body.text : message.body}
+                </p>
               </div>
             );
           })}

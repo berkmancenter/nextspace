@@ -34,6 +34,23 @@ beforeEach(() => {
 });
 
 describe('PollMessage', () => {
+  describe('in the presentation view', () => {
+    it('enlarges the question and choices so the room can read them', () => {
+      render(<PollMessage {...baseProps} presentation />);
+
+      expect(screen.getByText('Best language?')).toHaveStyle({ fontSize: '2rem' });
+      expect(screen.getByText('TypeScript')).toHaveStyle({ fontSize: '1.5rem' });
+      expect(screen.getByText('50%')).toHaveStyle({ fontSize: '1.125rem' });
+    });
+
+    it('keeps the default sizes outside the presentation view', () => {
+      render(<PollMessage {...baseProps} />);
+
+      expect(screen.getByText('Best language?')).toHaveStyle({ fontSize: '0.9375rem' });
+      expect(screen.getByText('TypeScript')).toHaveStyle({ fontSize: '0.9375rem' });
+    });
+  });
+
   describe('rendering', () => {
     it('renders the poll title', () => {
       render(<PollMessage {...baseProps} />);

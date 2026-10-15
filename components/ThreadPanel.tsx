@@ -7,6 +7,7 @@ import { normalizeAssistantPseudonym } from '../utils/Helpers';
 import { GenericEnhancerMenu } from './GenericEnhancerMenu';
 import { MessageFeedback } from './MessageFeedback';
 import { BotIcon } from './BotIcon';
+import { PRESENTATION_TEXT } from '../utils/presentationText';
 import { isReadersMessage } from './ThreadedMessage';
 
 interface ThreadPanelProps {
@@ -27,6 +28,8 @@ interface ThreadPanelProps {
   waitingForResponse?: boolean;
   /** Shown in place of the reply box when the reader may not reply yet. */
   replyLock?: React.ReactNode;
+  /** Sets message text to the presentation view's size and enlarges names and timestamps. */
+  presentation?: boolean;
 }
 
 export const ThreadPanel: FC<ThreadPanelProps> = ({
@@ -44,7 +47,10 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
   feedbackConfig,
   waitingForResponse = false,
   replyLock,
+  presentation = false,
 }) => {
+  const nameStyle = presentation ? PRESENTATION_TEXT.name : undefined;
+  const metaStyle = presentation ? PRESENTATION_TEXT.meta : undefined;
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [isReplying, setIsReplying] = React.useState(true); // Start with reply input open
@@ -236,7 +242,12 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
       </div>
 
       {/* Thread content - scrollable */}
-      <div ref={threadContentRef} className="flex-1 overflow-y-auto px-4 py-4">
+      <div
+        ref={threadContentRef}
+        data-testid="thread-message-list"
+        className="flex-1 overflow-y-auto px-4 py-4"
+        style={presentation ? PRESENTATION_TEXT.message : undefined}
+      >
         {/* Parent message - always left-aligned in thread view */}
         <div className="mb-6">
           <div className="text-xs font-semibold text-gray-500 uppercase mb-2">Original Message</div>
@@ -247,7 +258,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
             {/* Message content */}
             <div className="flex flex-col items-start flex-1">
               {/* Name and timestamp */}
-              <div className="text-sm font-bold mb-1 text-left">
+              <div className="text-sm font-bold mb-1 text-left" style={nameStyle}>
                 {normalizeAssistantPseudonym(parentMessage, botName)}
                 {parentMessage.ownerIsAdmin && <span className="text-gray-600 font-normal"> (Admin)</span>}
                 {isReadersMessage(parentMessage, pseudonym, currentUserId) && (
@@ -255,7 +266,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                 )}
                 {renderNameBadge?.(parentMessage)}
                 {parentMessage.createdAt && (
-                  <span className="text-xs font-normal text-gray-400 ml-2">
+                  <span className="text-xs font-normal text-gray-400 ml-2" style={metaStyle}>
                     {new Date(parentMessage.createdAt).toLocaleTimeString('en-US', {
                       hour: '2-digit',
                       minute: '2-digit',
@@ -304,7 +315,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
               {/* Message content */}
               <div className="flex flex-col items-start flex-1">
                 {/* Name and timestamp */}
-                <div className="text-sm font-bold mb-1 text-left">
+                <div className="text-sm font-bold mb-1 text-left" style={nameStyle}>
                   {normalizeAssistantPseudonym(reply, botName)}
                   {reply.ownerIsAdmin && <span className="text-gray-600 font-normal"> (Admin)</span>}
                   {isReadersMessage(reply, pseudonym, currentUserId) && (
@@ -312,7 +323,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                   )}
                   {renderNameBadge?.(reply)}
                   {reply.createdAt && (
-                    <span className="text-xs font-normal text-gray-400 ml-2">
+                    <span className="text-xs font-normal text-gray-400 ml-2" style={metaStyle}>
                       {new Date(reply.createdAt).toLocaleTimeString('en-US', {
                         hour: '2-digit',
                         minute: '2-digit',
@@ -344,7 +355,9 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
         {waitingForResponse && (
           <div className="flex items-center gap-1 mt-4">
             <BotIcon size={32} color="#4b5563" bouncing={true} />
-            <span className="text-xs text-gray-500 italic">thinking...</span>
+            <span className="text-xs text-gray-500 italic" style={metaStyle}>
+              thinking...
+            </span>
           </div>
         )}
 
