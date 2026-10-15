@@ -36,9 +36,9 @@ export function buildScene(payload: ConceptGraphPayload): SkyScene {
     sessionCount: index.size,
     sessionLabels: Array.from({ length: index.size }, (_, i) => sessionLabel(payload, i)),
     conceptSessions: conceptSessions(model),
-    concepts: new Map(payload.concepts.map((c) => [c.id, c])),
-    contributions: new Map(payload.contributions.map((k) => [k.id, k])),
-    prompts: new Map(payload.originPrompts.map((p) => [p.id, p])),
+    concepts: new Map((payload.concepts ?? []).map((c) => [c.id, c])),
+    contributions: new Map((payload.contributions ?? []).map((k) => [k.id, k])),
+    prompts: new Map((payload.originPrompts ?? []).map((p) => [p.id, p])),
   };
 }
 

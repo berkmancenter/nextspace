@@ -64,7 +64,8 @@ export const ConceptGraphView = ({ payload }: ConceptGraphViewProps) => {
 
   const skyPositions = useMemo(() => layoutSky(scene.model), [scene.model]);
   const orbitPositions = useMemo(() => layoutOrbit(scene.model, orbitCenter).positions, [scene.model, orbitCenter]);
-  const positions = useTweenedPositions(layout === 'orbit' ? orbitPositions : skyPositions, reduceMotion);
+  const targetPositions = layout === 'orbit' ? orbitPositions : skyPositions;
+  const positions = useTweenedPositions(targetPositions, reduceMotion);
   const filterState = useMemo(() => filterSky(scene.model, filter), [scene.model, filter]);
 
   const select = useCallback(
@@ -137,6 +138,7 @@ export const ConceptGraphView = ({ payload }: ConceptGraphViewProps) => {
                   <SkyCanvas
                     scene={scene}
                     positions={positions}
+                    targetPositions={targetPositions}
                     orbit={layout === 'orbit'}
                     filter={filterState}
                     hoverId={hoverId}
