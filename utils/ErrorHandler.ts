@@ -46,7 +46,10 @@ export const QueryParamsError = (router: NextRouter, page: Page): { header: stri
     checkTranscriptPasscode();
   }
 
-  if (missing.length > 0) return { header: `Missing required parameter${missing.length > 1 ? 's' : ''}`, params: missing };
+  if (missing.length > 0) {
+    console.warn('Incomplete event link, missing:', missing);
+    return { header: 'This link is incomplete. Ask the event organizer for the full link.', params: [] };
+  }
 
   return null;
 };
