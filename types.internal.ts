@@ -304,7 +304,25 @@ export type GraphConcept = Schemas['GraphConcept'] & {
      really were the same idea. A folded concept was a genuinely distinct idea, consolidated
      for space, so its label is kept so a reader can still find it. */
   foldedFrom?: string[];
+  /* One to three sentences describing the concept. Ahead of the generated spec like
+     `foldedFrom`: the backend emits it for about half of a series graph's concepts, and it is
+     absent on the rest. */
+  gloss?: string;
+  /* Every conversation the concept came up in, ordered and de-duplicated. Ahead of the generated
+     spec like `foldedFrom`: unlike `provenance.conversationId`, which stays the first (origin)
+     session, this survives merges and folds, so a recurring concept keeps all its sessions. */
+  conversationIds?: string[];
 };
+
+/* One session of a series graph. Ahead of the generated spec like `foldedFrom`. */
+export interface GraphSession {
+  conversationId: string;
+  /* 1-based, by event date ascending. */
+  order: number;
+  title?: string;
+  /* ISO date. */
+  date?: string;
+}
 export type GraphContribution = Schemas['GraphContribution'];
 export type GraphOriginPrompt = Schemas['GraphOriginPrompt'];
 
@@ -312,6 +330,9 @@ export type GraphOriginPrompt = Schemas['GraphOriginPrompt'];
    narrowed to the extended GraphConcept above (foldedFrom), same reason as there. */
 export type ConceptGraphPayload = Omit<Required<Schemas['ConceptGraphPayload']>, 'concepts'> & {
   concepts: GraphConcept[];
+  /* Series graphs only, and ahead of the generated spec like `foldedFrom`: the sessions in event
+     order, so numbering follows the calendar rather than which node happened to appear first. */
+  sessions?: GraphSession[];
 };
 
 /* The spec types a document payload as an open object; this is the shape it holds. */

@@ -1,8 +1,11 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import ArtifactPreviewPage from '../../pages/artifacts/preview';
-import { conceptGraphFixture, minimalConceptGraphFixture, seriesConceptGraphFixture } from '../../content/conceptGraphFixture';
-
-const nodeHandle = (container: HTMLElement, id: string) => container.querySelector(`[data-node-id="${id}"]`);
+import {
+  conceptGraphFixture,
+  denseConceptGraphFixture,
+  minimalConceptGraphFixture,
+  seriesConceptGraphFixture,
+} from '../../content/conceptGraphFixture';
 
 /* next/dynamic defers the graph past this render, so it is resolved eagerly here — the point
    of these tests is that the page hands the fixtures to the renderer. */
@@ -17,21 +20,33 @@ describe('the artifact preview page', () => {
   it('draws the full fixture, so the renderer can be looked at without a backend', () => {
     const { container } = render(<ArtifactPreviewPage />);
 
-    expect(container.querySelector('[data-node-id="c-assistant"]')).toBeInTheDocument();
-    expect(container.querySelector('[data-node-id="c-trust"]')).toBeInTheDocument();
-    expect(container.querySelector('[data-node-id="k18"]')).toBeInTheDocument();
+    for (const concept of conceptGraphFixture.concepts) {
+      expect(container.querySelector(`[data-concept-id="${concept.id}"]`)).toBeInTheDocument();
+    }
+    // k18 joins three concepts, so it is a diamond.
+    expect(
+      screen.getByRole('button', { name: /^Co-shapes, quote, joins The Assistant, Trust and Skepticism$/ }),
+    ).toBeInTheDocument();
   });
 
   it('draws the minimal fixture alongside it', () => {
     const { container } = render(<ArtifactPreviewPage />);
 
-    expect(container.querySelectorAll(`[data-node-id="${minimalConceptGraphFixture.contributions[0].id}"]`)).toHaveLength(1);
+    expect(container.querySelectorAll(`[data-concept-id="${minimalConceptGraphFixture.concepts[0].id}"]`)).toHaveLength(1);
+  });
+
+  it('draws the series, long-series and dense fixtures too', () => {
+    const { container } = render(<ArtifactPreviewPage />);
+
+    expect(container.querySelector('[data-concept-id="s-c-trust"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-concept-id="l-c8"]')).toBeInTheDocument();
+    expect(container.querySelector(`[data-concept-id="${denseConceptGraphFixture.concepts[46].id}"]`)).toBeInTheDocument();
   });
 
   it('shows the empty state too, which is a valid graph', () => {
     render(<ArtifactPreviewPage />);
 
-    expect(screen.getByText(/empty so far/i)).toBeInTheDocument();
+    expect(screen.getByText(/this graph is empty so far/i)).toBeInTheDocument();
   });
 
   it('says the data is local, so nobody mistakes it for an event', () => {
@@ -40,37 +55,18 @@ describe('the artifact preview page', () => {
     expect(screen.getByText(/makes no requests/i)).toBeInTheDocument();
   });
 
-  it('draws a node for every concept the fixture holds', () => {
-    // Every concept gets a node. Whether it gets a *label* depends on whether one fits
-    // without printing over a better-connected neighbour, which is the renderer's call.
-    const { container } = render(<ArtifactPreviewPage />);
-
-    for (const concept of conceptGraphFixture.concepts) {
-      expect(container.querySelector(`[data-node-id="${concept.id}"]`)).toBeInTheDocument();
-    }
-  });
-
   it('names what the series fixture’s folded concept encompasses, on demand', () => {
-    // The series fixture stands in for a graph that outgrew its size cap: `s-c-trust` carries
-    // a `foldedFrom` the same as a real fold would leave behind, so a reviewer can see the
-    // detail card's "Also encompasses" line without a real series long enough to trigger one.
+    // `s-c-trust` carries a `foldedFrom` the same as a real fold would leave behind, so a
+    // reviewer can see the panel's "Also encompasses" line without a series long enough to fold.
     const folded = seriesConceptGraphFixture.concepts.find((c) => c.foldedFrom?.length);
     expect(folded).toBeDefined();
+    const text = `Also encompasses ${folded!.foldedFrom![0]}`;
 
     const { container } = render(<ArtifactPreviewPage />);
 
-    // No permanent mark on the canvas — same rule as a statement or an origin prompt. Scoped
-    // to the detail cards themselves (there are none until something is hovered or clicked),
-    // since the section's own descriptive prose names the folded label deliberately, to tell a
-    // reviewer what to click for.
-    for (const detail of screen.queryAllByTestId('graph-node-detail')) {
-      expect(within(detail).queryByText(new RegExp(folded!.foldedFrom![0]))).not.toBeInTheDocument();
-    }
-
-    fireEvent.click(nodeHandle(container, folded!.id)!);
-
-    const details = screen.getAllByTestId('graph-node-detail');
-    const withFold = details.find((detail) => within(detail).queryByText(new RegExp(folded!.foldedFrom![0])));
-    expect(withFold).toBeDefined();
+    // No permanent mark on the sky: it only shows once the concept is selected.
+    expect(screen.queryByText(text)).not.toBeInTheDocument();
+    fireEvent.click(container.querySelector(`[data-concept-id="${folded!.id}"]`)!);
+    expect(screen.getAllByText(text)).toHaveLength(1);
   });
 });

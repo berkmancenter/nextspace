@@ -18,19 +18,12 @@ import { ConceptGraphPayload } from '../types.internal';
  * - `c-assistant` is joined by a contribution from nearly every other concept while
  *   `c-hallucination` and `c-workplace-norms` sit at the edge of the graph, so both a hub
  *   and a leaf are on screen.
- * - A contribution draws its statement, when it has one, in place of its short `kind` — see
- *   {@link buildGraph} — which is why most of these run long enough that a reader has to
- *   zoom in before one resolves without colliding with whatever is near it. A few carry no
- *   statement at all, since the field is optional, and that is independent of shape: `k19` is
- *   a statement-less leaf (a diamond, since it names one concept) and `k20` is a two-concept
- *   line *with* a statement — the reverse of the usual pairing, where most two-concept links
- *   lack one. All four combinations of shape (diamond or line) and weight (solid outline for
- *   a quote, dashed for a summary-only `kind`) are on screen because of these two, so the
- *   canvas draws every combination the renderer supports even though the legend itself only
- *   ever shows weight, never shape (see the legend caption in ConceptGraphView, and its own
- *   comment for why). See the `CONTRIBUTION` comment there for why weight never becomes a
- *   different colour: every one of these, statement or not, is still a specific thing a
- *   participant said, never something invented independently of them.
+ * - Some carry no statement at all, since the field is optional, and that is independent of
+ *   shape: `k19` is a statement-less leaf (a diamond, since it names one concept) and `k20` is a
+ *   two-concept line *with* a statement, the reverse of the usual pairing. All four
+ *   combinations of shape (diamond or line) and weight (solid outline for a quote, dashed for
+ *   summary only) are on the sky because of these two. Weight is never a different colour:
+ *   every one of these, statement or not, is still a specific thing a participant said.
  *
  * Everything here is invented. Statements are written the way the generator's are — the
  * events these graphs come from are held under the Chatham House Rule, so nothing names or
@@ -145,7 +138,7 @@ export const conceptGraphFixture: ConceptGraphPayload = {
 
     // A leaf without a statement: no one account carried a quotable sentence for it, the
     // same reason a two-concept link can lack one, but this one still gets its own diamond
-    // since it names only one concept. Drawn with ConceptGraphView's dashed outline rather
+    // since it names only one concept. Drawn with a dashed outline rather
     // than a different colour — still a participant contribution, just without the quote.
     { id: 'k19', kind: 'referenced', concepts: ['c-workplace-norms'] },
 
@@ -286,5 +279,161 @@ export const seriesConceptGraphFixture: ConceptGraphPayload = {
       concepts: ['s-c-disappointment', 's-c-trust'],
       provenance: { conversationId: SESSION_THREE },
     },
+    // Three concepts at once, with a quote: a solid diamond on the series sky. It also gives
+    // the assistant and trust a second and third session to draw as ring arcs.
+    {
+      id: 's-k8',
+      kind: 'reshapes',
+      concepts: ['s-c-assistant', 's-c-trust', 's-c-habit'],
+      statement: 'Once checking it became a habit, how much we trusted it stopped being a choice we made each time.',
+      provenance: { conversationId: SESSION_TWO },
+    },
   ],
 };
+
+/* A small seeded generator, so the fixtures below are the same on every run and in every test. */
+function seeded(seed: number) {
+  let a = seed;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * A series that spans nine sessions, one more than the eight session colours, so the colour
+ * for session nine wraps back to the first. Concepts recur across sessions, so the rings carry
+ * several arcs. Small on purpose: it is here to look at the session key and the wrap.
+ */
+const LONG_SESSIONS = Array.from({ length: 9 }, (_, i) => `6733fe79ca20209f1fa03${String(i).padStart(3, '0')}`);
+export const longSeriesConceptGraphFixture: ConceptGraphPayload = {
+  originPrompts: [
+    { id: 'l-p1', text: 'What did the first session leave unsettled?', provenance: { conversationId: LONG_SESSIONS[0] } },
+  ],
+  concepts: LONG_SESSIONS.map((session, i) => ({
+    id: `l-c${i}`,
+    label: `Theme ${i + 1}`,
+    provenance: { conversationId: session },
+    ...(i === 0 ? { origin: 'l-p1' } : {}),
+  })),
+  contributions: LONG_SESSIONS.map((session, i) => ({
+    id: `l-k${i}`,
+    kind: 'returns to',
+    concepts: [`l-c${i}`, `l-c${(i + 1) % LONG_SESSIONS.length}`],
+    ...(i % 3 === 0 ? {} : { statement: `A remark from session ${i + 1} that picks the thread back up.` }),
+    provenance: { conversationId: session },
+  })),
+};
+
+/**
+ * A graph the size and shape of a real series graph: forty-seven concepts with long labels,
+ * eighty-five contributions (about two thirds joining two concepts, the rest diamonds joining
+ * three to five), no provenance at all (so no session rings, filter or prompts), a handful of
+ * folded concepts, a gloss on about half the concepts, and three contributions with no
+ * statement. Everything is synthetic, generated from a fixed seed, and the statements run up
+ * to about three hundred characters, which is what the reading panel has to hold.
+ */
+export const denseConceptGraphFixture: ConceptGraphPayload = (() => {
+  const rand = seeded(20241);
+  const pick = <T>(items: T[]) => items[Math.floor(rand() * items.length)];
+
+  const handWritten = [
+    'Ambiguity of machine agency and responsibility',
+    'Inherited assumptions in training material',
+    'Closed systems and who may inspect them',
+    'Everyday reliance on automated advice',
+    'Slow erosion of professional judgement',
+    'Shared vocabulary for describing mistakes',
+  ];
+  const heads = [
+    'Oversight',
+    'Consent',
+    'Dependence',
+    'Transparency',
+    'Fatigue',
+    'Authority',
+    'Care',
+    'Bias',
+    'Autonomy',
+    'Trust',
+  ];
+  const tails = [
+    'in public institutions',
+    'around household habits',
+    'in workplace routines',
+    'of expert judgement',
+    'in shared decisions',
+    'across cultural settings',
+    'in private spaces',
+    'during civic debate',
+  ];
+  const generated = heads.flatMap((h) => tails.map((t) => `${h} ${t}`));
+  // Fisher-Yates with the seeded generator, then the first 41 to sit beside the hand-written six.
+  for (let i = generated.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [generated[i], generated[j]] = [generated[j], generated[i]];
+  }
+  const labels = [...handWritten, ...generated.slice(0, 41)];
+
+  const glosses = [
+    'How people describe where a decision really came from when a tool shaped it.',
+    'A habit that forms quietly and is noticed only when it is interrupted. Several people recognised it in themselves.',
+    'The gap between what a system is said to do and what anyone in the room could check.',
+  ];
+  const concepts = labels.map((label, i) => ({
+    id: `d-c${i}`,
+    label,
+    ...(i % 2 === 0 ? { gloss: glosses[i % glosses.length] } : {}),
+    ...(i % 9 === 4 ? { foldedFrom: [`${label.split(' ')[0]} (earlier wording)`] } : {}),
+  }));
+
+  const kinds = [
+    'enables',
+    'tension with',
+    'central worry about',
+    'depends on',
+    'complicates',
+    'distinguishes',
+    'borrows from',
+    'is hidden by',
+    'rests on',
+  ];
+  const clauses = [
+    'I only noticed it when the tool was unavailable and I had to work the old way',
+    'nobody in my team could say who had actually decided',
+    'it was fine until the first time it mattered',
+    'we kept using the word as if everyone meant the same thing by it',
+    'I trust the process more than I trust any single answer it gives me',
+    'the people who built it were not the people who had to live with it',
+    'part of me wants to know how it works and part of me does not',
+  ];
+  const statement = () => {
+    const n = 1 + Math.floor(rand() * 3);
+    return Array.from({ length: n }, () => `${pick(clauses)}.`)
+      .join(' ')
+      .slice(0, 300);
+  };
+
+  // Hubs first: low indexes are favoured, so a few concepts connect to many.
+  const concept = () => `d-c${Math.floor(rand() * rand() * concepts.length)}`;
+  const distinct = (n: number) => {
+    const out = new Set<string>();
+    while (out.size < n) out.add(concept());
+    return [...out];
+  };
+
+  const contributions = Array.from({ length: 85 }, (_, i) => {
+    const size = i < 57 ? 2 : i < 71 ? 3 : i < 80 ? 4 : 5;
+    return {
+      id: `d-k${i}`,
+      kind: pick(kinds),
+      concepts: distinct(size),
+      // Three of them carry no quote, spread through the list rather than bunched.
+      ...(i % 29 === 7 ? {} : { statement: statement() }),
+    };
+  });
+
+  return { originPrompts: [], concepts, contributions };
+})();

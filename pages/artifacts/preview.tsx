@@ -3,7 +3,9 @@ import dynamic from 'next/dynamic';
 import { Box, Divider, Typography } from '@mui/material';
 import {
   conceptGraphFixture,
+  denseConceptGraphFixture,
   emptyConceptGraphFixture,
+  longSeriesConceptGraphFixture,
   minimalConceptGraphFixture,
   seriesConceptGraphFixture,
 } from '../../content/conceptGraphFixture';
@@ -48,23 +50,37 @@ export default function ArtifactPreviewPage() {
 
         <Section
           title="A full graph"
-          note="Ten concepts, twenty contributions, two origin prompts. Most contributions are leaves — one person's statement about living with the assistant, linked to the concept it speaks to — drawn by that statement rather than a short kind, so a long one only resolves once you zoom in far enough for it to stop colliding with its neighbours. A few contributions are plain relationships between concepts that no single statement carries, drawn as dashed lines rather than solid ones; the leaf labelled referenced has no statement either, so it is a dashed diamond, while the line labelled deepens is the reverse case — a two-concept relationship that does carry one, so it draws solid. Diamond or line, solid or dashed, it's the same amber throughout: all four are equally a participant's own contribution, differing only in whether a direct quote survived. The diamond labelled co-shapes joins three concepts at once — the case a plain edge cannot express. Origin prompts are hidden until you switch them on with the button above the canvas; shown, each is drawn in full, never elided. Hover or tap a node to read it; scroll to zoom, drag to pan."
+          note="Ten concepts, twenty contributions, two origin prompts. Concepts are stars, brighter with more connections. A contribution joining three concepts is a diamond with a spoke to each, and one joining exactly two is the line between them. Solid means a direct quote survived; dashed means summary only, so the diamond labelled referenced and the lines labelled tempers or meets are dashed, while the line labelled deepens is solid. The two small pills are origin prompts, dotted to what they led to. Hover or focus a star to light its constellation; select anything to read it beside the sky. Orbit centres the selected concept, and List is the complete keyboard and screen-reader equivalent."
         >
           <ConceptGraphView payload={conceptGraphFixture} />
         </Section>
 
         <Section
           title="A series graph"
-          note="One topic's sessions folded into a single graph. Concepts are coloured by the session that raised them, numbered by first appearance — a session is not a person, and it is the one piece of provenance safe to show a reader. Trust, raised in the first session and returned to in the second and third, is one node rather than three. It also stands in for a series long enough to outgrow its size cap: click it to see 'Also encompasses: Reliability', a concept folded into it rather than dropped."
+          note="One topic's sessions folded into a single graph. Each star's ring is cut into one arc per session it appears in, coloured by session; Trust is in three, the assistant in two. The Show menu fades everything outside one session without moving anything. Trust also stands in for a series long enough to outgrow its size cap: select it to see 'Also encompasses Reliability'."
         >
-          <ConceptGraphView payload={seriesConceptGraphFixture} height={420} />
+          <ConceptGraphView payload={seriesConceptGraphFixture} />
+        </Section>
+
+        <Section
+          title="A series past eight sessions"
+          note="Nine sessions, one more than there are session colours, so the ninth reuses the first colour. Rings are always solid; dashed is reserved for summary only."
+        >
+          <ConceptGraphView payload={longSeriesConceptGraphFixture} />
+        </Section>
+
+        <Section
+          title="A dense graph with no provenance"
+          note="Forty-seven concepts and eighty-five contributions, about two thirds of them lines and the rest diamonds joining three to five concepts, with long labels, a few summary-only contributions and some folded concepts. Like a real generated graph it has no session or prompt data, so there are no rings, no filter and no prompt pills. Synthetic text throughout."
+        >
+          <ConceptGraphView payload={denseConceptGraphFixture} />
         </Section>
 
         <Section
           title="The smallest graph that draws all three node kinds"
-          note="One concept, its one leaf statement, and the origin prompt attached to the concept by a dashed link — switch on 'Show origin prompts' above the canvas to see it."
+          note="One concept, its one leaf statement, and the origin prompt attached to the concept by a dotted link."
         >
-          <ConceptGraphView payload={minimalConceptGraphFixture} height={320} />
+          <ConceptGraphView payload={minimalConceptGraphFixture} />
         </Section>
 
         <Section
