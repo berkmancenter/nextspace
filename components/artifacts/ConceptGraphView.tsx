@@ -27,8 +27,10 @@ interface ConceptGraphViewProps {
 
 /** Below this width the sky's labels get too small to read, so the list is the default. */
 const NARROW_QUERY = '(max-width:599px)';
-/** The widest the canvas may be while still fitting the window's height (85vh), at the sky's own aspect ratio. */
-const SKY_MAX_WIDTH = `calc(85vh * ${skyGeometry.viewBox.width} / ${skyGeometry.viewBox.height + 2 * VIEW_PAD})`;
+/* The page header, title and controls above the canvas take about this much of the window's height. */
+const ABOVE_CANVAS_PX = 300;
+/** The widest the canvas may be while its whole height still fits the window, at the sky's own aspect ratio (never under 480px). */
+const SKY_MAX_WIDTH = `max(480px, calc((100vh - ${ABOVE_CANVAS_PX}px) * ${skyGeometry.viewBox.width} / ${skyGeometry.viewBox.height + 2 * VIEW_PAD}))`;
 
 /**
  * Draws a ConceptGraphArtifact as a dark "concept sky": concepts are bone-coloured stars, the
@@ -124,8 +126,8 @@ export const ConceptGraphView = ({ payload }: ConceptGraphViewProps) => {
       >
         <SkyControls scene={scene} view={view} filter={filter} onView={changeView} onFilter={changeFilter} />
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'stretch', justifyContent: 'center' }}>
-          {/* The sky never grows taller than the window: its width is capped at the height it would
-              have, so the canvas keeps its aspect ratio and the hover card stays on its star. */}
+          {/* The sky never grows taller than what is left of the window below the header: its width is
+              capped at the height that leaves, so the canvas keeps its aspect ratio and the hover card stays on its star. */}
           <Box
             sx={{
               flex: '999 1 600px',
