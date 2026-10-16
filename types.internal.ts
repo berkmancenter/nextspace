@@ -327,8 +327,10 @@ export type GraphContribution = Schemas['GraphContribution'];
 export type GraphOriginPrompt = Schemas['GraphOriginPrompt'];
 
 /* The backend defaults every array to [], so a payload never lacks one. `concepts` is
-   narrowed to the extended GraphConcept above (foldedFrom), same reason as there. */
-export type ConceptGraphPayload = Omit<Required<Schemas['ConceptGraphPayload']>, 'concepts'> & {
+   narrowed to the extended GraphConcept above (foldedFrom), same reason as there. `sessions` is
+   omitted too: once the generated spec carries it, `Required` would make it mandatory, and an
+   intersection with an optional `sessions` can't loosen that back. */
+export type ConceptGraphPayload = Omit<Required<Schemas['ConceptGraphPayload']>, 'concepts' | 'sessions'> & {
   concepts: GraphConcept[];
   /* Series graphs only, and ahead of the generated spec like `foldedFrom`: the sessions in event
      order, so numbering follows the calendar rather than which node happened to appear first. */
