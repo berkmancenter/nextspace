@@ -305,6 +305,8 @@ export function SkyPanel({ scene, selectedId, filter, view, onSelect, onClear, o
       tabIndex={0}
       sx={{
         flex: '1 1 320px',
+        // Beside a wide sky it stays a readable column rather than taking all the leftover width.
+        maxWidth: { xs: 'none', lg: 480 },
         minWidth: 0,
         boxSizing: 'border-box',
         display: 'flex',

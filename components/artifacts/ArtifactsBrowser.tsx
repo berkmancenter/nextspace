@@ -82,7 +82,15 @@ export const ArtifactsBrowser = ({
   }
 
   return (
-    <Box sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, sm: 3 }, py: { xs: 2, sm: 4 } }}>
+    // A graph is a picture rather than prose, so it gets the whole window; documents keep a readable measure.
+    <Box
+      sx={{
+        maxWidth: selected?.type === 'ConceptGraphArtifact' ? 'none' : 1180,
+        mx: 'auto',
+        px: { xs: 2, sm: 3 },
+        py: { xs: 2, sm: 4 },
+      }}
+    >
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
