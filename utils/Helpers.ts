@@ -465,6 +465,26 @@ export const normalizeAssistantPseudonym = (message: PseudonymousMessage, botNam
   return message.fromAgent ? botName : message.pseudonym;
 };
 
+const TIMESTAMP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Decides which messages in a chat list show a timestamp. A message shows one when it is the first with a time,
+ * or when at least 5 minutes have passed since the last timestamp shown, so a steady conversation still gets one
+ * every 5 minutes.
+ * @param messages - Messages in display order. Messages without `createdAt` (like intros) never show a timestamp.
+ * @returns One boolean per message, in the same order.
+ */
+export const getTimestampVisibility = (messages: { createdAt?: string }[]): boolean[] => {
+  let lastShownMs: number | null = null;
+  return messages.map((message) => {
+    if (!message.createdAt) return false;
+    const createdMs = new Date(message.createdAt).getTime();
+    if (lastShownMs !== null && createdMs - lastShownMs < TIMESTAMP_INTERVAL_MS) return false;
+    lastShownMs = createdMs;
+    return true;
+  });
+};
+
 export const buildDirectChannels = (userId: string, agents: AgentChannelConfig[]): components['schemas']['Channel'][] => {
   return agents.map((agent) => ({
     name: `direct-${userId}-${agent.agentId}`,

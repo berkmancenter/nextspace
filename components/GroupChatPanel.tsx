@@ -10,7 +10,7 @@ import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { BotIcon } from './BotIcon';
 import { createMentionsEnhancer } from './enhancers/mentionsEnhancer';
-import { normalizeAssistantPseudonym, parseMessageBody } from '../utils/Helpers';
+import { getTimestampVisibility, normalizeAssistantPseudonym, parseMessageBody } from '../utils/Helpers';
 import { PollMessage, PollMessageBody } from './messages/PollMessage';
 import { IconButton, Tooltip } from '@mui/material';
 import ArrowCircleDownIcon from '@mui/icons-material/ArrowCircleDown';
@@ -135,6 +135,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
 
     return { parentMessages: parents, threadMap: map };
   }, [messages]);
+  const timestampVisibility = useMemo(() => getTimestampVisibility(parentMessages), [parentMessages]);
 
   // Auto-scroll based on any new messages, including threaded replies
   const { messagesEndRef, messagesContainerRef, isAtBottom, scrollToBottom } = useAutoScroll(messages);
@@ -350,15 +351,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
               </div>
 
               {parentMessages.map((message, i) => {
-                // Determine if we should show timestamp
-                const showTimestamp = (() => {
-                  // Some messages, like intros, may not have createdAt - in that case, don't show timestamp
-                  if (!message.createdAt) return false;
-                  if (i === 0) return true;
-                  const prevDate = new Date(parentMessages[i - 1].createdAt!);
-                  const currDate = new Date(message.createdAt!);
-                  return prevDate.getHours() !== currDate.getHours() || prevDate.getMinutes() !== currDate.getMinutes();
-                })();
+                const showTimestamp = timestampVisibility[i];
 
                 return (
                   <ThreadedMessage

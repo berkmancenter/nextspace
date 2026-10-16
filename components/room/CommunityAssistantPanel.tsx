@@ -6,7 +6,7 @@ import { BotIcon } from '../BotIcon';
 import { CommunityMessageInput } from './CommunityMessageInput';
 import { PendingMessage } from './PendingMessage';
 import { PendingRoomMessage, PseudonymousMessage } from '../../types.internal';
-import { parseMessageBody } from '../../utils/Helpers';
+import { getTimestampVisibility, parseMessageBody } from '../../utils/Helpers';
 import { getRoomInitials } from '../../utils/roomAvatarUtils';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
 import styles from './communityRoom.module.css';
@@ -63,6 +63,7 @@ export function CommunityAssistantPanel({
   const { messagesEndRef, messagesContainerRef } = useAutoScroll(messages);
 
   const parentMessages = useMemo(() => messages.filter((m) => !m.parentMessage), [messages]);
+  const timestampVisibility = useMemo(() => getTimestampVisibility(parentMessages), [parentMessages]);
 
   const renderNameBadge = (message: PseudonymousMessage) =>
     message.fromAgent ? <span className={`${styles.agentBadge} ${styles.agentBadgeBesideName}`}>AI Bot</span> : null;
@@ -179,13 +180,7 @@ export function CommunityAssistantPanel({
         ) : (
           <div className="flex flex-col items-start gap-4 pb-2" aria-live="polite">
             {parentMessages.map((message, i) => {
-              const showTimestamp = (() => {
-                if (!message.createdAt) return false;
-                if (i === 0) return true;
-                const prevDate = new Date(parentMessages[i - 1].createdAt!);
-                const currDate = new Date(message.createdAt!);
-                return prevDate.getHours() !== currDate.getHours() || prevDate.getMinutes() !== currDate.getMinutes();
-              })();
+              const showTimestamp = timestampVisibility[i];
 
               return (
                 <ThreadedMessage

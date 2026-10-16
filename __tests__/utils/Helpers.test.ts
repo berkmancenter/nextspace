@@ -1,6 +1,7 @@
 import {
   resolveConversationBotName,
   normalizeAssistantPseudonym,
+  getTimestampVisibility,
   buildDirectChannels,
   parseMessageBody,
   createConversationFromData,
@@ -128,6 +129,40 @@ describe('normalizeAssistantPseudonym', () => {
   it('returns empty string when pseudonym is missing', () => {
     const msg = makeMessage({ pseudonym: undefined });
     expect(normalizeAssistantPseudonym(msg as any, botName)).toBe('');
+  });
+});
+
+describe('getTimestampVisibility', () => {
+  const at = (time: string) => ({ createdAt: `2026-10-14T${time}:00.000Z` });
+
+  it('shows the first message with a time', () => {
+    expect(getTimestampVisibility([at('10:00')])).toEqual([true]);
+  });
+
+  it('hides messages less than 5 minutes after the last shown timestamp', () => {
+    expect(getTimestampVisibility([at('10:00'), at('10:01'), at('10:04')])).toEqual([true, false, false]);
+  });
+
+  it('shows a message exactly 5 minutes after the last shown timestamp', () => {
+    expect(getTimestampVisibility([at('10:00'), at('10:05')])).toEqual([true, true]);
+  });
+
+  it('measures from the last shown timestamp, not the previous message', () => {
+    expect(getTimestampVisibility([at('10:00'), at('10:03'), at('10:06'), at('10:09'), at('10:11')])).toEqual([
+      true,
+      false,
+      true,
+      false,
+      true,
+    ]);
+  });
+
+  it('never shows a message without a time and does not count it as shown', () => {
+    expect(getTimestampVisibility([{}, at('10:00'), {}, at('10:02')])).toEqual([false, true, false, false]);
+  });
+
+  it('returns an empty list for no messages', () => {
+    expect(getTimestampVisibility([])).toEqual([]);
   });
 });
 

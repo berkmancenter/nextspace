@@ -8,7 +8,7 @@ import { CommunityMessageInput, RealNameGate } from './CommunityMessageInput';
 import { MemberIntroContent, PendingRoomMessage, PseudonymousMessage } from '../../types.internal';
 import { MemberIntroCard } from './MemberIntroCard';
 import { PendingBubble, PendingMessage } from './PendingMessage';
-import { parseMessageBody } from '../../utils/Helpers';
+import { getTimestampVisibility, parseMessageBody } from '../../utils/Helpers';
 import { getRoomInitials } from '../../utils/roomAvatarUtils';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
 import styles from './communityRoom.module.css';
@@ -121,6 +121,7 @@ export function CommunityGroupChatPanel({
     map.forEach((replies) => replies.sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()));
     return { parentMessages: parents, threadMap: map };
   }, [messages]);
+  const timestampVisibility = useMemo(() => getTimestampVisibility(parentMessages), [parentMessages]);
 
   const isEmptyRoom = messages.length === 0 && pendingMessages.length === 0;
 
@@ -331,13 +332,7 @@ export function CommunityGroupChatPanel({
                     );
                   }
 
-                  const showTimestamp = (() => {
-                    if (!message.createdAt) return false;
-                    if (i === 0) return true;
-                    const prevDate = new Date(parentMessages[i - 1].createdAt!);
-                    const currDate = new Date(message.createdAt!);
-                    return prevDate.getHours() !== currDate.getHours() || prevDate.getMinutes() !== currDate.getMinutes();
-                  })();
+                  const showTimestamp = timestampVisibility[i];
 
                   return (
                     <React.Fragment key={key}>

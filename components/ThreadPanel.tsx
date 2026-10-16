@@ -3,7 +3,7 @@ import { Close, Send, ArrowBack } from '@mui/icons-material';
 import { IconButton, useMediaQuery, useTheme } from '@mui/material';
 import { PseudonymousMessage, FeedbackConfig } from '../types.internal';
 import { InputEnhancer, ActiveEnhancerState } from '../types/inputEnhancer';
-import { normalizeAssistantPseudonym } from '../utils/Helpers';
+import { getTimestampVisibility, normalizeAssistantPseudonym } from '../utils/Helpers';
 import { GenericEnhancerMenu } from './GenericEnhancerMenu';
 import { MessageFeedback } from './MessageFeedback';
 import { BotIcon } from './BotIcon';
@@ -66,6 +66,9 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
       textareaRef.current.focus();
     }
   }, [isReplying]);
+
+  // The parent always shows its own time, so replies are spaced from it rather than from each other.
+  const replyTimestampVisibility = getTimestampVisibility([parentMessage, ...replies]).slice(1);
 
   const locked = Boolean(replyLock);
   const wasLocked = useRef(locked);
@@ -322,9 +325,9 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                     <span className="text-gray-600 font-normal"> (You)</span>
                   )}
                   {renderNameBadge?.(reply)}
-                  {reply.createdAt && (
+                  {replyTimestampVisibility[idx] && (
                     <span className="text-xs font-normal text-gray-400 ml-2" style={metaStyle}>
-                      {new Date(reply.createdAt).toLocaleTimeString('en-US', {
+                      {new Date(reply.createdAt!).toLocaleTimeString('en-US', {
                         hour: '2-digit',
                         minute: '2-digit',
                       })}
