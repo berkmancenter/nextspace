@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Alert, Box, Button, Chip, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, Dialog, DialogContent, DialogTitle, Typography } from '@mui/material';
 import HistoryIcon from '@mui/icons-material/History';
 import { ArtifactVersionHistory, formatStamp } from './ArtifactVersionHistory';
 import { DocumentArtifactView } from './DocumentArtifactView';
@@ -55,6 +55,88 @@ export const ArtifactView = ({ artifact, artifactPasscode, isLive }: ArtifactVie
   const version = viewingVersion ?? artifact.currentVersion;
   const isHistorical = !!viewingVersion && viewingVersion.versionNumber !== artifact.currentVersionNumber;
 
+  const historyPanel = (
+    <ArtifactVersionHistory
+      artifact={artifact}
+      artifactPasscode={artifactPasscode}
+      viewingVersionNumber={viewingVersion?.versionNumber}
+      onSelectVersion={(selected) =>
+        setViewingVersion(selected.versionNumber === artifact.currentVersionNumber ? null : selected)
+      }
+    />
+  );
+
+  // A concept graph fills the window, so its heading is folded into the reading column beside the sky and the
+  // history opens over it. Colours are inherited: the heading sits on the dark sky or, on a narrow screen, above it.
+  if (artifact.type === 'ConceptGraphArtifact' && version) {
+    return (
+      <Box sx={{ minWidth: 0, height: '100%', minHeight: 0 }}>
+        <ConceptGraphView
+          payload={version.payload as ConceptGraphPayload}
+          header={
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, color: 'inherit' }}>
+              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
+                <Typography variant="subtitle1" component="h1" sx={{ fontWeight: 600, lineHeight: 1.25 }}>
+                  {artifact.title}
+                </Typography>
+                {isLive && !isHistorical && (
+                  <Chip size="small" variant="outlined" label="updated just now" sx={{ color: 'inherit' }} />
+                )}
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Typography variant="caption" sx={{ opacity: 0.75 }}>
+                  Version {version.versionNumber ?? artifact.currentVersionNumber}
+                  {version.createdAt ? ` · ${formatStamp(version.createdAt)}` : ''}
+                </Typography>
+                <Button
+                  size="small"
+                  color="inherit"
+                  startIcon={<HistoryIcon />}
+                  onClick={() => setShowHistory(true)}
+                  sx={{ minWidth: 0, py: 0, textTransform: 'none' }}
+                >
+                  History
+                </Button>
+              </Box>
+              {version.note && (
+                <Typography
+                  variant="caption"
+                  title={version.note}
+                  sx={{
+                    opacity: 0.75,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {version.note}
+                </Typography>
+              )}
+              {isHistorical && (
+                <Alert
+                  severity="info"
+                  sx={{ py: 0 }}
+                  action={
+                    <Button size="small" onClick={() => setViewingVersion(null)}>
+                      Latest
+                    </Button>
+                  }
+                >
+                  Showing version {viewingVersion!.versionNumber}. Version {artifact.currentVersionNumber} is current.
+                </Alert>
+              )}
+            </Box>
+          }
+        />
+        <Dialog open={showHistory} onClose={() => setShowHistory(false)} fullWidth maxWidth="sm" scroll="paper">
+          <DialogTitle>Version history</DialogTitle>
+          <DialogContent>{historyPanel}</DialogContent>
+        </Dialog>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ minWidth: 0 }}>
       <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
@@ -104,8 +186,6 @@ export const ArtifactView = ({ artifact, artifactPasscode, isLive }: ArtifactVie
 
       {!version ? (
         <Alert severity="warning">This artifact has no readable version yet.</Alert>
-      ) : artifact.type === 'ConceptGraphArtifact' ? (
-        <ConceptGraphView payload={version.payload as ConceptGraphPayload} />
       ) : artifact.type === 'DocumentArtifact' ? (
         <DocumentArtifactView payload={version.payload as DocumentPayload} />
       ) : (
@@ -124,16 +204,7 @@ export const ArtifactView = ({ artifact, artifactPasscode, isLive }: ArtifactVie
         </Box>
       )}
 
-      {showHistory && (
-        <ArtifactVersionHistory
-          artifact={artifact}
-          artifactPasscode={artifactPasscode}
-          viewingVersionNumber={viewingVersion?.versionNumber}
-          onSelectVersion={(selected) =>
-            setViewingVersion(selected.versionNumber === artifact.currentVersionNumber ? null : selected)
-          }
-        />
-      )}
+      {showHistory && historyPanel}
     </Box>
   );
 };

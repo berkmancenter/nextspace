@@ -19,7 +19,7 @@ const PANEL_BORDER = '#E2E8F0';
  * into. Matomo is the durable record instead of the transcript, the same trade this
  * component's zoom/pan/fit tracking already made.
  */
-export const GraphFeedback = () => {
+export const GraphFeedback = ({ compact = false }: { compact?: boolean }) => {
   const [rating, setRating] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [textSent, setTextSent] = useState(false);
@@ -38,8 +38,18 @@ export const GraphFeedback = () => {
   };
 
   return (
-    <Box sx={{ mt: 2, pt: 1.5, borderTop: `1px solid ${PANEL_BORDER}` }}>
-      <Typography variant="caption" id="graph-feedback-label" sx={{ display: 'block', color: MUTED, mb: 0.75 }}>
+    <Box
+      sx={
+        compact
+          ? { display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', minHeight: 40 }
+          : { mt: 2, pt: 1.5, borderTop: `1px solid ${PANEL_BORDER}` }
+      }
+    >
+      <Typography
+        variant="caption"
+        id="graph-feedback-label"
+        sx={{ display: compact ? 'inline' : 'block', color: MUTED, mb: compact ? 0 : 0.75 }}
+      >
         Is this graph interesting, useful and clear?
       </Typography>
       <Box role="radiogroup" aria-labelledby="graph-feedback-label" sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -66,7 +76,16 @@ export const GraphFeedback = () => {
       </Box>
 
       {rating !== null && (
-        <Box sx={{ display: 'flex', gap: 1, mt: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 1,
+            mt: compact ? 0 : 1,
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            flex: compact ? 1 : undefined,
+          }}
+        >
           <Typography variant="body2" sx={{ color: MUTED }}>
             Thanks!
           </Typography>

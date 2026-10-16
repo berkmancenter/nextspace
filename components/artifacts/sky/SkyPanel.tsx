@@ -18,6 +18,8 @@ interface SkyPanelProps {
   onClear: () => void;
   /** Enter Orbit around the selected concept, or leave it. */
   onToggleOrbit: () => void;
+  /** Take the rest of the height of a column that is exactly one window tall, and scroll inside it. */
+  fill?: boolean;
 }
 
 const SUMMARY_ONLY_NOTE = 'Summary only. There is no direct quote for this contribution.';
@@ -58,7 +60,7 @@ function ContributionMark({ conceptCount, dashed }: { conceptCount: number; dash
  * nothing is selected. Wording is shown exactly as the payload carries it. Who said it is never
  * shown: see {@link SkyScene} for why only the session is safe.
  */
-export function SkyPanel({ scene, selectedId, filter, view, onSelect, onClear, onToggleOrbit }: SkyPanelProps) {
+export function SkyPanel({ scene, selectedId, filter, view, onSelect, onClear, onToggleOrbit, fill }: SkyPanelProps) {
   const kind = nodeKind(scene, selectedId);
   const chip = (id: string) => (
     <Box component="button" type="button" key={id} sx={chipSx} onClick={() => onSelect(id)}>
@@ -304,9 +306,10 @@ export function SkyPanel({ scene, selectedId, filter, view, onSelect, onClear, o
       // Focusable so a keyboard reader can scroll it: a hub concept can touch dozens of contributions.
       tabIndex={0}
       sx={{
-        flex: '1 1 320px',
-        // Beside a wide sky it stays a readable column rather than taking all the leftover width.
-        maxWidth: { xs: 'none', lg: 480 },
+        // `fill`: the panel is the rest of a column that is exactly one window tall, so it takes what is
+        // left and scrolls inside it. Otherwise it sits beside or below the sky at its own height.
+        flex: fill ? '1 1 0' : '1 1 320px',
+        minHeight: 0,
         minWidth: 0,
         boxSizing: 'border-box',
         display: 'flex',
@@ -318,8 +321,8 @@ export function SkyPanel({ scene, selectedId, filter, view, onSelect, onClear, o
         border: `1px solid ${cgVar('border')}`,
         overflowY: 'auto',
         // Capped so a hub's long panel scrolls beside the sky instead of stretching the whole row.
-        alignSelf: 'flex-start',
-        maxHeight: 'min(85vh, 780px)',
+        alignSelf: fill ? 'stretch' : 'flex-start',
+        maxHeight: fill ? 'none' : 'min(85vh, 780px)',
         // Statements run to a few hundred characters and labels are long: wrap, never clip.
         overflowWrap: 'anywhere',
       }}
