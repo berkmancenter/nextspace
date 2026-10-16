@@ -36,7 +36,7 @@ interface SkyCanvasProps {
 }
 
 /** Air above and below the 1000x680 frame: a star on Orbit's outer ring sits 20 units from the edge, and its label hangs below it. */
-const VIEW_PAD = 36;
+export const VIEW_PAD = 36;
 const RING_OFFSET = 3.5;
 const RING_WIDTH = 2.25;
 const SELECT_RING_OFFSET = 9;

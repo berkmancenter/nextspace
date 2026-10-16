@@ -9,6 +9,9 @@ import { GenerateGraphButton } from './GenerateGraphButton';
 import { useArtifacts } from '../../hooks/useArtifacts';
 import { Artifact, ArtifactContainer, AuthType } from '../../types.internal';
 
+/** The page's own header (the navigation bar) and footer, which the graph's one-screen layout sits between. */
+const PAGE_CHROME_PX = 64 + 72;
+
 /**
  * Props for ArtifactsBrowser.
  * @property container - Which conversation's or topic's artifacts to read. Null until the route is ready.
@@ -63,6 +66,7 @@ export const ArtifactsBrowser = ({
   // An admin's topic listing also holds the topic's conversation graphs, which are not the
   // series graph; only a graph scoped like the container counts as already existing here.
   const containerScope = isTopic ? 'topic' : 'conversation';
+  const isGraph = selected?.type === 'ConceptGraphArtifact';
   const hasGraphForContainer = artifacts.some(
     (artifact) => artifact.type === 'ConceptGraphArtifact' && artifact.scope === containerScope,
   );
@@ -82,7 +86,23 @@ export const ArtifactsBrowser = ({
   }
 
   return (
-    <Box sx={{ maxWidth: 1180, mx: 'auto', px: { xs: 2, sm: 3 }, py: { xs: 2, sm: 4 } }}>
+    // A graph is a picture rather than prose, so it gets the whole window, exactly one screen tall (below the
+    // page's own header and footer); documents keep a readable measure and scroll.
+    <Box
+      sx={{
+        maxWidth: isGraph ? 'none' : 1180,
+        mx: 'auto',
+        px: { xs: 2, sm: 3 },
+        py: { xs: 2, sm: 4 },
+        ...(isGraph && {
+          boxSizing: 'border-box',
+          height: { md: `calc(100dvh - ${PAGE_CHROME_PX}px)` },
+          display: { md: 'flex' },
+          flexDirection: 'column',
+          py: { xs: 2, md: 1.5 },
+        }),
+      }}
+    >
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -93,11 +113,12 @@ export const ArtifactsBrowser = ({
         sx={{
           display: 'grid',
           gridTemplateColumns: { xs: '1fr', md: '240px minmax(0, 1fr)' },
-          gap: { xs: 2, md: 4 },
-          alignItems: 'start',
+          gap: { xs: 2, md: isGraph ? 2 : 4 },
+          alignItems: { xs: 'start', md: isGraph ? 'stretch' : 'start' },
+          ...(isGraph && { flex: { md: 1 }, minHeight: 0, '& > *': { minHeight: 0 } }),
         }}
       >
-        <Box component="nav" aria-label="Artifacts" sx={{ minWidth: 0 }}>
+        <Box component="nav" aria-label="Artifacts" sx={{ minWidth: 0, ...(isGraph && { overflowY: { md: 'auto' } }) }}>
           <Typography
             variant="overline"
             sx={{ color: 'text.secondary', letterSpacing: '0.08em', display: 'block', mb: 0.5 }}
