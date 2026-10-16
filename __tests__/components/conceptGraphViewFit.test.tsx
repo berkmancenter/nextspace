@@ -59,6 +59,31 @@ describe('ConceptGraphView layout', () => {
   });
 });
 
+describe('ConceptGraphView background click', () => {
+  const firstStar = () => screen.getAllByRole('button', { name: /, concept/ })[0];
+  const panel = () => screen.getByRole('complementary', { name: 'Reading panel' });
+  const explainer = /Concepts are stars/;
+
+  it.each([true, false])('puts the graph back as it was when empty space is clicked (fit: %s)', async (fit) => {
+    mockMedia({ fit });
+    const { container } = render(<ConceptGraphView payload={conceptGraphFixture} />);
+    await userEvent.click(firstStar());
+    expect(within(panel()).queryByText(explainer)).not.toBeInTheDocument();
+
+    await userEvent.click(sky(container));
+    expect(within(panel()).getByText(explainer)).toBeInTheDocument();
+    expect(firstStar()).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('leaves the selection alone when the reading panel is clicked', async () => {
+    mockMedia({ fit: true });
+    render(<ConceptGraphView payload={conceptGraphFixture} />);
+    await userEvent.click(firstStar());
+    await userEvent.click(panel());
+    expect(within(panel()).queryByText(explainer)).not.toBeInTheDocument();
+  });
+});
+
 describe('ArtifactView for a concept graph', () => {
   const artifact = {
     id: 'a1',

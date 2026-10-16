@@ -36,6 +36,8 @@ const NARROW_QUERY = '(max-width:599px)';
 const FIT_QUERY = '(min-width:1000px) and (min-height:680px)';
 /** The sky's own proportions, padding included, so a box with this aspect ratio holds the canvas exactly. */
 const SKY_ASPECT = `${skyGeometry.viewBox.width} / ${skyGeometry.viewBox.height + 2 * VIEW_PAD}`;
+/** What a click may land on without clearing the selection: things to act on, the reading panel, and dialogs. */
+const KEEP_SELECTION = 'button, a, input, textarea, select, aside, [role="button"], [role="radio"], .MuiDialog-root';
 const SKY_RATIO = skyGeometry.viewBox.width / (skyGeometry.viewBox.height + 2 * VIEW_PAD);
 
 /**
@@ -147,6 +149,14 @@ export const ConceptGraphView = ({ payload, header }: ConceptGraphViewProps) => 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape' && selectedId) setSelected(null);
   };
+  // A click on empty sky, or on the card around it, puts the graph back as it was: nothing selected, nothing
+  // dimmed. Anything you can act on, the reading panel you may be reading, and the dialogs opened from here
+  // (which bubble through React even though they render elsewhere) are left alone.
+  const onClick = (e: React.MouseEvent) => {
+    if (!selectedId) return;
+    if ((e.target as Element).closest(KEEP_SELECTION)) return;
+    setSelected(null);
+  };
   const skySx = {
     borderRadius: `${skyShape.radiusLg}px`,
     border: `1px solid ${cgVar('border')}`,
@@ -164,6 +174,7 @@ export const ConceptGraphView = ({ payload, header }: ConceptGraphViewProps) => 
         <Box
           className="concept-sky"
           onKeyDown={onKeyDown}
+          onClick={onClick}
           sx={{
             ...skySx,
             flex: 1,
@@ -223,6 +234,7 @@ export const ConceptGraphView = ({ payload, header }: ConceptGraphViewProps) => 
       <Box
         className="concept-sky"
         onKeyDown={onKeyDown}
+        onClick={onClick}
         sx={{ ...skySx, display: 'flex', flexDirection: 'column', gap: 2, p: { xs: 1.5, sm: 2.5 } }}
       >
         {controls}
