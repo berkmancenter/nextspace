@@ -167,6 +167,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     agentId,
     agentIds,
     chatPasscode: '',
+    jargonPasscode: '',
     initialJoinComplete,
     chatIntroRef,
     assistantIntroRef,
