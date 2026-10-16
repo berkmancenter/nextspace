@@ -6,6 +6,7 @@ import { components } from '../types';
 import { Api, RetrieveData, GetChannelPasscode, QueryParamsError } from '../utils';
 import { createConversationFromData, resolveConversationBotName } from '../utils/Helpers';
 import type { ConversationType } from '../context/ConversationTypeContext';
+import { withStoredChannels } from '../utils/presentationChannels';
 
 type Resource = components['schemas']['Resource'];
 
@@ -17,6 +18,7 @@ export interface UseConversationSetupParams {
   setConversationType: (type: ConversationType | null) => void;
   setBotNameContext: (name: string) => void;
   setResources: React.Dispatch<React.SetStateAction<Resource[]>>;
+  presentation?: boolean;
 }
 
 // Return type for the useConversationSetup hook, defining the state and functions it provides
@@ -61,6 +63,7 @@ export function useConversationSetup({
   setConversationType,
   setBotNameContext,
   setResources,
+  presentation = false,
 }: UseConversationSetupParams): UseConversationSetupReturn {
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [paramsError, setParamsError] = useState<{ header: string; params: string[] } | null>(null);
@@ -97,11 +100,12 @@ export function useConversationSetup({
 
   // Serialize channel to a stable string — Next.js creates a new array reference on every
   // router update even when the value is unchanged, which would cause spurious re-fetches.
-  const channelDep = Array.isArray(router.query.channel) ? router.query.channel.join(',') : router.query.channel;
+  const query = presentation ? withStoredChannels(router.query) : router.query;
+  const channelDep = Array.isArray(query.channel) ? query.channel.join(',') : query.channel;
 
   useEffect(() => {
     if (!Api.get().getAccessToken() || !router.isReady) return;
-    const queryError = QueryParamsError(router, 'assistant');
+    const queryError = QueryParamsError(query, 'assistant');
     if (queryError) {
       setParamsError(queryError);
       return;
@@ -151,11 +155,11 @@ export function useConversationSetup({
         setBotName(resolvedBotName);
         setBotNameContext(resolvedBotName);
 
-        if (router.query.channel) {
-          const transcriptPasscodeParam = GetChannelPasscode('transcript', router.query, setGeneralError);
+        if (query.channel) {
+          const transcriptPasscodeParam = GetChannelPasscode('transcript', query, setGeneralError);
           if (transcriptPasscodeParam) setTranscriptPasscode(transcriptPasscodeParam);
 
-          const chatPasscodeParam = GetChannelPasscode('chat', router.query, setGeneralError);
+          const chatPasscodeParam = GetChannelPasscode('chat', query, setGeneralError);
           if (chatPasscodeParam) setChatPasscode(chatPasscodeParam);
         }
 

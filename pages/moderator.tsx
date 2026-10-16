@@ -63,7 +63,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
 
   useEffect(() => {
     if (!router.isReady || !socket || !Api.get().getAccessToken()) return;
-    const queryError = QueryParamsError(router, 'moderator');
+    const queryError = QueryParamsError(router.query, 'moderator');
     if (queryError) {
       setParamsError(queryError);
       return;

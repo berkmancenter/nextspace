@@ -4,14 +4,17 @@ import userEvent from '@testing-library/user-event';
 import EventAssistantRoom from '../../pages/assistant';
 import PresentationRoom from '../../pages/present';
 import { RetrieveData, SendData, getPollResponseCounts, inspectPoll } from '../../utils';
-import { createConversationFromData, GetChannelPasscode } from '../../utils/Helpers';
+import { createConversationFromData } from '../../utils/Helpers';
 import { ConversationTypeProvider } from '../../context/ConversationTypeContext';
+import { savePresentationChannels, withStoredChannels } from '../../utils/presentationChannels';
 
 // Mock next/router
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockRouter = {
   push: mockPush,
-  query: { conversationId: 'test-conversation-id' } as any,
+  replace: mockReplace,
+  query: { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6' } as any,
   isReady: true,
 };
 
@@ -63,27 +66,8 @@ jest.mock('../../utils', () => ({
       getAccessToken: jest.fn(() => 'mock-access-token'),
     })),
   },
-  QueryParamsError: jest.fn((router, page) => {
-    const { conversationId, channel }: { conversationId?: string; channel?: string[] | string } = router.query;
-    const missing: string[] = [];
-
-    if (!conversationId) missing.push('conversation ID');
-    if (!channel) missing.push('channel');
-
-    if (typeof channel === 'string' && !channel.startsWith('chat')) missing.push('chat channel');
-    else if (Array.isArray(channel) && !channel.find((ch) => ch.startsWith('chat'))) missing.push('chat channel');
-    if (!GetChannelPasscode('chat', router.query)) missing.push('chat passcode');
-    if (
-      (typeof channel === 'string' && channel.startsWith('transcript')) ||
-      (Array.isArray(channel) && channel.find((ch) => ch.startsWith('transcript')))
-    ) {
-      if (!GetChannelPasscode('transcript', router.query)) missing.push('transcript passcode');
-    }
-    if (missing.length > 0) return { header: `Missing required parameter${missing.length > 1 ? 's' : ''}`, params: missing };
-
-    return null;
-  }),
-
+  // Loaded on call: requiring the real module inside this factory hits a circular import through utils/Helpers.
+  QueryParamsError: (...args: unknown[]) => jest.requireActual('../../utils/ErrorHandler').QueryParamsError(...args),
   RetrieveData: jest.fn(),
   SendData: jest.fn(),
   getPollResponseCounts: jest.fn(),
@@ -186,6 +170,8 @@ describe('EventAssistantRoom', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockReset().mockResolvedValue(true);
+    mockReplace.mockReset().mockResolvedValue(true);
+    window.sessionStorage.clear();
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
     });
@@ -197,7 +183,7 @@ describe('EventAssistantRoom', () => {
     });
 
     mockSocket.hasListeners.mockReturnValue(false);
-    mockRouter.query = { conversationId: 'test-conversation-id', channel: ['transcript,MJqaT2ii', 'chat,chat-pass'] };
+    mockRouter.query = { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6', channel: ['transcript,MJqaT2ii', 'chat,chat-pass'] };
     mockRouter.isReady = true;
 
     // Default mock implementation
@@ -338,7 +324,7 @@ describe('EventAssistantRoom', () => {
     });
 
     await waitFor(() => {
-      expect(RetrieveData).toHaveBeenCalledWith('conversations/test-conversation-id', 'mock-access-token');
+      expect(RetrieveData).toHaveBeenCalledWith('conversations/a1b2c3d4e5f6a1b2c3d4e5f6', 'mock-access-token');
     });
   });
 
@@ -441,7 +427,7 @@ describe('EventAssistantRoom', () => {
 
     await waitFor(() => {
       expect(RetrieveData).toHaveBeenCalledWith(
-        'messages/test-conversation-id?channel=direct-user-123-agent-123',
+        'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-agent-123',
         'mock-access-token',
       );
     });
@@ -462,7 +448,7 @@ describe('EventAssistantRoom', () => {
 
     await waitFor(() => {
       expect(mockSocket.emit).toHaveBeenCalledWith('conversation:join', {
-        conversationId: 'test-conversation-id',
+        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         token: 'mock-access-token',
         channels: [
           {
@@ -495,7 +481,7 @@ describe('EventAssistantRoom', () => {
 
     await waitFor(() => {
       expect(mockSocket.emit).toHaveBeenCalledWith('conversation:join', {
-        conversationId: 'test-conversation-id',
+        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         token: 'mock-access-token',
         channels: [
           {
@@ -919,7 +905,10 @@ describe('EventAssistantRoom', () => {
     });
 
     await waitFor(() => {
-      expect(RetrieveData).toHaveBeenCalledWith('messages/test-conversation-id?channel=chat,chat-pass', 'mock-access-token');
+      expect(RetrieveData).toHaveBeenCalledWith(
+        'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=chat,chat-pass',
+        'mock-access-token',
+      );
     });
   });
 
@@ -979,7 +968,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=direct-user-123-agent-123',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-agent-123',
           'mock-access-token',
         );
       });
@@ -1038,7 +1027,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=chat,chat-pass',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=chat,chat-pass',
           'mock-access-token',
         );
       });
@@ -1108,7 +1097,7 @@ describe('EventAssistantRoom', () => {
 
       // Verify the initial messages query was made
       expect(RetrieveData).toHaveBeenCalledWith(
-        'messages/test-conversation-id?channel=direct-user-123-agent-123',
+        'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-agent-123',
         'mock-access-token',
       );
     });
@@ -1281,7 +1270,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=direct-user-123-agent-123',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-agent-123',
           'mock-access-token',
         );
       });
@@ -1322,7 +1311,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=direct-user-123-agent-123',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-agent-123',
           'mock-access-token',
         );
       });
@@ -1386,11 +1375,11 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=direct-user-123-agent-123',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-agent-123',
           'mock-access-token',
         );
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=direct-user-123-jargon-agent-456',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-jargon-agent-456',
           'mock-access-token',
         );
       });
@@ -1610,7 +1599,7 @@ describe('EventAssistantRoom', () => {
     beforeEach(() => {
       // Reset router query to avoid chat tab being selected by default
       mockRouter.query = {
-        conversationId: 'test-conversation-id',
+        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         channel: ['chat,test-chat-pass', 'transcript,test-transcript-pass'],
       };
     });
@@ -1711,7 +1700,7 @@ describe('EventAssistantRoom', () => {
     });
 
     it('filters out messages with answersPrompt from display', async () => {
-      mockRouter.query = { conversationId: 'test-conversation-id', channel: 'chat,chat-pass' };
+      mockRouter.query = { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6', channel: 'chat,chat-pass' };
 
       const user = userEvent.setup();
 
@@ -1808,7 +1797,7 @@ describe('EventAssistantRoom', () => {
     });
 
     it('restores selected prompt option on page load when response exists', async () => {
-      mockRouter.query = { conversationId: 'test-conversation-id', channel: 'chat,chat-pass' };
+      mockRouter.query = { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6', channel: 'chat,chat-pass' };
 
       const user = userEvent.setup();
 
@@ -1902,7 +1891,7 @@ describe('EventAssistantRoom', () => {
         fromAgent: true,
         channels: ['direct-user-123-agent-123'],
         createdAt: '2024-01-01T09:59:00Z',
-        conversation: 'test-conversation-id',
+        conversation: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         pause: false,
         visible: true,
         upVotes: [],
@@ -2032,7 +2021,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=direct-user-123-agent-123',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-agent-123',
           'mock-access-token',
         );
       });
@@ -2091,7 +2080,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=chat,chat-pass',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=chat,chat-pass',
           'mock-access-token',
         );
       });
@@ -2463,7 +2452,7 @@ describe('EventAssistantRoom', () => {
       });
 
       await waitFor(() => {
-        expect(RetrieveData).toHaveBeenCalledWith('conversations/test-conversation-id', 'mock-access-token');
+        expect(RetrieveData).toHaveBeenCalledWith('conversations/a1b2c3d4e5f6a1b2c3d4e5f6', 'mock-access-token');
       });
 
       const user = userEvent.setup();
@@ -2857,7 +2846,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(mockSocket.emit).toHaveBeenCalledWith('conversation:join', {
-          conversationId: 'test-conversation-id',
+          conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
           token: 'mock-access-token',
           channels: [{ name: 'chat', passcode: 'chat-pass', direct: false }],
           observer: true,
@@ -2870,7 +2859,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=chat,chat-pass',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=chat,chat-pass',
           'mock-access-token',
         );
       });
@@ -2987,6 +2976,103 @@ describe('EventAssistantRoom', () => {
         expect(screen.queryByRole('dialog', { name: 'Exit presentation view?' })).not.toBeInTheDocument();
       });
       consoleError.mockRestore();
+    });
+
+    describe('passcodes in the address bar', () => {
+      const STRIPPED_QUERY = { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6' };
+      const CHANNELS = ['transcript,MJqaT2ii', 'chat,chat-pass'];
+
+      const expectJoinedWithChatPasscode = async (passcode: string) => {
+        await waitFor(() => {
+          expect(mockSocket.emit).toHaveBeenCalledWith(
+            'conversation:join',
+            expect.objectContaining({ channels: expect.arrayContaining([{ name: 'chat', passcode, direct: false }]) }),
+          );
+        });
+      };
+
+      afterEach(() => {
+        jest.restoreAllMocks();
+      });
+
+      it("moves the passcodes out of the address bar into this tab's storage", async () => {
+        await renderPresentation();
+
+        await waitFor(() => {
+          expect(mockReplace).toHaveBeenCalledWith({ pathname: '/present', query: STRIPPED_QUERY }, undefined, {
+            shallow: true,
+          });
+        });
+        expect(withStoredChannels(STRIPPED_QUERY).channel).toEqual(CHANNELS);
+      });
+
+      it('leaves the passcodes in the participant view address bar', async () => {
+        await act(async () => {
+          render(<EventAssistantRoom authType={'guest'} />);
+        });
+
+        await expectJoinedWithChatPasscode('chat-pass');
+        expect(mockReplace).not.toHaveBeenCalled();
+        expect(window.sessionStorage.length).toBe(0);
+      });
+
+      it('keeps the passcodes in the address bar when storage is unavailable', async () => {
+        jest.spyOn(console, 'warn').mockImplementation(() => {});
+        jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+          throw new Error('SecurityError');
+        });
+
+        await renderPresentation();
+
+        await expectJoinedWithChatPasscode('chat-pass');
+        expect(mockReplace).not.toHaveBeenCalled();
+      });
+
+      it('rejoins from storage after a reload in the same tab', async () => {
+        savePresentationChannels('a1b2c3d4e5f6a1b2c3d4e5f6', CHANNELS);
+        mockRouter.query = STRIPPED_QUERY;
+
+        await renderPresentation();
+
+        await expectJoinedWithChatPasscode('chat-pass');
+        expect(document.getElementById('params-error')).not.toBeInTheDocument();
+      });
+
+      it('shows the incomplete-link message in a new tab opened with the stripped address', async () => {
+        mockRouter.query = STRIPPED_QUERY;
+
+        await renderPresentation();
+
+        expect(
+          await screen.findByText('This link is incomplete. Ask the event organizer for the full link.'),
+        ).toBeInTheDocument();
+        expect(mockSocket.emit).not.toHaveBeenCalledWith('conversation:join', expect.anything());
+      });
+
+      it('uses the passcodes from a full link over ones stored by an earlier link', async () => {
+        savePresentationChannels('a1b2c3d4e5f6a1b2c3d4e5f6', ['chat,old-pass']);
+
+        await renderPresentation();
+
+        await expectJoinedWithChatPasscode('chat-pass');
+        await waitFor(() => {
+          expect(withStoredChannels(STRIPPED_QUERY).channel).toEqual(CHANNELS);
+        });
+      });
+
+      it('opens the participant view with the stored passcodes after they leave the address bar', async () => {
+        savePresentationChannels('a1b2c3d4e5f6a1b2c3d4e5f6', CHANNELS);
+        mockRouter.query = STRIPPED_QUERY;
+        await renderPresentation();
+
+        await userEvent.click(screen.getByRole('button', { name: 'Exit presentation view' }));
+        await userEvent.click(screen.getByRole('button', { name: 'Go to participant view' }));
+
+        expect(mockPush).toHaveBeenCalledWith({
+          pathname: '/assistant/',
+          query: { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6', channel: CHANNELS },
+        });
+      });
     });
 
     it('opens the participant view with the same event and passcodes on confirming exit', async () => {
