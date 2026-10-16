@@ -18,6 +18,7 @@ import { PreferencesPanel } from '../components/PreferencesPanel';
 import { PresentationHeader } from '../components/PresentationHeader';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
 import { CheckAuthHeader } from '../utils/Helpers';
+import { withStoredChannels } from '../utils/presentationChannels';
 import TokenManagerDefault from '../utils/TokenManager';
 import { Button, Dialog } from '@mui/material';
 import { Info } from '@mui/icons-material';
@@ -124,7 +125,15 @@ export function EventAssistantRoom({
     showEventStatusDialog,
     setShowEventStatusDialog,
     markEventEnded,
-  } = useConversationSetup({ socket, userId, router, setConversationType, setBotNameContext, setResources });
+  } = useConversationSetup({
+    socket,
+    userId,
+    router,
+    setConversationType,
+    setBotNameContext,
+    setResources,
+    presentation,
+  });
 
   // A shared screen has no Private Chat, and the backend counts attendees by their private assistant channels.
   const privateChatAgentIds = presentation ? NO_AGENT_IDS : agentIds;
@@ -538,7 +547,7 @@ export function EventAssistantRoom({
     </div>
   );
 
-  const exitPresentation = () => router.push({ pathname: '/assistant/', query: router.query });
+  const exitPresentation = () => router.push({ pathname: '/assistant/', query: withStoredChannels(router.query) });
 
   return (
     <>

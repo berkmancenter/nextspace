@@ -1,15 +1,15 @@
-import { NextRouter } from 'next/router';
+import { ParsedUrlQuery } from 'querystring';
 import { GetChannelPasscode } from './Helpers';
 
 type Page = 'moderator' | 'assistant';
 
 /**
- * Checks if the router query parameters are valid for a conversation and returns an error message if they are not.
- * @param router - The Next.js router object.
+ * Checks if the query parameters are valid for a conversation and returns an error message if they are not.
+ * @param query - The page's query parameters.
  * @param page - The current page type.
  */
-export const QueryParamsError = (router: NextRouter, page: Page): { header: string; params: string[] } | null => {
-  const { conversationId, channel }: { conversationId?: string; channel?: string[] | string } = router.query;
+export const QueryParamsError = (query: ParsedUrlQuery, page: Page): { header: string; params: string[] } | null => {
+  const { conversationId, channel }: { conversationId?: string; channel?: string[] | string } = query;
   const missing: string[] = [];
 
   const checkTranscriptPasscode = () => {
@@ -18,7 +18,7 @@ export const QueryParamsError = (router: NextRouter, page: Page): { header: stri
       (typeof channel === 'string' && channel.startsWith('transcript')) ||
       (Array.isArray(channel) && channel.find((ch) => ch.startsWith('transcript')))
     ) {
-      if (!GetChannelPasscode('transcript', router.query)) missing.push('transcript passcode');
+      if (!GetChannelPasscode('transcript', query)) missing.push('transcript passcode');
     }
   };
 
@@ -32,7 +32,7 @@ export const QueryParamsError = (router: NextRouter, page: Page): { header: stri
     // If only one channel specified, check if starts with 'moderator'
     if (typeof channel === 'string' && !channel.startsWith('moderator')) missing.push('moderator channel');
     else if (Array.isArray(channel) && !channel.find((ch) => ch.startsWith('moderator'))) missing.push('moderator channel');
-    if (!GetChannelPasscode('moderator', router.query)) missing.push('moderator passcode');
+    if (!GetChannelPasscode('moderator', query)) missing.push('moderator passcode');
 
     checkTranscriptPasscode();
   }
@@ -41,12 +41,15 @@ export const QueryParamsError = (router: NextRouter, page: Page): { header: stri
     // If only one channel specified, check if starts with 'chat'
     if (typeof channel === 'string' && !channel.startsWith('chat')) missing.push('chat channel');
     else if (Array.isArray(channel) && !channel.find((ch) => ch.startsWith('chat'))) missing.push('chat channel');
-    if (!GetChannelPasscode('chat', router.query)) missing.push('chat passcode');
+    if (!GetChannelPasscode('chat', query)) missing.push('chat passcode');
 
     checkTranscriptPasscode();
   }
 
-  if (missing.length > 0) return { header: `Missing required parameter${missing.length > 1 ? 's' : ''}`, params: missing };
+  if (missing.length > 0) {
+    console.warn('Incomplete event link, missing:', missing);
+    return { header: 'This link is incomplete. Ask the event organizer for the full link.', params: [] };
+  }
 
   return null;
 };

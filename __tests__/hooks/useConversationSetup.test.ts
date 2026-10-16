@@ -25,6 +25,7 @@ jest.mock('../../utils/Helpers', () => ({
 }));
 
 import { useConversationSetup } from '../../hooks/useConversationSetup';
+import { savePresentationChannels } from '../../utils/presentationChannels';
 import { RetrieveData, GetChannelPasscode, QueryParamsError } from '../../utils';
 import { createConversationFromData, resolveConversationBotName } from '../../utils/Helpers';
 
@@ -61,7 +62,7 @@ function makeConversation(overrides: Record<string, any> = {}) {
   };
 }
 
-function renderSetup(routerOverrides: Partial<NextRouter> = {}) {
+function renderSetup(routerOverrides: Partial<NextRouter> = {}, presentation = false) {
   const setConversationType = jest.fn();
   const setBotNameContext = jest.fn();
   const setResources = jest.fn();
@@ -76,6 +77,7 @@ function renderSetup(routerOverrides: Partial<NextRouter> = {}) {
         setConversationType,
         setBotNameContext,
         setResources,
+        presentation,
       }),
     { initialProps: { router } },
   );
@@ -175,6 +177,24 @@ describe('useConversationSetup', () => {
       });
 
       expect(mockRetrieveData).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('presentation view', () => {
+    beforeEach(() => {
+      window.sessionStorage.clear();
+    });
+
+    it('does not fetch again when the passcodes move from the address bar into storage', async () => {
+      const fullQuery = { conversationId: 'test-conversation-id', channel: ['chat,chat-pass'] };
+      const { rerender } = renderSetup({ query: fullQuery }, true);
+      await waitFor(() => expect(mockRetrieveData).toHaveBeenCalledTimes(1));
+
+      savePresentationChannels('test-conversation-id', fullQuery.channel);
+      rerender({ router: makeRouter({ query: { conversationId: 'test-conversation-id' } }) });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockRetrieveData).toHaveBeenCalledTimes(1);
     });
   });
 
