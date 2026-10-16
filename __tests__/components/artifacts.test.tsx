@@ -602,6 +602,48 @@ describe('GenerateGraphButton', () => {
     expect(await screen.findByText(/Not enough of the event record to map/)).toBeInTheDocument();
   });
 
+  it('reports a failure when the prop jumps from ready straight to failed, and clears the wait', async () => {
+    mockGenerate.mockResolvedValue({
+      generated: true,
+      artifact: { id: 'a1', generationStatus: 'pending', currentVersionNumber: 4 },
+      status: 'pending',
+    });
+    const onGenerated = jest.fn();
+    const ready = { id: 'a1', generationStatus: 'ready', currentVersionNumber: 4 } as Artifact;
+    const { rerender } = render(
+      <GenerateGraphButton container={{ conversationId: 'conv-1' }} artifact={ready} onGenerated={onGenerated} />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /regenerate concept graph/i }));
+
+    // The run fails before the parent ever observes 'pending'.
+    rerender(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ ...ready, generationStatus: 'failed', generationError: 'Run died early' } as Artifact}
+        onGenerated={onGenerated}
+      />,
+    );
+    expect(await screen.findByText(/Run died early/)).toBeInTheDocument();
+
+    // The agent's next automatic run must not surface a banner for a run this admin never started.
+    rerender(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ ...ready, generationStatus: 'pending' } as Artifact}
+        onGenerated={onGenerated}
+      />,
+    );
+    rerender(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ ...ready, currentVersionNumber: 5 } as Artifact}
+        onGenerated={onGenerated}
+      />,
+    );
+    expect(screen.queryByText(/Wrote version/)).not.toBeInTheDocument();
+  });
+
   it('does not show a completion banner to a visitor who did not trigger this run', () => {
     render(
       <GenerateGraphButton
