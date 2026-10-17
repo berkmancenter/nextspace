@@ -76,6 +76,12 @@ export const GenerateGraphButton = ({ container, artifact, onGenerated }: Genera
     awaitingResultRef.current = true;
     try {
       const generation = await generateConceptGraph(container);
+      // A successful response proves the claim happened, so the run is pending from here on even
+      // if the prop never shows it: a short run can fail before the parent's reload() returns,
+      // jumping the prop straight from 'ready' to 'failed'. Without this the completion effect
+      // would never see a 'pending' predecessor, skip the banner, and leave awaitingResultRef set
+      // for the agent's next automatic run to be mistaken for this admin's.
+      previousStatusRef.current = 'pending';
       onGenerated(generation);
     } catch (err) {
       awaitingResultRef.current = false;
