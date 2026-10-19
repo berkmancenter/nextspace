@@ -1,4 +1,3 @@
-import { NextRouter } from 'next/router';
 import { QueryParamsError } from '../../utils/ErrorHandler';
 import { GetChannelPasscode } from '../../utils/Helpers';
 
@@ -8,169 +7,190 @@ jest.mock('../../utils/Helpers', () => ({
 
 const mockGetChannelPasscode = GetChannelPasscode as jest.MockedFunction<typeof GetChannelPasscode>;
 
-const createMockRouter = (query: Record<string, string | string[]>): NextRouter => ({ query }) as unknown as NextRouter;
+const INCOMPLETE_LINK_MESSAGE = 'This link is incomplete. Ask the event organizer for the full link.';
 
 describe('QueryParamsError', () => {
+  let warnSpy: jest.SpyInstance;
+
+  const expectMissing = (param: string) =>
+    expect(warnSpy).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining([param]));
+
   beforeEach(() => {
     mockGetChannelPasscode.mockReturnValue('passcode');
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
     jest.clearAllMocks();
+    warnSpy.mockRestore();
+  });
+
+  describe('incomplete link message', () => {
+    it('shows a plain message without a list of parameter names', () => {
+      const query = {};
+
+      const result = QueryParamsError(query, 'assistant');
+
+      expect(result).toEqual({ header: INCOMPLETE_LINK_MESSAGE, params: [] });
+    });
+
+    it('shows the same message on the moderator page', () => {
+      const query = {};
+
+      const result = QueryParamsError(query, 'moderator');
+
+      expect(result).toEqual({ header: INCOMPLETE_LINK_MESSAGE, params: [] });
+    });
+
+    it('does not log anything when the link is complete', () => {
+      const query = {
+        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
+        channel: ['chat-main', 'transcript-main'],
+      };
+
+      QueryParamsError(query, 'assistant');
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('common validation', () => {
     it('should return null when all params are valid for moderator page', () => {
-      const router = createMockRouter({
+      const query = {
         conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         channel: ['moderator-main', 'transcript-main'],
-      });
+      };
 
-      const result = QueryParamsError(router, 'moderator');
+      const result = QueryParamsError(query, 'moderator');
       expect(result).toBeNull();
     });
 
     it('should return null when all params are valid for assistant page', () => {
-      const router = createMockRouter({
+      const query = {
         conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         channel: ['chat-main', 'transcript-main'],
-      });
+      };
 
-      const result = QueryParamsError(router, 'assistant');
+      const result = QueryParamsError(query, 'assistant');
       expect(result).toBeNull();
     });
 
-    it('should return error when conversationId is missing', () => {
-      const router = createMockRouter({
+    it('logs the problem when conversationId is missing', () => {
+      const query = {
         channel: ['moderator-main', 'transcript-main'],
-      });
+      };
 
-      const result = QueryParamsError(router, 'moderator');
-      expect(result).not.toBeNull();
-      expect(result?.params).toContain('conversation ID');
+      QueryParamsError(query, 'moderator');
+      expectMissing('conversation ID');
     });
 
-    it('should return error when conversationId is invalid format', () => {
-      const router = createMockRouter({
+    it('logs the problem when conversationId is invalid format', () => {
+      const query = {
         conversationId: 'invalid-id',
         channel: ['moderator-main', 'transcript-main'],
-      });
+      };
 
-      const result = QueryParamsError(router, 'moderator');
-      expect(result).not.toBeNull();
-      expect(result?.params).toContain('invalid conversation ID');
+      QueryParamsError(query, 'moderator');
+      expectMissing('invalid conversation ID');
     });
 
-    it('should return error when channel is missing', () => {
-      const router = createMockRouter({
+    it('logs the problem when channel is missing', () => {
+      const query = {
         conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
-      });
+      };
 
-      const result = QueryParamsError(router, 'moderator');
-      expect(result).not.toBeNull();
-      expect(result?.params).toContain('channel');
-    });
-
-    it('should use singular header when only one param is missing', () => {
-      mockGetChannelPasscode.mockReturnValue(null);
-      const router = createMockRouter({
-        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
-        channel: ['moderator-main', 'transcript-main'],
-      });
-
-      const result = QueryParamsError(router, 'moderator');
-      expect(result?.header).toBe('Missing required parameters');
+      QueryParamsError(query, 'moderator');
+      expectMissing('channel');
     });
   });
 
   describe('moderator page', () => {
-    it('should return error when moderator channel is missing (string channel)', () => {
-      const router = createMockRouter({
+    it('logs the problem when moderator channel is missing (string channel)', () => {
+      const query = {
         conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         channel: 'transcript-main',
-      });
+      };
 
-      const result = QueryParamsError(router, 'moderator');
-      expect(result?.params).toContain('moderator channel');
+      QueryParamsError(query, 'moderator');
+      expectMissing('moderator channel');
     });
 
-    it('should return error when moderator channel is missing (array channel)', () => {
-      const router = createMockRouter({
+    it('logs the problem when moderator channel is missing (array channel)', () => {
+      const query = {
         conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         channel: ['transcript-main'],
-      });
+      };
 
-      const result = QueryParamsError(router, 'moderator');
-      expect(result?.params).toContain('moderator channel');
+      QueryParamsError(query, 'moderator');
+      expectMissing('moderator channel');
     });
 
-    it('should return error when moderator passcode is missing', () => {
+    it('logs the problem when moderator passcode is missing', () => {
       mockGetChannelPasscode.mockImplementation((type) => (type === 'moderator' ? null : 'passcode'));
 
-      const router = createMockRouter({
+      const query = {
         conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         channel: ['moderator-main', 'transcript-main'],
-      });
+      };
 
-      const result = QueryParamsError(router, 'moderator');
-      expect(result?.params).toContain('moderator passcode');
+      QueryParamsError(query, 'moderator');
+      expectMissing('moderator passcode');
     });
 
-    it('should return error when transcript passcode is missing', () => {
+    it('logs the problem when transcript passcode is missing', () => {
       mockGetChannelPasscode.mockImplementation((type) => (type === 'transcript' ? null : 'passcode'));
 
-      const router = createMockRouter({
+      const query = {
         conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         channel: ['moderator-main', 'transcript-main'],
-      });
+      };
 
-      const result = QueryParamsError(router, 'moderator');
-      expect(result?.params).toContain('transcript passcode');
+      QueryParamsError(query, 'moderator');
+      expectMissing('transcript passcode');
     });
   });
 
   describe('assistant page', () => {
-    it('should return error when chat channel is missing (string channel)', () => {
-      const router = createMockRouter({
+    it('logs the problem when chat channel is missing (string channel)', () => {
+      const query = {
         conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         channel: 'transcript-main',
-      });
+      };
 
-      const result = QueryParamsError(router, 'assistant');
-      expect(result?.params).toContain('chat channel');
+      QueryParamsError(query, 'assistant');
+      expectMissing('chat channel');
     });
 
-    it('should return error when chat channel is missing (array channel)', () => {
-      const router = createMockRouter({
+    it('logs the problem when chat channel is missing (array channel)', () => {
+      const query = {
         conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         channel: ['transcript-main'],
-      });
+      };
 
-      const result = QueryParamsError(router, 'assistant');
-      expect(result?.params).toContain('chat channel');
+      QueryParamsError(query, 'assistant');
+      expectMissing('chat channel');
     });
 
-    it('should return error when chat passcode is missing', () => {
+    it('logs the problem when chat passcode is missing', () => {
       mockGetChannelPasscode.mockImplementation((type) => (type === 'chat' ? null : 'passcode'));
 
-      const router = createMockRouter({
+      const query = {
         conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         channel: ['chat-main', 'transcript-main'],
-      });
+      };
 
-      const result = QueryParamsError(router, 'assistant');
-      expect(result?.params).toContain('chat passcode');
+      QueryParamsError(query, 'assistant');
+      expectMissing('chat passcode');
     });
   });
 
   describe('multiple errors', () => {
-    it('should return multiple missing params at once', () => {
+    it('logs every missing param at once', () => {
       mockGetChannelPasscode.mockReturnValue(null);
-      const router = createMockRouter({});
+      const query = {};
 
-      const result = QueryParamsError(router, 'moderator');
-      expect(result?.params.length).toBeGreaterThan(1);
-      expect(result?.header).toBe('Missing required parameters');
+      QueryParamsError(query, 'moderator');
+      expect(warnSpy.mock.calls[0][1].length).toBeGreaterThan(1);
     });
   });
 });

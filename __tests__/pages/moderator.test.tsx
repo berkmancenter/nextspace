@@ -10,6 +10,9 @@ import { resolveConversationBotName } from '../../utils/Helpers';
 import { ConversationTypeProvider, useBotName } from '../../context/ConversationTypeContext';
 import { channel } from 'diagnostics_channel';
 
+const CONVERSATION_ID = 'a1b2c3d4e5f6a1b2c3d4e5f6';
+const INCOMPLETE_LINK_MESSAGE = 'This link is incomplete. Ask the event organizer for the full link.';
+
 // Mock dependencies
 jest.mock('next/router', () => ({
   useRouter: jest.fn(),
@@ -34,25 +37,8 @@ jest.mock('../../utils', () => ({
   },
   GetChannelPasscode: jest.fn().mockReturnValue('mock-passcode'),
   RetrieveData: jest.fn(),
-  QueryParamsError: jest.fn((router, page) => {
-    const { conversationId, channel }: { conversationId?: string; channel?: string[] | string } = router.query;
-    const missing: string[] = [];
-
-    if (!conversationId) missing.push('conversation ID');
-    if (!channel) missing.push('channel');
-
-    if (typeof channel === 'string' && !channel.startsWith('moderator')) missing.push('moderator channel');
-    else if (Array.isArray(channel) && !channel.find((ch) => ch.startsWith('moderator'))) missing.push('moderator channel');
-    if (!GetChannelPasscode('moderator', router.query)) missing.push('moderator passcode');
-    if (typeof channel === 'string' && !channel.startsWith('transcript')) missing.push('transcript channel');
-    else if (Array.isArray(channel) && !channel.find((ch) => ch.startsWith('transcript')))
-      missing.push('transcript channel');
-    if (!GetChannelPasscode('transcript', router.query)) missing.push('transcript passcode');
-
-    if (missing.length > 0) return { header: `Missing required parameter${missing.length > 1 ? 's' : ''}`, params: missing };
-
-    return null;
-  }),
+  // Loaded on call: requiring the real module inside this factory hits a circular import through utils/Helpers.
+  QueryParamsError: (...args: unknown[]) => jest.requireActual('../../utils/ErrorHandler').QueryParamsError(...args),
   emitWithTokenRefresh: jest.fn((socket, event, data, onSuccess) => {
     // Simulate successful emit
     if (onSuccess) onSuccess();
@@ -68,6 +54,7 @@ jest.mock('react-scroll', () => ({
 }));
 
 jest.mock('../../utils/Helpers', () => ({
+  GetChannelPasscode: (...args: unknown[]) => jest.requireActual('../../utils/Helpers').GetChannelPasscode(...args),
   CheckAuthHeader: jest.fn().mockResolvedValue({ props: {} }),
   createConversationFromData: jest.fn().mockResolvedValue({
     type: { name: 'eventAssistant' },
@@ -104,7 +91,7 @@ describe('ModeratorScreen', () => {
   const mockRouter = {
     isReady: true,
     query: {
-      conversationId: 'test-conversation',
+      conversationId: CONVERSATION_ID,
       channel: ['moderator,nDWq1-bh', 'transcript,MJqaT2ii'],
     },
   };
@@ -283,7 +270,7 @@ describe('ModeratorScreen', () => {
     (useRouter as jest.Mock).mockReturnValue({
       ...mockRouter,
       query: {
-        conversationId: 'test-conversation-id',
+        conversationId: CONVERSATION_ID,
         channel: null,
       },
     });
@@ -295,8 +282,8 @@ describe('ModeratorScreen', () => {
     await waitFor(() => {
       expect(document.getElementById('params-error')).toBeInTheDocument();
       expect(screen.getByText('Error')).toBeInTheDocument();
-      expect(screen.getByText(/Missing required parameter/)).toBeInTheDocument();
-      expect(screen.getByText(/channel/i)).toBeInTheDocument();
+      expect(screen.getByText(INCOMPLETE_LINK_MESSAGE)).toBeInTheDocument();
+      expect(screen.queryByRole('list')).not.toBeInTheDocument();
     });
   });
 
@@ -304,7 +291,7 @@ describe('ModeratorScreen', () => {
     (useRouter as jest.Mock).mockReturnValue({
       ...mockRouter,
       query: {
-        conversationId: 'test-conversation-id',
+        conversationId: CONVERSATION_ID,
         channel: 'moderator',
         passcode: null,
       },
@@ -317,9 +304,8 @@ describe('ModeratorScreen', () => {
     await waitFor(() => {
       expect(document.getElementById('params-error')).toBeInTheDocument();
       expect(screen.getByText('Error')).toBeInTheDocument();
-      expect(screen.getByText(/Missing required parameter/)).toBeInTheDocument();
-      expect(screen.getByRole('list')).toBeInTheDocument();
-      expect(screen.getByText(/transcript channel/i)).toBeInTheDocument();
+      expect(screen.getByText(INCOMPLETE_LINK_MESSAGE)).toBeInTheDocument();
+      expect(screen.queryByRole('list')).not.toBeInTheDocument();
     });
   });
 
@@ -344,7 +330,7 @@ describe('ModeratorScreen', () => {
     });
 
     await waitFor(() => {
-      expect(RetrieveData).toHaveBeenCalledWith('messages/test-conversation?channel=moderator,mock-passcode', 'mock-token');
+      expect(RetrieveData).toHaveBeenCalledWith(`messages/${CONVERSATION_ID}?channel=moderator,mock-passcode`, 'mock-token');
     });
   });
 
@@ -355,7 +341,7 @@ describe('ModeratorScreen', () => {
 
     await waitFor(() => {
       expect(mockSocket.emit).toHaveBeenCalledWith('conversation:join', {
-        conversationId: 'test-conversation',
+        conversationId: CONVERSATION_ID,
         token: 'mock-token',
         channel: { name: 'moderator', passcode: 'mock-passcode' },
       });
@@ -442,7 +428,7 @@ describe('ModeratorScreen', () => {
       const retrieveDataCalls = (RetrieveData as jest.Mock).mock.calls;
       // At least one call should be the gap-reconnect re-fetch for moderator messages
       const reconnectFetch = retrieveDataCalls.find(
-        ([url]) => url.includes('messages/test-conversation') && url.includes('moderator'),
+        ([url]) => url.includes(`messages/${CONVERSATION_ID}`) && url.includes('moderator'),
       );
       expect(reconnectFetch).toBeDefined();
       // It must use the current token from the singleton, not a stale string
