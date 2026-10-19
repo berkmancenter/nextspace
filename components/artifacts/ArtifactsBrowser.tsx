@@ -124,7 +124,12 @@ export const ArtifactsBrowser = ({
         </Box>
 
         {selected ? (
-          <ArtifactView artifact={selected} artifactPasscode={artifactPasscode} isLive={liveArtifactIds.has(selected.id)} />
+          <ArtifactView
+            artifact={selected}
+            artifactPasscode={artifactPasscode}
+            authType={authType}
+            isLive={liveArtifactIds.has(selected.id)}
+          />
         ) : (
           <Typography variant="body2" color="text.secondary">
             {emptyMessage}

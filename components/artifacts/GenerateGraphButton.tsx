@@ -76,6 +76,9 @@ export const GenerateGraphButton = ({ container, artifact, onGenerated }: Genera
     awaitingResultRef.current = true;
     try {
       const generation = await generateConceptGraph(container);
+      // A successful response proves this admin's claim happened, so the artifact is pending
+      // from here on even if a short run fails before the parent's reload ever shows 'pending'.
+      previousStatusRef.current = 'pending';
       onGenerated(generation);
     } catch (err) {
       awaitingResultRef.current = false;

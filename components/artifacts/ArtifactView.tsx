@@ -4,7 +4,7 @@ import { Alert, Box, Button, Chip, Typography } from '@mui/material';
 import HistoryIcon from '@mui/icons-material/History';
 import { ArtifactVersionHistory, formatStamp } from './ArtifactVersionHistory';
 import { DocumentArtifactView } from './DocumentArtifactView';
-import { Artifact, ArtifactVersion, ConceptGraphPayload, DocumentPayload } from '../../types.internal';
+import { Artifact, ArtifactVersion, AuthType, ConceptGraphPayload, DocumentPayload } from '../../types.internal';
 
 /* The graph renderer pulls in d3's force, zoom and scale modules and measures the DOM to
    lay itself out, so it is loaded on demand and never on the server. A conversation whose
@@ -22,11 +22,13 @@ const ConceptGraphView = dynamic(() => import('./ConceptGraphView').then((m) => 
  * Props for ArtifactView.
  * @property artifact - The artifact to show, at its latest version.
  * @property artifactPasscode - The container's read passcode, threaded through to the history calls.
+ * @property authType - The reader's auth type. The raw generation error is server text, so only an admin sees it.
  * @property isLive - True when a new version of this artifact arrived over the socket during this visit.
  */
 interface ArtifactViewProps {
   artifact: Artifact;
   artifactPasscode?: string;
+  authType?: AuthType;
   isLive?: boolean;
 }
 
@@ -43,7 +45,7 @@ const TYPE_LABEL: Record<string, string> = {
  * latest version they simply see the new one; when they have stepped back into the history
  * the view stays where they put it and the arrival is offered as a link rather than taken.
  */
-export const ArtifactView = ({ artifact, artifactPasscode, isLive }: ArtifactViewProps) => {
+export const ArtifactView = ({ artifact, artifactPasscode, authType, isLive }: ArtifactViewProps) => {
   const [viewingVersion, setViewingVersion] = useState<ArtifactVersion | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
@@ -110,7 +112,11 @@ export const ArtifactView = ({ artifact, artifactPasscode, isLive }: ArtifactVie
         artifact.generationStatus === 'pending' ? (
           <Alert severity="info">Generating…</Alert>
         ) : artifact.generationStatus === 'failed' ? (
-          <Alert severity="warning">{artifact.generationError ?? 'Generation failed to produce a version.'}</Alert>
+          <Alert severity="warning">
+            {authType === 'admin' && artifact.generationError
+              ? artifact.generationError
+              : 'Generation failed to produce a version.'}
+          </Alert>
         ) : (
           <Alert severity="warning">This artifact has no readable version yet.</Alert>
         )
