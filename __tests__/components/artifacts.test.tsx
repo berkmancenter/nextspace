@@ -12,6 +12,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { generateConceptGraph } from '../../utils';
 import { trackConversationEvent, trackEvent } from '../../utils/analytics';
+import { ArtifactView } from '../../components/artifacts/ArtifactView';
 import { GenerateGraphButton } from '../../components/artifacts/GenerateGraphButton';
 import { ArtifactList } from '../../components/artifacts/ArtifactList';
 import { ArtifactPasscodePrompt } from '../../components/artifacts/ArtifactPasscodePrompt';
@@ -224,6 +225,31 @@ describe('GenerateGraphButton', () => {
     expect(await screen.findByText(/Not enough of the event record to map/)).toBeInTheDocument();
   });
 
+  it('reports a failure when the prop jumps ready to failed without ever showing pending', async () => {
+    mockGenerate.mockResolvedValue({
+      generated: true,
+      artifact: { id: 'a1', generationStatus: 'pending', currentVersionNumber: 2 },
+      status: 'pending',
+    });
+    const onGenerated = jest.fn();
+    const ready = { id: 'a1', generationStatus: 'ready', currentVersionNumber: 2 } as Artifact;
+    const { rerender } = render(
+      <GenerateGraphButton container={{ conversationId: 'conv-1' }} artifact={ready} onGenerated={onGenerated} />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /regenerate concept graph/i }));
+
+    rerender(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ ...ready, generationStatus: 'failed', generationError: 'Too short' } as Artifact}
+        onGenerated={onGenerated}
+      />,
+    );
+
+    expect(await screen.findByText(/Too short/)).toBeInTheDocument();
+  });
+
   it('does not show a completion banner to a visitor who did not trigger this run', () => {
     render(
       <GenerateGraphButton
@@ -370,5 +396,27 @@ describe('GraphFeedback', () => {
     render(<GraphFeedback />);
 
     expect(screen.queryByLabelText('Additional feedback')).not.toBeInTheDocument();
+  });
+});
+
+describe('ArtifactView failed generation', () => {
+  const failed = {
+    id: 'a1',
+    type: 'ConceptGraphArtifact',
+    title: 'Graph',
+    generationStatus: 'failed',
+    generationError: 'ECONNRESET at llm.internal:443',
+    currentVersionNumber: 0,
+  } as unknown as Artifact;
+
+  it('shows the raw error detail to an admin', () => {
+    render(<ArtifactView artifact={failed} authType="admin" />);
+    expect(screen.getByText(/ECONNRESET/)).toBeInTheDocument();
+  });
+
+  it('shows only a fixed message to a passcode reader', () => {
+    render(<ArtifactView artifact={failed} authType="guest" />);
+    expect(screen.queryByText(/ECONNRESET/)).not.toBeInTheDocument();
+    expect(screen.getByText('Generation failed to produce a version.')).toBeInTheDocument();
   });
 });

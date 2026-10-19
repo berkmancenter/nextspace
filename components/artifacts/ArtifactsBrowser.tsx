@@ -182,6 +182,7 @@ export const ArtifactsBrowser = ({
             artifact={selected}
             artifactPasscode={artifactPasscode}
             conversationId={container?.conversationId}
+            authType={authType}
             isLive={liveArtifactIds.has(selected.id)}
           />
         ) : (
