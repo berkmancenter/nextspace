@@ -27,9 +27,11 @@ export interface UseAnalyticsOptions {
  * moderators are staff, not audience, and counting their visits would muddy the
  * "big audience, few talkers" signal the tracked-session count exists to show. The
  * presentation page is left out for the same reason: a shared screen is not an audience
- * member. To start counting another participant-facing page, add its pageType here.
+ * member. The conversation's artifacts page is counted because it is how audience members read what
+ * the event produced; the series (topic) and preview pages have no conversation id and are never
+ * tagged. To start counting another participant-facing page, add its pageType here.
  */
-const PARTICIPANT_EVENT_PAGE_TYPES = ['assistant', 'backchannel'];
+const PARTICIPANT_EVENT_PAGE_TYPES = ['assistant', 'backchannel', 'artifacts'];
 
 /**
  * Custom hook for automatic analytics tracking

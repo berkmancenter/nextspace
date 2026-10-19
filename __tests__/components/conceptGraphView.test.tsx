@@ -1,5 +1,6 @@
 jest.mock('../../utils/analytics', () => ({
   trackEvent: jest.fn(),
+  trackConversationEvent: jest.fn(),
 }));
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -12,7 +13,7 @@ import {
   seriesConceptGraphFixture,
 } from '../../content/conceptGraphFixture';
 import { ConceptGraphView } from '../../components/artifacts/ConceptGraphView';
-import { trackEvent } from '../../utils/analytics';
+import { trackConversationEvent, trackEvent } from '../../utils/analytics';
 import { ConceptGraphPayload } from '../../types.internal';
 
 /* jsdom lays nothing out and has no matchMedia, so the two media queries the view reads are
@@ -281,7 +282,7 @@ describe('ConceptGraphView', () => {
       expect(starGroup(container, 's-c-blame')).toHaveAttribute('opacity', '0.12');
       expect(starGroup(container, 's-c-trust')).toHaveAttribute('opacity', '1');
       expect(starGroup(container, 's-c-blame').getAttribute('transform')).toBe(before);
-      expect(trackEvent).toHaveBeenCalledWith('graph', 'filter', 'session');
+      expect(trackEvent).toHaveBeenCalledWith('graph', 'filter', 'session', 1);
     });
 
     it('lists a session colour key and an origin prompt entry in the legend', () => {
@@ -508,9 +509,94 @@ describe('ConceptGraphView', () => {
     render(<ConceptGraphView payload={graph} />);
 
     await user.click(screen.getByRole('button', { name: 'Orbit' }));
-    expect(trackEvent).toHaveBeenCalledWith('graph', 'view', 'orbit');
+    expect(trackEvent).toHaveBeenCalledWith('graph', 'view', 'orbit', undefined);
     await user.click(star('Issuer'));
-    expect(trackEvent).toHaveBeenCalledWith('graph', 'select', 'concept');
+    expect(trackEvent).toHaveBeenCalledWith('graph', 'select', 'concept', undefined);
+  });
+
+  describe('analytics', () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    const stars = () => screen.getAllByRole('button', { name: /, concept/ });
+
+    it('attributes graph events to the conversation when there is one', async () => {
+      const user = userEvent.setup();
+      render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+      await user.click(screen.getByRole('button', { name: 'Orbit' }));
+      await user.click(star('Issuer'));
+
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'view', 'orbit', undefined);
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'select', 'concept', undefined);
+      expect(trackEvent).not.toHaveBeenCalledWith('graph', 'select', 'concept', undefined);
+    });
+
+    it('records the session number, and full_series for the whole graph', async () => {
+      const user = userEvent.setup();
+      render(<ConceptGraphView payload={seriesConceptGraphFixture} conversationId="conv-1" />);
+      const select = screen.getByRole('combobox', { name: /show/i });
+
+      await user.selectOptions(select, 'Session 3');
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'filter', 'session', 3);
+
+      await user.selectOptions(select, 'Full series');
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'filter', 'full_series', undefined);
+    });
+
+    it('records a deselect by a second click on the node', async () => {
+      const user = userEvent.setup();
+      render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+      await user.click(star('Issuer'));
+      expect(trackConversationEvent).not.toHaveBeenCalledWith('conv-1', 'graph', 'deselect', expect.anything(), undefined);
+      await user.click(star('Issuer'));
+
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'deselect', 'toggle', undefined);
+    });
+
+    it('records a deselect by closing the reading panel', async () => {
+      const user = userEvent.setup();
+      render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+      await user.click(star('Issuer'));
+      await user.click(within(panel()).getByRole('button', { name: /^Close/ }));
+
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'deselect', 'panel', undefined);
+    });
+
+    it('records a deselect by Escape, and none when nothing is selected', async () => {
+      const user = userEvent.setup();
+      render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+      stars()[0].focus();
+      await user.keyboard('{Escape}');
+      expect(trackConversationEvent).not.toHaveBeenCalledWith('conv-1', 'graph', 'deselect', 'escape', undefined);
+
+      await user.click(star('Issuer'));
+      await user.keyboard('{Escape}');
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'deselect', 'escape', undefined);
+    });
+
+    it('records a deselect by a click on empty sky', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+      await user.click(star('Issuer'));
+      await user.click(container.querySelector('.concept-sky') as HTMLElement);
+
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'deselect', 'empty_sky', undefined);
+    });
+
+    it('sends events without attribution when there is no conversation (a series or the preview)', async () => {
+      const user = userEvent.setup();
+      render(<ConceptGraphView payload={graph} />);
+
+      await user.click(star('Issuer'));
+      await user.click(star('Issuer'));
+
+      expect(trackEvent).toHaveBeenCalledWith('graph', 'deselect', 'toggle', undefined);
+      expect(trackConversationEvent).not.toHaveBeenCalled();
+    });
   });
 
   describe('with the backend’s session list', () => {

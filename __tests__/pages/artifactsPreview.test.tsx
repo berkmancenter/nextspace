@@ -1,3 +1,5 @@
+jest.mock('../../hooks/useAnalytics', () => ({ useAnalytics: jest.fn() }));
+
 import { fireEvent, render, screen } from '@testing-library/react';
 import ArtifactPreviewPage from '../../pages/artifacts/preview';
 import {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, Box, Button, CircularProgress } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { generateConceptGraph } from '../../utils';
+import { trackArtifactEvent } from '../../utils/artifactAnalytics';
 import { ArtifactContainer, ConceptGraphGenerationResult } from '../../types.internal';
 
 /**
@@ -49,11 +50,15 @@ export const GenerateGraphButton = ({ container, hasExistingGraph, onGenerated }
     setRunning(true);
     setResult(null);
     setError(null);
+    const track = (action: string, name: string) => trackArtifactEvent(container.conversationId, 'artifact', action, name);
+    track('generate_graph', hasExistingGraph ? 'regenerate' : 'generate');
     try {
       const generation = await generateConceptGraph(container);
       setResult(generation);
+      track('generate_graph_result', generation.generated ? 'generated' : 'nothing_written');
       if (generation.generated) onGenerated(generation);
     } catch (err) {
+      track('generate_graph_result', 'error');
       setError(err instanceof Error ? err.message : 'Could not generate a concept graph.');
     } finally {
       setRunning(false);

@@ -1,5 +1,6 @@
 jest.mock('../../utils/analytics', () => ({
   trackEvent: jest.fn(),
+  trackConversationEvent: jest.fn(),
 }));
 jest.mock('../../components/artifacts/sky/visibleLabels', () => {
   const actual = jest.requireActual('../../components/artifacts/sky/visibleLabels');

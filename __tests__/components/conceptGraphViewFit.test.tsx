@@ -1,5 +1,6 @@
 jest.mock('../../utils/analytics', () => ({
   trackEvent: jest.fn(),
+  trackConversationEvent: jest.fn(),
 }));
 jest.mock('../../components/artifacts/ArtifactVersionHistory', () => ({
   ArtifactVersionHistory: () => <div>history list</div>,

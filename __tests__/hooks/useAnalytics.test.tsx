@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { useAnalytics } from '../../hooks/useAnalytics';
-import { tagEventVisit } from '../../utils/analytics';
+import { tagEventVisit, trackPageView } from '../../utils/analytics';
 
 // Mock the router so we can control the conversation id in scope on mount.
 const mockRouter = {
@@ -74,5 +74,24 @@ describe('useAnalytics visit tagging', () => {
     renderHook(() => useAnalytics({ pageType: 'home' }));
 
     expect(tagEventVisit).not.toHaveBeenCalled();
+  });
+
+  it('tags the visit on the conversation artifacts page, which audience members read', () => {
+    mockRouter.query = { conversationId: 'conv-123' };
+
+    renderHook(() => useAnalytics({ pageType: 'artifacts' }));
+
+    expect(tagEventVisit).toHaveBeenCalledWith('conv-123');
+    expect(trackPageView).toHaveBeenCalledWith('/assistant', expect.objectContaining({ conversationId: 'conv-123' }));
+  });
+
+  it('does NOT tag the series or preview artifact pages, but still records the page view', () => {
+    mockRouter.query = { topicId: 'topic-1' };
+
+    renderHook(() => useAnalytics({ pageType: 'artifacts_topic' }));
+    renderHook(() => useAnalytics({ pageType: 'artifacts_preview' }));
+
+    expect(tagEventVisit).not.toHaveBeenCalled();
+    expect(trackPageView).toHaveBeenCalledTimes(2);
   });
 });

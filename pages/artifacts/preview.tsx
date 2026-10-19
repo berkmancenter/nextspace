@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import dynamic from 'next/dynamic';
 import { Box, Divider, Typography } from '@mui/material';
+import { useAnalytics } from '../../hooks/useAnalytics';
 import {
   conceptGraphFixture,
   denseConceptGraphFixture,
@@ -33,6 +34,8 @@ const ConceptGraphView = dynamic(
  * Static route, so it takes precedence over `/artifacts/[conversationId]`.
  */
 export default function ArtifactPreviewPage() {
+  // Fixture data: a page view only, there is no conversation behind it.
+  useAnalytics({ pageType: 'artifacts_preview' });
   return (
     <>
       <Head>

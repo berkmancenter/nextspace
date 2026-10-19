@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { Box, CircularProgress } from '@mui/material';
 import { ArtifactsBrowser } from '../../components';
 import { useSessionJoin } from '../../hooks';
+import { useAnalytics } from '../../hooks/useAnalytics';
 import { CheckAuthHeader } from '../../utils';
 import { ArtifactContainer, AuthType } from '../../types.internal';
 
@@ -25,6 +26,8 @@ export const getServerSideProps = async (context: { req: any }) => {
  */
 export default function ConversationArtifactsPage({ authType }: { authType: AuthType }) {
   const router = useRouter();
+  // Page view plus the visit-scope conversation tag (read from the route), like the other event pages.
+  useAnalytics({ pageType: 'artifacts' });
   const conversationId = typeof router.query.conversationId === 'string' ? router.query.conversationId : undefined;
   const passcodeFromUrl = typeof router.query.artifactPasscode === 'string' ? router.query.artifactPasscode : undefined;
   const selectedFromUrl = typeof router.query.artifact === 'string' ? router.query.artifact : undefined;
