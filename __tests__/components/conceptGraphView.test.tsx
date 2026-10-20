@@ -13,6 +13,9 @@ import {
   seriesConceptGraphFixture,
 } from '../../content/conceptGraphFixture';
 import { ConceptGraphView } from '../../components/artifacts/ConceptGraphView';
+import { DWELL_MS, SkyCanvas } from '../../components/artifacts/sky/SkyCanvas';
+import { buildScene } from '../../components/artifacts/sky/scene';
+import { filterSky, layoutSky } from '../../utils/conceptSky';
 import { trackConversationEvent, trackEvent } from '../../utils/analytics';
 import { ConceptGraphPayload } from '../../types.internal';
 
@@ -673,6 +676,21 @@ describe('ConceptGraphView', () => {
         expect(hovers()).toHaveLength(0);
       });
 
+      it('does not fire twice, or later, when the filter changes while a node stays hovered', () => {
+        render(<ConceptGraphView payload={seriesConceptGraphFixture} conversationId="conv-1" />);
+
+        fireEvent.pointerEnter(stars()[0]);
+        act(() => void jest.advanceTimersByTime(300));
+        fireEvent.change(screen.getByRole('combobox', { name: /show/i }), { target: { value: '1' } });
+        act(() => void jest.advanceTimersByTime(199));
+        expect(hovers()).toHaveLength(0);
+        act(() => void jest.advanceTimersByTime(1));
+        expect(hovers()).toHaveLength(1);
+
+        act(() => void jest.advanceTimersByTime(5000));
+        expect(hovers()).toHaveLength(1);
+      });
+
       it('sends a hover without attribution when there is no conversation', () => {
         render(<ConceptGraphView payload={graph} />);
 
@@ -731,5 +749,86 @@ describe('ConceptGraphView', () => {
   it('keeps the feedback prompt beneath the sky', () => {
     render(<ConceptGraphView payload={graph} />);
     expect(screen.getByText(/Is this graph interesting, useful and clear/)).toBeInTheDocument();
+  });
+});
+
+describe('SkyCanvas dwell', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  const scene = buildScene(graph);
+  const positions = layoutSky(scene.model);
+  const filter = filterSky(scene.model, 'all');
+
+  const canvas = (hoverId: string | null, onDwell: jest.Mock, withScene = scene) => (
+    <SkyCanvas
+      scene={withScene}
+      positions={positions}
+      targetPositions={positions}
+      orbit={false}
+      filter={filter}
+      hoverId={hoverId}
+      selectedId={null}
+      onHover={jest.fn()}
+      onDwell={onDwell}
+      onToggle={jest.fn()}
+    />
+  );
+
+  it('reports the kind of a hovered concept or prompt after DWELL_MS, and nothing sooner', () => {
+    const onDwell = jest.fn();
+    const { rerender } = render(canvas('c-issuer', onDwell));
+
+    act(() => void jest.advanceTimersByTime(DWELL_MS - 1));
+    expect(onDwell).not.toHaveBeenCalled();
+    act(() => void jest.advanceTimersByTime(1));
+    expect(onDwell).toHaveBeenCalledTimes(1);
+    expect(onDwell).toHaveBeenLastCalledWith('concept');
+
+    rerender(canvas('p1', onDwell));
+    act(() => void jest.advanceTimersByTime(DWELL_MS));
+    expect(onDwell).toHaveBeenCalledTimes(2);
+    expect(onDwell).toHaveBeenLastCalledWith('prompt');
+  });
+
+  it('never reports a contribution', () => {
+    const onDwell = jest.fn();
+    render(canvas('k1', onDwell));
+
+    act(() => void jest.advanceTimersByTime(5000));
+    expect(onDwell).not.toHaveBeenCalled();
+  });
+
+  it('keeps one timer through a new scene or callback identity, and calls the latest callback', () => {
+    const first = jest.fn();
+    const second = jest.fn();
+    const { rerender } = render(canvas('c-issuer', first));
+
+    act(() => void jest.advanceTimersByTime(300));
+    rerender(canvas('c-issuer', second, buildScene(graph)));
+    act(() => void jest.advanceTimersByTime(199));
+    expect(second).not.toHaveBeenCalled();
+    act(() => void jest.advanceTimersByTime(1));
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
+
+    act(() => void jest.advanceTimersByTime(5000));
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels on leaving and on unmount', () => {
+    const onDwell = jest.fn();
+    const { rerender, unmount } = render(canvas('c-issuer', onDwell));
+
+    act(() => void jest.advanceTimersByTime(200));
+    rerender(canvas(null, onDwell));
+    act(() => void jest.advanceTimersByTime(1000));
+    expect(onDwell).not.toHaveBeenCalled();
+
+    rerender(canvas('c-issuer', onDwell));
+    act(() => void jest.advanceTimersByTime(200));
+    unmount();
+    act(() => void jest.advanceTimersByTime(1000));
+    expect(onDwell).not.toHaveBeenCalled();
   });
 });

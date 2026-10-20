@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useId, useMemo } from 'react';
+import React, { memo, useEffect, useId, useMemo, useRef } from 'react';
 import { Box } from '@mui/material';
 import {
   ContributionPlacement,
@@ -98,14 +98,19 @@ export const SkyCanvas = memo(function SkyCanvas({
   const focusId = hoverId ?? selectedId;
   const focus = useMemo(() => focusSet(model, focusId), [model, focusId]);
 
-  // One event per continuous hover: the timer belongs to the hovered id, so leaving (or unmounting) cancels
-  // it and a re-render of the same hover does not restart it. A contribution is never reported.
+  // One event per continuous hover: the timer is keyed on the hovered id alone, so leaving, a new target or
+  // unmounting cancels it, while a new scene or callback identity mid-hover (a filter change, a parent
+  // re-render) neither restarts nor re-fires it. Those two are read through refs. A contribution is never reported.
+  const sceneRef = useRef(scene);
+  const onDwellRef = useRef(onDwell);
+  sceneRef.current = scene;
+  onDwellRef.current = onDwell;
   useEffect(() => {
-    const kind = nodeKind(scene, hoverId);
-    if (!kind || kind === 'contribution' || !onDwell) return;
-    const timer = setTimeout(() => onDwell(kind), DWELL_MS);
+    const kind = nodeKind(sceneRef.current, hoverId);
+    if (!kind || kind === 'contribution') return;
+    const timer = setTimeout(() => onDwellRef.current?.(kind), DWELL_MS);
     return () => clearTimeout(timer);
-  }, [hoverId, scene, onDwell]);
+  }, [hoverId]);
 
   const payload = model.payload;
   const conceptList = payload.concepts ?? [];
