@@ -16,8 +16,8 @@ import {
   sessionArcs,
 } from '../../../utils/conceptSky';
 import {
-  NodeKind,
   SkyScene,
+  analyticsName,
   conceptLabel,
   joined,
   nodeKind,
@@ -41,8 +41,8 @@ interface SkyCanvasProps {
   hoverId: string | null;
   selectedId: string | null;
   onHover: (id: string | null) => void;
-  /** The pointer or focus has stayed on a concept or prompt for DWELL_MS. Gets the node's kind, never its id; contributions are never reported. */
-  onDwell?: (kind: NodeKind) => void;
+  /** The pointer or focus has stayed on a concept or prompt for DWELL_MS. Gets the node's analytics name (see analyticsName), never its id; contributions are never reported. */
+  onDwell?: (name: string) => void;
   /** A click on the sky: selects, or clears when the thing is already selected. */
   onToggle: (id: string) => void;
 }
@@ -108,7 +108,8 @@ export const SkyCanvas = memo(function SkyCanvas({
   useEffect(() => {
     const kind = nodeKind(sceneRef.current, hoverId);
     if (!kind || kind === 'contribution') return;
-    const timer = setTimeout(() => onDwellRef.current?.(kind), DWELL_MS);
+    const name = analyticsName(sceneRef.current, hoverId) ?? kind;
+    const timer = setTimeout(() => onDwellRef.current?.(name), DWELL_MS);
     return () => clearTimeout(timer);
   }, [hoverId]);
 

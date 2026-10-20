@@ -312,6 +312,10 @@ export type GraphConcept = Schemas['GraphConcept'] & {
      spec like `foldedFrom`: unlike `provenance.conversationId`, which stays the first (origin)
      session, this survives merges and folds, so a recurring concept keeps all its sessions. */
   conversationIds?: string[];
+  /* Opaque id that is safe to send to analytics: a keyed hash of `id`, which is itself derived from
+     discussion text and must never be sent. Ahead of the generated spec like `foldedFrom` (backend
+     llm_engine#396); absent when the server has no ANALYTICS_ID_SECRET. */
+  analyticsId?: string;
 };
 
 /* One session of a series graph. Ahead of the generated spec like `foldedFrom`. */
@@ -324,7 +328,8 @@ export interface GraphSession {
   date?: string;
 }
 export type GraphContribution = Schemas['GraphContribution'];
-export type GraphOriginPrompt = Schemas['GraphOriginPrompt'];
+/* `analyticsId` is ahead of the generated spec, same as on GraphConcept above. */
+export type GraphOriginPrompt = Schemas['GraphOriginPrompt'] & { analyticsId?: string };
 
 /* The backend defaults every array to [], so a payload never lacks one. `concepts` is
    narrowed to the extended GraphConcept above (foldedFrom), same reason as there. `sessions` is

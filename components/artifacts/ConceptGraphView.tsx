@@ -12,7 +12,7 @@ import { SkyList } from './sky/SkyList';
 import { SkyPanel, SkyView } from './sky/SkyPanel';
 import SkyStyle from './sky/SkyStyle';
 import SkyViewStyle from './sky/SkyViewStyle';
-import { NodeKind, buildScene, nodeKind } from './sky/scene';
+import { analyticsName, buildScene, nodeKind } from './sky/scene';
 import { cgVar, skyGeometry, skyShape } from './sky/tokens';
 import { useTweenedPositions } from './sky/useTweenedPositions';
 
@@ -87,15 +87,15 @@ export const ConceptGraphView = ({ payload, header, conversationId }: ConceptGra
   const positions = useTweenedPositions(targetPositions, reduceMotion);
   const filterState = useMemo(() => filterSky(scene.model, filter), [scene.model, filter]);
 
-  // The sky reports a dwell with the kind of node, for the same reason `select` does.
-  const dwell = useCallback((kind: NodeKind) => track('hover', kind), [track]);
+  // The sky reports a dwell with the same name `select` uses (see analyticsName).
+  const dwell = useCallback((name: string) => track('hover', name), [track]);
   const select = useCallback(
     (id: string | null) => {
       setSelected(id);
       if (id && nodeKind(scene, id) === 'concept') setOrbitCenter(id);
-      // Kind only, never the id: the backend derives concept and prompt ids from their text (a slug of the
-      // label), which comes out of the discussion, and a contribution id would point at one person's account.
-      if (id) track('select', nodeKind(scene, id) ?? 'unknown');
+      // The kind, plus the backend's opaque analyticsId for a concept or prompt. Never the node id: it is a
+      // slug of discussion text, and a contribution id would point at one person's account.
+      if (id) track('select', analyticsName(scene, id) ?? 'unknown');
     },
     [scene, track],
   );
