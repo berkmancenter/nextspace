@@ -3,6 +3,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ThreadedMessage, isReadersMessage } from '../ThreadedMessage';
 import { ThreadPanel } from '../ThreadPanel';
+import type { MessageModeration } from '../ModerationControls';
 import { BotIcon } from '../BotIcon';
 import { CommunityMessageInput, RealNameGate } from './CommunityMessageInput';
 import { MemberIntroContent, PendingRoomMessage, PseudonymousMessage } from '../../types.internal';
@@ -39,6 +40,8 @@ interface CommunityGroupChatPanelProps {
   messagesWithUnreadReplies?: Set<string>;
   onSendMessage: (message: string, parentMessageId?: string) => Promise<boolean>;
   onMarkAsRead?: (messageId: string) => void;
+  /** Hide controls, drawn only when the reader is an admin. */
+  moderation?: MessageModeration;
 }
 
 const renderMarkdown = (text: string): React.ReactNode => (
@@ -105,7 +108,9 @@ export function CommunityGroupChatPanel({
   messagesWithUnreadReplies = new Set(),
   onSendMessage,
   onMarkAsRead,
+  moderation,
 }: CommunityGroupChatPanelProps) {
+  const adminModeration = isAdmin ? moderation : undefined;
   const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(null);
 
   const { parentMessages, threadMap } = useMemo(() => {
@@ -350,6 +355,7 @@ export function CommunityGroupChatPanel({
                         renderNameBadge={renderNameBadge}
                         showTimestamp={showTimestamp}
                         isThreadOpen={selectedThreadId === message.id}
+                        moderation={adminModeration}
                         hasUnreadReplies={message.id ? messagesWithUnreadReplies.has(message.id) : false}
                       />
                     </React.Fragment>
@@ -420,6 +426,7 @@ export function CommunityGroupChatPanel({
             renderMessageContent={renderMessageContent}
             renderNameBadge={renderNameBadge}
             enhancers={[]}
+            moderation={adminModeration}
             botName={botName}
             waitingForResponse={!!(waitingForThreadedReply && lastMessage?.parentMessage === selectedThreadId)}
             replyLock={

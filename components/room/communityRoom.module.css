@@ -146,6 +146,41 @@
   }
 }
 
+/* Hidden messages (admin view) and the hovered message row are given light
+   Tailwind surfaces (bg-gray-200 / bg-white) by the shared threading components.
+   In Night Archive the name and meta text above are light, so those surfaces
+   would leave them at about 1.1:1. Re-surface them with dark-appropriate
+   greys; light mode keeps the Tailwind grey and darkens the faint meta text. */
+.root :global(.message-hidden) {
+  color: var(--room-text-primary);
+}
+.root :global(.message-hidden .text-gray-400),
+.root :global(.message-hidden .text-gray-500) {
+  color: #4b5563 !important;
+}
+.root[data-theme='dark'] :global(.message-hidden) {
+  background-color: #2a2c31;
+}
+.root[data-theme='dark'] :global(.message-row.bg-white) {
+  background-color: #1d1f23;
+}
+.root[data-theme='dark'] :global(.message-hidden .text-gray-400),
+.root[data-theme='dark'] :global(.message-hidden .text-gray-500) {
+  color: #b3aea3 !important;
+}
+@media (prefers-color-scheme: dark) {
+  .root:not([data-theme='light']) :global(.message-hidden) {
+    background-color: #2a2c31;
+  }
+  .root:not([data-theme='light']) :global(.message-row.bg-white) {
+    background-color: #1d1f23;
+  }
+  .root:not([data-theme='light']) :global(.message-hidden .text-gray-400),
+  .root:not([data-theme='light']) :global(.message-hidden .text-gray-500) {
+    color: #b3aea3 !important;
+  }
+}
+
 /* ThreadedMessage and ThreadPanel print the sender name in Tailwind's bold
    text-sm, which is the app's Inter at 14px. The room's design sets it in Space
    Grotesk at 13px, and re-typing it here leaves those shared files untouched. */

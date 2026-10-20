@@ -550,4 +550,86 @@ describe('CommunityGroupChatPanel', () => {
       expect(screen.getByText('(You)')).toBeInTheDocument();
     });
   });
+
+  describe('moderation controls', () => {
+    const message = (id: string, extra: Record<string, unknown> = {}) => ({
+      id,
+      pseudonym: 'Sofia Marchetti',
+      owner: 'owner-1',
+      createdAt: '2026-01-05T12:00:00Z',
+      body: { text: `text ${id}` },
+      channels: ['chat'],
+      conversation: 'conv-1',
+      pseudonymId: 'sofia-1',
+      fromAgent: false,
+      ...extra,
+    });
+    const moderation = () => ({
+      onToggleHidden: jest.fn(),
+      onToggleHideAuthor: jest.fn(),
+      isAuthorHidden: jest.fn(() => false),
+    });
+    const props = (extra: Record<string, unknown>) => ({ ...baseProps, messages: [message('m1')], ...extra }) as any;
+
+    it('draws the controls for an admin', () => {
+      const m = moderation();
+      render(<CommunityGroupChatPanel {...props({ isAdmin: true, moderation: m })} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Hide' }));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Personal information' }));
+      expect(m.onToggleHidden).toHaveBeenCalledWith(expect.objectContaining({ id: 'm1' }), 'pii');
+      expect(screen.getByRole('button', { name: 'Hide all from this user' })).toBeInTheDocument();
+    });
+
+    it('never draws them for a non-admin, even if given the prop', () => {
+      render(<CommunityGroupChatPanel {...props({ isAdmin: false, moderation: moderation() })} />);
+      expect(screen.queryByRole('button', { name: 'Hide' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Hide all from this user' })).not.toBeInTheDocument();
+      expect(document.querySelector('[aria-haspopup="menu"]')).toBeNull();
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    });
+
+    it('draws none for an admin without the prop', () => {
+      render(<CommunityGroupChatPanel {...props({ isAdmin: true, messages: [message('m1', { hidden: true })] })} />);
+      expect(screen.queryByRole('button', { name: 'Unhide' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Hidden')).not.toBeInTheDocument();
+    });
+
+    it('labels a hidden message for an admin', () => {
+      render(
+        <CommunityGroupChatPanel
+          {...props({ isAdmin: true, moderation: moderation(), messages: [message('m1', { hidden: true })] })}
+        />,
+      );
+      expect(screen.getByText('Hidden')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Unhide' })).toBeInTheDocument();
+    });
+
+    it('renders a stub as the placeholder', () => {
+      const stub = { id: 's', hidden: true, body: null, createdAt: '2026-01-05T12:00:00Z' };
+      render(<CommunityGroupChatPanel {...props({ messages: [stub] })} />);
+      expect(screen.getByTestId('hidden-message-placeholder')).toBeInTheDocument();
+    });
+
+    it('forwards the controls to the open thread only for an admin', async () => {
+      const thread = [message('m1'), message('r1', { parentMessage: 'm1', pseudonym: 'Other', owner: 'owner-2' })];
+      const openThread = async () => {
+        // The reply control appears on hover, on the wrapper three levels above the bubble text.
+        fireEvent.mouseEnter(screen.getByText('text m1').parentElement!.parentElement!.parentElement!);
+        fireEvent.click(await screen.findByLabelText('Reply to Sofia Marchetti'));
+      };
+
+      const admin = render(
+        <CommunityGroupChatPanel {...props({ isAdmin: true, moderation: moderation(), messages: thread })} />,
+      );
+      await openThread();
+      expect(screen.getByText('Replies')).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'Hide' })).toHaveLength(4);
+      admin.unmount();
+
+      render(<CommunityGroupChatPanel {...props({ isAdmin: false, moderation: moderation(), messages: thread })} />);
+      await openThread();
+      expect(screen.getByText('Replies')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Hide' })).not.toBeInTheDocument();
+    });
+  });
 });
