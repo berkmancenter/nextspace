@@ -40,8 +40,8 @@ export function Errors(props: ErrorsProps) {
 export function ParamErrors(props: ParamErrorsProps) {
   return (
     <div id="params-error" className="flex items-center justify-center w-full h-full">
-      <div className="min-h-36 min-w-2xs border-2 border-red-400">
-        <h3 className="text-lg font-bold px-4 py-2 bg-red-400 text-white w-full">
+      <div className="min-h-36 min-w-2xs border-2 border-red-400 dark:border-nx-border-interactive">
+        <h3 className="text-lg font-bold px-4 py-2 bg-red-400 text-white w-full dark:bg-red-900 dark:text-nx-text">
           <ErrorOutlineSharp />
           &nbsp;Error
         </h3>

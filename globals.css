@@ -9,6 +9,372 @@
   }
 }
 
+/* ── Presentation view theme ──
+   The presentation view (/present) has a dark theme, the default, and a light one. The theme is the
+   data-presenter-theme attribute on <html> (see utils/presenterTheme.ts); the attribute is only
+   there while that view is open. Light is today's look, so the values under :root are what every
+   other page uses and the dark values only apply under html[data-presenter-theme='dark'].
+
+   Brand rules for the dark values: no pure black or white; Mid violet is a pill/chip fill and
+   decorative border only; Logo violet is a button fill with a Soft lilac label and never text, a
+   border or a focus ring. Contrast of each pairing is in the comments. */
+:root {
+  /* Roles used by inline styles in components shared with other views; the light values are the
+     colors those components have always used. */
+  --nx-nav-bg: #ede7f6;
+  --nx-nav-border: #d1c4e9;
+  --nx-nav-active-bg: #d1c4e9;
+  --nx-nav-indicator: transparent;
+  --nx-nav-text-active: #1a1a1a;
+  --nx-nav-text-inactive: #9e9e9e;
+  --nx-logo-body: #4845d2;
+  --nx-logo-band: #a5b4fc;
+  --nx-logo-pupil: black;
+  --nx-logo-glint: white;
+  --nx-avatar-user-bg: #f1d2d6;
+  --nx-avatar-other-bg: #fae8c6;
+  --nx-avatar-assistant-bg: #ddd6fe;
+  --nx-bubble-user-bg: #f1d2d6;
+  --nx-bubble-other-bg: #fae8c6;
+  --nx-bubble-assistant-bg: #ddd6fe;
+  --nx-bubble-default-bg: #e8f0fe;
+  --nx-bubble-hover-bg: white;
+  --nx-bubble-border: rgb(0 0 0 / 0.1);
+  --nx-mention: #7c3aed;
+  --nx-icon-muted: #4b5563;
+  --nx-fab-bg: white;
+  --nx-fab-fg: #4845d2;
+  --nx-fab-border: 0 solid transparent;
+  --nx-fab-hover-bg: #f5f5f5;
+  --nx-reply-btn-bg: white;
+  --nx-reply-btn-border: #d1d5db;
+  --nx-reply-btn-icon: #6b7280;
+  --nx-reply-btn-hover-bg: #4a0979;
+  --nx-reply-btn-hover-border: #4a0979;
+  --nx-reply-btn-hover-icon: white;
+  --nx-unread-dot: #7c3aed;
+  --nx-error-text: #ef4444;
+  --nx-button-text: #1976d2;
+  --nx-button-error-text: #d32f2f;
+  --nx-button-outline-border: rgb(25 118 210 / 0.5);
+  --nx-button-contained-bg: #1976d2;
+  --nx-button-contained-fg: #fff;
+  --nx-button-contained-hover-bg: #1565c0;
+  --nx-resource-icon: #4a0979;
+  --nx-resource-chevron: #666;
+  --nx-resource-person: #1e40af;
+  --nx-resource-speaker: #4a0979;
+  --nx-switch-thumb: #ffffff;
+  --nx-switch-track: #4a0979;
+  --nx-divider-light: #f3f4f6;
+  --nx-card-border: #e5e7eb;
+  --nx-transcript-badge-fg: #ffffff;
+  --nx-danger-bg: #b91c1c;
+  --nx-danger-hover-bg: #991b1b;
+  --nx-danger-fg: white;
+  --nx-danger-icon: #f87171;
+  --nx-dialog-cancel: #4b5563;
+  --nx-poll-bg: white;
+  --nx-poll-border: rgb(0 0 0 / 0.1);
+  --nx-poll-divider: rgb(0 0 0 / 0.07);
+  --nx-poll-row-divider: rgb(0 0 0 / 0.05);
+  --nx-poll-text: #1f2937;
+  --nx-poll-choice: #374151;
+  --nx-poll-meta: #9ca3af;
+  --nx-poll-selected-bg: rgb(72 69 210 / 0.1);
+  --nx-poll-check-bg: #4845d2;
+  --nx-poll-check-fg: white;
+  --nx-poll-check-border: rgb(0 0 0 / 0.25);
+  --nx-poll-count: #6b7280;
+  --nx-poll-count-selected: #4845d2;
+  --nx-feedback-fg: #1976d2;
+  --nx-feedback-bg: white;
+  --nx-feedback-border: #666666;
+  --nx-feedback-selected-bg: rgb(25 118 210 / 0.08);
+  --nx-feedback-selected-border: rgb(25 118 210 / 0.5);
+  --nx-feedback-hover-bg: #4a0979;
+  --nx-feedback-hover-fg: white;
+  --nx-feedback-disabled-fg: rgb(0 0 0 / 0.38);
+  --nx-feedback-disabled-border: rgb(0 0 0 / 0.26);
+  --nx-composer-header-bg: #f1d2d6;
+  --nx-chip-btn-fg: #374151;
+  --nx-chip-btn-bg: #e5e7eb;
+  --nx-chip-btn-border: 0 solid transparent;
+  --nx-chip-btn-hover-fg: #374151;
+  --nx-chip-btn-hover-bg: #d1d5db;
+  --nx-send-fg: white;
+  --nx-send-bg: #2f69c4;
+  --nx-hover-bg: #f3f4f6;
+  --nx-icon-button: rgb(0 0 0 / 0.54);
+  --nx-icon-button-hover: rgb(0 0 0 / 0.04);
+  --nx-pill-bg: #e0e7ff;
+  --nx-pill-text: #4845d2;
+  --nx-input-border: #a5b4fc;
+  --nx-input-focus-border: #6366f1;
+  --nx-cta-bg: #4845d2;
+  --nx-cta-hover-bg: #3b38b8;
+  --nx-transcript-bg: #200434;
+  --nx-scroll-track: #2d0a4e;
+  --nx-scroll-thumb: #6b21a8;
+  --nx-scroll-thumb-hover: #7c3aed;
+  --nx-focus-row-bg: #4a0979;
+  --nx-layout-bg: #ffffff;
+}
+
+html[data-presenter-theme='dark'] {
+  color-scheme: dark;
+
+  /* Brand tokens */
+  --nx-bg-base: #2a0449; /* Aubergine: main content background */
+  --nx-bg-chrome: #200434; /* Deep violet: header and side nav */
+  --nx-surface-raised: #350560; /* Deep accent: Berkie bubble, composer, close button */
+  --nx-surface-active: #4a0979; /* Mid violet: active nav, pills, avatar (never a full background) */
+  --nx-border-subtle: #350560; /* decorative dividers */
+  --nx-border-strong: #4a0979; /* decorative edges */
+  --nx-border-interactive: #b5aaef; /* Logo periwinkle: 8.2:1 on base; composer, toggle, inputs */
+  --nx-text-primary: #e1cfef; /* Soft lilac: 8.9 to 12.7:1 on every surface above */
+  --nx-text-secondary: #b5aaef; /* Logo periwinkle: 6.2 to 8.8:1 on every surface above */
+  --nx-brand-logo: #b5aaef; /* 8.8:1 on chrome */
+  --nx-focus-ring: #b5aaef; /* 3px outline, 3px offset: 8.2:1 on base */
+  --nx-fill-primary-button: #6240cc; /* Logo violet: button fills only */
+  --nx-on-primary-button: #e1cfef; /* Soft lilac label on Logo violet: 4.6:1 */
+
+  --nx-avatar-user-bg: var(--nx-surface-active);
+  --nx-avatar-other-bg: var(--nx-surface-active);
+  --nx-avatar-assistant-bg: var(--nx-surface-active);
+  --nx-bubble-user-bg: var(--nx-surface-raised);
+  --nx-bubble-other-bg: var(--nx-bg-chrome);
+  --nx-bubble-assistant-bg: var(--nx-surface-raised);
+  --nx-bubble-default-bg: var(--nx-surface-raised);
+  --nx-bubble-hover-bg: var(--nx-bg-base);
+  --nx-bubble-border: var(--nx-border-strong);
+  --nx-mention: var(--nx-text-secondary);
+  --nx-icon-muted: var(--nx-text-primary);
+  --nx-fab-bg: var(--nx-surface-raised);
+  --nx-fab-fg: var(--nx-text-secondary);
+  --nx-fab-border: 1.5px solid var(--nx-border-interactive);
+  --nx-fab-hover-bg: var(--nx-surface-active);
+
+  --nx-reply-btn-bg: var(--nx-surface-raised);
+  --nx-reply-btn-border: var(--nx-border-interactive);
+  --nx-reply-btn-icon: var(--nx-text-secondary);
+  --nx-reply-btn-hover-bg: var(--nx-fill-primary-button);
+  --nx-reply-btn-hover-border: var(--nx-border-interactive);
+  --nx-reply-btn-hover-icon: var(--nx-on-primary-button);
+  --nx-unread-dot: var(--nx-text-secondary);
+  --nx-transcript-badge-fg: var(--nx-text-primary);
+  --nx-danger-bg: #991b1b; /* Soft lilac label: 5.7:1 */
+  --nx-danger-hover-bg: #7f1d1d; /* 6.9:1 */
+  --nx-danger-fg: var(--nx-on-primary-button);
+  --nx-danger-icon: #f87171; /* 5.7:1 on Deep accent */
+  --nx-dialog-cancel: var(--nx-text-secondary);
+  --nx-resource-icon: var(--nx-text-secondary);
+  --nx-resource-chevron: var(--nx-text-secondary);
+  --nx-resource-person: var(--nx-text-primary);
+  --nx-resource-speaker: var(--nx-text-primary);
+  --nx-switch-thumb: var(--nx-text-primary);
+  --nx-switch-track: var(--nx-fill-primary-button);
+  --nx-divider-light: var(--nx-border-subtle);
+  --nx-card-border: var(--nx-border-strong);
+  --nx-button-text: var(--nx-text-secondary);
+  --nx-button-error-text: #fca5a5;
+  --nx-button-outline-border: var(--nx-border-interactive);
+  --nx-button-contained-bg: var(--nx-fill-primary-button);
+  --nx-button-contained-fg: var(--nx-on-primary-button);
+  --nx-button-contained-hover-bg: color-mix(in srgb, var(--nx-fill-primary-button) 80%, var(--nx-bg-chrome));
+  --nx-error-text: #fca5a5; /* 9.1:1 on base, 6.9:1 on Mid violet */
+  --nx-poll-bg: var(--nx-bg-base);
+  --nx-poll-border: var(--nx-border-strong);
+  --nx-poll-divider: var(--nx-border-subtle);
+  --nx-poll-row-divider: var(--nx-border-subtle);
+  --nx-poll-text: var(--nx-text-primary);
+  --nx-poll-choice: var(--nx-text-primary);
+  --nx-poll-meta: var(--nx-text-secondary);
+  --nx-poll-selected-bg: var(--nx-surface-active);
+  --nx-poll-check-bg: var(--nx-border-interactive); /* periwinkle fill, base-colored check: 8.2:1 */
+  --nx-poll-check-fg: var(--nx-bg-base);
+  --nx-poll-check-border: var(--nx-border-interactive);
+  --nx-poll-count: var(--nx-text-secondary);
+  --nx-poll-count-selected: var(--nx-text-primary);
+  --nx-feedback-fg: var(--nx-text-secondary);
+  --nx-feedback-bg: var(--nx-surface-raised);
+  --nx-feedback-border: var(--nx-border-interactive);
+  --nx-feedback-selected-bg: var(--nx-surface-active);
+  --nx-feedback-selected-border: var(--nx-border-interactive);
+  --nx-feedback-hover-bg: var(--nx-fill-primary-button);
+  --nx-feedback-hover-fg: var(--nx-on-primary-button);
+  --nx-feedback-disabled-fg: var(--nx-text-secondary);
+  --nx-feedback-disabled-border: var(--nx-border-strong);
+  --nx-composer-header-bg: var(--nx-surface-raised);
+  --nx-chip-btn-fg: var(--nx-text-primary);
+  --nx-chip-btn-bg: var(--nx-surface-active);
+  --nx-chip-btn-border: 1.5px solid var(--nx-border-interactive);
+  --nx-chip-btn-hover-fg: var(--nx-on-primary-button);
+  --nx-chip-btn-hover-bg: var(--nx-fill-primary-button);
+  --nx-send-fg: var(--nx-on-primary-button);
+  --nx-send-bg: var(--nx-fill-primary-button);
+  --nx-hover-bg: var(--nx-surface-active);
+  --nx-icon-button: var(--nx-text-primary);
+  --nx-icon-button-hover: rgb(225 207 239 / 0.12);
+
+  --nx-logo-body: var(--nx-brand-logo);
+  --nx-logo-band: var(--nx-bg-base);
+  --nx-logo-pupil: var(--nx-text-primary);
+  --nx-logo-glint: var(--nx-bg-chrome);
+
+  --nx-nav-bg: var(--nx-bg-chrome);
+  --nx-nav-border: var(--nx-border-subtle);
+  --nx-nav-active-bg: var(--nx-surface-active);
+  --nx-nav-indicator: var(--nx-text-secondary);
+  --nx-nav-text-active: var(--nx-text-primary);
+  --nx-nav-text-inactive: var(--nx-text-secondary);
+
+  --nx-pill-bg: var(--nx-surface-active);
+  --nx-pill-text: var(--nx-text-primary);
+  --nx-input-border: var(--nx-border-interactive);
+  --nx-input-focus-border: var(--nx-border-interactive);
+  --nx-cta-bg: var(--nx-fill-primary-button);
+  --nx-cta-hover-bg: var(--nx-fill-primary-button);
+  --nx-transcript-bg: var(--nx-bg-chrome);
+  --nx-scroll-track: var(--nx-bg-chrome);
+  --nx-scroll-thumb: var(--nx-border-interactive);
+  --nx-scroll-thumb-hover: var(--nx-text-primary);
+  --nx-focus-row-bg: var(--nx-surface-raised);
+  --nx-layout-bg: var(--nx-bg-base);
+
+  /* Components share Tailwind's gray scale with the other views, so the dark theme re-maps the scale
+     rather than touching every class: lighter-than-page grays become surfaces, darker grays become
+     text. White is not re-mapped, because some components (the transcript) use it as an overlay on
+     a dark background; each use of white is set on the component. Anything else these can't express
+     (filled buttons, status colors) is set on the component too. */
+  --color-gray-50: var(--nx-bg-chrome);
+  --color-gray-100: var(--nx-surface-raised);
+  --color-gray-200: var(--nx-surface-active);
+  --color-gray-300: var(--nx-border-interactive);
+  --color-gray-400: var(--nx-text-secondary);
+  --color-gray-500: var(--nx-text-secondary);
+  --color-gray-600: var(--nx-text-secondary);
+  --color-gray-700: var(--nx-text-primary);
+  --color-gray-800: var(--nx-text-primary);
+  --color-gray-900: var(--nx-text-primary);
+  --color-neutral-400: var(--nx-text-secondary);
+  --color-medium-slate-blue: var(--nx-text-secondary);
+}
+
+/* Tailwind utilities for the dark tokens, used with the dark: variant. */
+@custom-variant dark (html[data-presenter-theme='dark'] &);
+
+@theme inline {
+  --color-nx-base: var(--nx-bg-base);
+  --color-nx-chrome: var(--nx-bg-chrome);
+  --color-nx-raised: var(--nx-surface-raised);
+  --color-nx-active: var(--nx-surface-active);
+  --color-nx-border-subtle: var(--nx-border-subtle);
+  --color-nx-border-strong: var(--nx-border-strong);
+  --color-nx-border-interactive: var(--nx-border-interactive);
+  --color-nx-text: var(--nx-text-primary);
+  --color-nx-text-secondary: var(--nx-text-secondary);
+  --color-nx-button: var(--nx-fill-primary-button);
+  --color-nx-on-button: var(--nx-on-primary-button);
+  --color-nx-pill: var(--nx-pill-bg);
+  --color-nx-pill-text: var(--nx-pill-text);
+  --color-nx-input-border: var(--nx-input-border);
+  --color-nx-input-focus: var(--nx-input-focus-border);
+  --color-nx-cta: var(--nx-cta-bg);
+  --color-nx-cta-hover: var(--nx-cta-hover-bg);
+  --color-nx-transcript: var(--nx-transcript-bg);
+  --color-nx-scroll-track: var(--nx-scroll-track);
+  --color-nx-scroll-thumb: var(--nx-scroll-thumb);
+  --color-nx-scroll-thumb-hover: var(--nx-scroll-thumb-hover);
+  --color-nx-focus-row: var(--nx-focus-row-bg);
+  --color-nx-layout: var(--nx-layout-bg);
+}
+
+/* Focus indicator for links and buttons in the dark theme: 3px periwinkle with a 3px offset. */
+html[data-presenter-theme='dark']
+  :is(a[href], button, [role='button'], [role='tab'], summary, .MuiButtonBase-root):focus-visible {
+  outline: 3px solid var(--nx-focus-ring);
+  outline-offset: 3px;
+}
+
+html[data-presenter-theme='dark'] body {
+  background-color: var(--nx-bg-base);
+  color: var(--nx-text-primary);
+}
+
+/* Plain links with no color class of their own: the text/secondary color instead of the browser's. */
+:where(html[data-presenter-theme='dark'] a[href]) {
+  color: var(--nx-text-secondary);
+}
+
+/* Text fields: the browser's own field colors would be neither white nor on-brand once color-scheme is
+   dark, so they take the surface behind them and the brand text colors. */
+html[data-presenter-theme='dark'] :is(textarea, input:not([type='checkbox'], [type='radio'], [type='range'])) {
+  background-color: transparent;
+  color: var(--nx-text-primary);
+}
+
+html[data-presenter-theme='dark'] :is(textarea, input)::placeholder {
+  color: var(--nx-text-secondary);
+  opacity: 1;
+}
+
+/* Message composers show the same 3px periwinkle ring as buttons when the field inside has focus. */
+html[data-presenter-theme='dark'] .nx-composer:focus-within {
+  outline: 3px solid var(--nx-focus-ring);
+  outline-offset: 3px;
+}
+
+/* Markmap draws its own text and widgets from these variables. */
+html[data-presenter-theme='dark'] .markmap {
+  --markmap-text-color: var(--nx-text-primary);
+  --markmap-a-color: var(--nx-text-secondary);
+  --markmap-a-hover-color: var(--nx-text-primary);
+  --markmap-code-bg: var(--nx-surface-active);
+  --markmap-code-color: var(--nx-text-primary);
+  --markmap-circle-open-bg: var(--nx-bg-base);
+}
+
+/* MUI surfaces take their colors from the MUI theme, which has no dark palette; dialogs, menus and
+   tooltips render in a portal on <body>, so they are styled from the attribute on <html>. */
+html[data-presenter-theme='dark'] .MuiPaper-root,
+html[data-presenter-theme='dark'] .MuiDialog-paper {
+  background-color: var(--nx-surface-raised);
+  background-image: none;
+  color: var(--nx-text-primary);
+}
+
+html[data-presenter-theme='dark'] :is(.MuiPopover-paper, .MuiDialog-paper, .MuiMenu-paper) .MuiTypography-root {
+  color: inherit;
+}
+
+html[data-presenter-theme='dark'] .MuiBadge-badge.MuiBadge-colorSecondary {
+  background-color: var(--nx-text-primary);
+}
+
+html[data-presenter-theme='dark'] .MuiDivider-root {
+  border-color: var(--nx-border-subtle);
+}
+
+html[data-presenter-theme='dark'] .MuiBackdrop-root:not(.MuiBackdrop-invisible) {
+  background-color: rgb(32 4 52 / 0.75);
+}
+
+html[data-presenter-theme='dark'] .MuiTooltip-tooltip {
+  background-color: var(--nx-surface-active);
+  color: var(--nx-text-primary);
+  border: 1px solid var(--nx-border-interactive);
+}
+
+html[data-presenter-theme='dark'] .MuiTooltip-arrow {
+  color: var(--nx-surface-active);
+}
+
+html[data-presenter-theme='dark'] .MuiMenuItem-root:hover,
+html[data-presenter-theme='dark'] .MuiMenuItem-root.Mui-selected {
+  background-color: var(--nx-surface-active);
+}
+
 /* Markdown content styling */
 .markdown-content {
   color: inherit;

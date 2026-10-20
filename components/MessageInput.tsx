@@ -4,7 +4,6 @@ import { Send, Close, InfoOutlined, KeyboardArrowDown } from '@mui/icons-materia
 import { ControlledInputConfig } from '../types.internal';
 import { ActiveEnhancerState, InputEnhancer } from '../types/inputEnhancer';
 import { GenericEnhancerMenu } from './GenericEnhancerMenu';
-import { getAvatarStyle } from '../utils/avatarUtils';
 
 interface MessageInputProps {
   /** The pseudonym of the user */
@@ -212,15 +211,15 @@ export const MessageInput: FC<MessageInputProps> = ({
   if (!pseudonym) return null;
 
   return (
-    <div className="flex bg-white pl-2 pr-2 md:px-8">
+    <div className="flex bg-white pl-2 pr-2 md:px-8 dark:bg-nx-base">
       <div className="w-full max-w-4xl">
         <Box display="flex" alignItems="center" padding="8px">
           <div className="flex flex-col w-full">
             {/* Header */}
             <div
-              className="border-[1px] border-b-0 border-[#A5B4FC] rounded-t-lg p-2 font-bold text-sm flex justify-between items-center"
+              className="border-[1px] border-b-0 border-nx-input-border rounded-t-lg p-2 dark:border-[1.5px] dark:border-b-0 font-bold text-sm flex justify-between items-center"
               style={{
-                backgroundColor: getAvatarStyle(pseudonym, true).avatarBg,
+                backgroundColor: 'var(--nx-composer-header-bg)',
               }}
             >
               <span className="uppercase flex items-center gap-1">
@@ -283,7 +282,7 @@ export const MessageInput: FC<MessageInputProps> = ({
                     onClick={onHide}
                     aria-expanded="true"
                     aria-label="Hide composer"
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] font-semibold text-gray-800 hover:bg-white/60"
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] font-semibold text-gray-800 hover:bg-white/60 dark:hover:bg-nx-active"
                   >
                     Hide
                     <KeyboardArrowDown fontSize="small" />
@@ -293,7 +292,7 @@ export const MessageInput: FC<MessageInputProps> = ({
             </div>
 
             {/* Input field with buttons at bottom */}
-            <div className="border-[1px] border-[#A5B4FC] border-t-0 rounded-b-lg bg-white transition-all focus-within:border-[#6366f1] focus-within:shadow-md">
+            <div className="nx-composer border-[1px] border-nx-input-border border-t-0 rounded-b-lg bg-white transition-all focus-within:border-nx-input-focus focus-within:shadow-md dark:border-[1.5px] dark:border-t-0 dark:bg-nx-raised">
               <textarea
                 id="message-input"
                 ref={messageInputRef as any}
@@ -328,8 +327,9 @@ export const MessageInput: FC<MessageInputProps> = ({
                         sx={{
                           padding: '6px',
                           fontSize: '0.875rem',
-                          color: '#374151',
-                          backgroundColor: '#e5e7eb',
+                          color: 'var(--nx-chip-btn-fg)',
+                          backgroundColor: 'var(--nx-chip-btn-bg)',
+                          border: 'var(--nx-chip-btn-border)',
                           borderRadius: '50%',
                           width: '32px',
                           height: '32px',
@@ -337,7 +337,8 @@ export const MessageInput: FC<MessageInputProps> = ({
                           alignItems: 'center',
                           justifyContent: 'center',
                           '&:hover': {
-                            backgroundColor: '#d1d5db',
+                            color: 'var(--nx-chip-btn-hover-fg)',
+                            backgroundColor: 'var(--nx-chip-btn-hover-bg)',
                           },
                         }}
                       >
@@ -356,8 +357,8 @@ export const MessageInput: FC<MessageInputProps> = ({
                   <Send
                     sx={{
                       opacity: !currentMessage ? 0.5 : 1,
-                      color: 'white',
-                      backgroundColor: '#2f69c4',
+                      color: 'var(--nx-send-fg)',
+                      backgroundColor: 'var(--nx-send-bg)',
                       borderRadius: '50%',
                       padding: '4px',
                       transform: 'rotate(-45deg)',

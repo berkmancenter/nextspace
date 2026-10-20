@@ -221,7 +221,7 @@ describe('Transcript', () => {
     // Should apply focus styles with purple highlight
     await waitFor(() => {
       const highlightedElement = document.getElementById('transcript-message-m1');
-      expect(highlightedElement?.className).toContain('bg-[#4A0979]');
+      expect(highlightedElement?.className).toContain('bg-nx-focus-row');
     });
   });
 
@@ -246,7 +246,7 @@ describe('Transcript', () => {
 
     await waitFor(() => {
       const highlightedElement = document.getElementById('transcript-message-m1');
-      expect(highlightedElement?.className).toContain('bg-[#4A0979]');
+      expect(highlightedElement?.className).toContain('bg-nx-focus-row');
     });
   });
 
@@ -266,7 +266,7 @@ describe('Transcript', () => {
     // Should auto-open with focus
     await waitFor(() => {
       const highlightedElement = document.getElementById('transcript-message-m1');
-      expect(highlightedElement?.className).toContain('bg-[#4A0979]');
+      expect(highlightedElement?.className).toContain('bg-nx-focus-row');
     });
 
     // Manually close via toggle
@@ -281,7 +281,7 @@ describe('Transcript', () => {
 
     await waitFor(() => {
       const highlightedElement = document.getElementById('transcript-message-m1');
-      expect(highlightedElement?.className).toContain('bg-[#4A0979]');
+      expect(highlightedElement?.className).toContain('bg-nx-focus-row');
     });
   });
 
@@ -299,7 +299,7 @@ describe('Transcript', () => {
     // Should auto-open with focus
     await waitFor(() => {
       const highlightedElement = document.getElementById('transcript-message-m1');
-      expect(highlightedElement?.className).toContain('bg-[#4A0979]');
+      expect(highlightedElement?.className).toContain('bg-nx-focus-row');
     });
 
     // Remove focusTimeRange
@@ -307,7 +307,7 @@ describe('Transcript', () => {
 
     await waitFor(() => {
       const highlightedElement = document.getElementById('transcript-message-m1');
-      expect(highlightedElement?.className).not.toContain('bg-[#4A0979]');
+      expect(highlightedElement?.className).not.toContain('bg-nx-focus-row');
     });
   });
 
@@ -324,7 +324,7 @@ describe('Transcript', () => {
 
     // Should auto-open and focus m1
     await waitFor(() => {
-      expect(document.querySelector('#transcript-message-m1')).toHaveClass('bg-[#4A0979]');
+      expect(document.querySelector('#transcript-message-m1')).toHaveClass('bg-nx-focus-row');
     });
 
     // Change focusTimeRange to focus m2
@@ -339,8 +339,8 @@ describe('Transcript', () => {
     );
 
     await waitFor(() => {
-      expect(document.querySelector('#transcript-message-m2')).toHaveClass('bg-[#4A0979]');
-      expect(document.querySelector('#transcript-message-m1')).not.toHaveClass('bg-[#4A0979]');
+      expect(document.querySelector('#transcript-message-m2')).toHaveClass('bg-nx-focus-row');
+      expect(document.querySelector('#transcript-message-m1')).not.toHaveClass('bg-nx-focus-row');
     });
   });
 
@@ -376,7 +376,7 @@ describe('Transcript', () => {
     await waitFor(
       () => {
         const highlightedElement = document.getElementById('transcript-message-m1');
-        expect(highlightedElement?.className).toContain('bg-[#4A0979]');
+        expect(highlightedElement?.className).toContain('bg-nx-focus-row');
       },
       { timeout: 300 },
     );

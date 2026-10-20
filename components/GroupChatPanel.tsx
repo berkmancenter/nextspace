@@ -185,7 +185,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
         className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
         style={{ backgroundColor: style.avatarBg }}
       >
-        {isAssistant ? <BotIcon size={22} color="#4b5563" /> : <style.icon fontSize="inherit" />}
+        {isAssistant ? <BotIcon size={22} color="var(--nx-icon-muted)" /> : <style.icon fontSize="inherit" />}
       </div>
     );
   };
@@ -215,9 +215,9 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
           <div
             className="rounded-2xl px-2 py-1 text-gray-800 self-start"
             style={{
-              backgroundColor: isHovered ? 'white' : style.bubbleBg,
+              backgroundColor: isHovered ? 'var(--nx-bubble-hover-bg)' : style.bubbleBg,
               width: '100%',
-              border: '1px solid rgba(0, 0, 0, 0.1)',
+              border: '1px solid var(--nx-bubble-border)',
             }}
           >
             {parsed.text && renderAssistantMessage(parsed.text)}
@@ -253,9 +253,9 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
         <div
           className="rounded-2xl px-2 py-1 text-gray-800 self-start"
           style={{
-            backgroundColor: isHovered ? 'white' : style.bubbleBg,
+            backgroundColor: isHovered ? 'var(--nx-bubble-hover-bg)' : style.bubbleBg,
             width: '100%',
-            border: '1px solid rgba(0, 0, 0, 0.1)',
+            border: '1px solid var(--nx-bubble-border)',
           }}
         >
           {renderAssistantMessage(parsed.text)}
@@ -281,7 +281,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                         maxWidth: '100%',
                         height: 'auto',
                         borderRadius: '8px',
-                        border: '1px solid rgba(0, 0, 0, 0.1)',
+                        border: '1px solid var(--nx-bubble-border)',
                       }}
                     />
                   );
@@ -332,7 +332,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
         <div className="relative flex flex-col flex-1 overflow-hidden">
           <div
             ref={messagesContainerRef}
-            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-2 pr-2 md:px-8 pt-2 bg-gray-100"
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-2 pr-2 md:px-8 pt-2 bg-gray-100 dark:bg-nx-base"
           >
             <div
               className="flex flex-col items-start gap-4 pb-2"
@@ -376,7 +376,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
               {/* Bot loading indicator - appears after last user message (only for main chat) */}
               {waitingForResponse && !waitingForThreadedReply && parentMessages.length > 0 && (
                 <div className="relative z-10 flex items-center gap-1 mt-2 mb-1">
-                  <BotIcon size={32} color="#4b5563" bouncing={true} />
+                  <BotIcon size={32} color="var(--nx-icon-muted)" bouncing={true} />
                   <span className="text-xs text-gray-500 italic" style={presentation ? PRESENTATION_TEXT.meta : undefined}>
                     thinking...
                   </span>
@@ -396,10 +396,11 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                   position: 'absolute',
                   bottom: 24,
                   right: 24,
-                  backgroundColor: 'white',
-                  color: '#4845D2',
+                  backgroundColor: 'var(--nx-fab-bg)',
+                  color: 'var(--nx-fab-fg)',
+                  border: '1.5px solid var(--nx-fab-border)',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                  '&:hover': { backgroundColor: '#f5f5f5' },
+                  '&:hover': { backgroundColor: 'var(--nx-fab-hover-bg)' },
                 }}
               >
                 <ArrowCircleDownIcon />
@@ -410,20 +411,20 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
 
         {/* MessageInput*/}
         {inactive ? (
-          <div className="px-4 py-3 text-sm text-gray-500 italic text-center border-t border-gray-200">
+          <div className="px-4 py-3 text-sm text-gray-500 italic text-center border-t border-gray-200 dark:border-nx-border-subtle">
             This event is not active.
           </div>
         ) : (
           <div ref={messageInputRef} className="flex-shrink-0">
             {presentation ? (
               inputHidden && (
-                <div className="flex justify-center bg-gray-100 px-4 pt-2.5 pb-4">
+                <div className="flex justify-center bg-gray-100 px-4 pt-2.5 pb-4 dark:bg-nx-base">
                   <button
                     ref={writeMessageButtonRef}
                     type="button"
                     onClick={() => toggleComposer(false)}
                     aria-expanded="false"
-                    className="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white py-2 pl-4 pr-3.5 text-[15px] font-semibold text-gray-600 shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:border-[#A5B4FC] hover:text-medium-slate-blue"
+                    className="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white py-2 pl-4 pr-3.5 text-[15px] font-semibold text-gray-600 shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:border-nx-input-border hover:text-medium-slate-blue dark:bg-nx-raised"
                   >
                     <EditIcon sx={{ fontSize: 18 }} />
                     Write a message
@@ -432,7 +433,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                 </div>
               )
             ) : (
-              <div className="flex items-center justify-end border-t border-gray-200 px-2 py-0.5 bg-white">
+              <div className="flex items-center justify-end border-t border-gray-200 px-2 py-0.5 bg-white dark:border-nx-border-subtle dark:bg-nx-base">
                 <Tooltip title={inputHidden ? 'Show input' : 'Hide input'}>
                   <IconButton
                     size="small"

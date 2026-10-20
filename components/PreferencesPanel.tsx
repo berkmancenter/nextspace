@@ -41,8 +41,8 @@ export function PreferencesPanel({ botName }: PreferencesPanelProps) {
   };
 
   const switchSx = {
-    '& .MuiSwitch-switchBase.Mui-checked': { color: '#ffffff' },
-    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#4A0979', opacity: 1 },
+    '& .MuiSwitch-switchBase.Mui-checked': { color: 'var(--nx-switch-thumb)' },
+    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: 'var(--nx-switch-track)', opacity: 1 },
   };
 
   const ToggleRow = ({
@@ -57,7 +57,7 @@ export function PreferencesPanel({ botName }: PreferencesPanelProps) {
     divider?: boolean;
   }) => (
     <>
-      {divider && <div style={{ borderTop: '1px solid #F3F4F6', margin: '0 24px' }} />}
+      {divider && <div style={{ borderTop: '1px solid var(--nx-divider-light)', margin: '0 24px' }} />}
       <div className="flex items-center justify-between py-4 px-6">
         <div>
           <div className="font-semibold text-gray-900">{label}</div>
@@ -69,8 +69,8 @@ export function PreferencesPanel({ botName }: PreferencesPanelProps) {
   );
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-100">
-      <div className="bg-white px-6 py-4 border-t border-b border-gray-200">
+    <div className="flex-1 overflow-y-auto bg-gray-100 dark:bg-nx-base">
+      <div className="bg-white px-6 py-4 border-t border-b border-gray-200 dark:bg-nx-chrome">
         <div className="max-w-3xl mx-auto flex items-baseline gap-4 sm:gap-8">
           <h1 className="text-xl font-bold text-gray-900">Your Preferences</h1>
           <span className="text-sm text-gray-500">Settings in this browser only</span>
@@ -82,7 +82,10 @@ export function PreferencesPanel({ botName }: PreferencesPanelProps) {
             <h2 className="font-semibold text-gray-900">{botName} Behavior</h2>
             <p className="text-sm text-gray-500 mt-1 italic">How {botName} helps you during the event</p>
           </div>
-          <div className="flex-1 bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E5E7EB' }}>
+          <div
+            className="flex-1 bg-white rounded-xl overflow-hidden dark:bg-nx-raised"
+            style={{ border: '1px solid var(--nx-card-border)' }}
+          >
             <ToggleRow
               prefKey="jargonClarification"
               label="Jargon Filter"

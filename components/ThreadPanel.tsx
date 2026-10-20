@@ -208,9 +208,9 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
   }, [activeEnhancer, handleEnhancerSelect]);
 
   return (
-    <div className="flex flex-col h-full border-l-2 border-gray-300 bg-gray-50">
+    <div className="flex flex-col h-full border-l-2 border-gray-300 bg-gray-50 dark:border-nx-border-subtle">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-300 bg-white">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-300 bg-white dark:border-nx-border-subtle dark:bg-nx-chrome">
         <div className="flex items-center gap-2">
           {isMobile && (
             <IconButton
@@ -219,7 +219,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
               aria-label="Go back"
               sx={{
                 '&:hover': {
-                  backgroundColor: '#f3f4f6',
+                  backgroundColor: 'var(--nx-hover-bg)',
                 },
               }}
             >
@@ -235,7 +235,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
             aria-label="Close thread"
             sx={{
               '&:hover': {
-                backgroundColor: '#f3f4f6',
+                backgroundColor: 'var(--nx-hover-bg)',
               },
             }}
           >
@@ -301,7 +301,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
 
         {/* Divider */}
         {replies.length > 0 && (
-          <div className="border-t border-gray-300 mb-4">
+          <div className="border-t border-gray-300 mb-4 dark:border-nx-border-subtle">
             <div className="text-xs font-semibold text-gray-500 uppercase mt-4 mb-2">
               {replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}
             </div>
@@ -357,7 +357,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
         {/* Bot loading indicator - appears when waiting for threaded reply */}
         {waitingForResponse && (
           <div className="flex items-center gap-1 mt-4">
-            <BotIcon size={32} color="#4b5563" bouncing={true} />
+            <BotIcon size={32} color="var(--nx-icon-muted)" bouncing={true} />
             <span className="text-xs text-gray-500 italic" style={metaStyle}>
               thinking...
             </span>
@@ -369,7 +369,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
           {replyLock ? (
             <div onClickCapture={() => (unlockAskedHere.current = true)}>{replyLock}</div>
           ) : isReplying ? (
-            <div className="border-[1px] border-[#A5B4FC] rounded-lg bg-white transition-all focus-within:border-[#6366f1] focus-within:shadow-md">
+            <div className="nx-composer border-[1px] border-nx-input-border rounded-lg bg-white transition-all focus-within:border-nx-input-focus focus-within:shadow-md dark:border-[1.5px] dark:bg-nx-raised">
               <textarea
                 ref={textareaRef}
                 value={replyText}
@@ -426,8 +426,9 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                         sx={{
                           padding: '6px',
                           fontSize: '0.875rem',
-                          color: '#374151',
-                          backgroundColor: '#e5e7eb',
+                          color: 'var(--nx-chip-btn-fg)',
+                          backgroundColor: 'var(--nx-chip-btn-bg)',
+                          border: 'var(--nx-chip-btn-border)',
                           borderRadius: '50%',
                           width: '32px',
                           height: '32px',
@@ -435,7 +436,8 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                           alignItems: 'center',
                           justifyContent: 'center',
                           '&:hover': {
-                            backgroundColor: '#d1d5db',
+                            color: 'var(--nx-chip-btn-hover-fg)',
+                            backgroundColor: 'var(--nx-chip-btn-hover-bg)',
                           },
                         }}
                       >
@@ -459,8 +461,8 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                   <Send
                     sx={{
                       opacity: replyText.trim() ? 1 : 0.5,
-                      color: 'white',
-                      backgroundColor: '#2f69c4',
+                      color: 'var(--nx-send-fg)',
+                      backgroundColor: 'var(--nx-send-bg)',
                       borderRadius: '50%',
                       padding: '4px',
                       transform: 'rotate(-45deg)',
@@ -473,7 +475,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
           ) : (
             <button
               onClick={() => setIsReplying(true)}
-              className="w-full border border-gray-300 rounded-lg hover:bg-gray-50 px-4 py-3 text-sm text-gray-700 text-left transition-colors"
+              className="w-full border border-gray-300 rounded-lg hover:bg-gray-50 px-4 py-3 text-sm text-gray-700 text-left transition-colors dark:bg-nx-raised dark:hover:bg-nx-active"
             >
               Reply to thread...
             </button>

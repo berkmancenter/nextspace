@@ -67,20 +67,22 @@ export const PollMessage: FC<PollMessageProps> = ({ body, counts, presentation =
         marginTop: '0.625rem',
         borderRadius: '10px',
         overflow: 'hidden',
-        backgroundColor: 'white',
-        border: '1px solid rgba(0,0,0,0.1)',
+        backgroundColor: 'var(--nx-poll-bg)',
+        border: '1px solid var(--nx-poll-border)',
       }}
     >
       {/* Header */}
       <div
         style={{
           padding: '0.625rem 0.875rem 0.5rem',
-          borderBottom: '1px solid rgba(0,0,0,0.07)',
+          borderBottom: '1px solid var(--nx-poll-divider)',
         }}
       >
-        <p style={{ fontSize: titleSize, fontWeight: 600, color: '#1f2937', margin: 0, lineHeight: 1.4 }}>{title}</p>
+        <p style={{ fontSize: titleSize, fontWeight: 600, color: 'var(--nx-poll-text)', margin: 0, lineHeight: 1.4 }}>
+          {title}
+        </p>
         {!hasVoted && (
-          <p style={{ fontSize: metaSize, color: '#9ca3af', margin: '2px 0 0', lineHeight: 1 }}>
+          <p style={{ fontSize: metaSize, color: 'var(--nx-poll-meta)', margin: '2px 0 0', lineHeight: 1 }}>
             {multiSelect ? 'Select all that apply' : 'Select one'}
           </p>
         )}
@@ -101,8 +103,8 @@ export const PollMessage: FC<PollMessageProps> = ({ body, counts, presentation =
               style={{
                 cursor: canVote ? 'pointer' : 'default',
                 userSelect: 'none',
-                borderTop: i > 0 ? '1px solid rgba(0,0,0,0.05)' : undefined,
-                backgroundColor: isSelected ? 'rgba(72,69,210,0.1)' : undefined,
+                borderTop: i > 0 ? '1px solid var(--nx-poll-row-divider)' : undefined,
+                backgroundColor: isSelected ? 'var(--nx-poll-selected-bg)' : undefined,
                 transition: 'background-color 0.15s ease',
               }}
             >
@@ -124,20 +126,20 @@ export const PollMessage: FC<PollMessageProps> = ({ body, counts, presentation =
                       width: 16,
                       height: 16,
                       borderRadius: multiSelect ? '4px' : '50%',
-                      border: `2px solid ${isSelected ? '#4845D2' : 'rgba(0,0,0,0.25)'}`,
-                      backgroundColor: isSelected ? '#4845D2' : 'transparent',
+                      border: `2px solid ${isSelected ? 'var(--nx-poll-check-bg)' : 'var(--nx-poll-check-border)'}`,
+                      backgroundColor: isSelected ? 'var(--nx-poll-check-bg)' : 'transparent',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       transition: 'all 0.15s ease',
                     }}
                   >
-                    {isSelected && <Check sx={{ fontSize: '0.65rem', color: 'white' }} />}
+                    {isSelected && <Check sx={{ fontSize: '0.65rem', color: 'var(--nx-poll-check-fg)' }} />}
                   </div>
                   <span
                     style={{
                       fontSize: choiceSize,
-                      color: isSelected ? '#1f2937' : '#374151',
+                      color: isSelected ? 'var(--nx-poll-text)' : 'var(--nx-poll-choice)',
                       fontWeight: isSelected ? 600 : 400,
                       lineHeight: 1.35,
                     }}
@@ -153,7 +155,7 @@ export const PollMessage: FC<PollMessageProps> = ({ body, counts, presentation =
                       flexShrink: 0,
                       fontSize: metaSize,
                       fontWeight: isSelected ? 600 : 400,
-                      color: isSelected ? '#4845D2' : '#6b7280',
+                      color: isSelected ? 'var(--nx-poll-count-selected)' : 'var(--nx-poll-count)',
                     }}
                   >
                     {pct}%
@@ -169,21 +171,25 @@ export const PollMessage: FC<PollMessageProps> = ({ body, counts, presentation =
       <div
         style={{
           padding: '0.375rem 0.875rem',
-          borderTop: '1px solid rgba(0,0,0,0.07)',
+          borderTop: '1px solid var(--nx-poll-divider)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
         }}
       >
-        <span style={{ fontSize: metaSize, color: '#9ca3af' }}>
+        <span style={{ fontSize: metaSize, color: 'var(--nx-poll-meta)' }}>
           {showResults ? `${totalVotes} vote${totalVotes !== 1 ? 's' : ''}` : hasVoted ? 'Vote recorded' : ''}
         </span>
         {!isAlwaysReveal && hasVoted && (
-          <span style={{ fontSize: metaSize, color: '#9ca3af', fontStyle: 'italic' }}>Results visible later</span>
+          <span style={{ fontSize: metaSize, color: 'var(--nx-poll-meta)', fontStyle: 'italic' }}>
+            Results visible later
+          </span>
         )}
       </div>
 
-      {error && <p style={{ fontSize: metaSize, color: '#ef4444', padding: '0 0.875rem 0.5rem', margin: 0 }}>{error}</p>}
+      {error && (
+        <p style={{ fontSize: metaSize, color: 'var(--nx-error-text)', padding: '0 0.875rem 0.5rem', margin: 0 }}>{error}</p>
+      )}
     </div>
   );
 };
