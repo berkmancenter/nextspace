@@ -242,6 +242,33 @@ export function setCustomDimension(index: number, name: string, value: string, s
 }
 
 /**
+ * Clears a custom dimension using Matomo's native tracker API. Action-scope dimensions
+ * persist on the tracker until deleted, so clear one before an event that must not inherit
+ * the previous value (e.g. dimension 6 after a conversation page was visited).
+ * @param index - Dimension index
+ */
+export function deleteCustomDimension(index: number): void {
+  ensureMTM();
+
+  // Return early if analytics is disabled or not configured
+  if (typeof window === 'undefined' || !window._mtm) {
+    return;
+  }
+
+  // Initialize _paq array if it doesn't exist
+  if (!window._paq) {
+    window._paq = [];
+  }
+
+  // Use Matomo's native deleteCustomDimension API
+  window._paq.push(['deleteCustomDimension', index]);
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Analytics] Custom dimension deleted:', { index });
+  }
+}
+
+/**
  * Sets the user ID (pseudonym in this case) using Matomo's native tracker API
  * @param userId - User identifier
  */
