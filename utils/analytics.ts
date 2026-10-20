@@ -106,6 +106,18 @@ function ensureMTM(): void {
  * @param pageName - Name of the page being viewed
  * @param customData - Additional data to track with the page view
  */
+/**
+ * Tells Matomo's own tracker to record `url` instead of document.location for later hits. Used to keep the
+ * artifact passcode out of the URL Matomo reports. Queued on _paq, so it applies whenever the tracker loads.
+ */
+export function setTrackedUrl(url: string): void {
+  if (typeof window === 'undefined') return;
+  if (!window._paq) {
+    window._paq = [];
+  }
+  window._paq.push(['setCustomUrl', url]);
+}
+
 export function trackPageView(pageName: string, customData?: Record<string, any>): void {
   ensureMTM();
 
@@ -226,6 +238,33 @@ export function setCustomDimension(index: number, name: string, value: string, s
       value,
       scope,
     });
+  }
+}
+
+/**
+ * Clears a custom dimension using Matomo's native tracker API. Action-scope dimensions
+ * persist on the tracker until deleted, so clear one before an event that must not inherit
+ * the previous value (e.g. dimension 6 after a conversation page was visited).
+ * @param index - Dimension index
+ */
+export function deleteCustomDimension(index: number): void {
+  ensureMTM();
+
+  // Return early if analytics is disabled or not configured
+  if (typeof window === 'undefined' || !window._mtm) {
+    return;
+  }
+
+  // Initialize _paq array if it doesn't exist
+  if (!window._paq) {
+    window._paq = [];
+  }
+
+  // Use Matomo's native deleteCustomDimension API
+  window._paq.push(['deleteCustomDimension', index]);
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Analytics] Custom dimension deleted:', { index });
   }
 }
 

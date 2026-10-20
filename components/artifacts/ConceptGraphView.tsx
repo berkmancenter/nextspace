@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ReactNode } from 'react';
 import { Box, useMediaQuery } from '@mui/material';
 import { ConceptGraphPayload } from '../../types.internal';
-import { trackEvent } from '../../utils/analytics';
+import { trackArtifactEvent } from '../../utils/artifactAnalytics';
 import { SkyFilter, filterSky, layoutOrbit, layoutSky } from '../../utils/conceptSky';
 import { GraphFeedback } from './GraphFeedback';
 import { SkyCanvas, VIEW_PAD } from './sky/SkyCanvas';
@@ -12,7 +12,7 @@ import { SkyList } from './sky/SkyList';
 import { SkyPanel, SkyView } from './sky/SkyPanel';
 import SkyStyle from './sky/SkyStyle';
 import SkyViewStyle from './sky/SkyViewStyle';
-import { buildScene, nodeKind } from './sky/scene';
+import { NodeKind, buildScene, nodeKind } from './sky/scene';
 import { cgVar, skyGeometry, skyShape } from './sky/tokens';
 import { useTweenedPositions } from './sky/useTweenedPositions';
 
@@ -20,10 +20,12 @@ import { useTweenedPositions } from './sky/useTweenedPositions';
  * Props for ConceptGraphView.
  * @property payload - The graph to draw. Every array may be empty; an artifact can exist before an event fills it in.
  * @property header - The artifact's own heading, shown at the top of the reading column.
+ * @property conversationId - The conversation the graph came from, so its analytics events are attributed to it. Omitted on a series graph or a fixture.
  * @property height - Kept so existing callers still compile. The sky is a fixed-aspect frame that scales to its container's width, so there is no canvas height to set.
  */
 interface ConceptGraphViewProps {
   payload: ConceptGraphPayload;
+  conversationId?: string;
   height?: number;
   /** What the artifact is: its title, version and history. In the one-screen layout it heads the reading column rather than the page. */
   header?: ReactNode;
@@ -57,7 +59,11 @@ const SKY_RATIO = skyGeometry.viewBox.width / (skyGeometry.viewBox.height + 2 * 
  * Nothing that identifies a speaker (a pseudonym, a message id) is read or drawn anywhere in
  * the sky: these graphs come out of Chatham House Rule events. See {@link buildScene}.
  */
-export const ConceptGraphView = ({ payload, header }: ConceptGraphViewProps) => {
+export const ConceptGraphView = ({ payload, header, conversationId }: ConceptGraphViewProps) => {
+  const track = useCallback(
+    (action: string, name: string, value?: number) => trackArtifactEvent(conversationId, 'graph', action, name, value),
+    [conversationId],
+  );
   const scene = useMemo(() => buildScene(payload), [payload]);
   const narrow = useMediaQuery(NARROW_QUERY, { noSsr: true });
   const fit = useMediaQuery(FIT_QUERY, { noSsr: true });
@@ -81,19 +87,34 @@ export const ConceptGraphView = ({ payload, header }: ConceptGraphViewProps) => 
   const positions = useTweenedPositions(targetPositions, reduceMotion);
   const filterState = useMemo(() => filterSky(scene.model, filter), [scene.model, filter]);
 
+  // The sky reports a dwell with the kind of node, for the same reason `select` does.
+  const dwell = useCallback((kind: NodeKind) => track('hover', kind), [track]);
   const select = useCallback(
     (id: string | null) => {
       setSelected(id);
       if (id && nodeKind(scene, id) === 'concept') setOrbitCenter(id);
-      if (id) trackEvent('graph', 'select', nodeKind(scene, id) ?? 'unknown');
+      // Kind only, never the id: the backend derives concept and prompt ids from their text (a slug of the
+      // label), which comes out of the discussion, and a contribution id would point at one person's account.
+      if (id) track('select', nodeKind(scene, id) ?? 'unknown');
     },
-    [scene],
+    [scene, track],
+  );
+  // Every way the selection is dropped goes through here so each is counted, with how it happened.
+  const deselect = useCallback(
+    (method: 'toggle' | 'panel' | 'escape' | 'empty_sky') => {
+      setSelected(null);
+      track('deselect', method);
+    },
+    [track],
   );
   // On the sky a second click on the selection clears it; chips and list rows always select.
-  const toggle = useCallback((id: string) => (selectedId === id ? setSelected(null) : select(id)), [selectedId, select]);
+  const toggle = useCallback(
+    (id: string) => (selectedId === id ? deselect('toggle') : select(id)),
+    [selectedId, select, deselect],
+  );
 
   const changeView = (next: SkyView) => {
-    trackEvent('graph', 'view', next);
+    track('view', next);
     if (next === 'list') {
       setList(true);
       return;
@@ -109,7 +130,9 @@ export const ConceptGraphView = ({ payload, header }: ConceptGraphViewProps) => 
   };
 
   const changeFilter = (next: SkyFilter) => {
-    trackEvent('graph', 'filter', next === 'all' ? 'full_series' : 'session');
+    // Sessions are numbered from 1 in the picker ("Session 1"), so the value is that number.
+    if (next === 'all') track('filter', 'full_series');
+    else track('filter', 'session', next + 1);
     setFilter(next);
   };
 
@@ -124,6 +147,7 @@ export const ConceptGraphView = ({ payload, header }: ConceptGraphViewProps) => 
       hoverId={hoverId}
       selectedId={selectedId}
       onHover={setHoverId}
+      onDwell={dwell}
       onToggle={toggle}
     />
   );
@@ -135,7 +159,7 @@ export const ConceptGraphView = ({ payload, header }: ConceptGraphViewProps) => 
       filter={filterState}
       view={view}
       onSelect={select}
-      onClear={() => setSelected(null)}
+      onClear={() => deselect('panel')}
       onToggleOrbit={toggleOrbit}
       fill={fit}
     />
@@ -147,7 +171,7 @@ export const ConceptGraphView = ({ payload, header }: ConceptGraphViewProps) => 
     bgcolor: cgVar('surfaceSky'),
   };
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape' && selectedId) setSelected(null);
+    if (e.key === 'Escape' && selectedId) deselect('escape');
   };
   // A click on empty sky, or on the card around it, puts the graph back as it was: nothing selected, nothing
   // dimmed. Anything you can act on, the reading panel you may be reading, and the dialogs opened from here
@@ -155,7 +179,7 @@ export const ConceptGraphView = ({ payload, header }: ConceptGraphViewProps) => 
   const onClick = (e: React.MouseEvent) => {
     if (!selectedId) return;
     if ((e.target as Element).closest(KEEP_SELECTION)) return;
-    setSelected(null);
+    deselect('empty_sky');
   };
   const skySx = {
     borderRadius: `${skyShape.radiusLg}px`,
@@ -221,7 +245,7 @@ export const ConceptGraphView = ({ payload, header }: ConceptGraphViewProps) => 
             {view !== 'list' && <SkyLegend scene={scene} />}
           </Box>
         </Box>
-        <GraphFeedback compact />
+        <GraphFeedback compact conversationId={conversationId} />
       </Box>
     );
   }
@@ -252,7 +276,7 @@ export const ConceptGraphView = ({ payload, header }: ConceptGraphViewProps) => 
           {panel}
         </Box>
       </Box>
-      <GraphFeedback />
+      <GraphFeedback conversationId={conversationId} />
     </Box>
   );
 };

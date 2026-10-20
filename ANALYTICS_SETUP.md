@@ -375,6 +375,39 @@ The application tracks these event categories:
 
 ---
 
+## Event Reference: Graph and Artifact Events
+
+Events from the artifact pages (the concept graph and the artifact chrome around it) are sent through `trackArtifactEvent` in `utils/artifactAnalytics.ts`. When a conversation id is available the event carries it on custom dimension 6, like every other event on the site; a series (topic) page or the preview page has no single conversation, so its events go out without one.
+
+| Category | Action | Name | Value |
+|---|---|---|---|
+| `graph` | `select` | `concept`, `contribution` or `prompt` (node kind) | none |
+| `graph` | `hover` | `concept` or `prompt` (node kind), after the pointer or focus stays 500ms | none |
+| `graph` | `view` | `sky`, `orbit` or `list` | none |
+| `graph` | `filter` | `full_series` or `session` | session number, from 1 (`session` only) |
+| `graph` | `deselect` | `toggle`, `panel`, `escape` or `empty_sky` | none |
+| `graph` | `feedback_rating` | `No`, `Meh`, `OK` or `WOW!` | none |
+| `graph` | `feedback_text` | `submitted` | text length |
+| `artifact` | `history_open`, `history_close` | artifact type | none |
+| `artifact` | `version_select` | `earlier` or `latest` | version number |
+| `artifact` | `generate_graph` | `generate` or `regenerate` | none |
+| `artifact` | `generate_graph_result` | `generated`, `nothing_written` or `error` | none |
+| `artifact` | `share_link` | `copied`, `copy_failed` or `error` | none |
+| `artifact` | `passcode_submit` | `success` or `failure` | none |
+
+Notes:
+- `hover` fires once per continuous hover, not on every mouseover; leaving the node before 500ms sends nothing. Contributions are never reported on hover.
+- `select` and `hover` send the node kind only. Node ids are not sent: the backend derives concept and prompt ids from their text, which comes out of the discussion, and a contribution id points at one person's account.
+
+### Privacy rules
+
+These graphs come from events held under the Chatham House Rule, so:
+- Never send a passcode as an event name or value. A passcode that arrives in the URL reports nothing, and `passcode_submit` carries only the outcome.
+- Never send free text a reader typed. Feedback text reports `submitted` with its length as the value.
+- Never send participant or quote content, a pseudonym, a message id, or a node id or label (anything derived from what was said) as an event name. Use a fixed, enumerable name such as a node kind or a view name.
+
+---
+
 ## Configuration Checklist
 
 Use this to verify complete setup:

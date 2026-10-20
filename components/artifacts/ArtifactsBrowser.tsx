@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Alert, Box, Button, CircularProgress, Divider, Typography } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import type { Socket } from 'socket.io-client';
@@ -7,6 +8,7 @@ import { ArtifactShareLink } from './ArtifactShareLink';
 import { ArtifactView } from './ArtifactView';
 import { GenerateGraphButton } from './GenerateGraphButton';
 import { useArtifacts } from '../../hooks/useArtifacts';
+import { trackArtifactEvent } from '../../utils/artifactAnalytics';
 import { Artifact, ArtifactContainer, AuthType } from '../../types.internal';
 
 /** The page's own header (the navigation bar) and footer, which the graph's one-screen layout sits between. */
@@ -61,6 +63,37 @@ export const ArtifactsBrowser = ({
     socket,
   });
 
+  /* A passcode typed into the prompt is judged by the read it triggers: refused again means failure. Only the
+     outcome is tracked, never the passcode. `sawLoading` waits for that read to actually start, so the stale
+     not-loading render that follows the submit is not mistaken for its result. */
+  const pendingPasscode = useRef<{ sawLoading: boolean } | null>(null);
+  useEffect(() => {
+    const pending = pendingPasscode.current;
+    if (!pending) return;
+    if (loading) {
+      pending.sawLoading = true;
+      return;
+    }
+    if (!pending.sawLoading) return;
+    pendingPasscode.current = null;
+    trackArtifactEvent(
+      container?.conversationId,
+      'artifact',
+      'passcode_submit',
+      needsPasscode || error ? 'failure' : 'success',
+    );
+  }, [loading, needsPasscode, error, container?.conversationId]);
+
+  const handlePasscodeSubmit = (passcode: string) => {
+    if (passcode === artifactPasscode) {
+      // Nothing will be re-read for the same passcode, and it is the one that was just refused.
+      trackArtifactEvent(container?.conversationId, 'artifact', 'passcode_submit', 'failure');
+    } else {
+      pendingPasscode.current = { sawLoading: false };
+    }
+    onPasscodeSubmit(passcode);
+  };
+
   const selected: Artifact | undefined = artifacts.find((artifact) => artifact.id === selectedArtifactId) ?? artifacts[0];
   const isTopic = !!container?.topicId;
   // An admin's topic listing also holds the topic's conversation graphs, which are not the
@@ -73,7 +106,7 @@ export const ArtifactsBrowser = ({
 
   if (needsPasscode) {
     return (
-      <ArtifactPasscodePrompt onSubmit={onPasscodeSubmit} retrying={loading} rejected={!!artifactPasscode && !loading} />
+      <ArtifactPasscodePrompt onSubmit={handlePasscodeSubmit} retrying={loading} rejected={!!artifactPasscode && !loading} />
     );
   }
 
@@ -158,7 +191,12 @@ export const ArtifactsBrowser = ({
         </Box>
 
         {selected ? (
-          <ArtifactView artifact={selected} artifactPasscode={artifactPasscode} isLive={liveArtifactIds.has(selected.id)} />
+          <ArtifactView
+            artifact={selected}
+            artifactPasscode={artifactPasscode}
+            conversationId={container?.conversationId}
+            isLive={liveArtifactIds.has(selected.id)}
+          />
         ) : (
           <Typography variant="body2" color="text.secondary">
             {emptyMessage}

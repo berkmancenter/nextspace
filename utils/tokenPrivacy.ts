@@ -4,6 +4,19 @@ const TOKEN_PAGES = ['/reset-password', '/invite'];
 const REDACTED = 'REDACTED';
 const TOKEN_PARAM_PATTERN = /((?:^|[?&])token=)[^&#\s"']*/g;
 
+const PASSCODE_PARAM_PATTERN = /([?&])artifactPasscode=[^&#]*(&?)/g;
+
+/**
+ * Removes the `artifactPasscode` query parameter (the shareable-link read secret) from a relative or absolute URL
+ * and keeps every other parameter and the hash. Used for anything sent to analytics.
+ */
+export const stripArtifactPasscode = (url: string | null | undefined): string =>
+  (url ?? '')
+    .replace(PASSCODE_PARAM_PATTERN, (_match, lead: string, trail: string) =>
+      lead === '?' && trail ? '?' : trail ? lead : '',
+    )
+    .replace(/[?&]$/, '');
+
 export const isTokenPage = (pathname: string): boolean => TOKEN_PAGES.includes(pathname);
 
 export const scrubTokenFromUrl = (url: string): string => url.replace(TOKEN_PARAM_PATTERN, `$1${REDACTED}`);

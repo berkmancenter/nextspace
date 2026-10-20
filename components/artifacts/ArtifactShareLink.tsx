@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Box, Button, TextField } from '@mui/material';
 import LinkIcon from '@mui/icons-material/Link';
 import { fetchArtifactPasscode } from '../../utils';
+import { trackArtifactEvent } from '../../utils/artifactAnalytics';
 import { Artifact, ArtifactContainer } from '../../types.internal';
 
 /**
@@ -46,10 +47,14 @@ export const ArtifactShareLink = ({ container, selectedArtifact }: ArtifactShare
       try {
         await navigator.clipboard.writeText(buildLink(minted, linkedArtifactId));
         setCopied(true);
+        trackArtifactEvent(container.conversationId, 'artifact', 'share_link', 'copied');
       } catch (err) {
         console.warn('Share link built but could not be copied:', err);
+        // The link is still on screen to copy by hand.
+        trackArtifactEvent(container.conversationId, 'artifact', 'share_link', 'copy_failed');
       }
     } catch (err) {
+      trackArtifactEvent(container.conversationId, 'artifact', 'share_link', 'error');
       setPasscode(null);
       setError(err instanceof Error ? err.message : 'Could not build a share link.');
     } finally {

@@ -37,6 +37,12 @@ describe('_document.tsx Matomo Tag Manager', () => {
     expect(documentSource).toContain('!isTokenPage(props.__NEXT_DATA__.page)');
   });
 
+  it('hides the artifact passcode from the URL Matomo records', () => {
+    expect(documentSource).toContain('artifactPasscode');
+    expect(documentSource).toContain("'setCustomUrl'");
+    expect(documentSource.indexOf("'setCustomUrl'")).toBeLessThan(documentSource.indexOf('g.src='));
+  });
+
   it('loads Matomo script asynchronously', () => {
     // Verify the script sets async=true
     expect(documentSource).toContain('g.async=true');

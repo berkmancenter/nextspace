@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Box, Button, TextField, Typography } from '@mui/material';
-import { trackEvent } from '../../utils/analytics';
+import { trackArtifactEvent } from '../../utils/artifactAnalytics';
 
 const RATING_OPTIONS = ['No', 'Meh', 'OK', 'WOW!'] as const;
 const MUTED = '#64748B';
@@ -8,18 +8,22 @@ const PANEL_BORDER = '#E2E8F0';
 
 /**
  * A lightweight "was this graph clear?" prompt for a concept graph artifact, reported
- * through the same analytics pipeline (trackEvent) the canvas's own zoom/pan/fit tracking
- * already uses.
+ * through the same analytics pipeline (trackArtifactEvent) the graph's own select, view,
+ * filter and deselect tracking uses, attributed to the conversation when there is one.
  *
  * MessageFeedback, the chat equivalent, posts a rating into the conversation as a
  * specially-tagged message (`/feedback|Rating|...`) — that only works because that screen
  * already has a live conversation, a channel passcode, and someone with standing to send a
  * message in it. None of that holds here: a reader of this graph may hold only the artifact
  * passcode, for a conversation that is long over, with no message-sending channel to post
- * into. Matomo is the durable record instead of the transcript, the same trade this
- * component's zoom/pan/fit tracking already made.
+ * into. Matomo is the durable record instead of the transcript.
+ *
+ * Only the rating and the length of any free text are sent: what a reader typed never leaves
+ * the page, since an event name is stored and reported in the clear.
+ * @property compact - One-line layout for the one-screen graph.
+ * @property conversationId - The conversation the graph belongs to, for attribution.
  */
-export const GraphFeedback = ({ compact = false }: { compact?: boolean }) => {
+export const GraphFeedback = ({ compact = false, conversationId }: { compact?: boolean; conversationId?: string }) => {
   const [rating, setRating] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [textSent, setTextSent] = useState(false);
@@ -27,13 +31,13 @@ export const GraphFeedback = ({ compact = false }: { compact?: boolean }) => {
   const handleRate = (option: string) => {
     if (rating !== null) return;
     setRating(option);
-    trackEvent('graph', 'feedback_rating', option);
+    trackArtifactEvent(conversationId, 'graph', 'feedback_rating', option);
   };
 
   const handleSendText = () => {
     const trimmed = text.trim();
     if (!trimmed || textSent) return;
-    trackEvent('graph', 'feedback_text', trimmed);
+    trackArtifactEvent(conversationId, 'graph', 'feedback_text', 'submitted', trimmed.length);
     setTextSent(true);
   };
 

@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { useAnalytics } from '../../hooks/useAnalytics';
-import { tagEventVisit } from '../../utils/analytics';
+import { setTrackedUrl, tagEventVisit, trackPageView } from '../../utils/analytics';
 
 // Mock the router so we can control the conversation id in scope on mount.
 const mockRouter = {
@@ -21,6 +21,7 @@ jest.mock('../../utils/analytics', () => ({
   setCustomDimension: jest.fn(),
   trackUserLocation: jest.fn(),
   tagEventVisit: jest.fn(),
+  setTrackedUrl: jest.fn(),
 }));
 
 // The duration hook touches timers/visibility we don't care about here.
@@ -74,5 +75,67 @@ describe('useAnalytics visit tagging', () => {
     renderHook(() => useAnalytics({ pageType: 'home' }));
 
     expect(tagEventVisit).not.toHaveBeenCalled();
+  });
+
+  it('tags the visit on the conversation artifacts page, which audience members read', () => {
+    mockRouter.query = { conversationId: 'conv-123' };
+
+    renderHook(() => useAnalytics({ pageType: 'artifacts' }));
+
+    expect(tagEventVisit).toHaveBeenCalledWith('conv-123');
+    expect(trackPageView).toHaveBeenCalledWith('/assistant', expect.objectContaining({ conversationId: 'conv-123' }));
+  });
+
+  it('does NOT tag the series or preview artifact pages, but still records the page view', () => {
+    mockRouter.query = { topicId: 'topic-1' };
+
+    renderHook(() => useAnalytics({ pageType: 'artifacts_topic' }));
+    renderHook(() => useAnalytics({ pageType: 'artifacts_preview' }));
+
+    expect(tagEventVisit).not.toHaveBeenCalled();
+    expect(trackPageView).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('useAnalytics passcode privacy', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRouter.query = {};
+  });
+
+  const pathSent = () => (trackPageView as jest.Mock).mock.calls[0][1].path;
+
+  it('strips a lone artifactPasscode from the page view path and the Matomo URL', () => {
+    mockRouter.pathname = '/artifacts/[conversationId]';
+    mockRouter.asPath = '/artifacts/c1?artifactPasscode=secret';
+    renderHook(() => useAnalytics({ pageType: 'artifacts' }));
+    expect(pathSent()).toBe('/artifacts/c1');
+    expect(setTrackedUrl).toHaveBeenCalledWith(expect.stringMatching(/\/artifacts\/c1$/));
+  });
+
+  it('keeps other parameters when stripping the passcode', () => {
+    mockRouter.asPath = '/artifacts/c1?artifactPasscode=secret&view=orbit';
+    renderHook(() => useAnalytics({ pageType: 'artifacts' }));
+    expect(pathSent()).toBe('/artifacts/c1?view=orbit');
+    expect(setTrackedUrl).toHaveBeenCalledWith(expect.stringMatching(/\/artifacts\/c1\?view=orbit$/));
+  });
+
+  it('leaves a path with no query alone and does not override the Matomo URL', () => {
+    mockRouter.asPath = '/artifacts/c1';
+    renderHook(() => useAnalytics({ pageType: 'artifacts' }));
+    expect(pathSent()).toBe('/artifacts/c1');
+    expect(setTrackedUrl).not.toHaveBeenCalled();
+  });
+
+  it('tolerates a router with no asPath and does not override the Matomo URL', () => {
+    const original = mockRouter.asPath;
+    (mockRouter as { asPath?: string }).asPath = undefined;
+    try {
+      expect(() => renderHook(() => useAnalytics({ pageType: 'artifacts' }))).not.toThrow();
+      expect(pathSent()).toBe('');
+      expect(setTrackedUrl).not.toHaveBeenCalled();
+    } finally {
+      mockRouter.asPath = original;
+    }
   });
 });

@@ -4,12 +4,14 @@ jest.mock('../../utils', () => ({
 
 jest.mock('../../utils/analytics', () => ({
   trackEvent: jest.fn(),
+  trackConversationEvent: jest.fn(),
+  deleteCustomDimension: jest.fn(),
 }));
 
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { generateConceptGraph } from '../../utils';
-import { trackEvent } from '../../utils/analytics';
+import { trackConversationEvent, trackEvent } from '../../utils/analytics';
 import { GenerateGraphButton } from '../../components/artifacts/GenerateGraphButton';
 import { ArtifactList } from '../../components/artifacts/ArtifactList';
 import { ArtifactPasscodePrompt } from '../../components/artifacts/ArtifactPasscodePrompt';
@@ -161,6 +163,54 @@ describe('GenerateGraphButton', () => {
     expect(onGenerated).not.toHaveBeenCalled();
   });
 
+  it('tracks the click and the outcome, attributed to the conversation', async () => {
+    mockGenerate.mockResolvedValue({ generated: true, version: { versionNumber: 2 } });
+    render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} hasExistingGraph onGenerated={jest.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /regenerate concept graph/i }));
+
+    await screen.findByText(/Wrote version 2/);
+    expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'artifact', 'generate_graph', 'regenerate', undefined);
+    expect(trackConversationEvent).toHaveBeenCalledWith(
+      'conv-1',
+      'artifact',
+      'generate_graph_result',
+      'generated',
+      undefined,
+    );
+  });
+
+  it('tracks a run that wrote nothing, and a refusal, as different outcomes', async () => {
+    mockGenerate.mockResolvedValueOnce({ generated: false });
+    render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} onGenerated={jest.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: /generate concept graph/i }));
+    await screen.findByText(/Nothing was written/);
+    expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'artifact', 'generate_graph', 'generate', undefined);
+    expect(trackConversationEvent).toHaveBeenCalledWith(
+      'conv-1',
+      'artifact',
+      'generate_graph_result',
+      'nothing_written',
+      undefined,
+    );
+
+    mockGenerate.mockRejectedValueOnce(new Error('Forbidden'));
+    await userEvent.click(screen.getByRole('button', { name: /generate concept graph/i }));
+    await screen.findByText('Forbidden');
+    expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'artifact', 'generate_graph_result', 'error', undefined);
+  });
+
+  it('tracks without attribution for a series, which has no single conversation', async () => {
+    mockGenerate.mockResolvedValue({ generated: false });
+    render(<GenerateGraphButton container={{ topicId: 'topic-1' }} onGenerated={jest.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /generate series graph/i }));
+
+    await screen.findByText(/Nothing was written/);
+    expect(trackEvent).toHaveBeenCalledWith('artifact', 'generate_graph', 'generate', undefined);
+    expect(trackConversationEvent).not.toHaveBeenCalled();
+  });
+
   it('surfaces a refusal', async () => {
     mockGenerate.mockRejectedValue(new Error('Forbidden'));
     render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} onGenerated={jest.fn()} />);
@@ -179,7 +229,7 @@ describe('GraphFeedback', () => {
 
     await userEvent.click(screen.getByRole('radio', { name: 'OK' }));
 
-    expect(trackEvent).toHaveBeenCalledWith('graph', 'feedback_rating', 'OK');
+    expect(trackEvent).toHaveBeenCalledWith('graph', 'feedback_rating', 'OK', undefined);
     expect(screen.getByText('Thanks!')).toBeInTheDocument();
   });
 
@@ -210,9 +260,37 @@ describe('GraphFeedback', () => {
     await userEvent.type(screen.getByLabelText('Additional feedback'), 'The legend took a while to make sense of.');
     await userEvent.click(screen.getByRole('button', { name: 'Send' }));
 
-    expect(trackEvent).toHaveBeenCalledWith('graph', 'feedback_rating', 'Meh');
-    expect(trackEvent).toHaveBeenCalledWith('graph', 'feedback_text', 'The legend took a while to make sense of.');
+    expect(trackEvent).toHaveBeenCalledWith('graph', 'feedback_rating', 'Meh', undefined);
+    expect(trackEvent).toHaveBeenCalledWith(
+      'graph',
+      'feedback_text',
+      'submitted',
+      'The legend took a while to make sense of.'.length,
+    );
     expect(screen.getByText('Noted.')).toBeInTheDocument();
+  });
+
+  it('never sends what the reader typed, only that text was submitted and how long it was', async () => {
+    render(<GraphFeedback conversationId="conv-1" />);
+    const typed = 'Call me on 555-0100 about this';
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Meh' }));
+    await userEvent.type(screen.getByLabelText('Additional feedback'), `  ${typed}  `);
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    expect(
+      JSON.stringify([(trackConversationEvent as jest.Mock).mock.calls, (trackEvent as jest.Mock).mock.calls]),
+    ).not.toContain('555');
+    expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'feedback_text', 'submitted', typed.length);
+  });
+
+  it('attributes the rating to the conversation when there is one', async () => {
+    render(<GraphFeedback conversationId="conv-1" />);
+
+    await userEvent.click(screen.getByRole('radio', { name: 'WOW!' }));
+
+    expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'feedback_rating', 'WOW!', undefined);
+    expect(trackEvent).not.toHaveBeenCalled();
   });
 
   it('has nothing to send before a rating is picked', () => {
