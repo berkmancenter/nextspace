@@ -393,6 +393,47 @@ describe('useSessionJoin', () => {
     expect(result.current.lastReconnectTime).toBeNull();
   });
 
+  describe('user room join', () => {
+    const captureHandlers = () => {
+      const handlers: Record<string, Function> = {};
+      mockSocket.on.mockImplementation((event: string, handler: Function) => {
+        handlers[event] = handler;
+      });
+      return handlers;
+    };
+
+    it('emits user:join with the valid token on connect and again on every reconnect', async () => {
+      mockTokenManagerGetValidToken.mockResolvedValue('fresh-token');
+      const handlers = captureHandlers();
+      renderHook(() => useSessionJoin(true, false));
+      await waitFor(() => expect(handlers.connect).toBeDefined());
+
+      await act(async () => {
+        handlers.connect();
+      });
+      expect(mockSocket.emit).toHaveBeenCalledWith('user:join', { token: 'fresh-token' });
+      expect(mockSocket.emit).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        handlers.disconnect();
+        jest.advanceTimersByTime(2_000);
+        handlers.connect();
+      });
+      expect(mockSocket.emit).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not emit user:join when there is no valid token', async () => {
+      mockTokenManagerGetValidToken.mockResolvedValue(null);
+      const handlers = captureHandlers();
+      renderHook(() => useSessionJoin(true, false));
+      await waitFor(() => expect(handlers.connect).toBeDefined());
+      await act(async () => {
+        handlers.connect();
+      });
+      expect(mockSocket.emit).not.toHaveBeenCalled();
+    });
+  });
+
   describe('gap-reconnect detection (lastReconnectTime)', () => {
     it('should set lastReconnectTime when reconnecting after a long gap (>= 10s)', async () => {
       let connectHandler: Function;
