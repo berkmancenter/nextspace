@@ -106,6 +106,18 @@ function ensureMTM(): void {
  * @param pageName - Name of the page being viewed
  * @param customData - Additional data to track with the page view
  */
+/**
+ * Tells Matomo's own tracker to record `url` instead of document.location for later hits. Used to keep the
+ * artifact passcode out of the URL Matomo reports. Queued on _paq, so it applies whenever the tracker loads.
+ */
+export function setTrackedUrl(url: string): void {
+  if (typeof window === 'undefined') return;
+  if (!window._paq) {
+    window._paq = [];
+  }
+  window._paq.push(['setCustomUrl', url]);
+}
+
 export function trackPageView(pageName: string, customData?: Record<string, any>): void {
   ensureMTM();
 

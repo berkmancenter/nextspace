@@ -8,7 +8,9 @@ import {
   setCustomDimension,
   trackUserLocation,
   tagEventVisit,
+  setTrackedUrl,
 } from '../utils/analytics';
+import { stripArtifactPasscode } from '../utils/tokenPrivacy';
 import { useVisibilityAwareDuration } from './useVisibilityAwareDuration';
 
 export interface UseAnalyticsOptions {
@@ -65,9 +67,19 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
       tagEventVisit(router.query.conversationId as string);
     }
 
+    /*
+     * Artifact pages carry the read passcode in `?artifactPasscode=`. Neither our page view nor Matomo's own
+     * tracker (which reads document.location) may record it, so both get the URL with it stripped.
+     */
+    const currentPath = router.asPath ?? '';
+    const safePath = stripArtifactPasscode(currentPath);
+    if (safePath !== currentPath) {
+      setTrackedUrl(new URL(safePath, window.location.origin).toString());
+    }
+
     // Track page view
     trackPageView(currentPageName, {
-      path: router.asPath,
+      path: safePath,
       ...(router.query.conversationId && {
         conversationId: router.query.conversationId,
       }),
