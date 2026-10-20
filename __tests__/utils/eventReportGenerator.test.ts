@@ -174,8 +174,10 @@ user2,10`;
         message: 'Failed to fetch report',
       });
 
+      // The backend's actual message surfaces instead of a generic fallback, so a
+      // caller downloading multiple report types can show the real reason per type.
       await expect(generateAndDownloadUserMetricsReport(mockConversationId, mockConversationDate)).rejects.toThrow(
-        'Failed to fetch server report',
+        'Failed to fetch report',
       );
 
       expect(mockClick).not.toHaveBeenCalled();
@@ -411,8 +413,10 @@ Response: I'm doing well, thanks!`;
         message: 'Failed to fetch report',
       });
 
+      // The backend's actual message surfaces instead of a generic fallback, so a
+      // caller downloading multiple report types can show the real reason per type.
       await expect(generateAndDownloadDirectMessageResponsesReport(mockConversationId)).rejects.toThrow(
-        'Failed to fetch direct message responses report',
+        'Failed to fetch report',
       );
 
       expect(mockClick).not.toHaveBeenCalled();

@@ -46,11 +46,13 @@ export function ParamErrors(props: ParamErrorsProps) {
           &nbsp;Error
         </h3>
         <p className="text-lg font-bold mx-9 my-3">{props.paramsError?.header}</p>
-        <ul className="text-lg mx-9 my-3 list-disc list-inside">
-          {props.paramsError?.params.map((param, index) => (
-            <li key={index}>{<code>{param}</code>}</li>
-          ))}
-        </ul>
+        {!!props.paramsError?.params.length && (
+          <ul className="text-lg mx-9 my-3 list-disc list-inside">
+            {props.paramsError.params.map((param, index) => (
+              <li key={index}>{<code>{param}</code>}</li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

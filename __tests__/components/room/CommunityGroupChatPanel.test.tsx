@@ -15,6 +15,7 @@ jest.mock('../../../hooks/useAutoScroll', () => ({
 }));
 
 jest.mock('../../../components/room/CommunityMessageInput', () => ({
+  ...jest.requireActual('../../../components/room/CommunityMessageInput'),
   CommunityMessageInput: ({ onSendMessage, tab, isEmptyRoom }: any) => (
     <div data-testid="community-message-input" data-tab={tab} data-empty-room={isEmptyRoom ? 'true' : 'false'}>
       <input
@@ -122,6 +123,16 @@ describe('CommunityGroupChatPanel', () => {
     expect(screen.getByText("Nothing has been said yet. You're first.")).toBeInTheDocument();
   });
 
+  it('says Berkie answers mentions and may also join in on its own', () => {
+    render(<CommunityGroupChatPanel {...baseProps} messages={[]} />);
+    const berkieNote = screen.getByText(
+      (_, element) => element?.tagName === 'P' && /is here too/.test(element.textContent ?? ''),
+    );
+    expect(berkieNote).toHaveTextContent(
+      'Berkie is here too. Put @Berkie in a message to ask it something. It may also reply on its own when a message seems meant for it or asks something it can answer.',
+    );
+  });
+
   it('tells the composer the room is empty so it can adjust its placeholder', () => {
     render(<CommunityGroupChatPanel {...baseProps} />);
     expect(screen.getByTestId('community-message-input')).toHaveAttribute('data-empty-room', 'true');
@@ -210,7 +221,7 @@ describe('CommunityGroupChatPanel', () => {
       },
     ];
     render(<CommunityGroupChatPanel {...baseProps} messages={messages} />);
-    expect(screen.getByText('AI Bot')).toBeInTheDocument();
+    expect(screen.getByText('AI Bot').parentElement).toHaveTextContent('Berkie');
   });
 
   it('sends a typed message through onSendMessage', async () => {
@@ -361,6 +372,24 @@ describe('CommunityGroupChatPanel', () => {
     });
   });
 
+  // The delivered message will come back carrying ownerIsAdmin, so the bubble standing in for
+  // it has to say the same thing or the label appears to flicker on once the server answers.
+  describe('an admin posting their own message', () => {
+    it('marks the waiting bubble as an admin', () => {
+      render(
+        <CommunityGroupChatPanel {...baseProps} isAdmin pendingMessages={[{ id: 'queued-0', body: 'foo', tab: 'chat' }]} />,
+      );
+
+      expect(screen.getByText('(Admin)')).toBeInTheDocument();
+    });
+
+    it('leaves a member’s waiting bubble unmarked', () => {
+      render(<CommunityGroupChatPanel {...baseProps} pendingMessages={[{ id: 'queued-0', body: 'foo', tab: 'chat' }]} />);
+
+      expect(screen.queryByText('(Admin)')).not.toBeInTheDocument();
+    });
+  });
+
   it('offers a retry on a refused message', async () => {
     const user = userEvent.setup();
     const onRetryPendingMessage = jest.fn();
@@ -428,6 +457,34 @@ describe('CommunityGroupChatPanel', () => {
 
     expect(screen.getByText('Reading them tonight.')).toBeInTheDocument();
     expect(screen.getByText('Waiting to send')).toBeInTheDocument();
+  });
+
+  it('locks the thread reply box while the reader has no real name', async () => {
+    const user = userEvent.setup();
+    const onRequestRealName = jest.fn();
+    const parent = {
+      id: 'parent-1',
+      pseudonym: 'Sofia Marchetti',
+      body: 'Both Aadhaar pieces are in the shared folder now.',
+      createdAt: '2026-08-26T09:00:00.000Z',
+    };
+
+    render(
+      <CommunityGroupChatPanel
+        {...baseProps}
+        messages={[parent as any]}
+        mustSetRealName
+        onRequestRealName={onRequestRealName}
+      />,
+    );
+
+    const bubble = screen.getByText('Both Aadhaar pieces are in the shared folder now.');
+    fireEvent.mouseEnter(bubble.parentElement!.parentElement!.parentElement!);
+    fireEvent.click(await screen.findByLabelText('Reply to Sofia Marchetti'));
+
+    expect(screen.queryByPlaceholderText('Reply...')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Set your name' }));
+    expect(onRequestRealName).toHaveBeenCalledTimes(1);
   });
 
   it('has no accessibility violations in the empty state', async () => {

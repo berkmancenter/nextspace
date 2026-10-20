@@ -1,6 +1,6 @@
 # Session & Token System — Developer Guide
 
-> **Audience:** New developers joining the Nextspace project.
+> **Audience:** New developers joining the NextSpace project.
 > **Goal:** Give you a complete mental model of how authentication, sessions, tokens, and
 > token refresh work end-to-end — across page navigations, HTTP calls, WebSocket
 > connections, and multiple browser tabs.
@@ -29,7 +29,7 @@
 
 ## 1. Big Picture
 
-Nextspace supports two kinds of users:
+NextSpace supports two kinds of users:
 
 | Kind              | How they get in                                                        | Token source                                    |
 | ----------------- | ---------------------------------------------------------------------- | ----------------------------------------------- |

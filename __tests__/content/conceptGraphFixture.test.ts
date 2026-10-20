@@ -1,6 +1,8 @@
 import {
   conceptGraphFixture,
+  denseConceptGraphFixture,
   emptyConceptGraphFixture,
+  longSeriesConceptGraphFixture,
   minimalConceptGraphFixture,
   seriesConceptGraphFixture,
 } from '../../content/conceptGraphFixture';
@@ -12,6 +14,8 @@ const fixtures: [string, ConceptGraphPayload][] = [
   ['minimalConceptGraphFixture', minimalConceptGraphFixture],
   ['emptyConceptGraphFixture', emptyConceptGraphFixture],
   ['seriesConceptGraphFixture', seriesConceptGraphFixture],
+  ['longSeriesConceptGraphFixture', longSeriesConceptGraphFixture],
+  ['denseConceptGraphFixture', denseConceptGraphFixture],
 ];
 
 /* The backend guarantees these properties of every payload it serves, and the renderer is
@@ -80,6 +84,20 @@ describe('conceptGraphFixture exercises the cases worth looking at', () => {
     expect(conceptGraphFixture.contributions.some((k) => !k.statement)).toBe(true);
   });
 
+  it('exercises all four combinations of shape (diamond or line) and weight (quoted or not)', () => {
+    // Concept count decides the shape (see buildGraph); statement presence is independent of
+    // it. Without cases like k19 and k20, some combination always goes undrawn on the preview
+    // page and untested here — most commonly a quoted diamond with no statement-less
+    // counterpart, or a quoted two-concept line, since real data skews heavily toward a
+    // statement on a diamond and none on a line (see the doc comment above).
+    const diamonds = conceptGraphFixture.contributions.filter((k) => k.concepts.length !== 2);
+    const lines = conceptGraphFixture.contributions.filter((k) => k.concepts.length === 2);
+    expect(diamonds.some((k) => k.statement)).toBe(true);
+    expect(diamonds.some((k) => !k.statement)).toBe(true);
+    expect(lines.some((k) => k.statement)).toBe(true);
+    expect(lines.some((k) => !k.statement)).toBe(true);
+  });
+
   it('attributes nothing, as a graph from a Chatham House Rule event must not', () => {
     const nodes = [
       ...conceptGraphFixture.concepts,
@@ -113,5 +131,62 @@ describe('seriesConceptGraphFixture models what a topic graph is', () => {
 
     expect(nodes.every((node) => node.provenance?.conversationId)).toBe(true);
     expect(nodes.every((node) => !node.provenance?.pseudonym && !node.provenance?.messageId)).toBe(true);
+  });
+});
+
+describe('the series fixtures exercise the session rings and marks', () => {
+  const sessionsOf = (id: string) =>
+    new Set(
+      [...seriesConceptGraphFixture.concepts, ...seriesConceptGraphFixture.contributions]
+        .filter((n) => ('concepts' in n ? n.concepts.includes(id) : n.id === id))
+        .map((n) => n.provenance?.conversationId),
+    );
+
+  it('has concepts that appear in two and in three sessions, so rings carry several arcs', () => {
+    expect(sessionsOf('s-c-assistant').size).toBe(2);
+    expect(sessionsOf('s-c-trust').size).toBe(3);
+  });
+
+  it('has a quoted line, a summary-only line, a quoted three-concept diamond and a summary-only leaf', () => {
+    const ks = seriesConceptGraphFixture.contributions;
+    expect(ks.some((k) => k.concepts.length === 2 && k.statement)).toBe(true);
+    expect(ks.some((k) => k.concepts.length === 2 && !k.statement)).toBe(true);
+    expect(ks.some((k) => k.concepts.length === 3 && k.statement)).toBe(true);
+  });
+
+  it('attaches an origin prompt to a concept and to a contribution', () => {
+    expect(seriesConceptGraphFixture.concepts.some((c) => c.origin)).toBe(true);
+    expect(seriesConceptGraphFixture.contributions.some((k) => k.origin)).toBe(true);
+  });
+
+  it('spans more sessions than there are session colours in the long series', () => {
+    expect(sessionIndexById(longSeriesConceptGraphFixture).size).toBeGreaterThan(8);
+  });
+});
+
+describe('denseConceptGraphFixture models a real series graph', () => {
+  const { concepts, contributions, originPrompts } = denseConceptGraphFixture;
+
+  it('is about fifty concepts and eighty-five contributions with no provenance and no prompts', () => {
+    expect(concepts).toHaveLength(47);
+    expect(contributions).toHaveLength(85);
+    expect(originPrompts).toEqual([]);
+    expect([...concepts, ...contributions].every((n) => !n.provenance)).toBe(true);
+    expect(sessionIndexById(denseConceptGraphFixture).size).toBe(0);
+  });
+
+  it('is about two thirds lines and the rest diamonds of three to five concepts', () => {
+    const lines = contributions.filter((k) => k.concepts.length === 2).length;
+    expect(lines).toBeGreaterThan(50);
+    expect(lines).toBeLessThan(65);
+    expect(Math.max(...contributions.map((k) => k.concepts.length))).toBe(5);
+    expect(contributions.every((k) => new Set(k.concepts).size === k.concepts.length)).toBe(true);
+  });
+
+  it('has a few summary-only contributions, statements up to about 300 characters, glosses on some, and folded concepts', () => {
+    expect(contributions.filter((k) => !k.statement)).toHaveLength(3);
+    expect(Math.max(...contributions.map((k) => k.statement?.length ?? 0))).toBeLessThanOrEqual(300);
+    expect(concepts.filter((c) => c.gloss).length).toBeGreaterThan(15);
+    expect(concepts.filter((c) => c.foldedFrom?.length).length).toBeGreaterThan(2);
   });
 });

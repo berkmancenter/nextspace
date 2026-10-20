@@ -75,6 +75,37 @@ describe('ThreadedMessage Component', () => {
     jest.clearAllMocks();
   });
 
+  it('draws the name badge beside the sender name, for the message and its reply preview', () => {
+    const badgeFor = (msg: PseudonymousMessage) => <span>{`Badge for ${msg.pseudonym}`}</span>;
+    render(<ThreadedMessage {...defaultProps} replies={mockReplies} renderNameBadge={badgeFor} />);
+
+    expect(screen.getByText('Badge for User1').parentElement).toHaveTextContent('User1');
+    expect(screen.getByText('Badge for User2').parentElement).toHaveTextContent('User2');
+  });
+
+  describe('in the presentation view', () => {
+    it('enlarges the sender names and timestamp so they read from across a room', () => {
+      render(<ThreadedMessage {...defaultProps} replies={mockReplies} showTimestamp presentation />);
+
+      expect(screen.getByText('(You)').parentElement).toHaveStyle({ fontSize: '1.5rem' });
+      expect(screen.getByText('User2').closest('div')).toHaveStyle({ fontSize: '1.5rem' });
+      expect(screen.getByText('12:00 PM')).toHaveStyle({ fontSize: '1.125rem' });
+    });
+
+    it('enlarges the "more replies" link', () => {
+      render(<ThreadedMessage {...defaultProps} replies={mockReplies} presentation />);
+
+      expect(screen.getByRole('button', { name: /view 1 more reply/i })).toHaveStyle({ fontSize: '1.125rem' });
+    });
+
+    it('keeps the default sizes outside the presentation view', () => {
+      render(<ThreadedMessage {...defaultProps} showTimestamp />);
+
+      expect(screen.getByText('(You)').parentElement).not.toHaveStyle({ fontSize: '1.5rem' });
+      expect(screen.getByText('12:00 PM')).not.toHaveStyle({ fontSize: '1.125rem' });
+    });
+  });
+
   it('renders the message content', () => {
     render(<ThreadedMessage {...defaultProps} />);
     expect(screen.getByTestId(`message-${mockMessage.id}`)).toBeInTheDocument();
@@ -105,6 +136,46 @@ describe('ThreadedMessage Component', () => {
     const otherUserMessage = { ...mockMessage, pseudonym: 'OtherUser' };
     render(<ThreadedMessage {...defaultProps} message={otherUserMessage} />);
     expect(screen.queryByText('(You)')).not.toBeInTheDocument();
+  });
+
+  describe('marking an author who is currently an admin', () => {
+    it('shows (Admin) when the message says its author holds the role', () => {
+      render(<ThreadedMessage {...defaultProps} message={{ ...mockMessage, ownerIsAdmin: true }} />);
+      expect(screen.getByText('(Admin)')).toBeInTheDocument();
+    });
+
+    it('shows nothing for an author who is not an admin', () => {
+      render(<ThreadedMessage {...defaultProps} message={{ ...mockMessage, ownerIsAdmin: false }} />);
+      expect(screen.queryByText('(Admin)')).not.toBeInTheDocument();
+    });
+
+    // A conversation without real names never sends the field, so an absent one has to read
+    // as "not an admin" rather than marking every author.
+    it('shows nothing when the conversation never sends the field', () => {
+      render(<ThreadedMessage {...defaultProps} />);
+      expect(screen.queryByText('(Admin)')).not.toBeInTheDocument();
+    });
+
+    // The label sits beside the name rather than inside it: avatar initials, @mention matching
+    // and the "is this mine" check all compare against the raw pseudonym.
+    it('leaves the name itself untouched', () => {
+      const adminMessage = { ...mockMessage, pseudonym: 'OtherUser', ownerIsAdmin: true };
+      render(<ThreadedMessage {...defaultProps} message={adminMessage} />);
+      expect(screen.getByText('OtherUser')).toBeInTheDocument();
+      expect(screen.queryByText('OtherUser (Admin)')).not.toBeInTheDocument();
+    });
+
+    it('marks an admin reading their own message as both admin and author', () => {
+      render(<ThreadedMessage {...defaultProps} message={{ ...mockMessage, ownerIsAdmin: true }} />);
+      expect(screen.getByText('(Admin)')).toBeInTheDocument();
+      expect(screen.getByText('(You)')).toBeInTheDocument();
+    });
+
+    it('marks an admin who wrote a reply', () => {
+      const adminReply = { ...mockReplies[0], ownerIsAdmin: true };
+      render(<ThreadedMessage {...defaultProps} replies={[adminReply]} />);
+      expect(screen.getByText('(Admin)')).toBeInTheDocument();
+    });
   });
 
   describe('identifying the reader by account id', () => {

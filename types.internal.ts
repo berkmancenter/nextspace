@@ -1,4 +1,5 @@
 import { components, operations } from './types';
+import type { ReactNode } from 'react';
 
 /**
  * Authentication type for user sessions
@@ -32,6 +33,7 @@ export interface EventUrl {
 export interface EventUrls {
   moderator: EventUrl[];
   participant: EventUrl[];
+  presentation: EventUrl[];
   zoom?: EventUrl;
 }
 
@@ -87,6 +89,13 @@ export type PseudonymousMessage = components['schemas']['Message'] & {
    * Never present on a message that came back from the API or the socket.
    */
   pending?: 'waiting' | 'failed';
+  /**
+   * Whether the author holds the admin role right now, not when they posted. Declared here as
+   * well as in the generated schema because types.ts is regenerated from whichever backend is
+   * running, so a build against a backend without this field would otherwise stop compiling.
+   * Absent in any conversation that does not use real names.
+   */
+  ownerIsAdmin?: boolean;
 };
 
 /**
@@ -248,16 +257,22 @@ export interface PendingRoomMessage {
   failed?: boolean;
   /** Why the server refused it, in words a member can act on. */
   failureReason?: string;
+  /**
+   * Set only when the refusal was that the room has no real name for the poster. Separate from
+   * failureReason because the room acts on it, reopening the naming prompt, rather than just
+   * showing it.
+   */
+  refusedForMissingName?: boolean;
 }
 
 /**
- * One row in the lounge: a community room the member belongs to, with just enough
+ * One row in the hallway: a community room the member belongs to, with just enough
  * of its latest activity to render a preview.
  * @property {string} preview - "Sender: message text", empty for a room with no messages.
  * @property {string | null} lastMessageAt - ISO timestamp of the newest message, null if there is none.
  * @property {boolean} hasUnread - Whether messages arrived since this device last opened the room.
  */
-export interface LoungeRoom {
+export interface HallwayRoom {
   id: string;
   name: string;
   preview: string;
@@ -289,14 +304,37 @@ export type GraphConcept = Schemas['GraphConcept'] & {
      really were the same idea. A folded concept was a genuinely distinct idea, consolidated
      for space, so its label is kept so a reader can still find it. */
   foldedFrom?: string[];
+  /* One to three sentences describing the concept. Ahead of the generated spec like
+     `foldedFrom`: the backend emits it for about half of a series graph's concepts, and it is
+     absent on the rest. */
+  gloss?: string;
+  /* Every conversation the concept came up in, ordered and de-duplicated. Ahead of the generated
+     spec like `foldedFrom`: unlike `provenance.conversationId`, which stays the first (origin)
+     session, this survives merges and folds, so a recurring concept keeps all its sessions. */
+  conversationIds?: string[];
 };
+
+/* One session of a series graph. Ahead of the generated spec like `foldedFrom`. */
+export interface GraphSession {
+  conversationId: string;
+  /* 1-based, by event date ascending. */
+  order: number;
+  title?: string;
+  /* ISO date. */
+  date?: string;
+}
 export type GraphContribution = Schemas['GraphContribution'];
 export type GraphOriginPrompt = Schemas['GraphOriginPrompt'];
 
 /* The backend defaults every array to [], so a payload never lacks one. `concepts` is
-   narrowed to the extended GraphConcept above (foldedFrom), same reason as there. */
-export type ConceptGraphPayload = Omit<Required<Schemas['ConceptGraphPayload']>, 'concepts'> & {
+   narrowed to the extended GraphConcept above (foldedFrom), same reason as there. `sessions` is
+   omitted too: once the generated spec carries it, `Required` would make it mandatory, and an
+   intersection with an optional `sessions` can't loosen that back. */
+export type ConceptGraphPayload = Omit<Required<Schemas['ConceptGraphPayload']>, 'concepts' | 'sessions'> & {
   concepts: GraphConcept[];
+  /* Series graphs only, and ahead of the generated spec like `foldedFrom`: the sessions in event
+     order, so numbering follows the calendar rather than which node happened to appear first. */
+  sessions?: GraphSession[];
 };
 
 /* The spec types a document payload as an open object; this is the shape it holds. */
@@ -376,8 +414,115 @@ export type ArtifactContainer = { conversationId: string; topicId?: never } | { 
  * GET /v1/artifacts/:artifactId or the artifact:version / artifact:generationFailed socket
  * events.
  */
-export type ConceptGraphGenerationResult = {
-  generated: true;
-  artifact: Artifact;
-  status: 'ready' | 'pending' | 'failed';
-};
+type GenerateResponseBody =
+  operations['generateConceptGraph']['responses'][202]['content']['application/json'];
+export type ConceptGraphGenerationResult = { generated: boolean; artifact?: Artifact } & Omit<
+  GenerateResponseBody,
+  'generated' | 'artifact'
+>;
+
+/**
+ * What the room learns from trying to claim a real name. `taken` is separate from a plain
+ * failure because it is the caller's to fix: another person in that room holds the name.
+ */
+export interface SaveRealNameResult {
+  ok: boolean;
+  taken?: boolean;
+}
+
+/**
+ * One rule a new password must meet, shown to the person before they type.
+ * @property {string} id - Stable key for the rule.
+ * @property {string} label - Text shown in the rule list.
+ * @property {(password: string) => boolean} isMet - Whether the password satisfies the rule.
+ */
+export interface PasswordRule {
+  id: string;
+  label: string;
+  isMet: (password: string) => boolean;
+}
+
+/**
+ * A one-time token read from the page's query string.
+ * `loading` means the router has not parsed the query string yet.
+ */
+export type QueryTokenState = { status: 'loading' } | { status: 'missing' } | { status: 'present'; token: string };
+
+/**
+ * Outcome of submitting a new password with a reset token.
+ * `invalid-token` covers a token that is expired, already used, or never existed.
+ * `rejected` carries the backend's reason, such as a password that breaks a rule.
+ */
+export type ResetPasswordResult =
+  | { status: 'success' }
+  | { status: 'invalid-token' }
+  | { status: 'rejected'; message: string }
+  | { status: 'error' };
+
+/**
+ * What `GET /auth/invite` returns for a live invite link. The backend never sends the invited email address.
+ * `hasAccount` is true when that address already has an account with a password, so the page asks for it.
+ */
+export interface InviteDetails {
+  nonce: string;
+  member: { name: string; hasAccount: boolean };
+  conversation: { id: string; name: string };
+}
+
+/**
+ * Outcome of checking an invite link on page load.
+ * `dead` covers an expired, used, replaced, or unknown link. `incomplete` means the backend could not read a token.
+ */
+export type GetInviteResult =
+  | { status: 'valid'; invite: InviteDetails }
+  | { status: 'dead' }
+  | { status: 'incomplete' }
+  | { status: 'error' };
+
+/** What `POST /auth/invite/consume` returns: the same `user` and `tokens` as `/auth/login`, plus the invite's room. */
+export interface InviteSession {
+  user: { id: string; pseudonyms: { pseudonym: string; active: boolean }[] };
+  tokens: {
+    access: { token: string; expires: string };
+    refresh: { token: string; expires: string };
+  };
+  conversationId: string;
+}
+
+/**
+ * Outcome of submitting a password with an invite link.
+ * `stale-nonce` means the one-time value from the page load expired or was replaced; fetching a new one and resubmitting
+ * is safe. `name-taken` means another member of the room is listed under the same real name.
+ */
+export type ConsumeInviteResult =
+  | { status: 'success'; session: InviteSession }
+  | { status: 'wrong-password' }
+  | { status: 'stale-nonce' }
+  | { status: 'name-taken' }
+  | { status: 'dead' }
+  | { status: 'error' };
+
+/** The resend endpoint answers the same way whether or not it sent anything, so success only means it was received. */
+export type ResendInviteResult = { status: 'accepted' } | { status: 'error' };
+
+/** Outcome of asking for a password reset email. `sent` does not mean an account uses the address. */
+export type RequestPasswordResetResult = { status: 'sent' } | { status: 'invalid-email' } | { status: 'error' };
+
+/**
+ * Props for the PasswordForm component
+ * @property {string} heading - Page heading shown above the form.
+ * @property {ReactNode} [intro] - Optional text under the heading.
+ * @property {string} submitLabel - Text on the submit button.
+ * @property {(password: string) => Promise<string | void>} onSubmit - Called with a password that meets the rules.
+ *   Resolve with a message to show it as an error on the field and re-enable the form. Resolve with nothing when the
+ *   caller has handled the result itself (for example by navigating away); the submit button then stays disabled.
+ * @property {'new' | 'current'} [purpose] - `new` (the default) chooses a password and enforces the rules. `current`
+ *   asks for an existing account's password and leaves checking it to the server.
+ */
+export interface PasswordFormProps {
+  heading: string;
+  intro?: ReactNode;
+  submitLabel: string;
+  onSubmit: (password: string) => Promise<string | void>;
+  purpose?: 'new' | 'current';
+}

@@ -7,6 +7,13 @@ describe('whatsNewEntries', () => {
       expect(new Date(entry.releasedAt).getTime()).not.toBeNaN();
     });
   });
+
+  it('spells the product name as NextSpace', () => {
+    whatsNewEntries.forEach((entry) => {
+      const productNameMentions = `${entry.title} ${entry.body}`.match(/nextspace/gi) ?? [];
+      productNameMentions.forEach((mention) => expect(mention).toBe('NextSpace'));
+    });
+  });
 });
 
 describe('getRecentEntries', () => {

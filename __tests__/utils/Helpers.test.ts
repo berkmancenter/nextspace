@@ -1,10 +1,12 @@
 import {
   resolveConversationBotName,
   normalizeAssistantPseudonym,
+  getTimestampVisibility,
   buildDirectChannels,
   parseMessageBody,
   createConversationFromData,
   GetChannelPasscode,
+  SendData,
   Api,
 } from '../../utils/Helpers';
 
@@ -127,6 +129,40 @@ describe('normalizeAssistantPseudonym', () => {
   it('returns empty string when pseudonym is missing', () => {
     const msg = makeMessage({ pseudonym: undefined });
     expect(normalizeAssistantPseudonym(msg as any, botName)).toBe('');
+  });
+});
+
+describe('getTimestampVisibility', () => {
+  const at = (time: string) => ({ createdAt: `2026-10-14T${time}:00.000Z` });
+
+  it('shows the first message with a time', () => {
+    expect(getTimestampVisibility([at('10:00')])).toEqual([true]);
+  });
+
+  it('hides messages less than 5 minutes after the last shown timestamp', () => {
+    expect(getTimestampVisibility([at('10:00'), at('10:01'), at('10:04')])).toEqual([true, false, false]);
+  });
+
+  it('shows a message exactly 5 minutes after the last shown timestamp', () => {
+    expect(getTimestampVisibility([at('10:00'), at('10:05')])).toEqual([true, true]);
+  });
+
+  it('measures from the last shown timestamp, not the previous message', () => {
+    expect(getTimestampVisibility([at('10:00'), at('10:03'), at('10:06'), at('10:09'), at('10:11')])).toEqual([
+      true,
+      false,
+      true,
+      false,
+      true,
+    ]);
+  });
+
+  it('never shows a message without a time and does not count it as shown', () => {
+    expect(getTimestampVisibility([{}, at('10:00'), {}, at('10:02')])).toEqual([false, true, false, false]);
+  });
+
+  it('returns an empty list for no messages', () => {
+    expect(getTimestampVisibility([])).toEqual([]);
   });
 });
 
@@ -308,6 +344,37 @@ describe('generateEventUrls (via createConversationFromData)', () => {
     expect(url).toContain('channel=chat,chat-pass');
   });
 
+  it('builds a presentation URL with the same channels as the participant URL', async () => {
+    const data = {
+      ...baseConversation,
+      channels: [
+        { name: 'transcript', passcode: 'tx-pass' },
+        { name: 'chat', passcode: 'chat-pass' },
+        { name: 'moderator', passcode: 'mod-pass' },
+      ],
+    };
+    const result = await createConversationFromData(data as any);
+    expect(result.eventUrls.presentation).toEqual([
+      {
+        label: 'Presentation view',
+        url: 'https://example.com/present/?conversationId=conv-123&channel=transcript,tx-pass&channel=chat,chat-pass',
+      },
+    ]);
+  });
+
+  it('builds no presentation URL for a backChannel conversation, which has no presentation view', async () => {
+    const data = {
+      ...baseConversation,
+      conversationType: 'backChannel',
+      channels: [
+        { name: 'participant', passcode: 'part-pass' },
+        { name: 'moderator', passcode: 'mod-pass' },
+      ],
+    };
+    const result = await createConversationFromData(data as any);
+    expect(result.eventUrls.presentation).toEqual([]);
+  });
+
   it('includes a moderator URL when  moderator channel exists', async () => {
     const data = {
       ...baseConversation,
@@ -337,6 +404,7 @@ describe('generateEventUrls (via createConversationFromData)', () => {
     };
     const result = await createConversationFromData(data as any);
     expect(result.eventUrls.participant).toEqual([{ label: 'Community Room', url: 'https://example.com/room/conv-123' }]);
+    expect(result.eventUrls.presentation).toEqual([]);
   });
 });
 
@@ -372,5 +440,60 @@ describe('GetChannelPasscode', () => {
     const result = GetChannelPasscode('chat', {}, noopError);
     expect(result).toBeNull();
     expect(noopError).toHaveBeenCalledWith('Please provide channels.');
+  });
+});
+
+describe('SendData', () => {
+  const originalFetch = global.fetch;
+  const respondWith = (status: number, statusText: string, json: () => Promise<unknown>) => {
+    global.fetch = jest.fn().mockResolvedValue({
+      status,
+      ok: status < 400,
+      statusText,
+      headers: new Headers(),
+      json,
+    } as unknown as Response);
+  };
+
+  beforeEach(() => {
+    jest.spyOn(Api.get(), 'GetTokens').mockReturnValue({ access: 'access-token', refresh: null } as any);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    global.fetch = originalFetch;
+  });
+
+  it("passes the server's reason through on a 400", async () => {
+    respondWith(400, 'Bad Request', () =>
+      Promise.resolve({ code: 400, message: 'Set your real name first.', reason: 'real_name_required' }),
+    );
+
+    const response = await SendData('messages', {});
+
+    expect(response).toEqual({
+      error: true,
+      status: 400,
+      message: 'Set your real name first.',
+      reason: 'real_name_required',
+    });
+  });
+
+  it("passes the server's reason through on other refusals", async () => {
+    respondWith(409, 'Conflict', () =>
+      Promise.resolve({ code: 409, message: 'That name is taken.', reason: 'real_name_taken' }),
+    );
+
+    const response = await SendData('users/pseudonyms/real-name', {});
+
+    expect(response).toEqual({ error: true, status: 409, message: 'Conflict', reason: 'real_name_taken' });
+  });
+
+  it('leaves the reason out when the refusal has no readable body', async () => {
+    respondWith(502, 'Bad Gateway', () => Promise.reject(new SyntaxError('Unexpected token <')));
+
+    const response = await SendData('messages', {});
+
+    expect(response).toEqual({ error: true, status: 502, message: 'Bad Gateway' });
   });
 });

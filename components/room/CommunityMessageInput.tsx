@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect, useCallback, KeyboardEvent, ChangeEvent } from 'react';
+import { useId, useMemo, useRef, useState, useEffect, useCallback, KeyboardEvent, ChangeEvent } from 'react';
 import { IconButton } from '@mui/material';
 import { BotIcon } from '../BotIcon';
 import { GenericEnhancerMenu } from '../GenericEnhancerMenu';
@@ -20,6 +20,12 @@ interface CommunityMessageInputProps {
    * held and delivered on reconnect; only the shortcuts pause.
    */
   offline?: boolean;
+  /**
+   * True while the room has no real name for this poster. The text box gives way to an explanation
+   * and a button that opens the naming dialog, and the other controls are disabled.
+   */
+  mustSetRealName?: boolean;
+  onRequestRealName?: () => void;
 }
 
 const placeholders = (botName: string): Record<string, string> => ({
@@ -27,6 +33,42 @@ const placeholders = (botName: string): Record<string, string> => ({
   chatEmpty: 'Say the first thing',
   assistant: `Ask ${botName}`,
 });
+
+/** Stands in for a composer while the room has no real name for the poster. */
+export function RealNameGate({ onRequestRealName }: { onRequestRealName?: () => void }) {
+  const helpId = useId();
+  return (
+    <div className={styles.nameGate}>
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        className={styles.nameGateIcon}
+      >
+        <rect x="5" y="11" width="14" height="10" rx="2" />
+        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+      </svg>
+      <p id={helpId} className={styles.nameGateHelp}>
+        You must set your real name before posting.
+      </p>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-describedby={helpId}
+        onClick={onRequestRealName}
+        className={styles.nameGateAction}
+      >
+        Set your name
+      </button>
+    </div>
+  );
+}
 
 /**
  * The room's composer. Forked from the shared MessageInput because the
@@ -43,10 +85,19 @@ export function CommunityMessageInput({
   waitingForResponse = false,
   disabled = false,
   offline = false,
+  mustSetRealName = false,
+  onRequestRealName,
 }: CommunityMessageInputProps) {
   const [value, setValue] = useState('');
   const [activeEnhancer, setActiveEnhancer] = useState<ActiveEnhancerState<any> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const wasLocked = useRef(mustSetRealName);
+
+  // The naming dialog hands focus back to the "Set your name" button, which is gone once the lock lifts.
+  useEffect(() => {
+    if (wasLocked.current && !mustSetRealName) textareaRef.current?.focus();
+    wasLocked.current = mustSetRealName;
+  }, [mustSetRealName]);
 
   const enhancers = useMemo(
     () => (tab === 'chat' ? [createMentionsEnhancer([...mentionTargets, botName])] : []),
@@ -147,21 +198,32 @@ export function CommunityMessageInput({
 
   const PLACEHOLDER = placeholders(botName);
   const placeholder = tab === 'chat' ? (isEmptyRoom ? PLACEHOLDER.chatEmpty : PLACEHOLDER.chat) : PLACEHOLDER.assistant;
-  const disclosure = tab === 'chat' ? `You're posting as ${realName}` : 'Only you can see this conversation';
+  const shortcutsIdle = offline || mustSetRealName;
+  const applyShortcut = (text: string) => {
+    if (!offline) insertAtCursor(text);
+  };
+  const controlsDisabled = disabled || mustSetRealName;
+  // Until a real name exists, realName holds the session pseudonym, which is not what the room would show.
+  const postingAs = mustSetRealName ? null : `You're posting as ${realName}`;
+  const disclosure = tab === 'chat' ? postingAs : 'Only you can see this conversation';
 
   return (
     <div className={styles.composerWrap}>
       <div className={styles.composerBox}>
-        <textarea
-          ref={textareaRef}
-          value={value}
-          placeholder={placeholder}
-          disabled={disabled}
-          onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className={styles.composerTextarea}
-          rows={1}
-        />
+        {mustSetRealName ? (
+          <RealNameGate onRequestRealName={onRequestRealName} />
+        ) : (
+          <textarea
+            ref={textareaRef}
+            value={value}
+            placeholder={placeholder}
+            disabled={disabled}
+            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className={styles.composerTextarea}
+            rows={1}
+          />
+        )}
         <div className={styles.composerButtonRow}>
           <div className={styles.composerButtonGroup}>
             {tab === 'chat' && (
@@ -169,9 +231,9 @@ export function CommunityMessageInput({
                 <IconButton
                   aria-label="Mention a member"
                   aria-disabled={offline ? 'true' : undefined}
-                  disabled={disabled}
-                  onClick={() => !offline && insertAtCursor('@')}
-                  className={`${styles.mentionButton}${offline ? ` ${styles.shortcutIdle}` : ''}`}
+                  disabled={controlsDisabled}
+                  onClick={() => applyShortcut('@')}
+                  className={`${styles.mentionButton}${shortcutsIdle ? ` ${styles.shortcutIdle}` : ''}`}
                 >
                   <span aria-hidden="true" className={styles.mentionButtonInner}>
                     @
@@ -180,9 +242,9 @@ export function CommunityMessageInput({
                 <IconButton
                   aria-label={`Ask ${botName}`}
                   aria-disabled={offline ? 'true' : undefined}
-                  disabled={disabled}
-                  onClick={() => !offline && insertAtCursor(`@${botName} `)}
-                  className={`${styles.askBotButton}${offline ? ` ${styles.shortcutIdle}` : ''}`}
+                  disabled={controlsDisabled}
+                  onClick={() => applyShortcut(`@${botName} `)}
+                  className={`${styles.askBotButton}${shortcutsIdle ? ` ${styles.shortcutIdle}` : ''}`}
                 >
                   <BotIcon size={20} color="var(--room-bot-accent)" />
                   <span className={styles.askBotLabel}>Ask {botName}</span>
@@ -193,7 +255,7 @@ export function CommunityMessageInput({
           <IconButton
             aria-label="Send message"
             aria-disabled={!value.trim() || disabled ? 'true' : undefined}
-            disabled={disabled}
+            disabled={controlsDisabled}
             onClick={handleSend}
             className={styles.sendButton}
           >
@@ -208,7 +270,7 @@ export function CommunityMessageInput({
           </IconButton>
         </div>
       </div>
-      <p className={styles.disclosure}>{disclosure}</p>
+      {disclosure && <p className={styles.disclosure}>{disclosure}</p>}
 
       {activeEnhancer && (
         <GenericEnhancerMenu

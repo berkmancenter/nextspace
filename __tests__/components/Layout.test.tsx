@@ -45,17 +45,75 @@ describe('Layout', () => {
     expect(screen.getByText('room body')).toBeInTheDocument();
   });
 
-  it('leaves the lounge to draw its own chrome', () => {
-    mockUseRouter.mockReturnValue({ pathname: '/lounge', asPath: '/lounge', isReady: true });
+  it('leaves the hallway to draw its own chrome', () => {
+    mockUseRouter.mockReturnValue({ pathname: '/hallway', asPath: '/hallway', isReady: true });
 
     render(
       <Layout>
-        <p>lounge body</p>
+        <p>hallway body</p>
       </Layout>,
     );
 
     expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
     expect(screen.queryByTestId('app-footer')).not.toBeInTheDocument();
-    expect(screen.getByText('lounge body')).toBeInTheDocument();
+    expect(screen.getByText('hallway body')).toBeInTheDocument();
+  });
+
+  it('leaves the not-found page to draw its own chrome', () => {
+    mockUseRouter.mockReturnValue({ pathname: '/404', asPath: '/admin/events', isReady: true });
+
+    render(
+      <Layout>
+        <p>not found body</p>
+      </Layout>,
+    );
+
+    expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('app-footer')).not.toBeInTheDocument();
+    expect(screen.getByText('not found body')).toBeInTheDocument();
+  });
+
+  it('leaves the invite page to draw its own chrome', () => {
+    mockUseRouter.mockReturnValue({ pathname: '/invite', asPath: '/invite', isReady: true });
+
+    render(
+      <Layout>
+        <p>invite body</p>
+      </Layout>,
+    );
+
+    expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('app-footer')).not.toBeInTheDocument();
+    expect(screen.getByText('invite body')).toBeInTheDocument();
+  });
+
+  it('leaves the presentation view to draw its own header, since it runs on a shared screen', () => {
+    mockUseRouter.mockReturnValue({
+      pathname: '/present',
+      asPath: '/present/?conversationId=conv-1&channel=chat,abc',
+      isReady: true,
+    });
+
+    render(
+      <Layout>
+        <p>presentation body</p>
+      </Layout>,
+    );
+
+    expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('app-footer')).not.toBeInTheDocument();
+    expect(screen.getByText('presentation body')).toBeInTheDocument();
+  });
+
+  it('keeps the app header on a page whose path only begins with the same letters as the room page', () => {
+    mockUseRouter.mockReturnValue({ pathname: '/roomy', asPath: '/roomy', isReady: true });
+
+    render(
+      <Layout>
+        <p>page body</p>
+      </Layout>,
+    );
+
+    expect(screen.getByTestId('app-header')).toBeInTheDocument();
   });
 });

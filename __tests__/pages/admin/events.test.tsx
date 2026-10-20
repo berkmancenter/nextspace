@@ -18,7 +18,7 @@ const conversationTypes2 = [{ name: 'Agent3', label: 'Agent 3' }];
 
 const availablePlatforms1 = [
   { name: 'zoom', label: 'Zoom' },
-  { name: 'nextspace', label: 'Nextspace' },
+  { name: 'nextspace', label: 'NextSpace' },
 ];
 
 const availablePlatforms2 = [{ name: 'slack', label: 'Slack' }];
@@ -172,6 +172,31 @@ describe('Events Page', () => {
         expect(screen.getByText('Active Event')).toBeInTheDocument();
       },
       { timeout: 3000 },
+    );
+  });
+
+  it('lists the presentation link in its own column after the participant links', async () => {
+    (Request as jest.Mock).mockResolvedValue([mockConversations[0]]);
+    (getConversation as jest.Mock).mockResolvedValueOnce({
+      ...mockConversations[0],
+      platformTypes: availablePlatforms1,
+      types: conversationTypes1,
+      eventUrls: {
+        moderator: [],
+        participant: [{ label: 'Berkie', url: 'https://example.com/assistant/?conversationId=1' }],
+        presentation: [{ label: 'Presentation view', url: 'https://example.com/present/?conversationId=1' }],
+      },
+    });
+
+    await act(async () => {
+      render(<EventsPage authType={'user'} />);
+    });
+
+    const presentationLink = await screen.findByRole('link', { name: 'Presentation view' });
+    expect(presentationLink).toHaveAttribute('href', 'https://example.com/present/?conversationId=1');
+    expect(screen.getByText('Presentation Links')).toBeInTheDocument();
+    expect(screen.getByText('Participant Links').compareDocumentPosition(screen.getByText('Presentation Links'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
     );
   });
 
@@ -1344,8 +1369,7 @@ describe('Events Page - Event Ownership', () => {
         owner: mockUserId,
       };
 
-      // Mock report generation failure
-      const alertMock = jest.spyOn(window, 'alert').mockImplementation(() => {});
+      // Mock report generation failure — only userMetrics fails, directMessages still succeeds
       (generateAndDownloadUserMetricsReport as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       (Request as jest.Mock).mockResolvedValue([inactiveEvent]);
@@ -1367,11 +1391,12 @@ describe('Events Page - Event Ownership', () => {
       await userEvent.click(screen.getByRole('button', { name: 'actions-menu-1' }));
       await userEvent.click(screen.getByText('Download Reports'));
 
+      // The direct messages report still downloads despite userMetrics failing, and the
+      // error banner names the real reason for the one that didn't.
       await waitFor(() => {
-        expect(alertMock).toHaveBeenCalledWith('Failed to generate report. Please try again.');
+        expect(generateAndDownloadDirectMessageResponsesReport).toHaveBeenCalled();
+        expect(screen.getByText('Failed to generate report — User Metrics (Network error)')).toBeInTheDocument();
       });
-
-      alertMock.mockRestore();
     });
   });
 });

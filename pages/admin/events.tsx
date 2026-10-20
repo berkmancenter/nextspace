@@ -118,18 +118,34 @@ const EventCard = ({
 
   const handleDownloadReport = async () => {
     setWaitingOnAction(true);
+
     try {
       // Use the scheduled time or created time for the report date
       const reportDate = event.scheduledTime ? new Date(event.scheduledTime) : new Date(event.createdAt!);
 
-      // Download first report: userMetrics
-      await generateAndDownloadUserMetricsReport(event.id!, reportDate);
+      /* Each report type is independently valid or not depending on the conversation type
+         (e.g. userMetrics doesn't apply without an eventAssistant conversation) — allSettled
+         so one being inapplicable never blocks the other from downloading. */
+      const [userMetricsResult, directMessagesResult] = await Promise.allSettled([
+        generateAndDownloadUserMetricsReport(event.id!, reportDate),
+        generateAndDownloadDirectMessageResponsesReport(event.id!),
+      ]);
 
-      // Download second report: directMessageResponses
-      await generateAndDownloadDirectMessageResponsesReport(event.id!);
-    } catch (err) {
-      console.error('Failed to generate report:', err);
-      alert('Failed to generate report. Please try again.');
+      // Warn rather than error — a report type not applying here is an expected outcome
+      // that's already surfaced to the user below, not an unhandled failure.
+      const failures: string[] = [];
+      if (userMetricsResult.status === 'rejected') {
+        console.warn('Failed to generate user metrics report:', userMetricsResult.reason);
+        failures.push(`User Metrics (${userMetricsResult.reason?.message || 'failed'})`);
+      }
+      if (directMessagesResult.status === 'rejected') {
+        console.warn('Failed to generate direct message responses report:', directMessagesResult.reason);
+        failures.push(`Direct Messages (${directMessagesResult.reason?.message || 'failed'})`);
+      }
+
+      if (failures.length > 0) {
+        onMessage(event.id!, `Failed to generate report — ${failures.join('; ')}`, true);
+      }
     } finally {
       setWaitingOnAction(false);
     }
@@ -337,6 +353,24 @@ const EventCard = ({
               <div className="flex-1">
                 <div className="font-medium">Participant Links</div>
                 {event.eventUrls.participant.map((link, i) => (
+                  <div key={i}>
+                    <a href={link.url} className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
+                      {link.label}
+                    </a>
+                    <Tooltip title={copiedLink === link.url ? 'Copied!' : 'Copy link'}>
+                      <IconButton size="small" onClick={() => handleCopyLink(link.url)} className="p-0.5">
+                        <ContentCopyIcon fontSize="small" className="text-gray-500" style={{ fontSize: '14px' }} />
+                      </IconButton>
+                    </Tooltip>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {event.eventUrls.presentation && event.eventUrls.presentation.length > 0 && (
+              <div className="flex-1">
+                <div className="font-medium">Presentation Links</div>
+                {event.eventUrls.presentation.map((link, i) => (
                   <div key={i}>
                     <a href={link.url} className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
                       {link.label}

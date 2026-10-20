@@ -21,7 +21,7 @@ import { WhatsNewEntry } from '../types.internal';
 export const whatsNewEntries: WhatsNewEntry[] = [
   {
     title: 'Quick Guide',
-    body: 'You found the new guide! This is a quick guide to all the Nextspace features and recent updates.',
+    body: 'You found the new guide! This is a quick guide to all the NextSpace features and recent updates.',
     releasedAt: '2026-04-27',
   },
   {

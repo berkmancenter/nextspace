@@ -1,6 +1,7 @@
 export {
   Authenticate,
   RefreshToken,
+  ResetPassword,
   RetrieveData,
   Request,
   SocketStateHandler,

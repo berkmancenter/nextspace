@@ -1,7 +1,14 @@
 import { withSentryConfig } from '@sentry/nextjs';
 
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  async redirects() {
+    return [{ source: '/lounge', destination: '/hallway', permanent: true }];
+  },
+  async headers() {
+    return [{ source: '/present', headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }] }];
+  },
+};
 
 export default withSentryConfig(nextConfig, {
   // For all available options, see:

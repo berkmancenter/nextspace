@@ -36,7 +36,7 @@ describe('EventDetails', () => {
     followers: [],
     enableDMs: [],
     experiments: [],
-    eventUrls: { moderator: [], participant: [] },
+    eventUrls: { moderator: [], participant: [], presentation: [] },
     type: {
       name: 'eventAssistant',
       label: 'Event Assistant',
@@ -269,6 +269,12 @@ describe('EventDetails', () => {
       expect(link).toHaveAttribute('href', 'https://harvard.zoom.us/j/81244556677');
       const header = screen.getByRole('button', { name: /Platform & format/ });
       expect(within(header).queryByText('Needs attention')).not.toBeInTheDocument();
+    });
+
+    it('lists NextSpace and Zoom as the platforms', () => {
+      renderAt(baseConversationData);
+      expandSection('Platform & format');
+      expect(screen.getByText('NextSpace, Zoom')).toBeInTheDocument();
     });
 
     it('shows "No meeting link yet" when the Zoom link is missing', () => {

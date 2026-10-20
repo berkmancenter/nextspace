@@ -30,6 +30,8 @@ interface NavigationBarProps {
   showTranscript: boolean;
   showResources?: boolean;
   botName: string;
+  /** Shared-screen layout: no Private Chat tab, and a wider rail with larger icons and labels. */
+  presentation?: boolean;
 }
 
 /**
@@ -39,7 +41,7 @@ interface NavigationBarProps {
  *  - Mobile: fixed bottom bar, horizontal layout
  *  - Desktop: left sidebar, vertical layout
  *
- * Four items: Event Bot, Group Chat, Transcript, Resources.
+ * Four items: Private Chat, Group Chat, Transcript, Resources.
  * Icons are black when selected, grey when unselected, on a light purple background.
  */
 export function NavigationBar({
@@ -54,15 +56,17 @@ export function NavigationBar({
   showTranscript,
   showResources = false,
   botName,
+  presentation = false,
 }: NavigationBarProps) {
   const navItems: NavItem[] = (
     [
       {
         id: 'assistant' as NavTab,
-        label: botName,
+        label: 'Private Chat',
         ActiveIcon: null,
         InactiveIcon: null,
-        show: true,
+        // Each participant's private chat is theirs alone, so it never goes on a shared screen.
+        show: !presentation,
       },
       {
         id: 'chat' as NavTab,
@@ -151,7 +155,7 @@ export function NavigationBar({
         </Badge>
         <span
           style={{
-            fontSize: '10px',
+            fontSize: presentation ? '12px' : '10px',
             fontWeight: isActive ? 700 : 400,
             color: isActive ? '#1a1a1a' : '#9E9E9E',
             letterSpacing: '0.03em',
@@ -173,7 +177,7 @@ export function NavigationBar({
         className="hidden lg:flex flex-col items-center py-6 gap-2 flex-shrink-0"
         style={{
           backgroundColor: '#EDE7F6',
-          width: '72px',
+          width: presentation ? '96px' : '72px',
           minHeight: '100%',
           borderRight: '1px solid #D1C4E9',
         }}
@@ -181,7 +185,7 @@ export function NavigationBar({
       >
         {navItems.map((item) => (
           <div key={item.id} className="relative w-full flex justify-center">
-            <NavButton item={item} size={26} />
+            <NavButton item={item} size={presentation ? 28 : 26} />
           </div>
         ))}
       </nav>

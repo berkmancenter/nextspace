@@ -54,6 +54,11 @@ describe('ParamErrors', () => {
     expect(screen.getByText('param2').tagName).toBe('CODE');
   });
 
+  it('leaves out the list when there are no params', () => {
+    render(<ParamErrors paramsError={{ header: 'Invalid parameters', params: [] }} />);
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+  });
+
   it('renders nothing for params when paramsError is null', () => {
     render(<ParamErrors paramsError={null} />);
     expect(screen.queryByText('Invalid parameters')).not.toBeInTheDocument();

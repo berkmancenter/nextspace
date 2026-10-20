@@ -33,6 +33,10 @@ describe('_document.tsx Matomo Tag Manager', () => {
     expect(documentSource).toContain('analyticsEnabled && matomoUrl');
   });
 
+  it('skips the script on pages whose URL carries a one-time token', () => {
+    expect(documentSource).toContain('!isTokenPage(props.__NEXT_DATA__.page)');
+  });
+
   it('loads Matomo script asynchronously', () => {
     // Verify the script sets async=true
     expect(documentSource).toContain('g.async=true');

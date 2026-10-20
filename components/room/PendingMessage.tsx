@@ -5,6 +5,8 @@ import styles from './communityRoom.module.css';
 interface PendingMessageProps {
   body: string;
   realName: string;
+  /** The delivered message carries this too, so the label does not pop in on arrival. */
+  isAdmin?: boolean;
   failed?: boolean;
   failureReason?: string;
   onRetry?: () => void;
@@ -61,7 +63,14 @@ export function PendingBubble({
  * Sits in the feed where the delivered message will land, so sending while
  * offline still looks like sending.
  */
-export function PendingMessage({ body, realName, failed = false, failureReason, onRetry }: PendingMessageProps) {
+export function PendingMessage({
+  body,
+  realName,
+  isAdmin = false,
+  failed = false,
+  failureReason,
+  onRetry,
+}: PendingMessageProps) {
   return (
     <div className={styles.pendingRow}>
       <div
@@ -73,6 +82,7 @@ export function PendingMessage({ body, realName, failed = false, failureReason, 
       <div className="flex flex-col items-start flex-1">
         <div className="text-sm font-bold mb-1 text-left">
           {realName}
+          {isAdmin && <span className="text-gray-600 font-normal"> (Admin)</span>}
           <span className="text-gray-600 font-normal"> (You)</span>
         </div>
         <PendingBubble body={body} failed={failed} failureReason={failureReason} onRetry={onRetry} />

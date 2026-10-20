@@ -1,6 +1,6 @@
 import { FC, useState, useRef, KeyboardEvent, ChangeEvent, useEffect, useCallback } from 'react';
 import { Box, IconButton, InputAdornment, TextField, Popover, Typography } from '@mui/material';
-import { Send, Close, InfoOutlined } from '@mui/icons-material';
+import { Send, Close, InfoOutlined, KeyboardArrowDown } from '@mui/icons-material';
 import { ControlledInputConfig } from '../types.internal';
 import { ActiveEnhancerState, InputEnhancer } from '../types/inputEnhancer';
 import { GenericEnhancerMenu } from './GenericEnhancerMenu';
@@ -26,6 +26,10 @@ interface MessageInputProps {
   onExitControlledMode: () => void;
   /** Callback when the input value changes in controlled mode */
   onInputChange?: (value: string) => void;
+  /** Adds a Hide button to the header that collapses the composer */
+  onHide?: () => void;
+  /** Reminds the writer that the message will appear on a shared screen */
+  shownOnScreen?: boolean;
 }
 
 export const MessageInput: FC<MessageInputProps> = ({
@@ -39,6 +43,8 @@ export const MessageInput: FC<MessageInputProps> = ({
   onExitControlledMode,
   onInputChange,
   onSendMessage,
+  onHide,
+  shownOnScreen = false,
 }) => {
   const [internalValue, setInternalValue] = useState('');
   const isControlled = inputValue !== undefined && onInputChange !== undefined;
@@ -219,6 +225,7 @@ export const MessageInput: FC<MessageInputProps> = ({
             >
               <span className="uppercase flex items-center gap-1">
                 Writing as {pseudonym}
+                {shownOnScreen && ' · shown on screen'}
                 <IconButton
                   size="small"
                   onClick={(e) => setPseudonymInfoAnchor(e.currentTarget)}
@@ -259,11 +266,30 @@ export const MessageInput: FC<MessageInputProps> = ({
                   </Typography>
                 )}
               </Popover>
-              {controlledMode && (
-                <IconButton size="small" onClick={onExitControlledMode} sx={{ padding: '4px' }}>
-                  <Close fontSize="small" />
-                </IconButton>
-              )}
+              <div className="flex items-center gap-1">
+                {controlledMode && (
+                  <IconButton
+                    size="small"
+                    onClick={onExitControlledMode}
+                    aria-label={`Exit ${controlledMode.label}`}
+                    sx={{ padding: '4px' }}
+                  >
+                    <Close fontSize="small" />
+                  </IconButton>
+                )}
+                {onHide && (
+                  <button
+                    type="button"
+                    onClick={onHide}
+                    aria-expanded="true"
+                    aria-label="Hide composer"
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] font-semibold text-gray-800 hover:bg-white/60"
+                  >
+                    Hide
+                    <KeyboardArrowDown fontSize="small" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Input field with buttons at bottom */}

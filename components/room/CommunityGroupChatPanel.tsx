@@ -4,11 +4,11 @@ import remarkGfm from 'remark-gfm';
 import { ThreadedMessage, isReadersMessage } from '../ThreadedMessage';
 import { ThreadPanel } from '../ThreadPanel';
 import { BotIcon } from '../BotIcon';
-import { CommunityMessageInput } from './CommunityMessageInput';
+import { CommunityMessageInput, RealNameGate } from './CommunityMessageInput';
 import { MemberIntroContent, PendingRoomMessage, PseudonymousMessage } from '../../types.internal';
 import { MemberIntroCard } from './MemberIntroCard';
 import { PendingBubble, PendingMessage } from './PendingMessage';
-import { parseMessageBody } from '../../utils/Helpers';
+import { getTimestampVisibility, parseMessageBody } from '../../utils/Helpers';
 import { getRoomInitials } from '../../utils/roomAvatarUtils';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
 import styles from './communityRoom.module.css';
@@ -16,6 +16,11 @@ import styles from './communityRoom.module.css';
 interface CommunityGroupChatPanelProps {
   messages: PseudonymousMessage[];
   realName: string;
+  /**
+   * Whether the reader holds the admin role. Needed alongside the messages themselves because a
+   * queued message has not reached the server, so it carries no ownerIsAdmin of its own.
+   */
+  isAdmin?: boolean;
   /** The reader's account id, which decides whose messages are theirs. */
   currentUserId?: string | null;
   botName: string;
@@ -27,6 +32,9 @@ interface CommunityGroupChatPanelProps {
   onRetryPendingMessage?: (id: string) => void;
   /** True while the socket is down, which greys out the composer shortcuts. */
   offline?: boolean;
+  /** True while the room has no real name for the reader, which locks the composer. */
+  mustSetRealName?: boolean;
+  onRequestRealName?: () => void;
   waitingForResponse?: boolean;
   messagesWithUnreadReplies?: Set<string>;
   onSendMessage: (message: string, parentMessageId?: string) => Promise<boolean>;
@@ -83,6 +91,7 @@ function dayLabel(iso: string): string {
 export function CommunityGroupChatPanel({
   messages,
   realName,
+  isAdmin = false,
   currentUserId,
   botName,
   communityName,
@@ -90,6 +99,8 @@ export function CommunityGroupChatPanel({
   pendingMessages = [],
   onRetryPendingMessage,
   offline = false,
+  mustSetRealName = false,
+  onRequestRealName,
   waitingForResponse = false,
   messagesWithUnreadReplies = new Set(),
   onSendMessage,
@@ -110,6 +121,7 @@ export function CommunityGroupChatPanel({
     map.forEach((replies) => replies.sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()));
     return { parentMessages: parents, threadMap: map };
   }, [messages]);
+  const timestampVisibility = useMemo(() => getTimestampVisibility(parentMessages), [parentMessages]);
 
   const isEmptyRoom = messages.length === 0 && pendingMessages.length === 0;
 
@@ -123,7 +135,13 @@ export function CommunityGroupChatPanel({
       .filter((m) => m.parentMessageId === parentId)
       .map(
         (m) =>
-          ({ id: m.id, pseudonym: realName, body: m.body, pending: m.failed ? 'failed' : 'waiting' }) as PseudonymousMessage,
+          ({
+            id: m.id,
+            pseudonym: realName,
+            ownerIsAdmin: isAdmin,
+            body: m.body,
+            pending: m.failed ? 'failed' : 'waiting',
+          }) as PseudonymousMessage,
       );
 
   const { messagesEndRef, messagesContainerRef, isAtBottom, scrollToBottom } = useAutoScroll(messages);
@@ -151,6 +169,9 @@ export function CommunityGroupChatPanel({
 
   const lastMessage = messages[messages.length - 1];
   const waitingForThreadedReply = waitingForResponse && lastMessage?.parentMessage;
+
+  const renderNameBadge = (message: PseudonymousMessage) =>
+    message.fromAgent ? <span className={`${styles.agentBadge} ${styles.agentBadgeBesideName}`}>AI Bot</span> : null;
 
   const renderAvatar = (message: PseudonymousMessage) => {
     const isCurrentUser = isReadersMessage(message, realName, currentUserId);
@@ -197,9 +218,6 @@ export function CommunityGroupChatPanel({
     if (isAssistant) {
       return (
         <div style={{ width: '85%' }}>
-          <div className={styles.agentBadge} style={{ marginBottom: 4 }}>
-            AI Bot
-          </div>
           <div
             className="rounded-2xl px-2 py-1"
             style={{
@@ -279,8 +297,10 @@ export function CommunityGroupChatPanel({
                 <p
                   style={{ fontFamily: 'var(--room-font-body), sans-serif', fontSize: 13, color: 'var(--room-text-muted)' }}
                 >
-                  {botName} is here too. It stays quiet unless you put{' '}
-                  <span style={{ fontWeight: 600, color: 'var(--room-text-primary)' }}>@{botName}</span> in a message.
+                  {botName} is here too. Put{' '}
+                  <span style={{ fontWeight: 600, color: 'var(--room-text-primary)' }}>@{botName}</span> in a message to ask
+                  it something. It may also reply on its own when a message seems meant for it or asks something it can
+                  answer.
                 </p>
               </div>
             ) : (
@@ -312,13 +332,7 @@ export function CommunityGroupChatPanel({
                     );
                   }
 
-                  const showTimestamp = (() => {
-                    if (!message.createdAt) return false;
-                    if (i === 0) return true;
-                    const prevDate = new Date(parentMessages[i - 1].createdAt!);
-                    const currDate = new Date(message.createdAt!);
-                    return prevDate.getHours() !== currDate.getHours() || prevDate.getMinutes() !== currDate.getMinutes();
-                  })();
+                  const showTimestamp = timestampVisibility[i];
 
                   return (
                     <React.Fragment key={key}>
@@ -333,6 +347,7 @@ export function CommunityGroupChatPanel({
                         botName={botName}
                         renderAvatar={renderAvatar}
                         renderMessageContent={renderMessageContent}
+                        renderNameBadge={renderNameBadge}
                         showTimestamp={showTimestamp}
                         isThreadOpen={selectedThreadId === message.id}
                         hasUnreadReplies={message.id ? messagesWithUnreadReplies.has(message.id) : false}
@@ -346,6 +361,7 @@ export function CommunityGroupChatPanel({
                     key={pending.id}
                     body={pending.body}
                     realName={realName}
+                    isAdmin={isAdmin}
                     failed={pending.failed}
                     failureReason={pending.failureReason}
                     onRetry={onRetryPendingMessage && (() => onRetryPendingMessage(pending.id))}
@@ -384,6 +400,8 @@ export function CommunityGroupChatPanel({
             onSendMessage={onSendMessage}
             isEmptyRoom={isEmptyRoom}
             offline={offline}
+            mustSetRealName={mustSetRealName}
+            onRequestRealName={onRequestRealName}
             waitingForResponse={waitingForResponse && !waitingForThreadedReply}
           />
         </div>
@@ -400,9 +418,17 @@ export function CommunityGroupChatPanel({
             onSendReply={handleSendReply}
             renderAvatar={renderAvatar}
             renderMessageContent={renderMessageContent}
+            renderNameBadge={renderNameBadge}
             enhancers={[]}
             botName={botName}
             waitingForResponse={!!(waitingForThreadedReply && lastMessage?.parentMessage === selectedThreadId)}
+            replyLock={
+              mustSetRealName ? (
+                <div className={styles.composerBox}>
+                  <RealNameGate onRequestRealName={onRequestRealName} />
+                </div>
+              ) : undefined
+            }
           />
         </div>
       )}

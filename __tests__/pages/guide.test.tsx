@@ -165,10 +165,10 @@ describe('GuidePage', () => {
     );
   });
 
-  it('uses conversationBotName as the assistant tab section heading', async () => {
+  it('labels the assistant tab section "Private Chat" regardless of the configured bot name', async () => {
     resolveWith(GUIDE_RESPONSE);
     render(<GuidePage />);
-    await waitFor(() => expect(screen.getByRole('region', { name: 'TestBot' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Private Chat' })).toBeInTheDocument());
   });
 
   it('renders slash commands under the commands tier', async () => {
@@ -240,7 +240,7 @@ describe('GuidePage', () => {
   it("falls back to 'Berkie' when conversationBotName is absent", async () => {
     resolveWith({ ...GUIDE_RESPONSE, conversationBotName: undefined });
     render(<GuidePage />);
-    await waitFor(() => expect(screen.getByRole('region', { name: 'Berkie' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/dig into topics with Berkie/)).toBeInTheDocument());
   });
 
   it('still renders a disabled automatic feature (enabled:false) in the guide', async () => {
@@ -291,7 +291,7 @@ describe('GuidePage', () => {
   it('has no accessibility violations in the loaded state', async () => {
     resolveWith(GUIDE_RESPONSE);
     const { container } = render(<GuidePage />);
-    await waitFor(() => expect(screen.getByRole('region', { name: 'TestBot' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Private Chat' })).toBeInTheDocument());
     expect(await axe(container)).toHaveNoViolations();
   });
 

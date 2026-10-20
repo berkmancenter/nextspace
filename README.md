@@ -1,10 +1,10 @@
-# About Nextspace
+# About NextSpace
 
-This repo is for the Nextspace frontend. It uses React, Typescript, and [Next.js](https://nextjs.org/). Production is hosted on [Vercel](https://vercel.com/frameworks/nextjs). For more info on the Nextspace backend, check out [LLM Engine](https://github.com/berkmancenter/llm_engine).
+This repo is for the NextSpace frontend. It uses React, Typescript, and [Next.js](https://nextjs.org/). Production is hosted on [Vercel](https://vercel.com/frameworks/nextjs). For more info on the NextSpace backend, check out [LLM Engine](https://github.com/berkmancenter/llm_engine).
 
 ## Authentication
 
-Nextspace uses a hybrid authentication model that supports both anonymous participation and authenticated administrative access.
+NextSpace uses a hybrid authentication model that supports both anonymous participation and authenticated administrative access.
 
 ### Authentication Types
 
@@ -31,7 +31,7 @@ Nextspace uses a hybrid authentication model that supports both anonymous partic
 
 ### How It Works
 
-1. **Guest Sessions**: When a user visits Nextspace, `SessionManager` automatically creates a guest session with a pseudonymous identity. This allows users to participate in conversations without creating an account.
+1. **Guest Sessions**: When a user visits NextSpace, `SessionManager` automatically creates a guest session with a pseudonymous identity. This allows users to participate in conversations without creating an account.
 
 2. **Admin Authentication**: Administrators log in through `/login` with credentials. Upon successful authentication, the session cookie is updated with `authType: "admin"`, granting access to administrative features.
 
@@ -279,7 +279,7 @@ This repo automatically has changes deployed to Vercel via the Vercel for GitHub
 
 ## Analytics Integration
 
-Nextspace includes built-in open source **Matomo Tag Manager** integration for comprehensive analytics tracking:
+NextSpace includes built-in open source **Matomo Tag Manager** integration for comprehensive analytics tracking:
 
 - Session duration and active time measurement
 - Page navigation and engagement tracking
@@ -310,7 +310,7 @@ NEXT_PUBLIC_ENABLE_ANALYTICS=true  # or omit (enabled by default)
 
 ## License
 
-Nextspace is [AGPL 3.0 licensed](./LICENSE).
+NextSpace is [AGPL 3.0 licensed](./LICENSE).
 
 ## Contributing
 

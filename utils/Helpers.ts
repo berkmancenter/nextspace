@@ -198,13 +198,23 @@ export const GetChannelPasscode = (channel: string, query: ParsedUrlQuery, setEr
   return passcodeParam;
 };
 
+/** A proxy or gateway can answer with an HTML page, so a body that isn't JSON reads as none. */
+async function readErrorBody(response: Response): Promise<{ message?: string; reason?: unknown } | null> {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Sends data to the API
  * @param urlSuffix - The endpoint suffix to send data to.
  * @param payload - The data payload to send in the request body.
  * @param accessToken - Optional access token to use for authorization.
  * @param fetchOptions - Optional fetch options to customize the request.
- * @returns The response data from the API, or error information.
+ * @returns The response data from the API, or error information. A refusal carries the server's
+ *   `reason` when the server gives one, a fixed string that tells apart refusals sharing a status.
  */
 export const SendData = async (
   urlSuffix: string,
@@ -240,24 +250,16 @@ export const SendData = async (
       !accessToken, // Use stored tokens if no explicit accessToken provided
     );
 
-    // Handle 400
-    if (response.status === 400) {
-      const errorData = await response.json();
-      return {
-        error: true,
-        status: 400,
-        message: errorData.message || 'Bad Request',
-      };
-    }
-
-    // Fallback
     if (!response.ok) {
+      const errorData = await readErrorBody(response);
+      const reason = typeof errorData?.reason === 'string' ? { reason: errorData.reason } : {};
+
+      if (response.status === 400) {
+        return { error: true, status: 400, message: errorData?.message || 'Bad Request', ...reason };
+      }
+
       console.error('Error:', response);
-      return {
-        error: true,
-        status: response.status,
-        message: response.statusText,
-      };
+      return { error: true, status: response.status, message: response.statusText, ...reason };
     }
 
     // Handle responses with no content (204 or empty body)
@@ -307,6 +309,7 @@ function generateEventUrls(conversationData: Conversation, botName: string): Eve
   const urlPrefix = `${window.location.protocol}//${window.location.host}`;
   const moderator: EventUrl[] = [];
   const participant: EventUrl[] = [];
+  const presentation: EventUrl[] = [];
 
   const zoomAdapter = conversationData.adapters.find((adapter) => adapter.type === 'zoom');
   const zoom = zoomAdapter ? { label: 'Zoom', url: zoomAdapter.config?.meetingUrl as string } : undefined;
@@ -343,13 +346,12 @@ function generateEventUrls(conversationData: Conversation, botName: string): Eve
       });
     }
   } else if (convType && convType.name === 'eventAssistant') {
-    const eventAssistantUrl = {
-      label: botName,
-      url: `${urlPrefix}/assistant/?conversationId=${conversationData.id}${
-        hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ''
-      }${hasChat ? `&channel=chat,${chatPasscode}` : ''}`,
-    };
-    participant.push(eventAssistantUrl);
+    // The presentation view joins as a participant, so it carries exactly the participant's channels.
+    const participantChannels = `?conversationId=${conversationData.id}${
+      hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ''
+    }${hasChat ? `&channel=chat,${chatPasscode}` : ''}`;
+    participant.push({ label: botName, url: `${urlPrefix}/assistant/${participantChannels}` });
+    presentation.push({ label: 'Presentation view', url: `${urlPrefix}/present/${participantChannels}` });
     if (modPasscode) {
       moderator.push({
         label: botName,
@@ -368,6 +370,7 @@ function generateEventUrls(conversationData: Conversation, botName: string): Eve
   return {
     moderator,
     participant,
+    presentation,
     zoom,
   };
 }
@@ -460,6 +463,26 @@ export const resolveConversationBotName = (
 export const normalizeAssistantPseudonym = (message: PseudonymousMessage, botName: string): string => {
   if (!message || !message.pseudonym) return '';
   return message.fromAgent ? botName : message.pseudonym;
+};
+
+const TIMESTAMP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Decides which messages in a chat list show a timestamp. A message shows one when it is the first with a time,
+ * or when at least 5 minutes have passed since the last timestamp shown, so a steady conversation still gets one
+ * every 5 minutes.
+ * @param messages - Messages in display order. Messages without `createdAt` (like intros) never show a timestamp.
+ * @returns One boolean per message, in the same order.
+ */
+export const getTimestampVisibility = (messages: { createdAt?: string }[]): boolean[] => {
+  let lastShownMs: number | null = null;
+  return messages.map((message) => {
+    if (!message.createdAt) return false;
+    const createdMs = new Date(message.createdAt).getTime();
+    if (lastShownMs !== null && createdMs - lastShownMs < TIMESTAMP_INTERVAL_MS) return false;
+    lastShownMs = createdMs;
+    return true;
+  });
 };
 
 export const buildDirectChannels = (userId: string, agents: AgentChannelConfig[]): components['schemas']['Channel'][] => {

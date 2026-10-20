@@ -6,9 +6,11 @@ import { Footer } from './Footer';
 import { AuthType } from '../types.internal';
 
 export const metadata: Metadata = {
-  title: 'Nextspace',
+  title: 'NextSpace',
   description: '',
 };
+
+const OWN_CHROME_ROUTES = ['/room', '/hallway', '/invite', '/404', '/present'];
 
 /**
  * Layout component
@@ -22,24 +24,25 @@ export const Layout = ({ children, authType = 'guest' }: Readonly<{ children: Re
   const router = useRouter();
   const currentUrl = router.isReady ? router.asPath : '';
 
-  // The community room and the lounge draw their own header and fill the viewport, so
-  // the app's header and footer would frame a second header and push them into a
-  // scroll. A room's asPath carries a room id rather than the literal
-  // "conversationId", so the check below can't see it.
-  const isRoomRoute = router.pathname.startsWith('/room') || router.pathname.startsWith('/lounge');
+  // These pages draw their own header and fill the viewport, so the app's header and footer would
+  // stack a second header and push them into a scroll. A room's asPath carries a room id rather
+  // than the literal "conversationId", so the check below can't see it.
+  const drawsOwnChrome = OWN_CHROME_ROUTES.some(
+    (route) => router.pathname === route || router.pathname.startsWith(`${route}/`),
+  );
 
   // Pages where footer should be hidden (full-screen chat interfaces)
-  const hideFooter = isRoomRoute || currentUrl.includes('conversationId');
+  const hideFooter = drawsOwnChrome || currentUrl.includes('conversationId');
 
   return (
     <div
       className={`min-h-screen flex flex-col ${
-        isRoomRoute || currentUrl.includes('conversationId')
+        drawsOwnChrome || currentUrl.includes('conversationId')
           ? 'bg-[#FFFFFF]'
           : 'bg-main bg-transparent bg-cover bg-center bg-no-repeat'
       }`}
     >
-      {!isRoomRoute && <Header authType={authType} />}
+      {!drawsOwnChrome && <Header authType={authType} />}
 
       <main className="flex-1">{children}</main>
 

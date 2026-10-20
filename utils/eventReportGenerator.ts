@@ -5,6 +5,21 @@
 
 import { RetrieveData } from './Api';
 
+/**
+ * Pulls the backend's actual error text out of a RetrieveData error response
+ * (shaped as `{ error: true, status, message }`, where `message` is either a
+ * bare string or a `{ message: string }` object depending on the endpoint),
+ * so callers can show the real reason instead of a generic fallback.
+ */
+function extractReportErrorMessage(response: { message?: unknown }, fallback: string): string {
+  const message = response?.message as unknown;
+  if (typeof message === 'string') return message;
+  if (message && typeof message === 'object' && typeof (message as any).message === 'string') {
+    return (message as any).message;
+  }
+  return fallback;
+}
+
 interface MatomoUserData {
   label: string; // userId/pseudonym
   [key: string]: string | number; // Dynamic columns from Matomo
@@ -215,30 +230,29 @@ function parseCSV(csvString: string): ServerReportData[] {
 /**
  * Fetch user metrics report from the backend
  */
-async function fetchUserMetricsReport(conversationId: string): Promise<string | null> {
-  try {
-    const params = new URLSearchParams({
-      reportName: 'userMetrics',
-      format: 'csv',
-      additionalChannels: 'chat',
-      agent: 'eventAssistant',
-    });
+async function fetchUserMetricsReport(conversationId: string): Promise<string> {
+  const params = new URLSearchParams({
+    reportName: 'userMetrics',
+    format: 'csv',
+    additionalChannels: 'chat',
+    agent: 'eventAssistant',
+  });
 
-    const urlSuffix = `conversations/${conversationId}/report?${params.toString()}`;
-    console.log(`Fetching user metrics report for conversation: ${conversationId}`);
+  const urlSuffix = `conversations/${conversationId}/report?${params.toString()}`;
+  console.log(`Fetching user metrics report for conversation: ${conversationId}`);
 
-    const response = await RetrieveData(urlSuffix, undefined, 'text');
+  const response = await RetrieveData(urlSuffix, undefined, 'text');
 
-    if (response && typeof response === 'object' && 'error' in response) {
-      console.error(`Failed to fetch user metrics report:`, response.message);
-      return null;
-    }
-
-    return response as string;
-  } catch (error: any) {
-    console.error(`Error fetching user metrics report: ${error.message}`);
-    return null;
+  if (response && typeof response === 'object' && 'error' in response) {
+    const message = extractReportErrorMessage(response, 'Failed to fetch user metrics report');
+    // A report type being inapplicable to this conversation is an expected, caller-handled
+    // outcome (surfaced in the UI), not a bug — warn rather than error so it doesn't read as
+    // an unhandled failure in tooling that treats console.error as a crash signal.
+    console.warn(`Failed to fetch user metrics report:`, message);
+    throw new Error(message);
   }
+
+  return response as string;
 }
 
 /**
@@ -353,73 +367,68 @@ function downloadCSV(csvContent: string, fileName: string) {
  * Main function to generate and download user metrics report
  */
 export async function generateAndDownloadUserMetricsReport(conversationId: string, conversationDate?: Date): Promise<void> {
-  try {
-    // Parse report date or use today
-    const reportDate = conversationDate || new Date();
+  // No try/catch here — a failure (e.g. this report type not applying to the conversation)
+  // is expected to propagate as-is to the caller, which decides how to surface it.
+  // Parse report date or use today
+  const reportDate = conversationDate || new Date();
 
-    // Get Matomo Site ID from environment variables
-    const matomoSiteId = process.env.NEXT_PUBLIC_MATOMO_SITE_ID;
+  // Get Matomo Site ID from environment variables
+  const matomoSiteId = process.env.NEXT_PUBLIC_MATOMO_SITE_ID;
 
-    console.log(`Generating user metrics report for conversation ${conversationId}`);
-    console.log(`Using report date: ${reportDate.toISOString().split('T')[0]}`);
+  console.log(`Generating user metrics report for conversation ${conversationId}`);
+  console.log(`Using report date: ${reportDate.toISOString().split('T')[0]}`);
 
-    // Fetch server report
-    const serverReportCSV = await fetchUserMetricsReport(conversationId);
-    if (!serverReportCSV) {
-      throw new Error('Failed to fetch server report');
+  // Fetch server report
+  const serverReportCSV = await fetchUserMetricsReport(conversationId);
+  if (!serverReportCSV) throw new Error('Failed to fetch user metrics report');
+
+  // Parse server report
+  const serverData = parseCSV(serverReportCSV);
+  console.log(`Parsed ${serverData.length} rows from server report`);
+
+  // Fetch Matomo data if configured
+  let matomoResult: { data: MatomoUserData[]; columns: string[] } | null = null;
+  let matomoVisitDetails: Map<string, { deviceTypes: Set<string>; locationTypes: Set<string> }> | null = null;
+
+  if (matomoSiteId) {
+    matomoResult = await fetchMatomoUserIdReport(matomoSiteId, reportDate, conversationId);
+
+    matomoVisitDetails = await fetchMatomoVisitDetails(matomoSiteId, reportDate, conversationId);
+
+    // Filter matomoResult to only include users who actually visited this conversation
+    if (matomoResult && matomoVisitDetails) {
+      const visitedUserIds = new Set(matomoVisitDetails.keys());
+      const filteredData = matomoResult.data.filter((user) => visitedUserIds.has(user.label));
+
+      console.log(
+        `Filtered Matomo data from ${matomoResult.data.length} to ${filteredData.length} users who visited this conversation`,
+      );
+
+      matomoResult = {
+        data: filteredData,
+        columns: matomoResult.columns,
+      };
     }
+  } else {
+    console.log('Matomo configuration not found, generating report without Matomo data');
+  }
 
-    // Parse server report
-    const serverData = parseCSV(serverReportCSV);
-    console.log(`Parsed ${serverData.length} rows from server report`);
+  // Generate combined CSV
+  const combinedCSV = generateCombinedCSV(
+    serverData,
+    matomoResult?.data || null,
+    matomoResult?.columns || null,
+    matomoVisitDetails,
+  );
 
-    // Fetch Matomo data if configured
-    let matomoResult: { data: MatomoUserData[]; columns: string[] } | null = null;
-    let matomoVisitDetails: Map<string, { deviceTypes: Set<string>; locationTypes: Set<string> }> | null = null;
+  // Download the file
+  const outputFileName = `userMetrics_${conversationId}.csv`;
+  downloadCSV(combinedCSV, outputFileName);
 
-    if (matomoSiteId) {
-      matomoResult = await fetchMatomoUserIdReport(matomoSiteId, reportDate, conversationId);
-
-      matomoVisitDetails = await fetchMatomoVisitDetails(matomoSiteId, reportDate, conversationId);
-
-      // Filter matomoResult to only include users who actually visited this conversation
-      if (matomoResult && matomoVisitDetails) {
-        const visitedUserIds = new Set(matomoVisitDetails.keys());
-        const filteredData = matomoResult.data.filter((user) => visitedUserIds.has(user.label));
-
-        console.log(
-          `Filtered Matomo data from ${matomoResult.data.length} to ${filteredData.length} users who visited this conversation`,
-        );
-
-        matomoResult = {
-          data: filteredData,
-          columns: matomoResult.columns,
-        };
-      }
-    } else {
-      console.log('Matomo configuration not found, generating report without Matomo data');
-    }
-
-    // Generate combined CSV
-    const combinedCSV = generateCombinedCSV(
-      serverData,
-      matomoResult?.data || null,
-      matomoResult?.columns || null,
-      matomoVisitDetails,
-    );
-
-    // Download the file
-    const outputFileName = `userMetrics_${conversationId}.csv`;
-    downloadCSV(combinedCSV, outputFileName);
-
-    console.log(`\nReport generated successfully: ${outputFileName}`);
-    console.log(`Total users: ${serverData.length}`);
-    if (matomoResult) {
-      console.log(`Matomo data included for ${matomoResult.data.length} users`);
-    }
-  } catch (error: any) {
-    console.error('Error generating report:', error);
-    throw error;
+  console.log(`\nReport generated successfully: ${outputFileName}`);
+  console.log(`Total users: ${serverData.length}`);
+  if (matomoResult) {
+    console.log(`Matomo data included for ${matomoResult.data.length} users`);
   }
 }
 
@@ -446,32 +455,31 @@ function downloadText(textContent: string, fileName: string) {
  * Generate and download direct message responses report
  */
 export async function generateAndDownloadDirectMessageResponsesReport(conversationId: string): Promise<void> {
-  try {
-    const params = new URLSearchParams({
-      reportName: 'directMessageResponses',
-      format: 'text',
-      additionalChannels: 'chat',
-    });
+  // No try/catch here — a failure (e.g. this report type not applying to the conversation)
+  // is expected to propagate as-is to the caller, which decides how to surface it.
+  const params = new URLSearchParams({
+    reportName: 'directMessageResponses',
+    format: 'text',
+    additionalChannels: 'chat',
+  });
 
-    const urlSuffix = `conversations/${conversationId}/report?${params.toString()}`;
-    console.log(`Fetching direct message responses report for conversation: ${conversationId}`);
+  const urlSuffix = `conversations/${conversationId}/report?${params.toString()}`;
+  console.log(`Fetching direct message responses report for conversation: ${conversationId}`);
 
-    const response = await RetrieveData(urlSuffix, undefined, 'text');
+  const response = await RetrieveData(urlSuffix, undefined, 'text');
 
-    if (response && typeof response === 'object' && 'error' in response) {
-      console.error(`Failed to fetch direct message responses report:`, response.message);
-      throw new Error('Failed to fetch direct message responses report');
-    }
+  if (response && typeof response === 'object' && 'error' in response) {
+    const message = extractReportErrorMessage(response, 'Failed to fetch direct message responses report');
+    // Expected, caller-handled outcome — warn rather than error (see note in fetchUserMetricsReport).
+    console.warn(`Failed to fetch direct message responses report:`, message);
+    throw new Error(message);
+  }
 
-    if (typeof response === 'string') {
-      const outputFileName = `directMessageResponses_${conversationId}.txt`;
-      downloadText(response, outputFileName);
-      console.log(`Direct message responses report generated successfully: ${outputFileName}`);
-    } else {
-      throw new Error('Unexpected response format');
-    }
-  } catch (error: any) {
-    console.error('Error generating direct message responses report:', error);
-    throw error;
+  if (typeof response === 'string') {
+    const outputFileName = `directMessageResponses_${conversationId}.txt`;
+    downloadText(response, outputFileName);
+    console.log(`Direct message responses report generated successfully: ${outputFileName}`);
+  } else {
+    throw new Error('Unexpected response format');
   }
 }

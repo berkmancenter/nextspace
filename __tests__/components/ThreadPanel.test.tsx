@@ -77,6 +77,55 @@ describe('ThreadPanel Component', () => {
     jest.clearAllMocks();
   });
 
+  it('sets message text to 2rem and enlarges sender names in the presentation view', () => {
+    render(<ThreadPanel {...defaultProps} presentation />);
+
+    expect(screen.getByTestId('thread-message-list')).toHaveStyle({ fontSize: '2rem' });
+    expect(screen.getByText('User2').closest('div')).toHaveStyle({ fontSize: '1.5rem' });
+  });
+
+  it('keeps the default message size outside the presentation view', () => {
+    render(<ThreadPanel {...defaultProps} />);
+
+    expect(screen.getByTestId('thread-message-list')).not.toHaveStyle({ fontSize: '2rem' });
+  });
+
+  it('shows the reply lock in place of the reply box when one is given', () => {
+    render(<ThreadPanel {...defaultProps} replyLock={<button type="button">Set your name first</button>} />);
+
+    expect(screen.getByRole('button', { name: 'Set your name first' })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Reply...')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Send reply')).not.toBeInTheDocument();
+  });
+
+  it('focuses the reply box when the lock it was unlocked from lifts', () => {
+    const lock = <button type="button">Set your name first</button>;
+    const { rerender } = render(<ThreadPanel {...defaultProps} replyLock={lock} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Set your name first' }));
+    rerender(<ThreadPanel {...defaultProps} />);
+
+    expect(screen.getByPlaceholderText('Reply...')).toHaveFocus();
+  });
+
+  it('leaves focus alone when the lock lifts after a name was set from somewhere else', () => {
+    const lock = <button type="button">Set your name first</button>;
+    const { rerender } = render(<ThreadPanel {...defaultProps} replyLock={lock} />);
+
+    rerender(<ThreadPanel {...defaultProps} />);
+
+    expect(screen.getByPlaceholderText('Reply...')).not.toHaveFocus();
+  });
+
+  it('draws the name badge beside the sender name, for the opening message and each reply', () => {
+    const badgeFor = (msg: PseudonymousMessage) => <span>{`Badge for ${msg.id}`}</span>;
+    render(<ThreadPanel {...defaultProps} renderNameBadge={badgeFor} />);
+
+    expect(screen.getByText('Badge for parent-123').parentElement).toHaveTextContent('User1');
+    expect(screen.getByText('Badge for reply-1').parentElement).toHaveTextContent('User2');
+    expect(screen.getByText('Badge for reply-2').parentElement).toHaveTextContent('User1');
+  });
+
   it('renders the thread panel header', () => {
     render(<ThreadPanel {...defaultProps} />);
     expect(screen.getByText('Replies')).toBeInTheDocument();
@@ -124,34 +173,21 @@ describe('ThreadPanel Component', () => {
     expect(youLabels.length).toBeGreaterThan(0);
   });
 
-  it('displays timestamps for parent message and replies', () => {
-    const fixedDate = new Date('2024-01-15T14:30:00');
-    const parentWithTimestamp = {
-      ...mockParentMessage,
-      createdAt: fixedDate.toISOString(),
-    };
-    const repliesWithTimestamps = mockReplies.map((reply, idx) => ({
-      ...reply,
-      createdAt: new Date(fixedDate.getTime() + (idx + 1) * 60000).toISOString(),
-    }));
+  it('shows a reply timestamp only once 5 minutes have passed since the last one shown', () => {
+    const parentTime = new Date('2024-01-15T14:30:00');
+    const minutesAfterParent = (minutes: number) => new Date(parentTime.getTime() + minutes * 60 * 1000);
+    const formatTime = (date: Date) => date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const parentWithTimestamp = { ...mockParentMessage, createdAt: parentTime.toISOString() };
+    const repliesWithTimestamps = [
+      { ...mockReplies[0], createdAt: minutesAfterParent(2).toISOString() },
+      { ...mockReplies[1], createdAt: minutesAfterParent(6).toISOString() },
+    ];
 
     render(<ThreadPanel {...defaultProps} parentMessage={parentWithTimestamp} replies={repliesWithTimestamps} />);
 
-    // Check parent message timestamp
-    const parentTimestamp = fixedDate.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    expect(screen.getByText(parentTimestamp)).toBeInTheDocument();
-
-    // Check reply timestamps
-    repliesWithTimestamps.forEach((reply) => {
-      const replyTimestamp = new Date(reply.createdAt).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      expect(screen.getByText(replyTimestamp)).toBeInTheDocument();
-    });
+    expect(screen.getByText(formatTime(parentTime))).toBeInTheDocument();
+    expect(screen.queryByText(formatTime(minutesAfterParent(2)))).not.toBeInTheDocument();
+    expect(screen.getByText(formatTime(minutesAfterParent(6)))).toBeInTheDocument();
   });
 
   it('renders reply input box by default', () => {

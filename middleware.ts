@@ -36,7 +36,14 @@ export async function middleware(request: NextRequest) {
     const authType = (cookie.payload.authType as string) || 'guest';
     requestHeaders.set('x-auth-type', authType);
 
-    // Only allow admin users to access admin routes
+    // Signing up can't turn a logged-in account into an admin, so they get a
+    // not-found page at the address they typed instead of the signup form.
+    if (isAdminRoute && authType === 'user') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/404';
+      return NextResponse.rewrite(url, { status: 404 });
+    }
+
     if (isAdminRoute && authType !== 'admin') {
       const url = request.nextUrl.clone();
       url.pathname = '/signup';

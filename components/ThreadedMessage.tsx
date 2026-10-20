@@ -4,6 +4,7 @@ import { IconButton } from '@mui/material';
 import { PseudonymousMessage, FeedbackConfig } from '../types.internal';
 import { normalizeAssistantPseudonym } from '../utils/Helpers';
 import { MessageFeedback } from './MessageFeedback';
+import { PRESENTATION_TEXT } from '../utils/presentationText';
 
 /**
  * Decides whether a message belongs to the reader. Account ids are used when the caller
@@ -35,10 +36,14 @@ interface ThreadedMessageProps {
   botName: string;
   renderAvatar: (msg: PseudonymousMessage) => React.ReactNode;
   renderMessageContent: (msg: PseudonymousMessage, isHovered?: boolean) => React.ReactNode;
+  /** Drawn right after a sender's name, such as a bot label. */
+  renderNameBadge?: (msg: PseudonymousMessage) => React.ReactNode;
   feedbackConfig?: FeedbackConfig;
   showTimestamp: boolean;
   isThreadOpen?: boolean;
   hasUnreadReplies?: boolean;
+  /** Enlarges names, the timestamp, and the replies link for the presentation view. */
+  presentation?: boolean;
 }
 
 export const ThreadedMessage: FC<ThreadedMessageProps> = ({
@@ -51,11 +56,15 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
   botName,
   renderAvatar,
   renderMessageContent,
+  renderNameBadge,
   feedbackConfig,
   showTimestamp,
   isThreadOpen = false,
   hasUnreadReplies = false,
+  presentation = false,
 }) => {
+  const nameStyle = presentation ? PRESENTATION_TEXT.name : undefined;
+  const metaStyle = presentation ? PRESENTATION_TEXT.meta : undefined;
   const [showReplyButton, setShowReplyButton] = useState(false);
   const [isReplyIndicatorPressed, setIsReplyIndicatorPressed] = useState(false);
   const [showExpandButton, setShowExpandButton] = useState(false);
@@ -173,7 +182,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
       {/* Timestamp */}
       {showTimestamp && (
         <div className="flex justify-center my-1">
-          <span className="text-sm text-gray-400">
+          <span className="text-sm text-gray-400" style={metaStyle}>
             {new Date(message.createdAt!).toLocaleTimeString('en-US', {
               hour: '2-digit',
               minute: '2-digit',
@@ -192,9 +201,11 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
         {/* Message content column */}
         <div className="flex flex-col items-start flex-1">
           {/* Name */}
-          <div className="text-sm font-bold mb-1 text-left">
+          <div className="text-sm font-bold mb-1 text-left" style={nameStyle}>
             {displayName}
+            {message.ownerIsAdmin && <span className="text-gray-600 font-normal"> (Admin)</span>}
             {isCurrentUser && <span className="text-gray-600 font-normal"> (You)</span>}
+            {renderNameBadge?.(message)}
           </div>
 
           {/* Message bubble wrapper with hover state - extended to include button area */}
@@ -262,11 +273,13 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                 {/* Message content */}
                 <div className="flex flex-col items-start flex-1">
                   {/* Name */}
-                  <div className="text-sm font-bold mb-1 text-left">
+                  <div className="text-sm font-bold mb-1 text-left" style={nameStyle}>
                     {normalizeAssistantPseudonym(replies[0], botName)}
+                    {replies[0].ownerIsAdmin && <span className="text-gray-600 font-normal"> (Admin)</span>}
                     {isReadersMessage(replies[0], pseudonym, currentUserId) && (
                       <span className="text-gray-600 font-normal"> (You)</span>
                     )}
+                    {renderNameBadge?.(replies[0])}
                   </div>
 
                   {/* Message bubble */}
@@ -312,6 +325,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                   }}
                   onTouchStart={() => setIsReplyIndicatorPressed(true)}
                   onTouchEnd={() => setIsReplyIndicatorPressed(false)}
+                  style={metaStyle}
                   className={`mt-2 -ml-3 px-3 py-2 text-xs text-gray-600 hover:bg-white active:bg-white transition-colors cursor-pointer flex items-center justify-between w-[calc(100%+0.75rem)] group ${isReplyIndicatorPressed ? 'bg-white' : ''} ${hasUnreadReplies && !isThreadOpen ? 'font-bold' : 'font-medium'}`}
                   // The unread dot and the bold weight are both visual-only, so the state
                   // reaches nobody using a screen reader unless the name carries it.

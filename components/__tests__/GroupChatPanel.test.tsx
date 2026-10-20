@@ -3,7 +3,11 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { GroupChatPanel } from '../GroupChatPanel';
 
 jest.mock('../MessageInput', () => ({
-  MessageInput: () => <div data-testid="message-input" />,
+  MessageInput: ({ onHide, shownOnScreen }: { onHide?: () => void; shownOnScreen?: boolean }) => (
+    <div data-testid="message-input" data-shown-on-screen={shownOnScreen ? 'true' : 'false'}>
+      {onHide && <button onClick={onHide}>Hide</button>}
+    </div>
+  ),
 }));
 
 jest.mock('../ThreadedMessage', () => ({
@@ -62,5 +66,45 @@ describe('GroupChatPanel input toggle', () => {
     render(<GroupChatPanel {...defaultProps} inactive={true} />);
     expect(screen.queryByTestId('message-input')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Hide input')).not.toBeInTheDocument();
+  });
+});
+
+describe('GroupChatPanel in the presentation view', () => {
+  it('starts with the composer collapsed to a "Write a message" button', () => {
+    render(<GroupChatPanel {...defaultProps} presentation />);
+
+    expect(screen.queryByTestId('message-input')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /write a message/i })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByLabelText('Show input')).not.toBeInTheDocument();
+  });
+
+  it('expands the composer, marked as shown on screen, and collapses it again with Hide', () => {
+    render(<GroupChatPanel {...defaultProps} presentation />);
+
+    fireEvent.click(screen.getByRole('button', { name: /write a message/i }));
+    expect(screen.getByTestId('message-input')).toHaveAttribute('data-shown-on-screen', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide' }));
+    expect(screen.queryByTestId('message-input')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /write a message/i })).toBeInTheDocument();
+  });
+
+  it('sets message text to at least 2rem (32px) so it reads from across a room', () => {
+    render(<GroupChatPanel {...defaultProps} presentation />);
+
+    expect(screen.getByTestId('chat-message-list')).toHaveStyle({ fontSize: '2rem' });
+  });
+
+  it('keeps the default message size outside the presentation view', () => {
+    render(<GroupChatPanel {...defaultProps} />);
+
+    expect(screen.getByTestId('chat-message-list')).not.toHaveStyle({ fontSize: '2rem' });
+  });
+
+  it('still shows the inactive notice instead of a composer when the event is not active', () => {
+    render(<GroupChatPanel {...defaultProps} presentation inactive />);
+
+    expect(screen.getByText('This event is not active.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /write a message/i })).not.toBeInTheDocument();
   });
 });

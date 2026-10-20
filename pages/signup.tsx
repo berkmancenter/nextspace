@@ -155,7 +155,7 @@ export default function CreateAccountPage() {
       )}
       <Box component="form" noValidate action="#" ref={formRef}>
         <Typography variant="h5" component="h2" gutterBottom sx={{ textAlign: 'center' }}>
-          Get started with Nextspace
+          Get started with NextSpace
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
           Already have an account?{' '}

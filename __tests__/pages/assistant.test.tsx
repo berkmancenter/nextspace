@@ -2,15 +2,19 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EventAssistantRoom from '../../pages/assistant';
+import PresentationRoom from '../../pages/present';
 import { RetrieveData, SendData, getPollResponseCounts, inspectPoll } from '../../utils';
-import { createConversationFromData, GetChannelPasscode } from '../../utils/Helpers';
+import { createConversationFromData } from '../../utils/Helpers';
 import { ConversationTypeProvider } from '../../context/ConversationTypeContext';
+import { savePresentationChannels, withStoredChannels } from '../../utils/presentationChannels';
 
 // Mock next/router
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockRouter = {
   push: mockPush,
-  query: { conversationId: 'test-conversation-id' } as any,
+  replace: mockReplace,
+  query: { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6' } as any,
   isReady: true,
 };
 
@@ -62,27 +66,8 @@ jest.mock('../../utils', () => ({
       getAccessToken: jest.fn(() => 'mock-access-token'),
     })),
   },
-  QueryParamsError: jest.fn((router, page) => {
-    const { conversationId, channel }: { conversationId?: string; channel?: string[] | string } = router.query;
-    const missing: string[] = [];
-
-    if (!conversationId) missing.push('conversation ID');
-    if (!channel) missing.push('channel');
-
-    if (typeof channel === 'string' && !channel.startsWith('chat')) missing.push('chat channel');
-    else if (Array.isArray(channel) && !channel.find((ch) => ch.startsWith('chat'))) missing.push('chat channel');
-    if (!GetChannelPasscode('chat', router.query)) missing.push('chat passcode');
-    if (
-      (typeof channel === 'string' && channel.startsWith('transcript')) ||
-      (Array.isArray(channel) && channel.find((ch) => ch.startsWith('transcript')))
-    ) {
-      if (!GetChannelPasscode('transcript', router.query)) missing.push('transcript passcode');
-    }
-    if (missing.length > 0) return { header: `Missing required parameter${missing.length > 1 ? 's' : ''}`, params: missing };
-
-    return null;
-  }),
-
+  // Loaded on call: requiring the real module inside this factory hits a circular import through utils/Helpers.
+  QueryParamsError: (...args: unknown[]) => jest.requireActual('../../utils/ErrorHandler').QueryParamsError(...args),
   RetrieveData: jest.fn(),
   SendData: jest.fn(),
   getPollResponseCounts: jest.fn(),
@@ -184,7 +169,9 @@ jest.mock('../../utils/Helpers', () => ({
 describe('EventAssistantRoom', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockPush.mockReset();
+    mockPush.mockReset().mockResolvedValue(true);
+    mockReplace.mockReset().mockResolvedValue(true);
+    window.sessionStorage.clear();
     (RetrieveData as jest.Mock).mockResolvedValue({
       agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
     });
@@ -196,7 +183,7 @@ describe('EventAssistantRoom', () => {
     });
 
     mockSocket.hasListeners.mockReturnValue(false);
-    mockRouter.query = { conversationId: 'test-conversation-id', channel: ['transcript,MJqaT2ii', 'chat,chat-pass'] };
+    mockRouter.query = { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6', channel: ['transcript,MJqaT2ii', 'chat,chat-pass'] };
     mockRouter.isReady = true;
 
     // Default mock implementation
@@ -337,7 +324,7 @@ describe('EventAssistantRoom', () => {
     });
 
     await waitFor(() => {
-      expect(RetrieveData).toHaveBeenCalledWith('conversations/test-conversation-id', 'mock-access-token');
+      expect(RetrieveData).toHaveBeenCalledWith('conversations/a1b2c3d4e5f6a1b2c3d4e5f6', 'mock-access-token');
     });
   });
 
@@ -382,7 +369,7 @@ describe('EventAssistantRoom', () => {
     });
 
     await act(async () => {
-      await userEvent.click(screen.getAllByRole('button', { name: 'Berkie' })[0]);
+      await userEvent.click(screen.getAllByRole('button', { name: 'Private Chat' })[0]);
     });
 
     await waitFor(() => {
@@ -440,7 +427,7 @@ describe('EventAssistantRoom', () => {
 
     await waitFor(() => {
       expect(RetrieveData).toHaveBeenCalledWith(
-        'messages/test-conversation-id?channel=direct-user-123-agent-123',
+        'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-agent-123',
         'mock-access-token',
       );
     });
@@ -461,7 +448,7 @@ describe('EventAssistantRoom', () => {
 
     await waitFor(() => {
       expect(mockSocket.emit).toHaveBeenCalledWith('conversation:join', {
-        conversationId: 'test-conversation-id',
+        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         token: 'mock-access-token',
         channels: [
           {
@@ -494,7 +481,7 @@ describe('EventAssistantRoom', () => {
 
     await waitFor(() => {
       expect(mockSocket.emit).toHaveBeenCalledWith('conversation:join', {
-        conversationId: 'test-conversation-id',
+        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         token: 'mock-access-token',
         channels: [
           {
@@ -569,7 +556,7 @@ describe('EventAssistantRoom', () => {
       const user = userEvent.setup();
 
       // Switch to the Event Bot (assistant) tab — nav bar shows both desktop + mobile, use first
-      const assistantTabs = screen.getAllByLabelText('Berkie');
+      const assistantTabs = screen.getAllByLabelText('Private Chat');
       await user.click(assistantTabs[0]);
 
       // Wait for AssistantChatPanel input to be present
@@ -633,7 +620,7 @@ describe('EventAssistantRoom', () => {
       const user = userEvent.setup();
 
       // Click on the Event Bot nav item to switch from Chat (default) to Assistant
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       const input = screen.getByPlaceholderText('Enter your message here');
@@ -703,7 +690,7 @@ describe('EventAssistantRoom', () => {
 
       const user = userEvent.setup();
 
-      const assistantTabs = screen.getAllByLabelText('Berkie');
+      const assistantTabs = screen.getAllByLabelText('Private Chat');
       await user.click(assistantTabs[0]);
 
       await waitFor(() => {
@@ -795,8 +782,8 @@ describe('EventAssistantRoom', () => {
         expect(createConversationFromData).toHaveBeenCalled();
       });
 
-      // "Berkie" comes from the mocked config.conversationBotName
-      expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
+      // The nav tab is always labeled "Private Chat", regardless of the configured bot name
+      expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0);
     });
 
     it("overrides botName from first agent's agentConfig.botName", async () => {
@@ -819,8 +806,15 @@ describe('EventAssistantRoom', () => {
         expect(createConversationFromData).toHaveBeenCalled();
       });
 
-      // botName should be overridden to "EventBot"
-      expect(screen.getAllByLabelText('EventBot').length).toBeGreaterThan(0);
+      // The nav tab is always labeled "Private Chat", regardless of the overridden bot name,
+      // but the override still surfaces in the assistant panel's own copy.
+      const assistantTabs = screen.getAllByLabelText('Private Chat');
+      expect(assistantTabs.length).toBeGreaterThan(0);
+      await userEvent.click(assistantTabs[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Ask EventBot any questions about the event/)).toBeInTheDocument();
+      });
     });
 
     it('falls back to config.conversationBotName when agentConfig.botName is not a string', async () => {
@@ -843,8 +837,15 @@ describe('EventAssistantRoom', () => {
         expect(createConversationFromData).toHaveBeenCalled();
       });
 
-      // Falls back to "Berkie" from config
-      expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
+      // The nav tab is always labeled "Private Chat", regardless of the configured bot name,
+      // but the fallback still surfaces in the assistant panel's own copy.
+      const assistantTabs = screen.getAllByLabelText('Private Chat');
+      expect(assistantTabs.length).toBeGreaterThan(0);
+      await userEvent.click(assistantTabs[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Ask Berkie any questions about the event/)).toBeInTheDocument();
+      });
     });
 
     it('falls back to config.conversationBotName when there are no agents', async () => {
@@ -864,7 +865,7 @@ describe('EventAssistantRoom', () => {
       });
 
       await act(async () => {
-        await userEvent.click(screen.getAllByRole('button', { name: 'Berkie' })[0]);
+        await userEvent.click(screen.getAllByRole('button', { name: 'Private Chat' })[0]);
       });
 
       // Inactive notice is shown because there's no event assistant agent, using default botName "Berkie"
@@ -904,7 +905,10 @@ describe('EventAssistantRoom', () => {
     });
 
     await waitFor(() => {
-      expect(RetrieveData).toHaveBeenCalledWith('messages/test-conversation-id?channel=chat,chat-pass', 'mock-access-token');
+      expect(RetrieveData).toHaveBeenCalledWith(
+        'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=chat,chat-pass',
+        'mock-access-token',
+      );
     });
   });
 
@@ -964,7 +968,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=direct-user-123-agent-123',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-agent-123',
           'mock-access-token',
         );
       });
@@ -1023,7 +1027,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=chat,chat-pass',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=chat,chat-pass',
           'mock-access-token',
         );
       });
@@ -1093,7 +1097,7 @@ describe('EventAssistantRoom', () => {
 
       // Verify the initial messages query was made
       expect(RetrieveData).toHaveBeenCalledWith(
-        'messages/test-conversation-id?channel=direct-user-123-agent-123',
+        'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-agent-123',
         'mock-access-token',
       );
     });
@@ -1266,7 +1270,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=direct-user-123-agent-123',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-agent-123',
           'mock-access-token',
         );
       });
@@ -1307,7 +1311,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=direct-user-123-agent-123',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-agent-123',
           'mock-access-token',
         );
       });
@@ -1371,11 +1375,11 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=direct-user-123-agent-123',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-agent-123',
           'mock-access-token',
         );
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=direct-user-123-jargon-agent-456',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-jargon-agent-456',
           'mock-access-token',
         );
       });
@@ -1416,8 +1420,8 @@ describe('EventAssistantRoom', () => {
         render(<EventAssistantRoom authType={'guest'} />);
       });
 
-      await waitFor(() => expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0));
-      await user.click(screen.getAllByLabelText('Berkie')[0]);
+      await waitFor(() => expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0));
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
 
       await waitFor(() => {
         expect(screen.getByText('An SLO is a reliability target.')).toBeInTheDocument();
@@ -1453,8 +1457,8 @@ describe('EventAssistantRoom', () => {
         .at(0)!;
 
       const user = userEvent.setup();
-      await waitFor(() => expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0));
-      await user.click(screen.getAllByLabelText('Berkie')[0]);
+      await waitFor(() => expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0));
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
 
       // A real socket broadcasts 'message:new' to every registered listener. The
       // assistant page AND the Transcript sidebar (mounted because the route has
@@ -1521,8 +1525,8 @@ describe('EventAssistantRoom', () => {
         render(<EventAssistantRoom authType={'guest'} />);
       });
 
-      await waitFor(() => expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0));
-      await user.click(screen.getAllByLabelText('Berkie')[0]);
+      await waitFor(() => expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0));
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
 
       await waitFor(() => {
         expect(screen.getByText('A clarification from jargon agent')).toBeInTheDocument();
@@ -1595,7 +1599,7 @@ describe('EventAssistantRoom', () => {
     beforeEach(() => {
       // Reset router query to avoid chat tab being selected by default
       mockRouter.query = {
-        conversationId: 'test-conversation-id',
+        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         channel: ['chat,test-chat-pass', 'transcript,test-transcript-pass'],
       };
     });
@@ -1680,10 +1684,10 @@ describe('EventAssistantRoom', () => {
 
       // Wait for the page to load and click on the assistant tab
       await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
+        expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0);
       });
 
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       await waitFor(() => {
@@ -1696,7 +1700,7 @@ describe('EventAssistantRoom', () => {
     });
 
     it('filters out messages with answersPrompt from display', async () => {
-      mockRouter.query = { conversationId: 'test-conversation-id', channel: 'chat,chat-pass' };
+      mockRouter.query = { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6', channel: 'chat,chat-pass' };
 
       const user = userEvent.setup();
 
@@ -1773,10 +1777,10 @@ describe('EventAssistantRoom', () => {
 
       // Wait for the page to load and click on the assistant tab
       await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
+        expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0);
       });
 
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       await waitFor(() => {
@@ -1793,7 +1797,7 @@ describe('EventAssistantRoom', () => {
     });
 
     it('restores selected prompt option on page load when response exists', async () => {
-      mockRouter.query = { conversationId: 'test-conversation-id', channel: 'chat,chat-pass' };
+      mockRouter.query = { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6', channel: 'chat,chat-pass' };
 
       const user = userEvent.setup();
 
@@ -1856,10 +1860,10 @@ describe('EventAssistantRoom', () => {
 
       // Wait for the page to load and click on the assistant tab
       await waitFor(() => {
-        expect(screen.getAllByLabelText('Berkie').length).toBeGreaterThan(0);
+        expect(screen.getAllByLabelText('Private Chat').length).toBeGreaterThan(0);
       });
 
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       await waitFor(() => {
@@ -1887,7 +1891,7 @@ describe('EventAssistantRoom', () => {
         fromAgent: true,
         channels: ['direct-user-123-agent-123'],
         createdAt: '2024-01-01T09:59:00Z',
-        conversation: 'test-conversation-id',
+        conversation: 'a1b2c3d4e5f6a1b2c3d4e5f6',
         pause: false,
         visible: true,
         upVotes: [],
@@ -1924,7 +1928,7 @@ describe('EventAssistantRoom', () => {
       await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
 
       // Switch to assistant tab to see the intro message
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       await waitFor(() => {
@@ -2017,13 +2021,13 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=direct-user-123-agent-123',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=direct-user-123-agent-123',
           'mock-access-token',
         );
       });
 
       // Switch to assistant tab to see what was rendered
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       // Regular message should be visible
@@ -2076,7 +2080,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => {
         expect(RetrieveData).toHaveBeenCalledWith(
-          'messages/test-conversation-id?channel=chat,chat-pass',
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=chat,chat-pass',
           'mock-access-token',
         );
       });
@@ -2139,7 +2143,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
 
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       // Wait for both messages to render (both fromAgent: true → AssistantMessage mock)
@@ -2239,7 +2243,7 @@ describe('EventAssistantRoom', () => {
 
       await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
 
-      const assistantTab = screen.getAllByLabelText('Berkie')[0];
+      const assistantTab = screen.getAllByLabelText('Private Chat')[0];
       await user.click(assistantTab);
 
       await waitFor(() => {
@@ -2448,7 +2452,7 @@ describe('EventAssistantRoom', () => {
       });
 
       await waitFor(() => {
-        expect(RetrieveData).toHaveBeenCalledWith('conversations/test-conversation-id', 'mock-access-token');
+        expect(RetrieveData).toHaveBeenCalledWith('conversations/a1b2c3d4e5f6a1b2c3d4e5f6', 'mock-access-token');
       });
 
       const user = userEvent.setup();
@@ -2812,6 +2816,272 @@ describe('EventAssistantRoom', () => {
           ),
         ).not.toBeInTheDocument();
       });
+    });
+  });
+
+  describe('presentation view', () => {
+    beforeEach(() => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        name: 'Legal Telescopes',
+      });
+    });
+
+    const renderPresentation = async () => {
+      await act(async () => {
+        render(<PresentationRoom authType={'guest'} />);
+      });
+    };
+
+    it('labels the screen as the presentation view and names the event', async () => {
+      await renderPresentation();
+
+      expect(screen.getByText('Presentation view')).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { level: 1, name: 'Legal Telescopes' })).toBeInTheDocument();
+    });
+
+    it('joins as a shared screen with the group chat but no private assistant channel', async () => {
+      await renderPresentation();
+
+      await waitFor(() => {
+        expect(mockSocket.emit).toHaveBeenCalledWith('conversation:join', {
+          conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
+          token: 'mock-access-token',
+          channels: [{ name: 'chat', passcode: 'chat-pass', direct: false }],
+          observer: true,
+        });
+      });
+    });
+
+    it('does not load private assistant messages, since the screen has no Private Chat', async () => {
+      await renderPresentation();
+
+      await waitFor(() => {
+        expect(RetrieveData).toHaveBeenCalledWith(
+          'messages/a1b2c3d4e5f6a1b2c3d4e5f6?channel=chat,chat-pass',
+          'mock-access-token',
+        );
+      });
+      const requestedPaths = (RetrieveData as jest.Mock).mock.calls.map(([path]) => String(path));
+      expect(requestedPaths.filter((path) => path.includes('channel=direct-'))).toEqual([]);
+    });
+
+    it('offers Group Chat, Transcript, and Resources tabs but no Private Chat', async () => {
+      await renderPresentation();
+
+      expect(screen.queryByLabelText('Private Chat')).not.toBeInTheDocument();
+      expect(screen.getAllByLabelText('Group Chat').length).toBeGreaterThan(0);
+      expect(screen.getAllByLabelText('Transcript').length).toBeGreaterThan(0);
+      expect(screen.getAllByLabelText('Resources').length).toBeGreaterThan(0);
+    });
+
+    it('keeps the transcript off the main screen until its tab is chosen', async () => {
+      await renderPresentation();
+
+      expect(screen.getByRole('heading', { name: 'LIVE TRANSCRIPT', hidden: true })).not.toBeVisible();
+
+      await userEvent.click(screen.getAllByLabelText('Transcript')[0]);
+
+      expect(screen.getByRole('heading', { name: 'LIVE TRANSCRIPT' })).toBeVisible();
+    });
+
+    it('starts with the composer collapsed', async () => {
+      await renderPresentation();
+
+      expect(await screen.findByRole('button', { name: /write a message/i })).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('Enter your message here')).not.toBeInTheDocument();
+    });
+
+    it('asks before exiting, and stays put on "Keep presenting"', async () => {
+      await renderPresentation();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Exit presentation view' }));
+      expect(screen.getByRole('dialog', { name: 'Exit presentation view?' })).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Keep presenting' }));
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Exit presentation view?' })).not.toBeInTheDocument();
+      });
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('moves focus into the composer when it opens, and back to "Write a message" when hidden', async () => {
+      await renderPresentation();
+
+      await userEvent.click(await screen.findByRole('button', { name: /write a message/i }));
+      expect(screen.getByPlaceholderText('Enter your message here')).toHaveFocus();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Hide composer' }));
+      expect(screen.queryByPlaceholderText('Enter your message here')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /write a message/i })).toHaveFocus();
+    });
+
+    it('does not move focus into the composer in the normal participant view', async () => {
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      expect(await screen.findByPlaceholderText('Enter your message here')).not.toHaveFocus();
+    });
+
+    it('keeps the exit reachable before the event starts, showing the notice in the page instead of a dialog', async () => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        name: 'Legal Telescopes',
+        active: false,
+      });
+
+      await renderPresentation();
+
+      expect(await screen.findByText('Event Not Started')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Exit presentation view' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Go to participant view' }));
+      expect(mockPush).toHaveBeenCalledWith({ pathname: '/assistant/', query: mockRouter.query });
+    });
+
+    it('shows the ended notice in the page with no composer once the event is over', async () => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        name: 'Legal Telescopes',
+        active: false,
+        endTime: '2024-06-01T12:00:00Z',
+      });
+
+      await renderPresentation();
+
+      expect(await screen.findByText('Event Has Ended')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(await screen.findByText('This event is not active.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /write a message/i })).not.toBeInTheDocument();
+    });
+
+    it('tells the presenter when leaving fails and lets them try again or keep presenting', async () => {
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      mockPush.mockRejectedValueOnce(new Error('navigation cancelled'));
+      await renderPresentation();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Exit presentation view' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Go to participant view' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't open the participant view. Try again.");
+      expect(consoleError).toHaveBeenCalledWith('Failed to leave the presentation view:', expect.any(Error));
+      expect(screen.getByRole('button', { name: 'Go to participant view' })).toBeEnabled();
+      await userEvent.click(screen.getByRole('button', { name: 'Keep presenting' }));
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Exit presentation view?' })).not.toBeInTheDocument();
+      });
+      consoleError.mockRestore();
+    });
+
+    describe('passcodes in the address bar', () => {
+      const STRIPPED_QUERY = { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6' };
+      const CHANNELS = ['transcript,MJqaT2ii', 'chat,chat-pass'];
+
+      const expectJoinedWithChatPasscode = async (passcode: string) => {
+        await waitFor(() => {
+          expect(mockSocket.emit).toHaveBeenCalledWith(
+            'conversation:join',
+            expect.objectContaining({ channels: expect.arrayContaining([{ name: 'chat', passcode, direct: false }]) }),
+          );
+        });
+      };
+
+      afterEach(() => {
+        jest.restoreAllMocks();
+      });
+
+      it("moves the passcodes out of the address bar into this tab's storage", async () => {
+        await renderPresentation();
+
+        await waitFor(() => {
+          expect(mockReplace).toHaveBeenCalledWith({ pathname: '/present', query: STRIPPED_QUERY }, undefined, {
+            shallow: true,
+          });
+        });
+        expect(withStoredChannels(STRIPPED_QUERY).channel).toEqual(CHANNELS);
+      });
+
+      it('leaves the passcodes in the participant view address bar', async () => {
+        await act(async () => {
+          render(<EventAssistantRoom authType={'guest'} />);
+        });
+
+        await expectJoinedWithChatPasscode('chat-pass');
+        expect(mockReplace).not.toHaveBeenCalled();
+        expect(window.sessionStorage.length).toBe(0);
+      });
+
+      it('keeps the passcodes in the address bar when storage is unavailable', async () => {
+        jest.spyOn(console, 'warn').mockImplementation(() => {});
+        jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+          throw new Error('SecurityError');
+        });
+
+        await renderPresentation();
+
+        await expectJoinedWithChatPasscode('chat-pass');
+        expect(mockReplace).not.toHaveBeenCalled();
+      });
+
+      it('rejoins from storage after a reload in the same tab', async () => {
+        savePresentationChannels('a1b2c3d4e5f6a1b2c3d4e5f6', CHANNELS);
+        mockRouter.query = STRIPPED_QUERY;
+
+        await renderPresentation();
+
+        await expectJoinedWithChatPasscode('chat-pass');
+        expect(document.getElementById('params-error')).not.toBeInTheDocument();
+      });
+
+      it('shows the incomplete-link message in a new tab opened with the stripped address', async () => {
+        mockRouter.query = STRIPPED_QUERY;
+
+        await renderPresentation();
+
+        expect(
+          await screen.findByText('This link is incomplete. Ask the event organizer for the full link.'),
+        ).toBeInTheDocument();
+        expect(mockSocket.emit).not.toHaveBeenCalledWith('conversation:join', expect.anything());
+      });
+
+      it('uses the passcodes from a full link over ones stored by an earlier link', async () => {
+        savePresentationChannels('a1b2c3d4e5f6a1b2c3d4e5f6', ['chat,old-pass']);
+
+        await renderPresentation();
+
+        await expectJoinedWithChatPasscode('chat-pass');
+        await waitFor(() => {
+          expect(withStoredChannels(STRIPPED_QUERY).channel).toEqual(CHANNELS);
+        });
+      });
+
+      it('opens the participant view with the stored passcodes after they leave the address bar', async () => {
+        savePresentationChannels('a1b2c3d4e5f6a1b2c3d4e5f6', CHANNELS);
+        mockRouter.query = STRIPPED_QUERY;
+        await renderPresentation();
+
+        await userEvent.click(screen.getByRole('button', { name: 'Exit presentation view' }));
+        await userEvent.click(screen.getByRole('button', { name: 'Go to participant view' }));
+
+        expect(mockPush).toHaveBeenCalledWith({
+          pathname: '/assistant/',
+          query: { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6', channel: CHANNELS },
+        });
+      });
+    });
+
+    it('opens the participant view with the same event and passcodes on confirming exit', async () => {
+      await renderPresentation();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Exit presentation view' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Go to participant view' }));
+
+      expect(mockPush).toHaveBeenCalledWith({ pathname: '/assistant/', query: mockRouter.query });
     });
   });
 

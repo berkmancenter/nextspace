@@ -386,6 +386,42 @@ describe('SessionManager', () => {
     });
   });
 
+  describe('Auth type', () => {
+    it('is guest before any session is restored', () => {
+      expect(sessionManager.getAuthType()).toBe('guest');
+    });
+
+    it('takes the auth type from the restored cookie', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({
+          tokens: { access: 'a', refresh: 'r' },
+          userId: 'user-123',
+          username: 'testuser',
+          authType: 'admin',
+        }),
+      });
+
+      await sessionManager.restoreSession();
+
+      expect(sessionManager.getAuthType()).toBe('admin');
+    });
+
+    it('takes the auth type passed in at login', () => {
+      sessionManager.markAuthenticated('testuser', 'user-123', 'admin');
+
+      expect(sessionManager.getAuthType()).toBe('admin');
+    });
+
+    it('goes back to guest when the session is cleared', () => {
+      sessionManager.markAuthenticated('testuser', 'user-123', 'admin');
+
+      sessionManager.clearSession();
+
+      expect(sessionManager.getAuthType()).toBe('guest');
+    });
+  });
+
   describe('Error Handling', () => {
     it('handles cookie fetch error gracefully', async () => {
       (global.fetch as jest.Mock)
