@@ -10,6 +10,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { generateConceptGraph } from '../../utils';
 import { trackEvent } from '../../utils/analytics';
+import { ArtifactView } from '../../components/artifacts/ArtifactView';
 import { GenerateGraphButton } from '../../components/artifacts/GenerateGraphButton';
 import { ArtifactList } from '../../components/artifacts/ArtifactList';
 import { ArtifactPasscodePrompt } from '../../components/artifacts/ArtifactPasscodePrompt';
@@ -128,37 +129,152 @@ describe('GenerateGraphButton', () => {
   });
 
   it('offers a re-run once a graph exists, since re-running appends rather than overwrites', () => {
-    render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} hasExistingGraph onGenerated={jest.fn()} />);
+    render(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ id: 'a1', generationStatus: 'ready', currentVersionNumber: 3 } as Artifact}
+        onGenerated={jest.fn()}
+      />,
+    );
 
     expect(screen.getByRole('button', { name: /regenerate concept graph/i })).toBeInTheDocument();
   });
 
-  it('reports the version it wrote and what the safety passes removed', async () => {
-    mockGenerate.mockResolvedValue({
-      generated: true,
-      artifact: { id: 'a1' },
-      version: { versionNumber: 4 },
-      report: { droppedStatements: 2, mergedConcepts: 1 },
-    });
-    const onGenerated = jest.fn();
-    render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} onGenerated={onGenerated} />);
+  it('disables the button and shows a pending state whenever the artifact is generating, whoever triggered it', () => {
+    render(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ id: 'a1', generationStatus: 'pending', currentVersionNumber: 0 } as Artifact}
+        onGenerated={jest.fn()}
+      />,
+    );
 
-    await userEvent.click(screen.getByRole('button', { name: /generate concept graph/i }));
-
-    expect(await screen.findByText(/Wrote version 4/)).toBeInTheDocument();
-    expect(screen.getByText(/1 concept\(s\) merged, 2 statement\(s\) removed/)).toBeInTheDocument();
-    expect(onGenerated).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /reading the event/i })).toBeDisabled();
   });
 
-  it('shows a run that mapped nothing as a result, not a failure', async () => {
-    mockGenerate.mockResolvedValue({ generated: false, reason: 'Not enough of the event record to map' });
+  it('reports the version once the claimed artifact turns ready', async () => {
+    mockGenerate.mockResolvedValue({
+      generated: true,
+      artifact: { id: 'a1', generationStatus: 'pending', currentVersionNumber: 0 },
+      status: 'pending',
+    });
     const onGenerated = jest.fn();
-    render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} onGenerated={onGenerated} />);
+    const { rerender } = render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} onGenerated={onGenerated} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /generate concept graph/i }));
+    expect(onGenerated).toHaveBeenCalled();
+
+    // The parent re-renders with the live, socket-updated artifact once the claim lands...
+    rerender(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ id: 'a1', generationStatus: 'pending', currentVersionNumber: 0 } as Artifact}
+        onGenerated={onGenerated}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /reading the event/i })).toBeDisabled();
+
+    // ...and again once the background job actually finishes.
+    rerender(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ id: 'a1', generationStatus: 'ready', currentVersionNumber: 4 } as Artifact}
+        onGenerated={onGenerated}
+      />,
+    );
+
+    expect(await screen.findByText(/Wrote version 4/)).toBeInTheDocument();
+  });
+
+  it('reports a run that mapped nothing, once the claimed artifact turns failed', async () => {
+    mockGenerate.mockResolvedValue({
+      generated: true,
+      artifact: { id: 'a1', generationStatus: 'pending', currentVersionNumber: 0 },
+      status: 'pending',
+    });
+    const onGenerated = jest.fn();
+    const { rerender } = render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} onGenerated={onGenerated} />);
 
     await userEvent.click(screen.getByRole('button', { name: /generate concept graph/i }));
 
+    rerender(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ id: 'a1', generationStatus: 'pending', currentVersionNumber: 0 } as Artifact}
+        onGenerated={onGenerated}
+      />,
+    );
+
+    rerender(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={
+          {
+            id: 'a1',
+            generationStatus: 'failed',
+            generationError: 'Not enough of the event record to map',
+            currentVersionNumber: 0,
+          } as Artifact
+        }
+        onGenerated={onGenerated}
+      />,
+    );
+
     expect(await screen.findByText(/Not enough of the event record to map/)).toBeInTheDocument();
-    expect(onGenerated).not.toHaveBeenCalled();
+  });
+
+  it('reports a failure when the prop jumps ready to failed without ever showing pending, and clears the wait', async () => {
+    mockGenerate.mockResolvedValue({
+      generated: true,
+      artifact: { id: 'a1', generationStatus: 'pending', currentVersionNumber: 2 },
+      status: 'pending',
+    });
+    const onGenerated = jest.fn();
+    const ready = { id: 'a1', generationStatus: 'ready', currentVersionNumber: 2 } as Artifact;
+    const { rerender } = render(
+      <GenerateGraphButton container={{ conversationId: 'conv-1' }} artifact={ready} onGenerated={onGenerated} />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /regenerate concept graph/i }));
+
+    rerender(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ ...ready, generationStatus: 'failed', generationError: 'Too short' } as Artifact}
+        onGenerated={onGenerated}
+      />,
+    );
+
+    expect(await screen.findByText(/Too short/)).toBeInTheDocument();
+
+    // The agent's next automatic run must not surface a banner for a run this admin never started.
+    rerender(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ ...ready, generationStatus: 'pending' } as Artifact}
+        onGenerated={onGenerated}
+      />,
+    );
+    rerender(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ ...ready, currentVersionNumber: 3 } as Artifact}
+        onGenerated={onGenerated}
+      />,
+    );
+    expect(screen.queryByText(/Wrote version/)).not.toBeInTheDocument();
+  });
+
+  it('does not show a completion banner to a visitor who did not trigger this run', () => {
+    render(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ id: 'a1', generationStatus: 'ready', currentVersionNumber: 4 } as Artifact}
+        onGenerated={jest.fn()}
+      />,
+    );
+
+    expect(screen.queryByText(/Wrote version/)).not.toBeInTheDocument();
   });
 
   it('surfaces a refusal', async () => {
@@ -168,6 +284,28 @@ describe('GenerateGraphButton', () => {
     await userEvent.click(screen.getByRole('button', { name: /generate concept graph/i }));
 
     expect(await screen.findByText('Forbidden')).toBeInTheDocument();
+  });
+});
+
+describe('ArtifactView failed generation', () => {
+  const failed = {
+    id: 'a1',
+    type: 'ConceptGraphArtifact',
+    title: 'Graph',
+    generationStatus: 'failed',
+    generationError: 'ECONNRESET at llm.internal:443',
+    currentVersionNumber: 0,
+  } as unknown as Artifact;
+
+  it('shows the raw error detail to an admin', () => {
+    render(<ArtifactView artifact={failed} authType="admin" />);
+    expect(screen.getByText(/ECONNRESET/)).toBeInTheDocument();
+  });
+
+  it('shows only a fixed message to a passcode reader', () => {
+    render(<ArtifactView artifact={failed} authType="guest" />);
+    expect(screen.queryByText(/ECONNRESET/)).not.toBeInTheDocument();
+    expect(screen.getByText('Generation failed to produce a version.')).toBeInTheDocument();
   });
 });
 

@@ -68,10 +68,45 @@ export const ArtifactList = ({ artifacts, selectedId, liveArtifactIds, onSelect 
                   }}
                 />
               )}
+              {artifact.generationStatus === 'pending' && (
+                <Box
+                  component="span"
+                  aria-label="generating"
+                  sx={{
+                    display: 'inline-block',
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    bgcolor: 'warning.main',
+                    ml: 0.75,
+                    verticalAlign: 'middle',
+                  }}
+                />
+              )}
+              {artifact.generationStatus === 'failed' && (
+                <Box
+                  component="span"
+                  aria-label="generation failed"
+                  sx={{
+                    display: 'inline-block',
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    bgcolor: 'error.main',
+                    ml: 0.75,
+                    verticalAlign: 'middle',
+                  }}
+                />
+              )}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              v{artifact.currentVersionNumber}
-              {artifact.currentVersion?.createdAt ? ` · ${formatStamp(artifact.currentVersion.createdAt)}` : ''}
+              {artifact.currentVersion
+                ? `v${artifact.currentVersionNumber}${artifact.currentVersion.createdAt ? ` · ${formatStamp(artifact.currentVersion.createdAt)}` : ''}`
+                : artifact.generationStatus === 'pending'
+                  ? 'Generating…'
+                  : artifact.generationStatus === 'failed'
+                    ? 'Generation failed'
+                    : `v${artifact.currentVersionNumber}`}
             </Typography>
           </Box>
         </ListItemButton>
