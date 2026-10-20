@@ -12,7 +12,7 @@ import { SkyList } from './sky/SkyList';
 import { SkyPanel, SkyView } from './sky/SkyPanel';
 import SkyStyle from './sky/SkyStyle';
 import SkyViewStyle from './sky/SkyViewStyle';
-import { buildScene, nodeKind } from './sky/scene';
+import { NodeKind, buildScene, nodeKind } from './sky/scene';
 import { cgVar, skyGeometry, skyShape } from './sky/tokens';
 import { useTweenedPositions } from './sky/useTweenedPositions';
 
@@ -87,11 +87,14 @@ export const ConceptGraphView = ({ payload, header, conversationId }: ConceptGra
   const positions = useTweenedPositions(targetPositions, reduceMotion);
   const filterState = useMemo(() => filterSky(scene.model, filter), [scene.model, filter]);
 
+  // The sky reports a dwell with the kind of node, for the same reason `select` does.
+  const dwell = useCallback((kind: NodeKind) => track('hover', kind), [track]);
   const select = useCallback(
     (id: string | null) => {
       setSelected(id);
       if (id && nodeKind(scene, id) === 'concept') setOrbitCenter(id);
-      // The node id is the graph's own identifier, not a speaker or message id.
+      // Kind only, never the id: the backend derives concept and prompt ids from their text (a slug of the
+      // label), which comes out of the discussion, and a contribution id would point at one person's account.
       if (id) track('select', nodeKind(scene, id) ?? 'unknown');
     },
     [scene, track],
@@ -144,6 +147,7 @@ export const ConceptGraphView = ({ payload, header, conversationId }: ConceptGra
       hoverId={hoverId}
       selectedId={selectedId}
       onHover={setHoverId}
+      onDwell={dwell}
       onToggle={toggle}
     />
   );

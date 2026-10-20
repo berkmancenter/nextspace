@@ -1,4 +1,4 @@
-import React, { memo, useId, useMemo } from 'react';
+import React, { memo, useEffect, useId, useMemo } from 'react';
 import { Box } from '@mui/material';
 import {
   ContributionPlacement,
@@ -15,7 +15,17 @@ import {
   promptContributionLinks,
   sessionArcs,
 } from '../../../utils/conceptSky';
-import { SkyScene, conceptLabel, joined, nodeKind, promptColor, relationPhrase, sessionName, sessionOfNode } from './scene';
+import {
+  NodeKind,
+  SkyScene,
+  conceptLabel,
+  joined,
+  nodeKind,
+  promptColor,
+  relationPhrase,
+  sessionName,
+  sessionOfNode,
+} from './scene';
 import { eyebrowSx } from './styles';
 import { visibleLabels } from './visibleLabels';
 import { cgVar, haloOpacity, haloRadius, sessionVar, skyGeometry as G, skyOpacity as O, starRadius } from './tokens';
@@ -31,6 +41,8 @@ interface SkyCanvasProps {
   hoverId: string | null;
   selectedId: string | null;
   onHover: (id: string | null) => void;
+  /** The pointer or focus has stayed on a concept or prompt for DWELL_MS. Gets the node's kind, never its id; contributions are never reported. */
+  onDwell?: (kind: NodeKind) => void;
   /** A click on the sky: selects, or clears when the thing is already selected. */
   onToggle: (id: string) => void;
 }
@@ -41,6 +53,8 @@ const RING_OFFSET = 3.5;
 const RING_WIDTH = 2.25;
 const SELECT_RING_OFFSET = 9;
 const HIT_PAD = 12;
+/** How long a node must stay hovered or focused before it counts as looked at rather than passed over. */
+export const DWELL_MS = 500;
 /** An invisible stroke wide enough to hover or tap a line, which is only 1.25px itself. */
 const LINE_HIT_WIDTH = 14;
 
@@ -69,6 +83,7 @@ export const SkyCanvas = memo(function SkyCanvas({
   hoverId,
   selectedId,
   onHover,
+  onDwell,
   onToggle,
 }: SkyCanvasProps) {
   const { model } = scene;
@@ -82,6 +97,15 @@ export const SkyCanvas = memo(function SkyCanvas({
   const promptPositions = useMemo(() => placePrompts(model, positions, placements), [model, positions, placements]);
   const focusId = hoverId ?? selectedId;
   const focus = useMemo(() => focusSet(model, focusId), [model, focusId]);
+
+  // One event per continuous hover: the timer belongs to the hovered id, so leaving (or unmounting) cancels
+  // it and a re-render of the same hover does not restart it. A contribution is never reported.
+  useEffect(() => {
+    const kind = nodeKind(scene, hoverId);
+    if (!kind || kind === 'contribution' || !onDwell) return;
+    const timer = setTimeout(() => onDwell(kind), DWELL_MS);
+    return () => clearTimeout(timer);
+  }, [hoverId, scene, onDwell]);
 
   const payload = model.payload;
   const conceptList = payload.concepts ?? [];
