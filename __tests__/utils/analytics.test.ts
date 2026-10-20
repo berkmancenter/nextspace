@@ -242,6 +242,67 @@ describe('Analytics Utility', () => {
     });
   });
 
+  describe('deleteCustomDimension', () => {
+    afterEach(() => {
+      delete (global as any).window;
+    });
+
+    it('should push a deleteCustomDimension call when analytics is enabled', async () => {
+      process.env.NEXT_PUBLIC_ENABLE_ANALYTICS = 'true';
+      process.env.NEXT_PUBLIC_MATOMO_URL = 'https://example.com/matomo.js';
+      global.window = { _mtm: [], _paq: [] } as any;
+      const { deleteCustomDimension } = await import('../../utils/analytics');
+
+      deleteCustomDimension(6);
+
+      expect((global.window as any)._paq).toEqual([['deleteCustomDimension', 6]]);
+    });
+
+    it('should do nothing when analytics is disabled', async () => {
+      process.env.NEXT_PUBLIC_ENABLE_ANALYTICS = 'false';
+      global.window = {} as any;
+      const { deleteCustomDimension } = await import('../../utils/analytics');
+
+      deleteCustomDimension(6);
+
+      expect((global.window as any)._paq).toBeUndefined();
+    });
+  });
+
+  describe('trackArtifactEvent', () => {
+    beforeEach(() => {
+      process.env.NEXT_PUBLIC_ENABLE_ANALYTICS = 'true';
+      process.env.NEXT_PUBLIC_MATOMO_URL = 'https://example.com/matomo.js';
+      global.window = { _mtm: [], _paq: [] } as any;
+    });
+
+    afterEach(() => {
+      delete (global as any).window;
+    });
+
+    it('should clear dimension 6 before an event without a conversation', async () => {
+      const { trackArtifactEvent } = await import('../../utils/artifactAnalytics');
+
+      trackArtifactEvent(undefined, 'artifact', 'history_open', 'DocumentArtifact');
+
+      expect((global.window as any)._paq).toEqual([
+        ['deleteCustomDimension', 6],
+        ['trackEvent', 'artifact', 'history_open', 'DocumentArtifact', undefined],
+      ]);
+    });
+
+    it('should set dimension 6 and not delete it for an event with a conversation', async () => {
+      const { trackArtifactEvent } = await import('../../utils/artifactAnalytics');
+
+      trackArtifactEvent('conv-1', 'artifact', 'history_open', 'DocumentArtifact');
+
+      expect((global.window as any)._paq).toEqual([
+        ['setCustomDimension', 6, 'conv-1'],
+        ['trackEvent', 'artifact', 'history_open', 'DocumentArtifact', undefined],
+      ]);
+    });
+  });
+
   describe('tagEventVisit', () => {
     beforeEach(() => {
       process.env.NEXT_PUBLIC_ENABLE_ANALYTICS = 'true';

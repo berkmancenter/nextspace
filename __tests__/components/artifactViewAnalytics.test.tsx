@@ -1,6 +1,7 @@
 jest.mock('../../utils/analytics', () => ({
   trackEvent: jest.fn(),
   trackConversationEvent: jest.fn(),
+  deleteCustomDimension: jest.fn(),
 }));
 jest.mock('../../components/artifacts/ArtifactVersionHistory', () => ({
   ArtifactVersionHistory: ({ onSelectVersion }: { onSelectVersion: (v: unknown) => void }) => (

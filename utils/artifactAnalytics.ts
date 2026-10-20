@@ -1,9 +1,11 @@
-import { trackConversationEvent, trackEvent } from './analytics';
+import { deleteCustomDimension, trackConversationEvent, trackEvent } from './analytics';
 
 /**
  * Tracks an event from the artifact pages. A conversation's artifacts carry the conversation
  * id on custom dimension 6, like every other event on the site; a series (topic) has no single
- * conversation, so its events go out without one rather than with a made-up attribution.
+ * conversation, so its events go out without one rather than with a made-up attribution. Dimension 6
+ * sticks on the tracker after an earlier conversation event, so those events clear it first
+ * rather than inherit the previous conversation.
  *
  * Never pass a passcode, free text or anything else a reader typed as `name`.
  * @param conversationId - The conversation the artifact belongs to, or undefined for a series or fixture page
@@ -22,6 +24,7 @@ export function trackArtifactEvent(
   if (conversationId) {
     trackConversationEvent(conversationId, category, action, name, value);
   } else {
+    deleteCustomDimension(6);
     trackEvent(category, action, name, value);
   }
 }
