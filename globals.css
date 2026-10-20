@@ -297,6 +297,12 @@ html[data-presenter-theme='dark']
   outline-offset: 3px;
 }
 
+/* The side-nav buttons fill the rail edge to edge (the left edge is the window edge), so an outside
+   ring is cut off. Draw the same 3px ring just inside the button instead. */
+html[data-presenter-theme='dark'] nav[aria-label='Main navigation'] button:focus-visible {
+  outline-offset: -3px;
+}
+
 html[data-presenter-theme='dark'] body {
   background-color: var(--nx-bg-base);
   color: var(--nx-text-primary);

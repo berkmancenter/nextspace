@@ -58,7 +58,7 @@ export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProp
           onClick={toggleTheme}
           aria-label={`Switch to ${switchTo} mode`}
           title={`Switch to ${switchTo} mode`}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border-[1.5px] border-gray-300 bg-gray-100 text-gray-800 hover:bg-gray-200 dark:hover:bg-nx-active"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border-[1.5px] dark:border-2 border-gray-300 bg-gray-100 text-gray-800 hover:bg-gray-200 dark:hover:bg-nx-active"
         >
           {theme === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
         </button>

@@ -191,6 +191,15 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
                 color: 'var(--nx-feedback-disabled-fg)',
                 backgroundColor: 'transparent',
               },
+              /* Dark theme only: the rating buttons are all disabled once one is chosen, so the generic
+                 disabled look above would hide the selected state. Keep the selected fill and border. */
+              ...(selectedFeedback === option.text && {
+                "html[data-presenter-theme='dark'] &.Mui-disabled": {
+                  borderColor: 'var(--nx-feedback-selected-border)',
+                  color: 'var(--nx-text-primary)',
+                  backgroundColor: 'var(--nx-feedback-selected-bg)',
+                },
+              }),
             }}
           >
             {selectedFeedback === option.text ? (
