@@ -203,12 +203,28 @@ npm install
 #### Generate a type file:
 
 ```bash
-npm run openapi-types:generate http://localhost:3000/v1/openapi.json
+npm run types:ensure
 ```
 
-This app uses a types file `types.ts` dynamically generated against the LLM Engine backend server.
+`types.ts` is gitignored and generated offline from the committed `openapi.json`, which is the front end's pinned contract with the LLM Engine backend. `types:ensure` runs automatically before `npm test` and in the pre-push hook; it only regenerates when `types.ts` is missing or older than `openapi.json` (`npm run types:ensure -- --force` always regenerates). No network or `.env` is needed, so fresh clones and extra worktrees just work.
 
-The above example generates types against LLM Engine running locally. You can also provide a URL to a remotely hosted LLM Engine instance if you prefer.
+To change the contract, refresh the snapshot with `types:sync`, which rewrites `openapi.json` and regenerates `types.ts`. Pick the source that matches what you need:
+
+```bash
+# Deployed API
+npm run types:sync -- "$API_URL/openapi.json"
+
+# Local LLM Engine
+npm run types:sync -- http://localhost:3000/v1/openapi.json
+
+# A backend branch or PR that is not deployed yet: in an llm_engine checkout of that branch,
+# run `yarn openapi:spec:generate` (writes openapi.json at its root), then
+npm run types:sync -- /path/to/llm_engine/openapi.json
+```
+
+Automation: git hooks (`post-checkout`, `post-merge`, `post-rewrite`) quietly re-run `types:ensure` when `openapi.json` changes, the pre-commit hook runs `types:check-spec` when `openapi.json` is staged, and a daily workflow (`types-drift.yml`) opens a `chore/sync-openapi` PR when the deployed API's spec differs from `openapi.json`. Backend changes that are not deployed yet use the manual path above.
+
+Contract rule: a front end PR that needs new backend fields updates `openapi.json` via `types:sync` from the backend PR's spec and names the llm_engine PR in its description. Merge the backend first, or accept the front end being temporarily ahead. After the backend deploys, run `types:sync` against the deployed API; that should be a no-op diff.
 
 #### Run the development server:
 
