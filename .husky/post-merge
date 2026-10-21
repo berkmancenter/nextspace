@@ -1,0 +1,7 @@
+#!/bin/sh
+# Best-effort: regenerate types.ts after a merge/pull that changed openapi.json.
+# Always exits 0, silent, offline, no TTY needed.
+[ -n "$CI" ] && exit 0
+git diff --quiet ORIG_HEAD HEAD -- openapi.json >/dev/null 2>&1 && exit 0
+npm run --silent types:ensure >/dev/null 2>&1 || true
+exit 0
