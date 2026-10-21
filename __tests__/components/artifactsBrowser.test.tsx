@@ -7,6 +7,7 @@ jest.mock('../../hooks/useArtifacts', () => ({
 jest.mock('../../utils/analytics', () => ({
   trackEvent: jest.fn(),
   trackConversationEvent: jest.fn(),
+  deleteCustomDimension: jest.fn(),
 }));
 
 jest.mock('../../utils', () => ({
