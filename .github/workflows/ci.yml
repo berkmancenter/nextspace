@@ -1,0 +1,53 @@
+#
+# @fileoverview Typecheck, test and build on pull requests and pushes to main.
+# Types are generated offline from the committed openapi.json (see `npm run types:ensure`),
+# so this workflow needs no secrets. Prettier and lint are not run here because they do not
+# currently pass on main.
+#
+# ==========
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Placeholders so `next build` can run; none of these reach a real service.
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+      NEXT_PUBLIC_SOCKET_URL: http://localhost:3000
+      NEXT_PUBLIC_ABOUT_URL: http://localhost
+      SESSION_SECRET: placeholder-secret-for-ci-build-only-0123456789
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Check openapi.json format
+        run: npm run types:check-spec
+      - name: Generate types from openapi.json
+        run: npm run types:ensure -- --force
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
