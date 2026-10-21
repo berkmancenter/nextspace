@@ -214,7 +214,9 @@ describe('EventDetails', () => {
       expandSection('Schedule');
       const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       expect(screen.getByText('Time zone')).toBeInTheDocument();
-      expect(screen.getByText(zone, { exact: false })).toBeInTheDocument();
+      // Scope to the field: in UTC the zone name also appears in the offset detail ("UTC (UTC+0)").
+      const field = screen.getByText('Time zone').parentElement as HTMLElement;
+      expect(within(field).getByText(zone)).toBeInTheDocument();
     });
 
     it('labels the times "Started"/"Ended" and shows the actual run times for a past event', () => {
