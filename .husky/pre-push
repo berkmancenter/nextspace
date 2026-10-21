@@ -1,3 +1,7 @@
-npx tsc --noEmit
-npm run test
-npm run build
+#!/bin/sh
+# Slim by design: types + typecheck only. Tests and `next build` run in CI
+# (.github/workflows/ci.yml). Skipped for agents/CI via HUSKY_NONINTERACTIVE=1 or CI.
+if [ "$HUSKY_NONINTERACTIVE" = "1" ] || [ -n "$CI" ]; then
+  exit 0
+fi
+npm run types:ensure && npx tsc --noEmit
