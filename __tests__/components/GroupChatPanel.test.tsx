@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GroupChatPanel } from '../../components/GroupChatPanel';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
@@ -450,6 +450,49 @@ describe('GroupChatPanel', () => {
     // Check that the message bubble has the purple background color (#DDD6FE)
     const messageBubble = container.querySelector('.rounded-2xl');
     expect(messageBubble).toHaveStyle({ backgroundColor: '#DDD6FE' });
+  });
+
+  describe('Admin moderation', () => {
+    const chatMessage = {
+      id: 'm1',
+      pseudonym: 'Alice',
+      owner: 'owner-1',
+      createdAt: '2025-10-17T12:00:00Z',
+      body: { text: 'Hello everyone' },
+      channels: ['chat'],
+      conversation: 'conv-1',
+      fromAgent: false,
+    } as any;
+    const reply = { ...chatMessage, id: 'm2', parentMessage: 'm1', body: { text: 'A reply' } } as any;
+    const moderation = {
+      onToggleHidden: jest.fn(),
+      onToggleHideAuthor: jest.fn(),
+      isAuthorHidden: jest.fn(() => false),
+    };
+
+    it('draws hide controls for an admin', () => {
+      render(<GroupChatPanel {...baseProps} messages={[chatMessage]} isAdmin moderation={moderation} />);
+      expect(screen.getByRole('button', { name: 'Hide' })).toBeInTheDocument();
+    });
+
+    it('draws no controls when the reader is not an admin, even if given moderation', () => {
+      render(<GroupChatPanel {...baseProps} messages={[chatMessage]} moderation={moderation} />);
+      expect(screen.queryByRole('button', { name: 'Hide' })).not.toBeInTheDocument();
+    });
+
+    it('draws no controls without moderation', () => {
+      render(<GroupChatPanel {...baseProps} messages={[chatMessage]} isAdmin />);
+      expect(screen.queryByRole('button', { name: 'Hide' })).not.toBeInTheDocument();
+    });
+
+    it('draws the controls on replies in the open thread panel', async () => {
+      render(<GroupChatPanel {...baseProps} messages={[chatMessage, reply]} isAdmin moderation={moderation} />);
+      // The reply button appears on hover; enter every ancestor since mouseenter does not bubble.
+      for (let el = screen.getByText('Hello everyone').parentElement; el; el = el.parentElement) fireEvent.mouseEnter(el);
+      fireEvent.click(await screen.findByRole('button', { name: 'Reply to Alice' }));
+      const panel = within(screen.getByTestId('thread-message-list'));
+      expect(panel.getAllByRole('button', { name: 'Hide' }).length).toBeGreaterThan(0);
+    });
   });
 
   describe('Visual message handling (media)', () => {

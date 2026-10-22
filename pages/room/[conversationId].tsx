@@ -7,20 +7,9 @@ import MenuIcon from '@mui/icons-material/Menu';
 import { Api, RetrieveData, SendData, emitWithTokenRefresh } from '../../utils';
 import { CheckAuthHeader } from '../../utils/Helpers';
 import { GIVE_FEEDBACK_URL } from '../../components/Header';
-import {
-  AuthType,
-  HideResult,
-  MessageHiddenEvent,
-  MessageHiddenNoticeEvent,
-  ModerationReason,
-  PendingRoomMessage,
-  PseudonymousMessage,
-  SaveRealNameResult,
-  UserPseudonym,
-} from '../../types.internal';
-import { applyModerationEvent, insertMessageInOrder } from '../../utils/messageModeration';
-import type { MessageModeration } from '../../components/ModerationControls';
-import { useConversationMessages, useRoomSetup, useSessionJoin, useTabNavigation } from '../../hooks';
+import { AuthType, PendingRoomMessage, PseudonymousMessage, SaveRealNameResult, UserPseudonym } from '../../types.internal';
+import { insertMessageInOrder } from '../../utils/messageModeration';
+import { useConversationMessages, useMessageModeration, useRoomSetup, useSessionJoin, useTabNavigation } from '../../hooks';
 import { CommunityNavigationBar, CommunityNavTab } from '../../components/room/CommunityNavigationBar';
 import { CommunityGroupChatPanel } from '../../components/room/CommunityGroupChatPanel';
 import { CommunityAssistantPanel } from '../../components/room/CommunityAssistantPanel';
@@ -79,8 +68,6 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   const [readingOnly, setReadingOnly] = useState(false);
   // Kept apart from useRoomSetup's generalError, which doubles as the fatal "room would not load" screen.
   const [sendError, setSendError] = useState<string | null>(null);
-  // A short-lived toast, for a moderation outcome that is not a failure of the room itself.
-  const [toast, setToast] = useState<{ severity: 'info' | 'error'; text: string } | null>(null);
 
   /**
    * A room posts under the real-name entry registered for that room, not the account's
@@ -301,115 +288,22 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
       }
     };
 
-    // The event carries ids only; ids that are not in a list are skipped, so both lists get it.
-    const onHidden = (event: MessageHiddenEvent) => {
-      const viewer = { isAdmin, selfId: userId };
-      setChatMessages((prev) => applyModerationEvent(prev, event, viewer));
-      setAssistantMessages((prev) => applyModerationEvent(prev, event, viewer));
-    };
-
-    // Also arrives on the per-user room, so it is only this conversation's when the id matches.
-    const onHiddenNotice = (notice?: MessageHiddenNoticeEvent) => {
-      if (notice?.conversationId !== conversationId) return;
-      setToast({ severity: 'info', text: 'A moderator has limited the visibility of your message(s).' });
-    };
-
     socket.on('message:new', onMessage);
-    socket.on('message:hidden', onHidden);
-    socket.on('message:hidden-notice', onHiddenNotice);
     return () => {
       socket.off('message:new', onMessage);
-      socket.off('message:hidden', onHidden);
-      socket.off('message:hidden-notice', onHiddenNotice);
     };
-  }, [
+  }, [socket, conversationId, setChatMessages, setAssistantMessages, activeTabRef, setUnseenAssistantCount]);
+
+  const { moderation, toast, clearToast } = useMessageModeration({
     socket,
-    isAdmin,
     userId,
     conversationId,
+    isAdmin,
+    chatMessages,
     setChatMessages,
     setAssistantMessages,
-    activeTabRef,
-    setUnseenAssistantCount,
-  ]);
-
-  /**
-   * Admin hide controls. The change shows at once and the server's `message:hidden` event then
-   * confirms it (and adds any reply cascade); a refusal puts it back and says so.
-   */
-  const applyAsAdmin = useCallback(
-    (ids: string[], hidden: boolean) => {
-      const event: MessageHiddenEvent = { messageIds: ids, hidden, display: 'omit' };
-      setChatMessages((prev) => applyModerationEvent(prev, event, { isAdmin: true }));
-    },
-    [setChatMessages],
-  );
-
-  // The newest moderation action per message id. A response only settles ids no later action has
-  // claimed, so a slow request cannot undo what the admin did after it.
-  const moderationSeqRef = useRef(0);
-  const latestActionRef = useRef(new Map<string, number>());
-
-  const sendModeration = useCallback(
-    async (path: string, hide: boolean, ids: string[], reason?: ModerationReason) => {
-      moderationSeqRef.current += 1;
-      const seq = moderationSeqRef.current;
-      const latest = latestActionRef.current;
-      const pending = pendingHiddenRef.current;
-      ids.forEach((id) => {
-        latest.set(id, seq);
-        pending.set(id, hide);
-      });
-      const isLatest = (id: string) => (latest.get(id) ?? 0) <= seq;
-
-      applyAsAdmin(ids, hide);
-      try {
-        // A skipped reason sends no body at all, as before; a chosen one goes in the JSON body.
-        const body = hide && reason ? { reason } : undefined;
-        const response = await SendData(path, body, undefined, undefined, hide ? 'POST' : 'DELETE');
-        if (!response || 'error' in response) {
-          applyAsAdmin(ids.filter(isLatest), !hide);
-          setToast({ severity: 'error', text: `Could not ${hide ? 'hide' : 'unhide'} the message(s). Try again.` });
-          return;
-        }
-        // The server lists the ids that really changed, cascaded replies included. Settle on those:
-        // anything guessed that did not change (still hidden for another reason) goes back.
-        const changed = (response as HideResult).messageIds;
-        if (!Array.isArray(changed)) return;
-        applyAsAdmin(
-          ids.filter((id) => !changed.includes(id) && isLatest(id)),
-          !hide,
-        );
-        applyAsAdmin(changed.filter(isLatest), hide);
-      } finally {
-        ids.forEach((id) => {
-          if (latest.get(id) === seq) pending.delete(id);
-        });
-      }
-    },
-    [applyAsAdmin],
-  );
-
-  const moderation: MessageModeration | undefined = useMemo(() => {
-    if (!isAdmin || !conversationId) return undefined;
-    return {
-      onToggleHidden: (message, reason) => {
-        if (!message.id) return;
-        sendModeration(`messages/${message.id}/hide`, !message.hidden, [message.id], reason);
-      },
-      onToggleHideAuthor: (message, unhide, reason) => {
-        if (!message.owner) return;
-        const ids = chatMessages
-          .filter((m) => m.owner === message.owner && m.id && Boolean(m.hidden) === unhide)
-          .map((m) => m.id as string);
-        sendModeration(`conversations/${conversationId}/users/${message.owner}/hide-messages`, !unhide, ids, reason);
-      },
-      isAuthorHidden: (message) => {
-        const theirs = chatMessages.filter((m) => m.owner && m.owner === message.owner);
-        return theirs.length > 0 && theirs.every((m) => m.hidden);
-      },
-    };
-  }, [isAdmin, conversationId, chatMessages, sendModeration]);
+    pendingHiddenRef,
+  });
 
   const deliverMessage = useCallback(
     async (queued: PendingRoomMessage) => {
@@ -686,8 +580,8 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
         botName={botName}
       />
 
-      <Snackbar open={Boolean(toast)} autoHideDuration={6000} onClose={() => setToast(null)}>
-        <Alert severity={toast?.severity ?? 'info'} onClose={() => setToast(null)}>
+      <Snackbar open={Boolean(toast)} autoHideDuration={6000} onClose={clearToast}>
+        <Alert severity={toast?.severity ?? 'info'} onClose={clearToast}>
           {toast?.text}
         </Alert>
       </Snackbar>

@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { MessageInput } from './MessageInput';
 import { ThreadedMessage } from './ThreadedMessage';
 import { ThreadPanel } from './ThreadPanel';
+import type { MessageModeration } from './ModerationControls';
 import { UserMessage } from './messages/UserMessage';
 import { PseudonymousMessage, ControlledInputConfig, FeedbackConfig } from '../types.internal';
 import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
@@ -74,6 +75,10 @@ interface GroupChatPanelProps {
   inactive?: boolean;
   /** Shared-screen layout: presentation text sizes, and a composer that starts collapsed. */
   presentation?: boolean;
+  /** Whether the reader holds the admin role; hide controls are drawn only for an admin. */
+  isAdmin?: boolean;
+  /** Hide controls for the group chat. */
+  moderation?: MessageModeration;
 }
 
 export const GroupChatPanel: FC<GroupChatPanelProps> = ({
@@ -94,7 +99,10 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   pollCounts = {},
   inactive = false,
   presentation = false,
+  isAdmin = false,
+  moderation,
 }) => {
+  const adminModeration = isAdmin ? moderation : undefined;
   // State for tracking which thread is open in split view
   const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(null);
   // A composer open on a shared screen takes room from the messages, so it starts collapsed there.
@@ -369,6 +377,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                     isThreadOpen={selectedThreadId === message.id}
                     hasUnreadReplies={message.id ? messagesWithUnreadReplies.has(message.id) : false}
                     presentation={presentation}
+                    moderation={adminModeration}
                   />
                 );
               })}
@@ -480,6 +489,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             feedbackConfig={feedbackConfig}
             waitingForResponse={!!(waitingForThreadedReply && lastMessage?.parentMessage === selectedThreadId)}
             presentation={presentation}
+            moderation={adminModeration}
           />
         </div>
       )}

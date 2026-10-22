@@ -46,7 +46,7 @@ export const whatsNewEntries: WhatsNewEntry[] = [
   },
   {
     title: 'Hide Messages',
-    body: 'Room admins can now hide a message, or everything from one participant, and unhide it later.',
+    body: 'Admins can now hide a message in any group chat, or everything from one participant, and unhide it later.',
     releasedAt: '2026-10-22',
   },
 ];
