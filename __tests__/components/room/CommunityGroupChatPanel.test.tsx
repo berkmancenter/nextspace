@@ -610,6 +610,18 @@ describe('CommunityGroupChatPanel', () => {
       expect(screen.getByTestId('hidden-message-placeholder')).toBeInTheDocument();
     });
 
+    it('closes the open thread when its parent leaves the list', async () => {
+      const thread = [message('m1'), message('r1', { parentMessage: 'm1', pseudonym: 'Other', owner: 'owner-2' })];
+      const { container, rerender } = render(<CommunityGroupChatPanel {...props({ messages: thread })} />);
+      fireEvent.mouseEnter(screen.getByText('text m1').parentElement!.parentElement!.parentElement!);
+      fireEvent.click(await screen.findByLabelText('Reply to Sofia Marchetti'));
+      expect(screen.getByText('Replies')).toBeInTheDocument();
+
+      rerender(<CommunityGroupChatPanel {...props({ messages: [] })} />);
+      expect(screen.queryByText('Replies')).not.toBeInTheDocument();
+      expect(container.querySelector('.md\\:w-1\\/2')).toBeNull();
+    });
+
     it('forwards the controls to the open thread only for an admin', async () => {
       const thread = [message('m1'), message('r1', { parentMessage: 'm1', pseudonym: 'Other', owner: 'owner-2' })];
       const openThread = async () => {

@@ -12,6 +12,7 @@ import { PendingBubble, PendingMessage } from './PendingMessage';
 import { getTimestampVisibility, parseMessageBody } from '../../utils/Helpers';
 import { getRoomInitials } from '../../utils/roomAvatarUtils';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
+import { useOpenThread } from '../../hooks/useOpenThread';
 import styles from './communityRoom.module.css';
 
 interface CommunityGroupChatPanelProps {
@@ -111,7 +112,6 @@ export function CommunityGroupChatPanel({
   moderation,
 }: CommunityGroupChatPanelProps) {
   const adminModeration = isAdmin ? moderation : undefined;
-  const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(null);
 
   const { parentMessages, threadMap } = useMemo(() => {
     const parents = messages.filter((m) => !m.parentMessage);
@@ -127,6 +127,7 @@ export function CommunityGroupChatPanel({
     return { parentMessages: parents, threadMap: map };
   }, [messages]);
   const timestampVisibility = useMemo(() => getTimestampVisibility(parentMessages), [parentMessages]);
+  const { selectedThreadId, selectedThread, setSelectedThreadId } = useOpenThread(parentMessages);
 
   const isEmptyRoom = messages.length === 0 && pendingMessages.length === 0;
 
@@ -262,7 +263,6 @@ export function CommunityGroupChatPanel({
     onMarkAsRead?.(messageId);
   };
 
-  const selectedThread = selectedThreadId ? parentMessages.find((m) => m.id === selectedThreadId) : null;
   const selectedThreadReplies = selectedThreadId
     ? [...(threadMap.get(selectedThreadId) || []), ...pendingRepliesAsMessages(selectedThreadId)]
     : [];

@@ -493,6 +493,45 @@ describe('GroupChatPanel', () => {
       const panel = within(screen.getByTestId('thread-message-list'));
       expect(panel.getAllByRole('button', { name: 'Hide' }).length).toBeGreaterThan(0);
     });
+
+    describe('when the parent of the open thread is hidden', () => {
+      const openThread = async () => {
+        for (let el = screen.getByText('Hello everyone').parentElement; el; el = el.parentElement) fireEvent.mouseEnter(el);
+        fireEvent.click(await screen.findByRole('button', { name: 'Reply to Alice' }));
+        expect(screen.getByTestId('thread-message-list')).toBeInTheDocument();
+      };
+      const splitLayout = (container: HTMLElement) => container.querySelector('.md\\:w-1\\/2');
+
+      it('closes the thread when the parent leaves the list', async () => {
+        const { container, rerender } = render(<GroupChatPanel {...baseProps} messages={[chatMessage, reply]} />);
+        await openThread();
+        expect(splitLayout(container)).not.toBeNull();
+
+        rerender(<GroupChatPanel {...baseProps} messages={[]} />);
+        expect(screen.queryByTestId('thread-message-list')).not.toBeInTheDocument();
+        expect(splitLayout(container)).toBeNull();
+
+        // The message coming back (unhidden) does not reopen the thread by itself.
+        rerender(<GroupChatPanel {...baseProps} messages={[chatMessage, reply]} />);
+        expect(screen.queryByTestId('thread-message-list')).not.toBeInTheDocument();
+      });
+
+      it('keeps the thread open while the reader still has the parent (author or admin)', async () => {
+        const { rerender } = render(
+          <GroupChatPanel {...baseProps} messages={[chatMessage, reply]} isAdmin moderation={moderation} />,
+        );
+        await openThread();
+        rerender(
+          <GroupChatPanel
+            {...baseProps}
+            messages={[{ ...chatMessage, hidden: true }, reply]}
+            isAdmin
+            moderation={moderation}
+          />,
+        );
+        expect(screen.getByTestId('thread-message-list')).toBeInTheDocument();
+      });
+    });
   });
 
   describe('Visual message handling (media)', () => {

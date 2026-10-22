@@ -9,6 +9,7 @@ import { UserMessage } from './messages/UserMessage';
 import { PseudonymousMessage, ControlledInputConfig, FeedbackConfig } from '../types.internal';
 import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { useAutoScroll } from '../hooks/useAutoScroll';
+import { useOpenThread } from '../hooks/useOpenThread';
 import { BotIcon } from './BotIcon';
 import { createMentionsEnhancer } from './enhancers/mentionsEnhancer';
 import { getTimestampVisibility, normalizeAssistantPseudonym, parseMessageBody } from '../utils/Helpers';
@@ -103,8 +104,6 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   moderation,
 }) => {
   const adminModeration = isAdmin ? moderation : undefined;
-  // State for tracking which thread is open in split view
-  const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(null);
   // A composer open on a shared screen takes room from the messages, so it starts collapsed there.
   const [inputHidden, setInputHidden] = useState(presentation);
 
@@ -144,6 +143,9 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     return { parentMessages: parents, threadMap: map };
   }, [messages]);
   const timestampVisibility = useMemo(() => getTimestampVisibility(parentMessages), [parentMessages]);
+
+  // Which thread is open in split view
+  const { selectedThreadId, selectedThread, setSelectedThreadId } = useOpenThread(parentMessages);
 
   // Auto-scroll based on any new messages, including threaded replies
   const { messagesEndRef, messagesContainerRef, isAtBottom, scrollToBottom } = useAutoScroll(messages);
@@ -325,7 +327,6 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   };
 
   // Get the selected thread data
-  const selectedThread = selectedThreadId ? parentMessages.find((m) => m.id === selectedThreadId) : null;
   const selectedThreadReplies = selectedThreadId ? threadMap.get(selectedThreadId) || [] : [];
 
   return (
