@@ -83,6 +83,8 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
   const isAssistant = message.fromAgent;
   const displayName = normalizeAssistantPseudonym(message, botName);
   const replyCount = replies.length || message.replyCount || 0;
+  // A stub has no author or content a reader may see, so it gets no name and nothing to reply to.
+  const isStub = isHiddenStub(message);
   const renderBody = (msg: PseudonymousMessage) =>
     isHiddenStub(msg) ? <HiddenMessagePlaceholder /> : renderMessageContent(msg);
 
@@ -184,6 +186,19 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
     };
   }, [hasUnreadReplies, message.id, onMarkAsRead]);
 
+  /**
+   * One background at a time, so paint never depends on stylesheet order. A hidden message keeps its
+   * grey (the room's dark theme re-surfaces `message-hidden`); an open thread then shows as the blue
+   * left border alone, and as the blue wash too when the message is not hidden.
+   */
+  const rowClasses = [
+    message.hidden ? 'message-hidden bg-gray-200' : '',
+    isThreadOpen ? `border-l-4 border-blue-400 pl-2 py-2 -ml-2 rounded-r-lg ${message.hidden ? '' : 'bg-blue-50'}` : '',
+    !isThreadOpen && showReplyButton && !message.hidden ? 'bg-white' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <div ref={messageRef} className="w-full">
       {/* Timestamp */}
@@ -199,21 +214,21 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
       )}
 
       {/* Message with avatar - always left-aligned */}
-      <div
-        className={`message-row flex flex-row gap-1.5 p-2 rounded-[.5rem] transition-all ${isThreadOpen ? 'bg-blue-50 border-l-4 border-blue-400 pl-2 py-2 -ml-2 rounded-r-lg' : `${showReplyButton && !message.hidden ? 'bg-white' : ''}`} ${message.hidden ? 'message-hidden bg-gray-200' : ''}`}
-      >
+      <div className={`message-row flex flex-row gap-1.5 p-2 rounded-[.5rem] transition-all ${rowClasses}`}>
         {/* Avatar */}
         {renderAvatar(message)}
 
         {/* Message content column */}
         <div className="flex flex-col items-start flex-1">
           {/* Name */}
-          <div className="text-sm font-bold mb-1 text-left" style={nameStyle}>
-            {displayName}
-            {message.ownerIsAdmin && <span className="text-gray-600 font-normal"> (Admin)</span>}
-            {isCurrentUser && <span className="text-gray-600 font-normal"> (You)</span>}
-            {renderNameBadge?.(message)}
-          </div>
+          {!isStub && (
+            <div className="text-sm font-bold mb-1 text-left" style={nameStyle}>
+              {displayName}
+              {message.ownerIsAdmin && <span className="text-gray-600 font-normal"> (Admin)</span>}
+              {isCurrentUser && <span className="text-gray-600 font-normal"> (You)</span>}
+              {renderNameBadge?.(message)}
+            </div>
+          )}
 
           {/* Message bubble wrapper with hover state - extended to include button area */}
           <div
@@ -229,7 +244,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
               {renderBody(message)}
 
               {/* Reply button pill - reply icon in top right */}
-              {showReplyButton && (
+              {showReplyButton && !isStub && (
                 <IconButton
                   onClick={handleReplyClick}
                   onMouseEnter={() => setShowReplyButton(true)}
@@ -281,14 +296,16 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                 {/* Message content */}
                 <div className="flex flex-col items-start flex-1">
                   {/* Name */}
-                  <div className="text-sm font-bold mb-1 text-left" style={nameStyle}>
-                    {normalizeAssistantPseudonym(replies[0], botName)}
-                    {replies[0].ownerIsAdmin && <span className="text-gray-600 font-normal"> (Admin)</span>}
-                    {isReadersMessage(replies[0], pseudonym, currentUserId) && (
-                      <span className="text-gray-600 font-normal"> (You)</span>
-                    )}
-                    {renderNameBadge?.(replies[0])}
-                  </div>
+                  {!isHiddenStub(replies[0]) && (
+                    <div className="text-sm font-bold mb-1 text-left" style={nameStyle}>
+                      {normalizeAssistantPseudonym(replies[0], botName)}
+                      {replies[0].ownerIsAdmin && <span className="text-gray-600 font-normal"> (Admin)</span>}
+                      {isReadersMessage(replies[0], pseudonym, currentUserId) && (
+                        <span className="text-gray-600 font-normal"> (You)</span>
+                      )}
+                      {renderNameBadge?.(replies[0])}
+                    </div>
+                  )}
 
                   {/* Message bubble */}
                   <div className={`w-full ${replies[0].hidden ? 'message-hidden rounded-lg bg-gray-200' : ''}`}>

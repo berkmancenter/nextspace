@@ -218,3 +218,36 @@ describe('ThreadPanel moderation', () => {
     expect(screen.getByTestId('hidden-message-placeholder')).toBeInTheDocument();
   });
 });
+
+describe('ThreadedMessage row styling and stubs', () => {
+  const row = (container: HTMLElement) => container.querySelector('.message-row') as HTMLElement;
+
+  it('keeps the grey of a hidden message whose thread is open, with the blue border only', () => {
+    const { container } = render(<ThreadedMessage {...threadedProps} message={make('a', { hidden: true })} isThreadOpen />);
+    expect(row(container)).toHaveClass('message-hidden', 'bg-gray-200', 'border-l-4', 'border-blue-400');
+    expect(row(container)).not.toHaveClass('bg-blue-50');
+  });
+
+  it('washes an open thread blue when the message is not hidden', () => {
+    const { container } = render(<ThreadedMessage {...threadedProps} message={make('a')} isThreadOpen />);
+    expect(row(container)).toHaveClass('bg-blue-50', 'border-blue-400');
+    expect(row(container)).not.toHaveClass('bg-gray-200');
+  });
+
+  it('shows no name and no reply button on a stub', async () => {
+    const stub = { id: 's', hidden: true, body: null, createdAt: new Date().toISOString() } as PseudonymousMessage;
+    const { container } = render(<ThreadedMessage {...threadedProps} message={stub} />);
+    expect(screen.getByTestId('hidden-message-placeholder')).toBeInTheDocument();
+    expect(container.querySelector('.font-bold')).toBeNull();
+    fireEvent.mouseEnter(screen.getByTestId('hidden-message-placeholder').parentElement as HTMLElement);
+    expect(screen.queryByRole('button', { name: /Reply to/ })).not.toBeInTheDocument();
+  });
+
+  it('shows no name on a stub reply preview', () => {
+    const stub = { id: 'rs', hidden: true, body: null, createdAt: new Date().toISOString() } as PseudonymousMessage;
+    const { container } = render(<ThreadedMessage {...threadedProps} message={make('a')} replies={[stub]} />);
+    expect(screen.getByTestId('hidden-message-placeholder')).toBeInTheDocument();
+    // Only the parent's name remains.
+    expect(container.querySelectorAll('.font-bold')).toHaveLength(1);
+  });
+});
