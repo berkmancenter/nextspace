@@ -88,7 +88,7 @@ export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProp
           event&apos;s admin page.
         </p>
         {exitFailed && (
-          <p role="alert" className="mt-3 text-sm font-semibold text-red-700">
+          <p role="alert" className="mt-3 text-sm font-semibold text-red-700 dark:text-nx-error">
             Couldn&apos;t open the participant view. Try again.
           </p>
         )}

@@ -144,7 +144,7 @@ const MarkmapViewComponent = ({ markdown, onClick, fullscreen = false }: Markmap
             e.stopPropagation();
             handleZoomOut();
           }}
-          className="px-2 py-0.5 text-sm rounded bg-gray-200 hover:bg-gray-300 text-gray-700 dark:hover:bg-nx-button dark:hover:text-nx-on-button"
+          className="px-2 py-0.5 text-sm rounded bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-nx-raised dark:text-nx-text dark:hover:bg-nx-button dark:hover:text-nx-on-button"
           aria-label="Zoom out mind map"
         >
           −
@@ -154,7 +154,7 @@ const MarkmapViewComponent = ({ markdown, onClick, fullscreen = false }: Markmap
             e.stopPropagation();
             handleFit();
           }}
-          className="px-2 py-0.5 text-sm rounded bg-gray-200 hover:bg-gray-300 text-gray-700 dark:hover:bg-nx-button dark:hover:text-nx-on-button"
+          className="px-2 py-0.5 text-sm rounded bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-nx-raised dark:text-nx-text dark:hover:bg-nx-button dark:hover:text-nx-on-button"
           aria-label="Fit mind map to container"
         >
           fit
@@ -164,7 +164,7 @@ const MarkmapViewComponent = ({ markdown, onClick, fullscreen = false }: Markmap
             e.stopPropagation();
             handleZoomIn();
           }}
-          className="px-2 py-0.5 text-sm rounded bg-gray-200 hover:bg-gray-300 text-gray-700 dark:hover:bg-nx-button dark:hover:text-nx-on-button"
+          className="px-2 py-0.5 text-sm rounded bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-nx-raised dark:text-nx-text dark:hover:bg-nx-button dark:hover:text-nx-on-button"
           aria-label="Zoom in mind map"
         >
           +

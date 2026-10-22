@@ -398,7 +398,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                   right: 24,
                   backgroundColor: 'var(--nx-fab-bg)',
                   color: 'var(--nx-fab-fg)',
-                  border: '1.5px solid var(--nx-fab-border)',
+                  border: 'var(--nx-fab-border)',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
                   '&:hover': { backgroundColor: 'var(--nx-fab-hover-bg)' },
                 }}
