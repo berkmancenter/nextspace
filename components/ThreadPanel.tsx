@@ -9,6 +9,7 @@ import { MessageFeedback } from './MessageFeedback';
 import { BotIcon } from './BotIcon';
 import { PRESENTATION_TEXT } from '../utils/presentationText';
 import { isReadersMessage } from './ThreadedMessage';
+import { chipButtonSx, sendIconSx } from './inputButtonStyles';
 
 interface ThreadPanelProps {
   parentMessage: PseudonymousMessage;
@@ -423,23 +424,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                         }}
                         size="small"
                         title={enhancer.button.getTitle(isActive)}
-                        sx={{
-                          padding: '6px',
-                          fontSize: '0.875rem',
-                          color: 'var(--nx-chip-btn-fg)',
-                          backgroundColor: 'var(--nx-chip-btn-bg)',
-                          border: 'var(--nx-chip-btn-border)',
-                          borderRadius: '50%',
-                          width: '32px',
-                          height: '32px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          '&:hover': {
-                            color: 'var(--nx-chip-btn-hover-fg)',
-                            backgroundColor: 'var(--nx-chip-btn-hover-bg)',
-                          },
-                        }}
+                        sx={chipButtonSx}
                       >
                         {enhancer.button.icon}
                       </IconButton>
@@ -458,17 +443,7 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                   aria-label="Send reply"
                   sx={{ padding: 0 }}
                 >
-                  <Send
-                    sx={{
-                      opacity: replyText.trim() ? 1 : 0.5,
-                      color: 'var(--nx-send-fg)',
-                      backgroundColor: 'var(--nx-send-bg)',
-                      borderRadius: '50%',
-                      padding: '4px',
-                      transform: 'rotate(-45deg)',
-                      fontSize: 20,
-                    }}
-                  />
+                  <Send sx={{ ...sendIconSx, opacity: replyText.trim() ? 1 : 0.5, fontSize: 20 }} />
                 </IconButton>
               </div>
             </div>

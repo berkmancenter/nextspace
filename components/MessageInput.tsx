@@ -4,6 +4,7 @@ import { Send, Close, InfoOutlined, KeyboardArrowDown } from '@mui/icons-materia
 import { ControlledInputConfig } from '../types.internal';
 import { ActiveEnhancerState, InputEnhancer } from '../types/inputEnhancer';
 import { GenericEnhancerMenu } from './GenericEnhancerMenu';
+import { chipButtonSx, sendIconSx } from './inputButtonStyles';
 
 interface MessageInputProps {
   /** The pseudonym of the user */
@@ -324,23 +325,7 @@ export const MessageInput: FC<MessageInputProps> = ({
                         }}
                         size="small"
                         title={enhancer.button.getTitle(isActive)}
-                        sx={{
-                          padding: '6px',
-                          fontSize: '0.875rem',
-                          color: 'var(--nx-chip-btn-fg)',
-                          backgroundColor: 'var(--nx-chip-btn-bg)',
-                          border: 'var(--nx-chip-btn-border)',
-                          borderRadius: '50%',
-                          width: '32px',
-                          height: '32px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          '&:hover': {
-                            color: 'var(--nx-chip-btn-hover-fg)',
-                            backgroundColor: 'var(--nx-chip-btn-hover-bg)',
-                          },
-                        }}
+                        sx={chipButtonSx}
                       >
                         {enhancer.button.icon}
                       </IconButton>
@@ -354,16 +339,7 @@ export const MessageInput: FC<MessageInputProps> = ({
                   disabled={!currentMessage || (disableWhileWaiting && waitingForResponse)}
                   sx={{ padding: 0 }}
                 >
-                  <Send
-                    sx={{
-                      opacity: !currentMessage ? 0.5 : 1,
-                      color: 'var(--nx-send-fg)',
-                      backgroundColor: 'var(--nx-send-bg)',
-                      borderRadius: '50%',
-                      padding: '4px',
-                      transform: 'rotate(-45deg)',
-                    }}
-                  />
+                  <Send sx={{ ...sendIconSx, opacity: !currentMessage ? 0.5 : 1 }} />
                 </IconButton>
               </div>
             </div>
