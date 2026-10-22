@@ -170,7 +170,7 @@ html[data-presenter-theme='dark'] {
   --nx-dialog-cancel: var(--nx-text-secondary);
   --nx-resource-icon: var(--nx-text-secondary);
   --nx-resource-chevron: var(--nx-text-secondary);
-  --nx-resource-person: var(--nx-text-primary);
+  --nx-resource-person: var(--nx-text-secondary); /* periwinkle on Deep accent: 6.2:1, vs lilac speaker */
   --nx-resource-speaker: var(--nx-text-primary);
   --nx-switch-thumb: var(--nx-text-primary);
   --nx-switch-track: var(--nx-fill-primary-button);
@@ -242,6 +242,9 @@ html[data-presenter-theme='dark'] {
   --nx-focus-row-bg: var(--nx-surface-raised);
   --nx-layout-bg: var(--nx-bg-base);
 
+  /* WARNING: this remap applies to every bg-gray-*, text-gray-* and border-gray-* in the presenter
+     subtree, resting states included (e.g. bg-gray-200 becomes solid Mid violet). Check each one in dark
+     and give it an explicit dark: override when the remapped color doesn't fit. */
   /* Components share Tailwind's gray scale with the other views, so the dark theme re-maps the scale
      rather than touching every class: lighter-than-page grays become surfaces, darker grays become
      text. White is not re-mapped, because some components (the transcript) use it as an overlay on
@@ -274,6 +277,7 @@ html[data-presenter-theme='dark'] {
   --color-nx-border-interactive: var(--nx-border-interactive);
   --color-nx-text: var(--nx-text-primary);
   --color-nx-text-secondary: var(--nx-text-secondary);
+  --color-nx-error: var(--nx-error-text);
   --color-nx-button: var(--nx-fill-primary-button);
   --color-nx-on-button: var(--nx-on-primary-button);
   --color-nx-pill: var(--nx-pill-bg);
