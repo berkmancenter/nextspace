@@ -134,9 +134,20 @@ describe('insertMessageInOrder', () => {
     expect(insertMessageInOrder(flagged, stub)).toBe(flagged);
   });
 
-  it('lets a full message clear the hidden flag an admin held', () => {
-    const result = insertMessageInOrder([msg('m1', { hidden: true })], msg('m1'));
-    expect(result[0].hidden).toBeUndefined();
+  it('keeps the hidden flag an admin held when a repeated copy carries none', () => {
+    const result = insertMessageInOrder([msg('m1', { hidden: true })], msg('m1', { count: 2 }));
+    expect(result[0].hidden).toBe(true);
+    expect(result[0]).toHaveProperty('count', 2);
+  });
+
+  it('takes the flag from the incoming copy when it carries one', () => {
+    const result = insertMessageInOrder([msg('m1', { hidden: true })], msg('m1', { hidden: false }));
+    expect(result[0].hidden).toBe(false);
+  });
+
+  it('clears the flag of a stub when the full message arrives', () => {
+    const stub = { id: 'm1', hidden: true, body: null, createdAt: msg('m1').createdAt } as PseudonymousMessage;
+    expect(insertMessageInOrder([stub], msg('m1'))[0].hidden).toBeUndefined();
   });
 
   it('appends a message with no timestamp', () => {

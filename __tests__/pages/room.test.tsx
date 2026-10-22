@@ -1026,14 +1026,17 @@ describe('RoomPage', () => {
       expect(screen.getByText('msg y')).toBeInTheDocument();
     });
 
-    it('clears the hidden flag for an admin when message:new restores the message', async () => {
+    it("keeps an admin's hidden flag through a repeated message:new until message:hidden clears it", async () => {
       await renderRoom('admin', [chatMsg('a', 1, { hidden: true })]);
       await waitFor(() => expect(screen.getByTestId('group-chat-panel')).toHaveAttribute('data-is-admin', 'true'));
       expect(screen.getByText('msg a').closest('[data-hidden]')).toHaveAttribute('data-hidden', 'true');
 
       act(() => handler('message:new')(chatMsg('a', 1)));
-      expect(screen.getByText('msg a').closest('[data-hidden]')).toHaveAttribute('data-hidden', 'false');
+      expect(screen.getByText('msg a').closest('[data-hidden]')).toHaveAttribute('data-hidden', 'true');
       expect(screen.getAllByText('msg a')).toHaveLength(1);
+
+      act(() => handler('message:hidden')({ messageIds: ['a'], hidden: false, display: 'omit' }));
+      expect(screen.getByText('msg a').closest('[data-hidden]')).toHaveAttribute('data-hidden', 'false');
     });
 
     it('greys the replies the server cascaded, using the response ids', async () => {

@@ -61,8 +61,9 @@ export const applyModerationEvent = (
 
 /**
  * Adds a message that arrived live. A message already present is replaced rather than repeated,
- * which is how an unhidden message takes the place of its stub or of an earlier copy, and clears the
- * `hidden` flag an admin held. A stub never replaces a full message. A message
+ * which is how an unhidden message takes the place of its stub or of an earlier copy. A copy with no
+ * `hidden` flag leaves the flag an admin holds in place (a `message:hidden` event clears it), but a
+ * stub is always replaced. A stub never replaces a full message. A message
  * that belongs before the newest ones (an unhidden older message) is slotted in by createdAt.
  * @param messages The current messages, oldest first.
  * @param incoming The message that arrived.
@@ -77,7 +78,11 @@ export const insertMessageInOrder = (
     // A stub (placeholder policy) can arrive after the full message it stands for; the full one wins.
     if (incoming.body === null && messages[existing].body !== null) return messages;
     const next = [...messages];
-    next[existing] = incoming;
+    // An admin's flag is theirs until a `message:hidden` event says otherwise: a repeated copy of the
+    // message carries no flag and must not wipe it. A stub holds no body, so a full message replaces it.
+    const held = messages[existing];
+    const keepsFlag = held.hidden === true && held.body !== null && incoming.hidden === undefined;
+    next[existing] = keepsFlag ? { ...incoming, hidden: true } : incoming;
     return next;
   }
 
