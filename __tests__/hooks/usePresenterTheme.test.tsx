@@ -26,6 +26,20 @@ describe('usePresenterTheme', () => {
     expect(htmlTheme()).toBe('light');
   });
 
+  it('shows the saved choice on the first committed render, before any later effect', () => {
+    window.localStorage.setItem(PRESENTER_THEME_STORAGE_KEY, 'light');
+    const seen: string[] = [];
+
+    renderHook(() => {
+      const value = usePresenterTheme();
+      seen.push(value.theme);
+      return value;
+    });
+
+    expect(seen[seen.length - 1]).toBe('light');
+    expect(seen).toEqual(['dark', 'light']);
+  });
+
   it('toggles between dark and light, applying and saving each choice', () => {
     const { result } = renderHook(() => usePresenterTheme());
 
