@@ -44,6 +44,11 @@ export const whatsNewEntries: WhatsNewEntry[] = [
     body: 'Group chat may include agent-generated polls that allow participants to vote on various topics.',
     releasedAt: '2026-06-22',
   },
+  {
+    title: 'Hide Messages',
+    body: 'Room admins can now hide a message, or everything from one participant, and unhide it later.',
+    releasedAt: '2026-10-22',
+  },
 ];
 
 /**
