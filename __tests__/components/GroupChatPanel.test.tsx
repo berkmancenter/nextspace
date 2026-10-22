@@ -516,7 +516,14 @@ describe('GroupChatPanel', () => {
         expect(screen.queryByTestId('thread-message-list')).not.toBeInTheDocument();
       });
 
-      it('keeps the thread open while the reader still has the parent (author or admin)', async () => {
+      it('keeps the thread open for the author, who still has their own hidden parent', async () => {
+        const { rerender } = render(<GroupChatPanel {...baseProps} messages={[chatMessage, reply]} />);
+        await openThread();
+        rerender(<GroupChatPanel {...baseProps} messages={[{ ...chatMessage, hidden: true }, reply]} />);
+        expect(screen.getByTestId('thread-message-list')).toBeInTheDocument();
+      });
+
+      it('keeps the thread open for an admin, who still has the parent', async () => {
         const { rerender } = render(
           <GroupChatPanel {...baseProps} messages={[chatMessage, reply]} isAdmin moderation={moderation} />,
         );
