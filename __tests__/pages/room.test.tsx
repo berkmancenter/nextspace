@@ -1175,6 +1175,22 @@ describe('RoomPage', () => {
         expect(screen.getByText('msg b')).toBeInTheDocument();
       });
 
+      it('re-reads history when a join succeeds after the first attempt failed', async () => {
+        let current = [chatMsg('a', 1), chatMsg('b', 2)];
+        mockServer('participant', () => current);
+        mockEmitWithTokenRefresh.mockImplementationOnce((...args: any[]) => args[4]?.(new Error('join refused')));
+        render(<RoomPage authType="guest" />);
+        await screen.findByText('msg a');
+        await waitFor(() => expect(handler('connect')).toBeDefined());
+
+        current = [chatMsg('b', 2)];
+        await act(async () => {
+          handler('connect')();
+        });
+        await waitFor(() => expect(screen.queryByText('msg a')).not.toBeInTheDocument());
+        expect(screen.getByText('msg b')).toBeInTheDocument();
+      });
+
       it('applies a hide event idempotently and ignores ids it does not hold', async () => {
         await renderRoom('participant', [chatMsg('a', 1), chatMsg('b', 2)]);
         const event = { messageIds: ['a', 'not-here'], hidden: true, display: 'omit' };

@@ -239,6 +239,9 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
         },
         (error: unknown) => {
           console.error('Failed to join room:', error);
+          // The attempt still opened a window in which events were missed, so a later successful
+          // join has to read history again rather than count as the first one.
+          hasJoinedOnceRef.current = true;
           setInitialJoinComplete(true);
         },
       );
