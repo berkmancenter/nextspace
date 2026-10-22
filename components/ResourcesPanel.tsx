@@ -197,7 +197,7 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                     <div className="space-y-3">
                       {moderators.map((mod, idx) => (
                         <div key={idx} className="flex items-start gap-3">
-                          <div className="bg-gradient-to-br from-blue-100 to-blue-200 dark:from-nx-active dark:to-nx-active rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0">
+                          <div className="bg-gradient-to-br from-blue-100 to-blue-200 dark:from-nx-raised dark:to-nx-raised dark:ring-1 dark:ring-nx-border-interactive rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0">
                             <Person sx={{ fontSize: 20, color: 'var(--nx-resource-person)' }} />
                           </div>
                           <div>
