@@ -166,6 +166,9 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   const chatIntroRef = useMemo(() => ({ current: [] as PseudonymousMessage[] }), []);
   const assistantIntroRef = useMemo(() => ({ current: [] as PseudonymousMessage[] }), []);
 
+  // Optimistic admin verdicts still waiting on the server, kept for fetches that land in the meantime.
+  const pendingHiddenRef = useRef(new Map<string, boolean>());
+
   const {
     assistantMessages,
     setAssistantMessages,
@@ -185,6 +188,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     chatIntroRef,
     assistantIntroRef,
     conversationId,
+    pendingHiddenRef,
   });
 
   // Nothing on the server records what anyone has read, so being in the room is what marks it read.
@@ -341,26 +345,47 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     [setChatMessages],
   );
 
+  // The newest moderation action per message id. A response only settles ids no later action has
+  // claimed, so a slow request cannot undo what the admin did after it.
+  const moderationSeqRef = useRef(0);
+  const latestActionRef = useRef(new Map<string, number>());
+
   const sendModeration = useCallback(
     async (path: string, hide: boolean, ids: string[], reason?: ModerationReason) => {
+      moderationSeqRef.current += 1;
+      const seq = moderationSeqRef.current;
+      const latest = latestActionRef.current;
+      const pending = pendingHiddenRef.current;
+      ids.forEach((id) => {
+        latest.set(id, seq);
+        pending.set(id, hide);
+      });
+      const isLatest = (id: string) => (latest.get(id) ?? 0) <= seq;
+
       applyAsAdmin(ids, hide);
-      // A skipped reason sends no body at all, as before; a chosen one goes in the JSON body.
-      const body = hide && reason ? { reason } : undefined;
-      const response = await SendData(path, body, undefined, undefined, hide ? 'POST' : 'DELETE');
-      if (!response || 'error' in response) {
-        applyAsAdmin(ids, !hide);
-        setToast({ severity: 'error', text: `Could not ${hide ? 'hide' : 'unhide'} the message(s). Try again.` });
-        return;
+      try {
+        // A skipped reason sends no body at all, as before; a chosen one goes in the JSON body.
+        const body = hide && reason ? { reason } : undefined;
+        const response = await SendData(path, body, undefined, undefined, hide ? 'POST' : 'DELETE');
+        if (!response || 'error' in response) {
+          applyAsAdmin(ids.filter(isLatest), !hide);
+          setToast({ severity: 'error', text: `Could not ${hide ? 'hide' : 'unhide'} the message(s). Try again.` });
+          return;
+        }
+        // The server lists the ids that really changed, cascaded replies included. Settle on those:
+        // anything guessed that did not change (still hidden for another reason) goes back.
+        const changed = (response as HideResult).messageIds;
+        if (!Array.isArray(changed)) return;
+        applyAsAdmin(
+          ids.filter((id) => !changed.includes(id) && isLatest(id)),
+          !hide,
+        );
+        applyAsAdmin(changed.filter(isLatest), hide);
+      } finally {
+        ids.forEach((id) => {
+          if (latest.get(id) === seq) pending.delete(id);
+        });
       }
-      // The server lists the ids that really changed, cascaded replies included. Settle on those:
-      // anything guessed that did not change (still hidden for another reason) goes back.
-      const changed = (response as HideResult).messageIds;
-      if (!Array.isArray(changed)) return;
-      applyAsAdmin(
-        ids.filter((id) => !changed.includes(id)),
-        !hide,
-      );
-      applyAsAdmin(changed, hide);
     },
     [applyAsAdmin],
   );

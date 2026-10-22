@@ -1269,6 +1269,79 @@ describe('RoomPage', () => {
         await waitFor(() => expect(hiddenState('a')).toBe('false'));
       });
 
+      it('does not let a slow hide-all undo an unhide the admin made after it', async () => {
+        const user = userEvent.setup();
+        await renderRoom('admin', [chatMsg('a', 1), chatMsg('b', 2, { owner: 'owner-a' })]);
+        await screen.findByText('Hide author of a');
+
+        let finishHideAll: (value: unknown) => void = () => {};
+        mockSendData.mockReturnValueOnce(new Promise((resolve) => (finishHideAll = resolve)));
+        await user.click(screen.getByText('Hide author of a'));
+        expect(hiddenState('a')).toBe('true');
+
+        mockSendData.mockResolvedValueOnce({ conversationId: 'test-room-id', messageIds: ['a'], hidden: false });
+        await user.click(screen.getByText('Toggle hide a'));
+        await waitFor(() => expect(hiddenState('a')).toBe('false'));
+
+        await act(async () => {
+          finishHideAll({ conversationId: 'test-room-id', messageIds: ['a', 'b'], hidden: true });
+        });
+        expect(hiddenState('a')).toBe('false');
+        expect(hiddenState('b')).toBe('true');
+      });
+
+      it('does not let a slow failure roll back a newer action on the same message', async () => {
+        const user = userEvent.setup();
+        await renderRoom('admin', [chatMsg('a', 1)]);
+        await screen.findByText('Toggle hide a');
+
+        let failHide: (value: unknown) => void = () => {};
+        mockSendData.mockReturnValueOnce(new Promise((resolve) => (failHide = resolve)));
+        await user.click(screen.getByText('Toggle hide a'));
+        expect(hiddenState('a')).toBe('true');
+
+        mockSendData.mockResolvedValueOnce({ conversationId: 'test-room-id', messageIds: ['a'], hidden: false });
+        await user.click(screen.getByText('Toggle hide a'));
+        await waitFor(() => expect(hiddenState('a')).toBe('false'));
+
+        mockSendData.mockReturnValueOnce(new Promise(() => {}));
+        await user.click(screen.getByText('Toggle hide a'));
+        expect(hiddenState('a')).toBe('true');
+
+        await act(async () => {
+          failHide({ error: true, status: 500 });
+        });
+        expect(hiddenState('a')).toBe('true');
+      });
+
+      it('keeps a hide that is still in flight when a history refetch lands', async () => {
+        const user = userEvent.setup();
+        let current = [chatMsg('a', 1)];
+        mockServer('admin', () => current);
+        render(<RoomPage authType="admin" />);
+        await screen.findByText('Toggle hide a');
+        await waitFor(() => expect(handler('connect')).toBeDefined());
+
+        let finishHide: (value: unknown) => void = () => {};
+        mockSendData.mockReturnValueOnce(new Promise((resolve) => (finishHide = resolve)));
+        await user.click(screen.getByText('Toggle hide a'));
+        expect(hiddenState('a')).toBe('true');
+
+        // The rejoin refetch reads the server before it has recorded the hide.
+        current = [chatMsg('a', 1)];
+        const reads = mockRetrieveData.mock.calls.length;
+        await act(async () => {
+          handler('connect')();
+        });
+        await waitFor(() => expect(mockRetrieveData.mock.calls.length).toBeGreaterThan(reads));
+        expect(hiddenState('a')).toBe('true');
+
+        await act(async () => {
+          finishHide({ conversationId: 'test-room-id', messageIds: ['a'], hidden: true });
+        });
+        expect(hiddenState('a')).toBe('true');
+      });
+
       it('unhides all of an author with DELETE on the hide-messages path', async () => {
         const user = userEvent.setup();
         await renderRoom('admin', [chatMsg('a', 1, { hidden: true }), chatMsg('b', 2, { hidden: true, owner: 'owner-a' })]);
