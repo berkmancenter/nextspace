@@ -381,8 +381,8 @@ Events from the artifact pages (the concept graph and the artifact chrome around
 
 | Category | Action | Name | Value |
 |---|---|---|---|
-| `graph` | `select` | `concept`, `contribution` or `prompt` (node kind) | none |
-| `graph` | `hover` | `concept` or `prompt` (node kind), after the pointer or focus stays 500ms | none |
+| `graph` | `select` | `concept:<analyticsId>`, `prompt:<analyticsId>` or `contribution` (node kind, plus the node's analytics id where it has one) | none |
+| `graph` | `hover` | `concept:<analyticsId>` or `prompt:<analyticsId>` (node kind, plus the node's analytics id), after the pointer or focus stays 500ms | none |
 | `graph` | `view` | `sky`, `orbit` or `list` | none |
 | `graph` | `filter` | `full_series` or `session` | session number, from 1 (`session` only) |
 | `graph` | `deselect` | `toggle`, `panel`, `escape` or `empty_sky` | none |
@@ -397,14 +397,16 @@ Events from the artifact pages (the concept graph and the artifact chrome around
 
 Notes:
 - `hover` fires once per continuous hover, not on every mouseover; leaving the node before 500ms sends nothing. Contributions are never reported on hover.
-- `select` and `hover` send the node kind only. Node ids are not sent: the backend derives concept and prompt ids from their text, which comes out of the discussion, and a contribution id points at one person's account.
+- `select` and `hover` name a concept or prompt `<kind>:<analyticsId>`, for example `concept:3f9a1c07b2d84e65`. `analyticsId` is an opaque string the backend adds to each concept and origin prompt: the first 16 hex characters of an HMAC of the node id, keyed with a server secret (`ANALYTICS_ID_SECRET`). It reveals nothing about the discussion and cannot be reversed by guessing text. Without that secret the backend omits it, and the name is the bare kind (`concept` or `prompt`). A contribution is always the bare kind `contribution`, never an id.
+- The node id itself is never sent: the backend derives concept and prompt ids from their text, which comes out of the discussion, and a contribution id points at one person's account.
+- Stability: an `analyticsId` follows the backend's slug id, so it changes when that id does, for example after an alias merge or a label rename. A concept's trend can therefore have gaps or split across two ids. Reports map ids back to labels server-side only; the labels are never sent to analytics.
 
 ### Privacy rules
 
 These graphs come from events held under the Chatham House Rule, so:
 - Never send a passcode as an event name or value. A passcode that arrives in the URL reports nothing, and `passcode_submit` carries only the outcome.
 - Never send free text a reader typed. Feedback text reports `submitted` with its length as the value.
-- Never send participant or quote content, a pseudonym, a message id, or a node id or label (anything derived from what was said) as an event name. Use a fixed, enumerable name such as a node kind or a view name.
+- Never send participant or quote content, a pseudonym, a message id, or a node id or label (anything derived from what was said) as an event name. Use a fixed, enumerable name such as a view name, or a node kind with its opaque `analyticsId` (never the node id).
 
 ---
 

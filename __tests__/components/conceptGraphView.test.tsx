@@ -603,6 +603,72 @@ describe('ConceptGraphView', () => {
       expect(names).toEqual(['concept', 'contribution', 'prompt']);
     });
 
+    describe('with an analyticsId from the backend', () => {
+      // The contribution carries one too, which no real backend sends: it must still be ignored.
+      const withIds = {
+        originPrompts: [{ ...graph.originPrompts[0], analyticsId: 'aaaa1111bbbb2222' }],
+        concepts: [{ ...graph.concepts[0], analyticsId: '3f9a1c07b2d84e65' }, graph.concepts[1], graph.concepts[2]],
+        contributions: [{ ...graph.contributions[0], analyticsId: 'deadbeefdeadbeef' }, graph.contributions[1]],
+      } as unknown as ConceptGraphPayload;
+      const calls = () => (trackConversationEvent as jest.Mock).mock.calls;
+      const names = (action: string) =>
+        calls()
+          .filter((c) => c[2] === action)
+          .map((c) => c[3]);
+
+      it('names a select <kind>:<analyticsId>, kind only without one, and contributions kind only', async () => {
+        const user = userEvent.setup();
+        render(<ConceptGraphView payload={withIds} conversationId="conv-1" />);
+
+        await user.click(star('Issuer'));
+        await user.click(star('Verifier'));
+        await user.click(screen.getByRole('button', { name: /^Co-governs, summary only/ }));
+        await user.click(screen.getByRole('button', { name: /^Origin prompt/ }));
+
+        expect(names('select')).toEqual(['concept:3f9a1c07b2d84e65', 'concept', 'contribution', 'prompt:aaaa1111bbbb2222']);
+      });
+
+      it('names a hover the same way', () => {
+        jest.useFakeTimers();
+        try {
+          render(<ConceptGraphView payload={withIds} conversationId="conv-1" />);
+
+          fireEvent.pointerEnter(star('Issuer'));
+          act(() => void jest.advanceTimersByTime(DWELL_MS));
+          fireEvent.pointerLeave(star('Issuer'));
+          fireEvent.pointerEnter(star('Verifier'));
+          act(() => void jest.advanceTimersByTime(DWELL_MS));
+          fireEvent.pointerLeave(star('Verifier'));
+          fireEvent.pointerEnter(screen.getByRole('button', { name: /^Origin prompt/ }));
+          act(() => void jest.advanceTimersByTime(DWELL_MS));
+
+          expect(names('hover')).toEqual(['concept:3f9a1c07b2d84e65', 'concept', 'prompt:aaaa1111bbbb2222']);
+        } finally {
+          jest.useRealTimers();
+        }
+      });
+
+      it('never sends a node id or label from the payload, only the analyticsId', async () => {
+        const user = userEvent.setup();
+        render(<ConceptGraphView payload={withIds} conversationId="conv-1" />);
+
+        await user.click(star('Issuer'));
+        await user.click(screen.getByRole('button', { name: /^Co-governs, summary only/ }));
+        await user.click(screen.getByRole('button', { name: /^Origin prompt/ }));
+
+        const forbidden = [
+          ...withIds.concepts.flatMap((c) => [c.id, c.label]),
+          ...withIds.contributions.flatMap((k) => [k.id, k.kind]),
+          ...withIds.originPrompts.flatMap((o) => [o.id, o.text]),
+        ];
+        const sent = calls().flatMap((c) => c.slice(1).map(String));
+        expect(sent.length).toBeGreaterThan(0);
+        for (const arg of sent) {
+          for (const bad of forbidden) expect(arg.toLowerCase()).not.toContain(bad.toLowerCase());
+        }
+      });
+    });
+
     describe('hover', () => {
       beforeEach(() => jest.useFakeTimers());
       afterEach(() => jest.useRealTimers());

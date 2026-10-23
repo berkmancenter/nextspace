@@ -50,6 +50,20 @@ export function nodeKind(scene: SkyScene, id: string | null | undefined): NodeKi
   return null;
 }
 
+/**
+ * The analytics event name for a node: its kind, plus `:<analyticsId>` when the backend supplied one.
+ * Only a concept or prompt can carry an id. A contribution is kind only, whatever its payload says, since
+ * it would point at one person's account. The suffix is exactly `analyticsId` (an opaque keyed hash),
+ * never derived from the node `id`, a label or any text, which all come out of the discussion.
+ */
+export function analyticsName(scene: SkyScene, id: string | null | undefined): string | null {
+  const kind = nodeKind(scene, id);
+  if (!kind || !id) return null;
+  if (kind === 'contribution') return kind;
+  const analyticsId = (kind === 'concept' ? scene.concepts.get(id) : scene.prompts.get(id))?.analyticsId;
+  return analyticsId ? `${kind}:${analyticsId}` : kind;
+}
+
 /** The session a node came from, or undefined for a single-session graph or an unattributed node. */
 export function sessionOfNode(scene: SkyScene, node: { provenance?: { conversationId?: string } }): number | undefined {
   const id = node.provenance?.conversationId;
