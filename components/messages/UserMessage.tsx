@@ -35,7 +35,7 @@ const renderMessageWithMentions = (text: string, contributors?: string[]): React
     // Check if this part is a mention
     if (part.startsWith('@')) {
       return (
-        <span key={index} className="font-semibold" style={{ color: '#7C3AED' }}>
+        <span key={index} className="font-semibold" style={{ color: 'var(--nx-mention)' }}>
           {part}
         </span>
       );
@@ -61,7 +61,7 @@ const renderMessageWithMentions = (text: string, contributors?: string[]): React
 export const UserMessage: FC<UserMessageProps> = ({
   message,
   contributors,
-  backgroundColor = '#E8F0FE',
+  backgroundColor = 'var(--nx-bubble-default-bg)',
   isHovered = false,
 }) => {
   const parsed = parseMessageBody(message.body);
@@ -70,9 +70,9 @@ export const UserMessage: FC<UserMessageProps> = ({
     <div
       className="rounded-2xl px-2 py-1 text-gray-800 self-start"
       style={{
-        backgroundColor: isHovered ? 'white' : backgroundColor,
+        backgroundColor: isHovered ? 'var(--nx-bubble-hover-bg)' : backgroundColor,
         width: '85%',
-        border: '1px solid rgba(0, 0, 0, 0.1)',
+        border: '1px solid var(--nx-bubble-border)',
       }}
     >
       {renderMessageWithMentions(parsed.text, contributors)}
@@ -99,7 +99,7 @@ export const UserMessage: FC<UserMessageProps> = ({
                     maxWidth: '100%',
                     height: 'auto',
                     borderRadius: '8px',
-                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                    border: '1px solid var(--nx-bubble-border)',
                   }}
                 />
               );

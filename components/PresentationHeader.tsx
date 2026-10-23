@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Dialog } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import LightModeIcon from '@mui/icons-material/LightMode';
 import { Logo } from './Logo';
+import { usePresenterTheme } from '../hooks/usePresenterTheme';
 
 interface PresentationHeaderProps {
   eventName: string;
@@ -19,6 +22,8 @@ interface PresentationHeaderProps {
 export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProps) => {
   const [confirmingExit, setConfirmingExit] = useState(false);
   const [exitFailed, setExitFailed] = useState(false);
+  const { theme, toggleTheme } = usePresenterTheme();
+  const switchTo = theme === 'dark' ? 'light' : 'dark';
 
   const closeDialog = () => {
     setConfirmingExit(false);
@@ -39,21 +44,30 @@ export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProp
   };
 
   return (
-    <header className="relative z-[1] flex h-[72px] flex-shrink-0 items-center gap-3.5 border-b border-gray-200 bg-white px-7 shadow-sm">
+    <header className="relative z-[1] flex h-[72px] flex-shrink-0 items-center gap-3.5 border-b border-gray-200 bg-white px-7 shadow-sm dark:border-nx-border-subtle dark:bg-nx-chrome">
       <Logo />
-      <span className="text-[22px] font-extrabold tracking-tight text-medium-slate-blue">NextSpace</span>
+      <span className="text-[22px] font-extrabold tracking-tight text-medium-slate-blue dark:text-nx-text">NextSpace</span>
       <h1 className="ml-3.5 min-w-0 truncate text-lg font-normal text-gray-800">{eventName}</h1>
 
       <div className="ml-auto flex flex-shrink-0 items-center gap-3.5">
-        <span className="whitespace-nowrap rounded-full bg-[#E0E7FF] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-medium-slate-blue">
+        <span className="whitespace-nowrap rounded-full bg-nx-pill px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-nx-pill-text">
           Presentation view
         </span>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label={`Switch to ${switchTo} mode`}
+          title={`Switch to ${switchTo} mode`}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border-[1.5px] dark:border-2 border-gray-300 bg-gray-100 text-gray-800 hover:bg-gray-200 dark:hover:bg-nx-active"
+        >
+          {theme === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+        </button>
         <button
           type="button"
           onClick={() => setConfirmingExit(true)}
           aria-label="Exit presentation view"
           title="Exit presentation view"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 dark:hover:bg-nx-active"
         >
           <CloseIcon />
         </button>
@@ -74,7 +88,7 @@ export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProp
           event&apos;s admin page.
         </p>
         {exitFailed && (
-          <p role="alert" className="mt-3 text-sm font-semibold text-red-700">
+          <p role="alert" className="mt-3 text-sm font-semibold text-red-700 dark:text-nx-error">
             Couldn&apos;t open the participant view. Try again.
           </p>
         )}
@@ -82,14 +96,14 @@ export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProp
           <button
             type="button"
             onClick={closeDialog}
-            className="whitespace-nowrap rounded-md border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100"
+            className="whitespace-nowrap rounded-md border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100 dark:border-nx-border-interactive dark:bg-nx-raised dark:hover:bg-nx-active"
           >
             Keep presenting
           </button>
           <button
             type="button"
             onClick={confirmExit}
-            className="whitespace-nowrap rounded-md bg-medium-slate-blue px-3.5 py-2 text-sm font-semibold text-white hover:bg-[#3b38b8]"
+            className="whitespace-nowrap rounded-md bg-nx-cta px-3.5 py-2 text-sm font-semibold text-white hover:bg-nx-cta-hover dark:text-nx-on-button dark:hover:brightness-110"
           >
             Go to participant view
           </button>

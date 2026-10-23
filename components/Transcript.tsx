@@ -55,6 +55,7 @@ interface TranscriptProps {
  * @param props - Props for the Transcript component
  */
 const botColor = getAssistantAvatarStyle().avatarBg;
+const botBadgeBackground = `color-mix(in srgb, ${botColor} 40%, transparent)`;
 
 export function Transcript(props: TranscriptProps) {
   const botName = useBotName();
@@ -559,13 +560,13 @@ export function Transcript(props: TranscriptProps) {
 
   return (
     <div
-      className={`bg-[#200434] text-white transition-all duration-300 ease-in-out flex flex-col ${
+      className={`bg-nx-transcript text-white dark:text-nx-text transition-all duration-300 ease-in-out flex flex-col ${
         props.hideToggle ? 'h-full w-full' : isOpen ? 'h-[40vh] lg:h-full lg:w-[33vw]' : 'flex-shrink-0 lg:h-full lg:w-16'
       }`}
     >
       {/* Header with toggle */}
       <div
-        className={`border-b border-white/10 bg-[#200434] relative before:absolute before:inset-0 before:bg-white/20 before:pointer-events-none flex-shrink-0 ${
+        className={`border-b border-white/10 bg-nx-transcript relative before:absolute before:inset-0 before:bg-white/20 before:pointer-events-none dark:border-nx-border-subtle dark:bg-nx-raised dark:before:hidden flex-shrink-0 ${
           isOpen && props.showControls ? 'px-4 pt-2 pb-4' : 'px-4 py-2'
         }`}
       >
@@ -579,7 +580,7 @@ export function Transcript(props: TranscriptProps) {
               {!props.hideToggle && (
                 <button
                   onClick={handleToggle}
-                  className="text-white hover:bg-white/10 rounded p-1 transition-colors"
+                  className="text-white hover:bg-white/10 rounded p-1 transition-colors dark:text-nx-text dark:hover:bg-nx-active"
                   aria-label="Close transcript"
                 >
                   <ChevronRight className="transition-transform -rotate-270 lg:rotate-0" />
@@ -588,11 +589,11 @@ export function Transcript(props: TranscriptProps) {
             </div>
             {props.showControls && (
               <>
-                <div className="w-full h-px bg-white/40 my-3" />
+                <div className="w-full h-px bg-white/40 my-3 dark:bg-nx-border-strong" />
                 <div className="flex gap-2">
                   <button
                     onClick={() => setShowPauseResumeConfirm(true)}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 border-2 border-white rounded-lg text-white hover:bg-white/10 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 border-2 border-white rounded-lg text-white hover:bg-white/10 transition-colors dark:border-nx-border-interactive dark:text-nx-text dark:hover:bg-nx-active"
                     aria-label={transcriptActive ? 'Pause recording' : 'Resume recording'}
                   >
                     {transcriptActive ? (
@@ -615,8 +616,8 @@ export function Transcript(props: TranscriptProps) {
                         }
                       }}
                       disabled={transcriptActive}
-                      className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 border-2 border-white rounded-lg text-white transition-colors ${
-                        transcriptActive ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10'
+                      className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 border-2 border-white rounded-lg text-white transition-colors dark:border-nx-border-interactive dark:text-nx-text ${
+                        transcriptActive ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10 dark:hover:bg-nx-active'
                       }`}
                       aria-label="Delete transcript"
                     >
@@ -624,15 +625,15 @@ export function Transcript(props: TranscriptProps) {
                       <span className="text-sm font-medium">Delete</span>
                     </button>
                     {transcriptActive && (
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 dark:border dark:border-nx-border-interactive dark:bg-nx-active dark:text-nx-text group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
                         Pause transcript before deleting
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900 dark:border-t-nx-border-interactive"></div>
                       </div>
                     )}
                   </div>
                   <button
                     onClick={handleDownload}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 border-2 border-white rounded-lg text-white hover:bg-white/10 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 border-2 border-white rounded-lg text-white hover:bg-white/10 transition-colors dark:border-nx-border-interactive dark:text-nx-text dark:hover:bg-nx-active"
                     aria-label="Download transcript"
                   >
                     <Download className="w-4 h-4" />
@@ -645,7 +646,7 @@ export function Transcript(props: TranscriptProps) {
                       <p className="text-sm text-red-200">{error}</p>
                       <button
                         onClick={() => setError(null)}
-                        className="text-red-200 hover:text-white transition-colors flex-shrink-0"
+                        className="text-red-200 hover:text-white transition-colors flex-shrink-0 dark:hover:text-nx-text"
                         aria-label="Dismiss error"
                       >
                         ✕
@@ -664,7 +665,7 @@ export function Transcript(props: TranscriptProps) {
             </div>
             <button
               onClick={handleToggle}
-              className="text-white hover:bg-white/10 rounded p-1 transition-colors lg:mx-auto"
+              className="text-white hover:bg-white/10 rounded p-1 transition-colors lg:mx-auto dark:text-nx-text dark:hover:bg-nx-active"
               aria-label="Open transcript"
             >
               <ChevronLeft className="transition-transform rotate-270 lg:rotate-0" />
@@ -687,7 +688,7 @@ export function Transcript(props: TranscriptProps) {
       {isOpen && (
         <div
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col-reverse min-h-0 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[#2D0A4E] [&::-webkit-scrollbar-thumb]:bg-[#6B21A8] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-[#7C3AED]"
+          className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col-reverse min-h-0 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-nx-scroll-track [&::-webkit-scrollbar-thumb]:bg-nx-scroll-thumb [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-nx-scroll-thumb-hover"
         >
           <div ref={topRef} />
           {messages.map((message, i) => {
@@ -697,7 +698,7 @@ export function Transcript(props: TranscriptProps) {
               <div
                 id={`transcript-message-${message.id}`}
                 key={`message-${i}`}
-                className={`mb-4 ${focusedMessageIds.includes(message.id!) ? 'bg-[#4A0979]' : ''}`}
+                className={`mb-4 ${focusedMessageIds.includes(message.id!) ? 'bg-nx-focus-row dark:shadow-[inset_4px_0_0_var(--nx-border-interactive)]' : ''}`}
               >
                 <div
                   className="flex items-center gap-2 text-gray-300 text-sm mb-1"
@@ -715,14 +716,17 @@ export function Transcript(props: TranscriptProps) {
                   {isBot && (
                     <span
                       className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold"
-                      style={{ backgroundColor: `${botColor}66`, color: '#FFFFFF' }}
+                      style={{ backgroundColor: botBadgeBackground, color: 'var(--nx-transcript-badge-fg)' }}
                     >
-                      <BotIcon size={12} color="#FFFFFF" />
+                      <BotIcon size={12} color="var(--nx-transcript-badge-fg)" />
                       {normalizeAssistantPseudonym(message, botName)}
                     </span>
                   )}
                 </div>
-                <p className="text-white text-base" style={props.presentation ? PRESENTATION_TEXT.message : undefined}>
+                <p
+                  className="text-white text-base dark:text-nx-text"
+                  style={props.presentation ? PRESENTATION_TEXT.message : undefined}
+                >
                   {message.body.text ? message.body.text : message.body}
                 </p>
               </div>
@@ -750,7 +754,7 @@ export function Transcript(props: TranscriptProps) {
       >
         <div className="flex flex-col items-center gap-4">
           <div className="w-16 h-16 rounded-full border-2 border-red-400 flex items-center justify-center">
-            <ReportProblem sx={{ fontSize: 40, color: '#f87171' }} />
+            <ReportProblem sx={{ fontSize: 40, color: 'var(--nx-danger-icon)' }} />
           </div>
           <h2 className="text-2xl font-bold text-gray-900">Delete transcription?</h2>
           <p className="text-gray-600 text-base leading-relaxed max-w-sm">
@@ -761,15 +765,15 @@ export function Transcript(props: TranscriptProps) {
               onClick={handleDelete}
               variant="contained"
               sx={{
-                backgroundColor: '#b91c1c',
-                color: 'white',
+                backgroundColor: 'var(--nx-danger-bg)',
+                color: 'var(--nx-danger-fg)',
                 padding: '12px 24px',
                 borderRadius: '8px',
                 textTransform: 'none',
                 fontSize: '16px',
                 fontWeight: 600,
                 '&:hover': {
-                  backgroundColor: '#991b1b',
+                  backgroundColor: 'var(--nx-danger-hover-bg)',
                 },
               }}
               autoFocus
@@ -779,7 +783,7 @@ export function Transcript(props: TranscriptProps) {
             <Button
               onClick={() => setShowDeleteConfirm(false)}
               sx={{
-                color: '#4b5563',
+                color: 'var(--nx-dialog-cancel)',
                 textTransform: 'none',
                 fontSize: '16px',
                 fontWeight: 500,
@@ -815,7 +819,7 @@ export function Transcript(props: TranscriptProps) {
       >
         <div className="flex flex-col items-center gap-4">
           <div className="w-16 h-16 rounded-full border-2 border-red-400 flex items-center justify-center">
-            <ReportProblem sx={{ fontSize: 40, color: '#f87171' }} />
+            <ReportProblem sx={{ fontSize: 40, color: 'var(--nx-danger-icon)' }} />
           </div>
           <h2 className="text-2xl font-bold text-gray-900">
             {transcriptActive ? 'Pause transcription?' : 'Resume transcription?'}
@@ -830,15 +834,15 @@ export function Transcript(props: TranscriptProps) {
               onClick={transcriptActive ? handlePause : handleResume}
               variant="contained"
               sx={{
-                backgroundColor: '#b91c1c',
-                color: 'white',
+                backgroundColor: 'var(--nx-danger-bg)',
+                color: 'var(--nx-danger-fg)',
                 padding: '12px 24px',
                 borderRadius: '8px',
                 textTransform: 'none',
                 fontSize: '16px',
                 fontWeight: 600,
                 '&:hover': {
-                  backgroundColor: '#991b1b',
+                  backgroundColor: 'var(--nx-danger-hover-bg)',
                 },
               }}
               autoFocus
@@ -848,7 +852,7 @@ export function Transcript(props: TranscriptProps) {
             <Button
               onClick={() => setShowPauseResumeConfirm(false)}
               sx={{
-                color: '#4b5563',
+                color: 'var(--nx-dialog-cancel)',
                 textTransform: 'none',
                 fontSize: '16px',
                 fontWeight: 500,

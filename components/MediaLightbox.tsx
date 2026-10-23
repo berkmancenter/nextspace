@@ -233,14 +233,14 @@ export const MediaLightbox: FC<MediaLightboxProps> = ({ open, onClose, mediaType
               <button
                 onClick={handleZoomOut}
                 disabled={zoomLevel <= MIN_ZOOM}
-                className="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 text-white dark:bg-nx-active dark:text-nx-text dark:hover:bg-nx-button dark:hover:text-nx-on-button disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Zoom out"
               >
                 −
               </button>
               <button
                 onClick={handleReset}
-                className="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 text-white"
+                className="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 text-white dark:bg-nx-active dark:text-nx-text dark:hover:bg-nx-button dark:hover:text-nx-on-button"
                 aria-label="Reset zoom"
               >
                 {Math.round(zoomLevel * 100)}%
@@ -248,7 +248,7 @@ export const MediaLightbox: FC<MediaLightboxProps> = ({ open, onClose, mediaType
               <button
                 onClick={handleZoomIn}
                 disabled={zoomLevel >= MAX_ZOOM}
-                className="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 text-white dark:bg-nx-active dark:text-nx-text dark:hover:bg-nx-button dark:hover:text-nx-on-button disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Zoom in"
               >
                 +

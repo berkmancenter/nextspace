@@ -144,10 +144,16 @@ describe('NavigationBar', () => {
   it('applies active background style to the active tab button', () => {
     render(<NavigationBar {...baseProps} activeTab="chat" />);
 
+    // jsdom drops background colors given as CSS variables, but keeps the box-shadow that draws the
+    // active tab's left indicator, which only the active tab has.
     const activeChatBtns = screen
       .getAllByLabelText('Group Chat')
-      .filter((btn) => (btn as HTMLElement).style.background === 'rgb(209, 196, 233)');
+      .filter((btn) => btn.getAttribute('style')?.includes('var(--nx-nav-indicator)'));
     expect(activeChatBtns.length).toBeGreaterThan(0);
+    const inactiveBtns = screen
+      .getAllByLabelText('Private Chat')
+      .filter((btn) => btn.getAttribute('style')?.includes('var(--nx-nav-indicator)'));
+    expect(inactiveBtns).toHaveLength(0);
   });
 
   it('applies bold font-weight label to the active tab', () => {

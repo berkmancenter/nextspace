@@ -642,14 +642,14 @@ export function EventAssistantRoom({
                     {presentation && showEventStatusDialog && (
                       <div
                         role="status"
-                        className="absolute inset-x-0 top-6 z-10 mx-auto w-full max-w-md rounded-2xl bg-white px-6 py-8 text-center shadow-2xl"
+                        className="absolute inset-x-0 top-6 z-10 mx-auto w-full max-w-md rounded-2xl bg-white px-6 py-8 text-center shadow-2xl dark:border dark:border-nx-border-strong dark:bg-nx-raised"
                       >
                         {eventStatusNotice}
                       </div>
                     )}
                     {/* Show dismissable resources reminder if active  */}
                     {resourcesReminderActive && (
-                      <div className="absolute top-0 w-full z-10 bg-yellow-100 p-4 rounded shadow-2xl animate-slide-in">
+                      <div className="absolute top-0 w-full z-10 bg-yellow-100 p-4 rounded shadow-2xl animate-slide-in dark:bg-nx-raised dark:text-nx-text">
                         <div className="flex justify-between font-bold">
                           <p>
                             {resourcesNavBadgeDismissed
@@ -666,7 +666,7 @@ export function EventAssistantRoom({
                           </Button>
                         </div>
                         <button
-                          className="mt-2 px-3 py-1 bg-yellow-200 hover:bg-yellow-300 rounded"
+                          className="mt-2 px-3 py-1 bg-yellow-200 hover:bg-yellow-300 rounded dark:border dark:border-nx-border-interactive dark:bg-nx-active dark:hover:bg-nx-active dark:hover:brightness-125"
                           onClick={() => {
                             handleTabChange('resources');
                             setResourcesReminderActive(false);

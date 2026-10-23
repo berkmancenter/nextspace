@@ -1,6 +1,7 @@
 import { Html, Head, Main, NextScript, DocumentContext, DocumentProps } from 'next/document';
 import { DocumentHeadTags, DocumentHeadTagsProps, documentGetInitialProps } from '@mui/material-nextjs/v15-pagesRouter';
 import { isTokenPage } from '../utils/tokenPrivacy';
+import { PRESENTER_THEME_INIT_SCRIPT } from '../utils/presenterTheme';
 
 export default function Document(props: DocumentProps & DocumentHeadTagsProps) {
   // Check if analytics is enabled (defaults to true if not set)
@@ -15,6 +16,10 @@ export default function Document(props: DocumentProps & DocumentHeadTagsProps) {
       <Head>
         <DocumentHeadTags {...props} />
         <link rel="icon" href="/favicon.ico" sizes="any" />
+        {/* Sets the presentation view's saved theme before first paint so there is no flash of the wrong one. */}
+        {props.__NEXT_DATA__.page === '/present' && (
+          <script dangerouslySetInnerHTML={{ __html: PRESENTER_THEME_INIT_SCRIPT }} />
+        )}
         {/* Matomo Tag Manager - Only load if analytics is enabled and URL is configured */}
         {loadMatomo && (
           <script

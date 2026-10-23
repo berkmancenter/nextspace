@@ -1,5 +1,5 @@
 import { FC, useState, useRef, useEffect, KeyboardEvent } from 'react';
-import { Box, Button, Typography, Link, alpha } from '@mui/material';
+import { Box, Button, Typography, Link } from '@mui/material';
 import { Check, AddCommentOutlined } from '@mui/icons-material';
 import { ControlledInputConfig } from '../types.internal';
 
@@ -167,17 +167,18 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
               paddingX: '10px',
               borderRadius: '5px',
               borderWidth: '1px',
-              borderColor: selectedFeedback === option.text ? undefined : '#666666',
-              backgroundColor: (theme) =>
-                selectedFeedback === option.text ? alpha(theme.palette.primary.main, 0.08) : 'white',
+              color: 'var(--nx-feedback-fg)',
+              borderColor:
+                selectedFeedback === option.text ? 'var(--nx-feedback-selected-border)' : 'var(--nx-feedback-border)',
+              backgroundColor: selectedFeedback === option.text ? 'var(--nx-feedback-selected-bg)' : 'var(--nx-feedback-bg)',
               textTransform: 'none',
               fontSize: '0.6875rem',
               fontWeight: 700,
               '&:hover': {
                 borderWidth: '1px',
-                borderColor: '#4A0979',
-                backgroundColor: '#4A0979',
-                color: 'white',
+                borderColor: 'var(--nx-feedback-hover-bg)',
+                backgroundColor: 'var(--nx-feedback-hover-bg)',
+                color: 'var(--nx-feedback-hover-fg)',
               },
               '&:focus-visible': {
                 outline: '2px solid',
@@ -186,10 +187,19 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
               },
               '&.Mui-disabled': {
                 borderWidth: '1px',
-                borderColor: (theme) => theme.palette.action.disabled,
-                color: (theme) => theme.palette.text.disabled,
+                borderColor: 'var(--nx-feedback-disabled-border)',
+                color: 'var(--nx-feedback-disabled-fg)',
                 backgroundColor: 'transparent',
               },
+              /* Dark theme only: the rating buttons are all disabled once one is chosen, so the generic
+                 disabled look above would hide the selected state. Keep the selected fill and border. */
+              ...(selectedFeedback === option.text && {
+                "html[data-presenter-theme='dark'] &.Mui-disabled": {
+                  borderColor: 'var(--nx-feedback-selected-border)',
+                  color: 'var(--nx-text-primary)',
+                  backgroundColor: 'var(--nx-feedback-selected-bg)',
+                },
+              }),
             }}
           >
             {selectedFeedback === option.text ? (
@@ -206,16 +216,19 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
 
       {/* Conditional "Say More" Message - shown after rating selection */}
       {selectedFeedback !== null && (
-        <Box className="bg-light-gray rounded-2xl p-3" marginTop="0.5rem">
+        <Box className="bg-light-gray rounded-2xl p-3 dark:bg-nx-raised" marginTop="0.5rem">
           <Typography variant="body2">
             Thank you for your input!{' '}
             <Link
               component="button"
               onClick={handleSayMoreClick}
-              className="text-medium-slate-blue"
+              className="text-medium-slate-blue dark:text-nx-text-secondary"
               sx={{
                 cursor: 'pointer',
                 textDecoration: 'underline',
+                "html[data-presenter-theme='dark'] &": {
+                  color: 'var(--nx-text-secondary)',
+                },
                 '&:hover': {
                   textDecoration: 'none',
                 },
