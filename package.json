@@ -17,10 +17,15 @@
     "prettier": "prettier --check \"**/*.{ts,tsx,js,mjs}\" --ignore-path .gitignore",
     "prettier:fix": "prettier --write \"**/*.{ts,tsx,js,mjs}\" --ignore-path .gitignore",
     "prepare": "husky",
+    "types:ensure": "node scripts/ensure-types.mjs",
+    "types:check-spec": "node scripts/check-spec.mjs",
+    "types:sync": "node scripts/sync-types.mjs",
     "openapi-types:generate:local": "openapi-typescript http://localhost:3000/v1/openapi.json --output types.ts",
     "openapi-types:generate": "sh -c 'if [ -z \"$1\" ]; then echo \"Error: URL to OpenAPI file required\" >&2; exit 1; fi; openapi-typescript \"$1\" --output types.ts' --",
     "start": "next start",
+    "pretest": "npm run types:ensure",
     "test": "jest",
+    "pretest:watch": "npm run types:ensure",
     "test:watch": "jest --watch"
   },
   "dependencies": {

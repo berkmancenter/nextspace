@@ -1,5 +1,23 @@
 #!/bin/sh
 
+# --- Non-interactive escape hatch -------------------------------------------
+# CI, coding agents, and scripted `git commit -m "..."` runs have no terminal.
+# In those contexts we skip the interactive commitizen / breaking-change
+# prompts below. This does NOT weaken checks: the commit-msg hook still runs
+# commitlint against the message, so conventional-commit format is enforced
+# regardless of how the commit was created.
+#
+# Detected when any of the following is true:
+#   * HUSKY_NONINTERACTIVE=1 is set (explicit opt-out)
+#   * CI is set (most CI providers)
+#   * /dev/tty cannot be opened (no controlling terminal)
+# The /dev/tty probe runs in a subshell so a failed open aborts only the
+# subshell, not this hook.
+if [ "$HUSKY_NONINTERACTIVE" = "1" ] || [ -n "$CI" ] || ! ( : < /dev/tty ) 2>/dev/null; then
+  exit 0
+fi
+
+# --- Interactive path -------------------------------------------------------
 # Check if this is an interactive commit (no -m flag used)
 if [ "$2" = "" ]; then
   # Run commitizen for interactive commits

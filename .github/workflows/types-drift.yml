@@ -1,0 +1,66 @@
+#
+# @fileoverview Daily check that openapi.json still matches the deployed API. If it has drifted,
+# opens (or updates) a PR on branch chore/sync-openapi. The PR is checked by ci.yml like any
+# other. Needs the API_URL repository secret (same one docs.yml uses) and the repository
+# setting "Allow GitHub Actions to create and approve pull requests".
+#
+# ==========
+
+name: Sync openapi.json with deployed API
+
+on:
+  schedule:
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: types-drift
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Use Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Fetch deployed spec in canonical format
+        env:
+          API_URL: ${{ secrets.API_URL }}
+        run: |
+          if [ -z "$API_URL" ]; then
+            echo "Error: API_URL secret is not set" >&2
+            exit 1
+          fi
+          # Writes openapi.json only (--no-types); types.ts is not needed here (CI regenerates it).
+          # Reuses sync-types.mjs for the fetch timeout and the empty-spec guard.
+          node scripts/sync-types.mjs "$API_URL/openapi.json" --no-types
+      - name: Open or update sync PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- openapi.json; then
+            echo "openapi.json matches the deployed API"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B chore/sync-openapi
+          git add openapi.json
+          git commit -m "chore: sync openapi.json with deployed API"
+          git push --force origin chore/sync-openapi
+          if [ -z "$(gh pr list --head chore/sync-openapi --state open --json number --jq '.[0].number')" ]; then
+            gh pr create --base main --head chore/sync-openapi \
+              --title "chore: sync openapi.json with deployed API" \
+              --body "This PR reflects the spec currently served by the deployed backend. CI validates that the frontend still compiles, tests and builds against it. If CI is green, merge."
+          fi

@@ -1,0 +1,6 @@
+#!/bin/sh
+# Best-effort: after a rebase/amend, refresh types.ts. types:ensure is a no-op unless
+# openapi.json is newer than types.ts, so this stays cheap. Always exits 0, silent, offline.
+[ -n "$CI" ] && exit 0
+npm run --silent types:ensure >/dev/null 2>&1 || true
+exit 0

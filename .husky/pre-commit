@@ -1,1 +1,4 @@
 npm run lint
+if git diff --cached --name-only | grep -qx 'openapi.json'; then
+  npm run types:check-spec
+fi
