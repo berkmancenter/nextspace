@@ -38,7 +38,7 @@ export const Layout = ({ children, authType = 'guest' }: Readonly<{ children: Re
     <div
       className={`min-h-screen flex flex-col ${
         drawsOwnChrome || currentUrl.includes('conversationId')
-          ? 'bg-[#FFFFFF]'
+          ? 'bg-nx-layout'
           : 'bg-main bg-transparent bg-cover bg-center bg-no-repeat'
       }`}
     >

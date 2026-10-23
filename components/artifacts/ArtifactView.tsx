@@ -4,6 +4,7 @@ import { Alert, Box, Button, Chip, Dialog, DialogContent, DialogTitle, Typograph
 import HistoryIcon from '@mui/icons-material/History';
 import { ArtifactVersionHistory, formatStamp } from './ArtifactVersionHistory';
 import { DocumentArtifactView } from './DocumentArtifactView';
+import { trackArtifactEvent } from '../../utils/artifactAnalytics';
 import { Artifact, ArtifactVersion, ConceptGraphPayload, DocumentPayload } from '../../types.internal';
 
 /* The graph renderer pulls in d3's force, zoom and scale modules and measures the DOM to
@@ -22,11 +23,13 @@ const ConceptGraphView = dynamic(() => import('./ConceptGraphView').then((m) => 
  * Props for ArtifactView.
  * @property artifact - The artifact to show, at its latest version.
  * @property artifactPasscode - The container's read passcode, threaded through to the history calls.
+ * @property conversationId - The conversation the artifact belongs to, for analytics attribution. Absent on a series.
  * @property isLive - True when a new version of this artifact arrived over the socket during this visit.
  */
 interface ArtifactViewProps {
   artifact: Artifact;
   artifactPasscode?: string;
+  conversationId?: string;
   isLive?: boolean;
 }
 
@@ -43,7 +46,7 @@ const TYPE_LABEL: Record<string, string> = {
  * latest version they simply see the new one; when they have stepped back into the history
  * the view stays where they put it and the arrival is offered as a link rather than taken.
  */
-export const ArtifactView = ({ artifact, artifactPasscode, isLive }: ArtifactViewProps) => {
+export const ArtifactView = ({ artifact, artifactPasscode, conversationId, isLive }: ArtifactViewProps) => {
   const [viewingVersion, setViewingVersion] = useState<ArtifactVersion | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
@@ -55,14 +58,32 @@ export const ArtifactView = ({ artifact, artifactPasscode, isLive }: ArtifactVie
   const version = viewingVersion ?? artifact.currentVersion;
   const isHistorical = !!viewingVersion && viewingVersion.versionNumber !== artifact.currentVersionNumber;
 
+  const track = (action: string, name: string, value?: number) =>
+    trackArtifactEvent(conversationId, 'artifact', action, name, value);
+  const openHistory = () => {
+    setShowHistory(true);
+    track('history_open', artifact.type);
+  };
+  const closeHistory = () => {
+    setShowHistory(false);
+    track('history_close', artifact.type);
+  };
+  // Version numbers are the artifact's own counter, not anything a reader typed.
+  const showLatest = () => {
+    setViewingVersion(null);
+    track('version_select', 'latest', artifact.currentVersionNumber);
+  };
+
   const historyPanel = (
     <ArtifactVersionHistory
       artifact={artifact}
       artifactPasscode={artifactPasscode}
       viewingVersionNumber={viewingVersion?.versionNumber}
-      onSelectVersion={(selected) =>
-        setViewingVersion(selected.versionNumber === artifact.currentVersionNumber ? null : selected)
-      }
+      onSelectVersion={(selected) => {
+        const isCurrent = selected.versionNumber === artifact.currentVersionNumber;
+        setViewingVersion(isCurrent ? null : selected);
+        track('version_select', isCurrent ? 'latest' : 'earlier', selected.versionNumber);
+      }}
     />
   );
 
@@ -73,6 +94,7 @@ export const ArtifactView = ({ artifact, artifactPasscode, isLive }: ArtifactVie
       <Box sx={{ minWidth: 0, height: '100%', minHeight: 0 }}>
         <ConceptGraphView
           payload={version.payload as ConceptGraphPayload}
+          conversationId={conversationId}
           header={
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, color: 'inherit' }}>
               <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
@@ -92,7 +114,7 @@ export const ArtifactView = ({ artifact, artifactPasscode, isLive }: ArtifactVie
                   size="small"
                   color="inherit"
                   startIcon={<HistoryIcon />}
-                  onClick={() => setShowHistory(true)}
+                  onClick={openHistory}
                   sx={{ minWidth: 0, py: 0, textTransform: 'none' }}
                 >
                   History
@@ -118,7 +140,7 @@ export const ArtifactView = ({ artifact, artifactPasscode, isLive }: ArtifactVie
                   severity="info"
                   sx={{ py: 0 }}
                   action={
-                    <Button size="small" onClick={() => setViewingVersion(null)}>
+                    <Button size="small" onClick={showLatest}>
                       Latest
                     </Button>
                   }
@@ -129,7 +151,7 @@ export const ArtifactView = ({ artifact, artifactPasscode, isLive }: ArtifactVie
             </Box>
           }
         />
-        <Dialog open={showHistory} onClose={() => setShowHistory(false)} fullWidth maxWidth="sm" scroll="paper">
+        <Dialog open={showHistory} onClose={closeHistory} fullWidth maxWidth="sm" scroll="paper">
           <DialogTitle>Version history</DialogTitle>
           <DialogContent>{historyPanel}</DialogContent>
         </Dialog>
@@ -163,7 +185,7 @@ export const ArtifactView = ({ artifact, artifactPasscode, isLive }: ArtifactVie
         <Button
           size="small"
           startIcon={<HistoryIcon />}
-          onClick={() => setShowHistory((shown) => !shown)}
+          onClick={showHistory ? closeHistory : openHistory}
           aria-expanded={showHistory}
         >
           {showHistory ? 'Hide history' : 'History'}
@@ -175,7 +197,7 @@ export const ArtifactView = ({ artifact, artifactPasscode, isLive }: ArtifactVie
           severity="info"
           sx={{ mb: 1.5 }}
           action={
-            <Button size="small" onClick={() => setViewingVersion(null)}>
+            <Button size="small" onClick={showLatest}>
               Latest
             </Button>
           }

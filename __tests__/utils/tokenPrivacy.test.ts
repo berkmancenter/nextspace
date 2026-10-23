@@ -1,4 +1,4 @@
-import { isTokenPage, scrubSentryEvent, scrubTokenFromUrl } from '../../utils/tokenPrivacy';
+import { isTokenPage, stripArtifactPasscode, scrubSentryEvent, scrubTokenFromUrl } from '../../utils/tokenPrivacy';
 
 describe('scrubTokenFromUrl', () => {
   it('redacts the token from an absolute URL', () => {
@@ -81,5 +81,34 @@ describe('isTokenPage', () => {
 
   it('does not match other pages', () => {
     expect(isTokenPage('/login')).toBe(false);
+  });
+});
+
+describe('stripArtifactPasscode', () => {
+  it('drops the query when the passcode is the only parameter', () => {
+    expect(stripArtifactPasscode('/artifacts/c1?artifactPasscode=abc123')).toBe('/artifacts/c1');
+  });
+
+  it('keeps the other parameters, whatever the passcode position', () => {
+    expect(stripArtifactPasscode('/artifacts/c1?artifactPasscode=abc&view=orbit')).toBe('/artifacts/c1?view=orbit');
+    expect(stripArtifactPasscode('/artifacts/c1?view=orbit&artifactPasscode=abc')).toBe('/artifacts/c1?view=orbit');
+    expect(stripArtifactPasscode('/a?x=1&artifactPasscode=abc&y=2#top')).toBe('/a?x=1&y=2#top');
+  });
+
+  it('leaves URLs without a passcode untouched', () => {
+    expect(stripArtifactPasscode('/artifacts/c1')).toBe('/artifacts/c1');
+    expect(stripArtifactPasscode('/artifacts/c1?view=orbit')).toBe('/artifacts/c1?view=orbit');
+    expect(stripArtifactPasscode('/x?myartifactPasscode=keep')).toBe('/x?myartifactPasscode=keep');
+  });
+
+  it('returns an empty string when there is no URL', () => {
+    expect(stripArtifactPasscode(undefined)).toBe('');
+    expect(stripArtifactPasscode(null)).toBe('');
+  });
+
+  it('works on absolute URLs', () => {
+    expect(stripArtifactPasscode('https://a.example/artifacts/topic/t?artifactPasscode=p%20q')).toBe(
+      'https://a.example/artifacts/topic/t',
+    );
   });
 });

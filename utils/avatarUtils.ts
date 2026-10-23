@@ -3,6 +3,7 @@ import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import PersonIcon from '@mui/icons-material/Person';
 
+// The colors are CSS variables (defined in globals.css) so the presentation view's dark theme can change them.
 export function getAvatarStyle(
   pseudonym: string,
   isCurrentUser: boolean = false,
@@ -10,15 +11,15 @@ export function getAvatarStyle(
   if (isCurrentUser) {
     return {
       icon: PersonIcon,
-      avatarBg: '#F1D2D6',
-      bubbleBg: '#F1D2D6',
+      avatarBg: 'var(--nx-avatar-user-bg)',
+      bubbleBg: 'var(--nx-bubble-user-bg)',
     };
   }
 
   return {
     icon: PersonOutlineIcon, // other users
-    avatarBg: '#FAE8C6',
-    bubbleBg: '#FAE8C6',
+    avatarBg: 'var(--nx-avatar-other-bg)',
+    bubbleBg: 'var(--nx-bubble-other-bg)',
   };
 }
 
@@ -29,7 +30,7 @@ export function getAssistantAvatarStyle(): {
 } {
   return {
     icon: SmartToyIcon,
-    avatarBg: '#DDD6FE',
-    bubbleBg: '#DDD6FE',
+    avatarBg: 'var(--nx-avatar-assistant-bg)',
+    bubbleBg: 'var(--nx-bubble-assistant-bg)',
   };
 }

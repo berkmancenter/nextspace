@@ -1,5 +1,7 @@
 jest.mock('../../utils/analytics', () => ({
   trackEvent: jest.fn(),
+  trackConversationEvent: jest.fn(),
+  deleteCustomDimension: jest.fn(),
 }));
 
 import { fireEvent, render, screen, within } from '@testing-library/react';

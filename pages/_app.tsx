@@ -54,6 +54,39 @@ export default function App({ Component, pageProps }: AppProps) {
     typography: {
       fontFamily: ['Inter Variable', 'sans-serif'].join(','),
     },
+    components: {
+      // Colors come from CSS variables so the presentation view's dark theme can change them; the
+      // light values in globals.css are MUI's defaults, so every other page looks the same.
+      MuiButton: {
+        styleOverrides: {
+          root: ({ ownerState }) => {
+            if (ownerState.color === 'error' && ownerState.variant !== 'contained') {
+              return { color: 'var(--nx-button-error-text)' };
+            }
+            if (ownerState.color !== 'primary') return {};
+            if (ownerState.variant === 'contained') {
+              return {
+                backgroundColor: 'var(--nx-button-contained-bg)',
+                color: 'var(--nx-button-contained-fg)',
+                '&:hover': { backgroundColor: 'var(--nx-button-contained-hover-bg)' },
+              };
+            }
+            if (ownerState.variant === 'outlined') {
+              return { color: 'var(--nx-button-text)', borderColor: 'var(--nx-button-outline-border)' };
+            }
+            return { color: 'var(--nx-button-text)' };
+          },
+        },
+      },
+      MuiIconButton: {
+        styleOverrides: {
+          root: ({ ownerState }) =>
+            ownerState.color === 'default' || ownerState.color === undefined
+              ? { color: 'var(--nx-icon-button)', '&:hover': { backgroundColor: 'var(--nx-icon-button-hover)' } }
+              : {},
+        },
+      },
+    },
   });
 
   // Restore or create session on app initialization (once)

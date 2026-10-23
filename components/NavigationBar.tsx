@@ -106,7 +106,7 @@ export function NavigationBar({
     isActive: boolean,
     size: number,
   ) => {
-    const color = isActive ? '#1a1a1a' : '#9E9E9E';
+    const color = isActive ? 'var(--nx-nav-text-active)' : 'var(--nx-nav-text-inactive)';
     if (id === 'assistant') {
       return <BotIcon size={size} color={color} />;
     }
@@ -138,7 +138,8 @@ export function NavigationBar({
           fullWidth ? 'justify-center flex-1 h-full gap-0.5' : 'w-full px-1 py-3'
         }`}
         style={{
-          background: isActive ? '#D1C4E9' : 'transparent',
+          backgroundColor: isActive ? 'var(--nx-nav-active-bg)' : 'transparent',
+          boxShadow: isActive ? 'inset 4px 0 0 var(--nx-nav-indicator)' : undefined,
           border: 'none',
           cursor: 'pointer',
         }}
@@ -157,7 +158,7 @@ export function NavigationBar({
           style={{
             fontSize: presentation ? '12px' : '10px',
             fontWeight: isActive ? 700 : 400,
-            color: isActive ? '#1a1a1a' : '#9E9E9E',
+            color: isActive ? 'var(--nx-nav-text-active)' : 'var(--nx-nav-text-inactive)',
             letterSpacing: '0.03em',
             textTransform: 'uppercase',
             lineHeight: 1.2,
@@ -176,10 +177,10 @@ export function NavigationBar({
       <nav
         className="hidden lg:flex flex-col items-center py-6 gap-2 flex-shrink-0"
         style={{
-          backgroundColor: '#EDE7F6',
+          backgroundColor: 'var(--nx-nav-bg)',
           width: presentation ? '96px' : '72px',
           minHeight: '100%',
-          borderRight: '1px solid #D1C4E9',
+          borderRight: '1px solid var(--nx-nav-border)',
         }}
         aria-label="Main navigation"
       >
@@ -194,8 +195,8 @@ export function NavigationBar({
       <nav
         className="lg:hidden fixed bottom-0 left-0 right-0 flex flex-row items-center justify-around z-50"
         style={{
-          backgroundColor: '#EDE7F6',
-          borderTop: '1px solid #D1C4E9',
+          backgroundColor: 'var(--nx-nav-bg)',
+          borderTop: '1px solid var(--nx-nav-border)',
           height: '60px',
         }}
         aria-label="Main navigation"

@@ -25,7 +25,19 @@ export function Errors(props: ErrorsProps) {
 
   return (
     <Snackbar open={!!(generalError || sessionError)} autoHideDuration={6000} onClose={() => setGeneralError(null)}>
-      <Alert severity="error" color="warning">
+      <Alert
+        severity="error"
+        color="warning"
+        sx={{
+          // The presentation view's dark theme; no effect on pages without the attribute.
+          "html[data-presenter-theme='dark'] &": {
+            backgroundColor: 'var(--nx-surface-raised)',
+            color: 'var(--nx-text-primary)',
+            border: '1.5px solid var(--nx-border-interactive)',
+            '& .MuiAlert-icon': { color: 'var(--nx-danger-icon)' },
+          },
+        }}
+      >
         {generalError || sessionError}
       </Alert>
     </Snackbar>
@@ -40,8 +52,8 @@ export function Errors(props: ErrorsProps) {
 export function ParamErrors(props: ParamErrorsProps) {
   return (
     <div id="params-error" className="flex items-center justify-center w-full h-full">
-      <div className="min-h-36 min-w-2xs border-2 border-red-400">
-        <h3 className="text-lg font-bold px-4 py-2 bg-red-400 text-white w-full">
+      <div className="min-h-36 min-w-2xs border-2 border-red-400 dark:border-nx-border-interactive">
+        <h3 className="text-lg font-bold px-4 py-2 bg-red-400 text-white w-full dark:bg-red-900 dark:text-nx-text">
           <ErrorOutlineSharp />
           &nbsp;Error
         </h3>

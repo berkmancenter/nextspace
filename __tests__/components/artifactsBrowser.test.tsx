@@ -4,6 +4,12 @@ jest.mock('../../hooks/useArtifacts', () => ({
   useArtifacts: (params: unknown) => mockUseArtifacts(params),
 }));
 
+jest.mock('../../utils/analytics', () => ({
+  trackEvent: jest.fn(),
+  trackConversationEvent: jest.fn(),
+  deleteCustomDimension: jest.fn(),
+}));
+
 jest.mock('../../utils', () => ({
   generateConceptGraph: jest.fn(),
   fetchArtifactPasscode: jest.fn(),
@@ -19,6 +25,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ArtifactsBrowser } from '../../components/artifacts/ArtifactsBrowser';
 import { fetchArtifactPasscode } from '../../utils';
+import { trackConversationEvent, trackEvent } from '../../utils/analytics';
 import { Artifact } from '../../types.internal';
 
 const mockFetchPasscode = fetchArtifactPasscode as jest.Mock;
@@ -198,5 +205,107 @@ describe('the share link', () => {
 
     expect(await screen.findByText('Forbidden')).toBeInTheDocument();
     expect(screen.queryByLabelText('Share link')).not.toBeInTheDocument();
+  });
+});
+
+describe('share link analytics', () => {
+  beforeEach(() => mockFetchPasscode.mockResolvedValue('Xk3fA9dQ'));
+  afterEach(() => {
+    delete (navigator as { clipboard?: unknown }).clipboard;
+  });
+
+  it('tracks a copied link, without the passcode or the link in the event', async () => {
+    Object.assign(navigator, { clipboard: { writeText: jest.fn().mockResolvedValue(undefined) } });
+    render(<ArtifactsBrowser {...props} authType="admin" container={{ conversationId: 'conv-1' }} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /copy share link/i }));
+
+    await screen.findByText(/^Copied/);
+    expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'artifact', 'share_link', 'copied', undefined);
+    expect(JSON.stringify((trackConversationEvent as jest.Mock).mock.calls)).not.toContain('Xk3fA9dQ');
+  });
+
+  it('tracks a link built but not copyable (no clipboard), and a failed mint', async () => {
+    render(<ArtifactsBrowser {...props} authType="admin" container={{ conversationId: 'conv-1' }} />);
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await userEvent.click(screen.getByRole('button', { name: /copy share link/i }));
+    await screen.findByLabelText('Share link');
+    expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'artifact', 'share_link', 'copy_failed', undefined);
+
+    mockFetchPasscode.mockRejectedValue(new Error('Forbidden'));
+    await userEvent.click(screen.getByRole('button', { name: /copy share link/i }));
+    await screen.findByText('Forbidden');
+    expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'artifact', 'share_link', 'error', undefined);
+  });
+
+  it('tracks a series share link without attribution', async () => {
+    render(<ArtifactsBrowser {...props} authType="admin" container={{ topicId: 'topic-1' }} />);
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await userEvent.click(screen.getByRole('button', { name: /copy share link/i }));
+
+    await screen.findByLabelText('Share link');
+    expect(trackEvent).toHaveBeenCalledWith('artifact', 'share_link', 'copy_failed', undefined);
+  });
+});
+
+describe('passcode submit analytics', () => {
+  const calls = () =>
+    JSON.stringify([(trackConversationEvent as jest.Mock).mock.calls, (trackEvent as jest.Mock).mock.calls]);
+
+  const submit = async (passcode: string) => {
+    await userEvent.type(screen.getByLabelText('Artifact passcode'), passcode);
+    await userEvent.click(screen.getByRole('button', { name: 'Open' }));
+  };
+
+  it('reports success once the read the passcode triggered comes back accepted', async () => {
+    mockUseArtifacts.mockReturnValue(state({ needsPasscode: true, artifacts: [] }));
+    const { rerender } = render(<ArtifactsBrowser {...props} container={{ conversationId: 'conv-1' }} />);
+
+    await submit('S3cretPass');
+    expect(trackConversationEvent).not.toHaveBeenCalled();
+
+    mockUseArtifacts.mockReturnValue(state({ needsPasscode: true, artifacts: [], loading: true }));
+    rerender(<ArtifactsBrowser {...props} container={{ conversationId: 'conv-1' }} artifactPasscode="S3cretPass" />);
+    expect(trackConversationEvent).not.toHaveBeenCalled();
+
+    mockUseArtifacts.mockReturnValue(state());
+    rerender(<ArtifactsBrowser {...props} container={{ conversationId: 'conv-1' }} artifactPasscode="S3cretPass" />);
+
+    expect(trackConversationEvent).toHaveBeenCalledTimes(1);
+    expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'artifact', 'passcode_submit', 'success', undefined);
+    expect(calls()).not.toContain('S3cretPass');
+  });
+
+  it('reports failure when the read is refused again, and never sends the passcode', async () => {
+    mockUseArtifacts.mockReturnValue(state({ needsPasscode: true, artifacts: [] }));
+    const { rerender } = render(<ArtifactsBrowser {...props} container={{ conversationId: 'conv-1' }} />);
+
+    await submit('WrongPass1');
+    mockUseArtifacts.mockReturnValue(state({ needsPasscode: true, artifacts: [], loading: true }));
+    rerender(<ArtifactsBrowser {...props} container={{ conversationId: 'conv-1' }} artifactPasscode="WrongPass1" />);
+    mockUseArtifacts.mockReturnValue(state({ needsPasscode: true, artifacts: [] }));
+    rerender(<ArtifactsBrowser {...props} container={{ conversationId: 'conv-1' }} artifactPasscode="WrongPass1" />);
+
+    expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'artifact', 'passcode_submit', 'failure', undefined);
+    expect(calls()).not.toContain('WrongPass1');
+  });
+
+  it('reports failure straight away when the same refused passcode is submitted again', async () => {
+    mockUseArtifacts.mockReturnValue(state({ needsPasscode: true, artifacts: [] }));
+    render(<ArtifactsBrowser {...props} container={{ topicId: 'topic-1' }} artifactPasscode="WrongPass1" />);
+
+    await submit('WrongPass1');
+
+    expect(trackEvent).toHaveBeenCalledWith('artifact', 'passcode_submit', 'failure', undefined);
+    expect(calls()).not.toContain('WrongPass1');
+  });
+
+  it('does not report anything for a passcode that arrived in the URL', () => {
+    render(<ArtifactsBrowser {...props} container={{ conversationId: 'conv-1' }} artifactPasscode="FromUrl1" />);
+
+    expect(trackConversationEvent).not.toHaveBeenCalled();
+    expect(trackEvent).not.toHaveBeenCalled();
   });
 });

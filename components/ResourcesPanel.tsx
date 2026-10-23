@@ -140,32 +140,35 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
       <button
         onClick={() => toggleCategory(category.id)}
         aria-expanded={isExpanded}
-        className="w-full flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 hover:bg-gray-50 transition-colors dark:bg-nx-raised dark:hover:bg-nx-active"
       >
         <div className="flex items-center gap-3">
-          <Icon sx={{ fontSize: 20, color: '#4A0979' }} aria-hidden="true" />
+          <Icon sx={{ fontSize: 20, color: 'var(--nx-resource-icon)' }} aria-hidden="true" />
           <span className="font-semibold text-gray-900 text-sm">{category.title}</span>
           {category.count > 0 && (
-            <span aria-hidden="true" className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+            <span
+              aria-hidden="true"
+              className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium dark:bg-nx-active dark:text-nx-text"
+            >
               {category.count}
             </span>
           )}
         </div>
         {isExpanded ? (
-          <ExpandLess sx={{ fontSize: 20, color: '#666' }} aria-hidden="true" />
+          <ExpandLess sx={{ fontSize: 20, color: 'var(--nx-resource-chevron)' }} aria-hidden="true" />
         ) : (
-          <ExpandMore sx={{ fontSize: 20, color: '#666' }} aria-hidden="true" />
+          <ExpandMore sx={{ fontSize: 20, color: 'var(--nx-resource-chevron)' }} aria-hidden="true" />
         )}
       </button>
     );
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-gray-50">
+    <div className="flex flex-col h-full overflow-hidden bg-gray-50 dark:bg-nx-base">
       {/* Event Description Header */}
-      <div className="flex-shrink-0 bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-purple-200 px-6 py-4">
+      <div className="flex-shrink-0 bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-purple-200 px-6 py-4 dark:from-nx-raised dark:to-nx-chrome dark:border-nx-border-strong">
         <div className="flex items-start gap-3">
-          <Info sx={{ fontSize: 24, color: '#4A0979', marginTop: '2px' }} />
+          <Info sx={{ fontSize: 24, color: 'var(--nx-resource-icon)', marginTop: '2px' }} />
           <div>
             <h1 className="text-lg font-bold text-gray-900 mb-1">{eventName || 'Event Resources'}</h1>
             {eventDescription && (
@@ -183,7 +186,7 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
         <div className="mb-2">
           <CategoryHeader category={categories[0]} isExpanded={expandedCategories.has('speakers')} />
           {expandedCategories.has('speakers') && (
-            <div className="bg-white px-6 py-4 border-b border-gray-200">
+            <div className="bg-white px-6 py-4 border-b border-gray-200 dark:bg-nx-base">
               <div className="space-y-4">
                 {moderators.length === 0 && speakers.length === 0 && (
                   <p className="text-sm text-gray-500">No speakers available.</p>
@@ -194,8 +197,8 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                     <div className="space-y-3">
                       {moderators.map((mod, idx) => (
                         <div key={idx} className="flex items-start gap-3">
-                          <div className="bg-gradient-to-br from-blue-100 to-blue-200 rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0">
-                            <Person sx={{ fontSize: 20, color: '#1e40af' }} />
+                          <div className="bg-gradient-to-br from-blue-100 to-blue-200 dark:from-nx-raised dark:to-nx-raised dark:ring-1 dark:ring-nx-border-interactive rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0">
+                            <Person sx={{ fontSize: 20, color: 'var(--nx-resource-person)' }} />
                           </div>
                           <div>
                             <h5 className="text-sm font-semibold text-gray-900">{mod.name}</h5>
@@ -218,8 +221,8 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                     <div className="space-y-3">
                       {speakers.map((speaker, idx) => (
                         <div key={idx} className="flex items-start gap-3">
-                          <div className="bg-gradient-to-br from-purple-100 to-purple-200 rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0">
-                            <Person sx={{ fontSize: 20, color: '#4A0979' }} />
+                          <div className="bg-gradient-to-br from-purple-100 to-purple-200 dark:from-nx-active dark:to-nx-active rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0">
+                            <Person sx={{ fontSize: 20, color: 'var(--nx-resource-speaker)' }} />
                           </div>
                           <div>
                             <h5 className="text-sm font-semibold text-gray-900">{speaker.name}</h5>
@@ -245,7 +248,7 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
         <div className="mb-2">
           <CategoryHeader category={categories[1]} isExpanded={expandedCategories.has('required')} />
           {expandedCategories.has('required') && (
-            <div className="bg-white px-6 py-4 border-b border-gray-200">
+            <div className="bg-white px-6 py-4 border-b border-gray-200 dark:bg-nx-base">
               {requiredResources.length === 0 ? (
                 <p className="text-sm text-gray-500 italic">No required readings assigned yet.</p>
               ) : (
@@ -257,14 +260,17 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                   </p>
                   <ul className="space-y-5 list-none">
                     {requiredResources.map((resource, idx) => (
-                      <li key={resource.id || idx} className="border border-amber-200 rounded-lg bg-amber-50 p-4">
+                      <li
+                        key={resource.id || idx}
+                        className="border border-amber-200 rounded-lg bg-amber-50 p-4 dark:border-nx-border-strong dark:bg-nx-raised"
+                      >
                         <div className="max-w-[600px]">
                           <div aria-hidden="true" className="flex items-center gap-2 mb-2">
-                            <span className="inline-block text-xs font-semibold text-amber-800 bg-amber-200 px-2 py-0.5 rounded-full">
+                            <span className="inline-block text-xs font-semibold text-amber-800 bg-amber-200 px-2 py-0.5 rounded-full dark:bg-nx-active dark:text-nx-text">
                               Required
                             </span>
                           </div>
-                          <h3 className="text-base font-semibold text-amber-900 mb-1">
+                          <h3 className="text-base font-semibold text-amber-900 mb-1 dark:text-nx-text">
                             {resource.url ? (
                               <a href={resource.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
                                 {resource.title}
@@ -286,7 +292,7 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                             </div>
                           )}
                           {resource.summary && (
-                            <div className="border-t border-amber-200 pt-3 mt-2">
+                            <div className="border-t border-amber-200 pt-3 mt-2 dark:border-nx-border-strong">
                               <p tabIndex={0} className="text-sm text-gray-700 leading-relaxed">
                                 <TruncatedText
                                   text={resource.summary}
@@ -310,7 +316,7 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
         <div className="mb-2">
           <CategoryHeader category={categories[2]} isExpanded={expandedCategories.has('readings')} />
           {expandedCategories.has('readings') && (
-            <div className="bg-white px-6 py-4 border-b border-gray-200">
+            <div className="bg-white px-6 py-4 border-b border-gray-200 dark:bg-nx-base">
               <p className="text-sm text-gray-600 mb-3">
                 References sourced from{' '}
                 <a
@@ -333,21 +339,25 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
                       <li
                         key={resource.id}
                         className={`border-l-4 pl-4 py-3 rounded-r ${
-                          isNew ? 'border-amber-400 bg-amber-50' : 'border-indigo-400 bg-indigo-50'
+                          isNew
+                            ? 'border-amber-400 bg-amber-50 dark:border-nx-border-interactive dark:bg-nx-raised'
+                            : 'border-indigo-400 bg-indigo-50 dark:border-nx-border-strong dark:bg-nx-chrome'
                         }`}
                       >
                         <div className="max-w-[600px]">
                           <div aria-hidden="true" className="flex items-center gap-2 mb-2">
-                            <span className="inline-block text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
+                            <span className="inline-block text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full dark:bg-nx-active dark:text-nx-text">
                               {resource.source === 'ai' ? 'AI Pick' : 'Speaker Pick'}
                             </span>
                             {isNew && (
-                              <span className="inline-block text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                              <span className="inline-block text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full dark:bg-nx-active dark:text-nx-text">
                                 New
                               </span>
                             )}
                           </div>
-                          <h3 className={`text-base font-semibold mb-1 ${isNew ? 'text-amber-900' : 'text-indigo-900'}`}>
+                          <h3
+                            className={`text-base font-semibold mb-1 ${isNew ? 'text-amber-900' : 'text-indigo-900'} dark:text-nx-text`}
+                          >
                             {resource.url ? (
                               <a href={resource.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
                                 {resource.title}

@@ -8,7 +8,9 @@ import {
   setCustomDimension,
   trackUserLocation,
   tagEventVisit,
+  setTrackedUrl,
 } from '../utils/analytics';
+import { stripArtifactPasscode } from '../utils/tokenPrivacy';
 import { useVisibilityAwareDuration } from './useVisibilityAwareDuration';
 
 export interface UseAnalyticsOptions {
@@ -27,9 +29,11 @@ export interface UseAnalyticsOptions {
  * moderators are staff, not audience, and counting their visits would muddy the
  * "big audience, few talkers" signal the tracked-session count exists to show. The
  * presentation page is left out for the same reason: a shared screen is not an audience
- * member. To start counting another participant-facing page, add its pageType here.
+ * member. The conversation's artifacts page is counted because it is how audience members read what
+ * the event produced; the series (topic) and preview pages have no conversation id and are never
+ * tagged. To start counting another participant-facing page, add its pageType here.
  */
-const PARTICIPANT_EVENT_PAGE_TYPES = ['assistant', 'backchannel'];
+const PARTICIPANT_EVENT_PAGE_TYPES = ['assistant', 'backchannel', 'artifacts'];
 
 /**
  * Custom hook for automatic analytics tracking
@@ -63,9 +67,19 @@ export function useAnalytics(options: UseAnalyticsOptions = {}) {
       tagEventVisit(router.query.conversationId as string);
     }
 
+    /*
+     * Artifact pages carry the read passcode in `?artifactPasscode=`. Neither our page view nor Matomo's own
+     * tracker (which reads document.location) may record it, so both get the URL with it stripped.
+     */
+    const currentPath = router.asPath ?? '';
+    const safePath = stripArtifactPasscode(currentPath);
+    if (safePath !== currentPath) {
+      setTrackedUrl(new URL(safePath, window.location.origin).toString());
+    }
+
     // Track page view
     trackPageView(currentPageName, {
-      path: router.asPath,
+      path: safePath,
       ...(router.query.conversationId && {
         conversationId: router.query.conversationId,
       }),

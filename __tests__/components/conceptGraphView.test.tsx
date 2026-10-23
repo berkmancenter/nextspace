@@ -1,5 +1,7 @@
 jest.mock('../../utils/analytics', () => ({
   trackEvent: jest.fn(),
+  trackConversationEvent: jest.fn(),
+  deleteCustomDimension: jest.fn(),
 }));
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -12,7 +14,10 @@ import {
   seriesConceptGraphFixture,
 } from '../../content/conceptGraphFixture';
 import { ConceptGraphView } from '../../components/artifacts/ConceptGraphView';
-import { trackEvent } from '../../utils/analytics';
+import { DWELL_MS, SkyCanvas } from '../../components/artifacts/sky/SkyCanvas';
+import { buildScene } from '../../components/artifacts/sky/scene';
+import { filterSky, layoutSky } from '../../utils/conceptSky';
+import { trackConversationEvent, trackEvent } from '../../utils/analytics';
 import { ConceptGraphPayload } from '../../types.internal';
 
 /* jsdom lays nothing out and has no matchMedia, so the two media queries the view reads are
@@ -281,7 +286,7 @@ describe('ConceptGraphView', () => {
       expect(starGroup(container, 's-c-blame')).toHaveAttribute('opacity', '0.12');
       expect(starGroup(container, 's-c-trust')).toHaveAttribute('opacity', '1');
       expect(starGroup(container, 's-c-blame').getAttribute('transform')).toBe(before);
-      expect(trackEvent).toHaveBeenCalledWith('graph', 'filter', 'session');
+      expect(trackEvent).toHaveBeenCalledWith('graph', 'filter', 'session', 1);
     });
 
     it('lists a session colour key and an origin prompt entry in the legend', () => {
@@ -508,9 +513,206 @@ describe('ConceptGraphView', () => {
     render(<ConceptGraphView payload={graph} />);
 
     await user.click(screen.getByRole('button', { name: 'Orbit' }));
-    expect(trackEvent).toHaveBeenCalledWith('graph', 'view', 'orbit');
+    expect(trackEvent).toHaveBeenCalledWith('graph', 'view', 'orbit', undefined);
     await user.click(star('Issuer'));
-    expect(trackEvent).toHaveBeenCalledWith('graph', 'select', 'concept');
+    expect(trackEvent).toHaveBeenCalledWith('graph', 'select', 'concept', undefined);
+  });
+
+  describe('analytics', () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    const stars = () => screen.getAllByRole('button', { name: /, concept/ });
+
+    it('attributes graph events to the conversation when there is one', async () => {
+      const user = userEvent.setup();
+      render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+      await user.click(screen.getByRole('button', { name: 'Orbit' }));
+      await user.click(star('Issuer'));
+
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'view', 'orbit', undefined);
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'select', 'concept', undefined);
+      expect(trackEvent).not.toHaveBeenCalledWith('graph', 'select', 'concept', undefined);
+    });
+
+    it('records the session number, and full_series for the whole graph', async () => {
+      const user = userEvent.setup();
+      render(<ConceptGraphView payload={seriesConceptGraphFixture} conversationId="conv-1" />);
+      const select = screen.getByRole('combobox', { name: /show/i });
+
+      await user.selectOptions(select, 'Session 3');
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'filter', 'session', 3);
+
+      await user.selectOptions(select, 'Full series');
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'filter', 'full_series', undefined);
+    });
+
+    it('records a deselect by a second click on the node', async () => {
+      const user = userEvent.setup();
+      render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+      await user.click(star('Issuer'));
+      expect(trackConversationEvent).not.toHaveBeenCalledWith('conv-1', 'graph', 'deselect', expect.anything(), undefined);
+      await user.click(star('Issuer'));
+
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'deselect', 'toggle', undefined);
+    });
+
+    it('records a deselect by closing the reading panel', async () => {
+      const user = userEvent.setup();
+      render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+      await user.click(star('Issuer'));
+      await user.click(within(panel()).getByRole('button', { name: /^Close/ }));
+
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'deselect', 'panel', undefined);
+    });
+
+    it('records a deselect by Escape, and none when nothing is selected', async () => {
+      const user = userEvent.setup();
+      render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+      stars()[0].focus();
+      await user.keyboard('{Escape}');
+      expect(trackConversationEvent).not.toHaveBeenCalledWith('conv-1', 'graph', 'deselect', 'escape', undefined);
+
+      await user.click(star('Issuer'));
+      await user.keyboard('{Escape}');
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'deselect', 'escape', undefined);
+    });
+
+    it('records a deselect by a click on empty sky', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+      await user.click(star('Issuer'));
+      await user.click(container.querySelector('.concept-sky') as HTMLElement);
+
+      expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'deselect', 'empty_sky', undefined);
+    });
+
+    it('never sends a node id, for any kind, as the name of a select', async () => {
+      const user = userEvent.setup();
+      render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+      await user.click(star('Issuer'));
+      await user.click(screen.getByRole('button', { name: /^Co-governs, summary only/ }));
+      await user.click(screen.getByRole('button', { name: /^Origin prompt/ }));
+
+      const names = (trackConversationEvent as jest.Mock).mock.calls.filter((c) => c[2] === 'select').map((c) => c[3]);
+      expect(names).toEqual(['concept', 'contribution', 'prompt']);
+    });
+
+    describe('hover', () => {
+      beforeEach(() => jest.useFakeTimers());
+      afterEach(() => jest.useRealTimers());
+
+      const hovers = () => (trackConversationEvent as jest.Mock).mock.calls.filter((c) => c[2] === 'hover');
+      const promptPill = () => screen.getByRole('button', { name: /^Origin prompt/ });
+
+      it('reports one hover per node kind once the pointer has stayed for 500ms', () => {
+        render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+        fireEvent.pointerEnter(star('Issuer'));
+        act(() => void jest.advanceTimersByTime(499));
+        expect(hovers()).toHaveLength(0);
+        act(() => void jest.advanceTimersByTime(1));
+        expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'hover', 'concept', undefined);
+
+        // Staying put (and any re-render) does not fire it again.
+        act(() => void jest.advanceTimersByTime(5000));
+        expect(hovers()).toHaveLength(1);
+
+        fireEvent.pointerLeave(star('Issuer'));
+        fireEvent.pointerEnter(promptPill());
+        act(() => void jest.advanceTimersByTime(500));
+        expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'graph', 'hover', 'prompt', undefined);
+        expect(hovers()).toHaveLength(2);
+      });
+
+      it('does not report a pointer that passes over a node, or one that left before 500ms', () => {
+        render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+        fireEvent.pointerEnter(star('Issuer'));
+        act(() => void jest.advanceTimersByTime(300));
+        fireEvent.pointerLeave(star('Issuer'));
+        fireEvent.pointerEnter(star('Verifier'));
+        act(() => void jest.advanceTimersByTime(300));
+        fireEvent.pointerLeave(star('Verifier'));
+        act(() => void jest.advanceTimersByTime(5000));
+
+        expect(hovers()).toHaveLength(0);
+      });
+
+      it('reports a new dwell when the pointer comes back to the same node', () => {
+        render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+        for (let i = 0; i < 2; i += 1) {
+          fireEvent.pointerEnter(star('Issuer'));
+          act(() => void jest.advanceTimersByTime(500));
+          fireEvent.pointerLeave(star('Issuer'));
+        }
+
+        expect(hovers()).toHaveLength(2);
+      });
+
+      it('never reports a contribution, however long it is hovered', () => {
+        render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+        fireEvent.pointerEnter(screen.getByRole('button', { name: /^Co-governs, summary only/ }));
+        fireEvent.pointerEnter(screen.getAllByRole('button', { name: /^Depends on/ })[0]);
+        act(() => void jest.advanceTimersByTime(5000));
+
+        expect(hovers()).toHaveLength(0);
+      });
+
+      it('cancels a pending dwell when the graph unmounts', () => {
+        const { unmount } = render(<ConceptGraphView payload={graph} conversationId="conv-1" />);
+
+        fireEvent.pointerEnter(star('Issuer'));
+        act(() => void jest.advanceTimersByTime(200));
+        unmount();
+        act(() => void jest.advanceTimersByTime(5000));
+
+        expect(hovers()).toHaveLength(0);
+      });
+
+      it('does not fire twice, or later, when the filter changes while a node stays hovered', () => {
+        render(<ConceptGraphView payload={seriesConceptGraphFixture} conversationId="conv-1" />);
+
+        fireEvent.pointerEnter(stars()[0]);
+        act(() => void jest.advanceTimersByTime(300));
+        fireEvent.change(screen.getByRole('combobox', { name: /show/i }), { target: { value: '1' } });
+        act(() => void jest.advanceTimersByTime(199));
+        expect(hovers()).toHaveLength(0);
+        act(() => void jest.advanceTimersByTime(1));
+        expect(hovers()).toHaveLength(1);
+
+        act(() => void jest.advanceTimersByTime(5000));
+        expect(hovers()).toHaveLength(1);
+      });
+
+      it('sends a hover without attribution when there is no conversation', () => {
+        render(<ConceptGraphView payload={graph} />);
+
+        fireEvent.pointerEnter(star('Issuer'));
+        act(() => void jest.advanceTimersByTime(500));
+
+        expect(trackEvent).toHaveBeenCalledWith('graph', 'hover', 'concept', undefined);
+        expect(trackConversationEvent).not.toHaveBeenCalled();
+      });
+    });
+
+    it('sends events without attribution when there is no conversation (a series or the preview)', async () => {
+      const user = userEvent.setup();
+      render(<ConceptGraphView payload={graph} />);
+
+      await user.click(star('Issuer'));
+      await user.click(star('Issuer'));
+
+      expect(trackEvent).toHaveBeenCalledWith('graph', 'deselect', 'toggle', undefined);
+      expect(trackConversationEvent).not.toHaveBeenCalled();
+    });
   });
 
   describe('with the backend’s session list', () => {
@@ -548,5 +750,86 @@ describe('ConceptGraphView', () => {
   it('keeps the feedback prompt beneath the sky', () => {
     render(<ConceptGraphView payload={graph} />);
     expect(screen.getByText(/Is this graph interesting, useful and clear/)).toBeInTheDocument();
+  });
+});
+
+describe('SkyCanvas dwell', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  const scene = buildScene(graph);
+  const positions = layoutSky(scene.model);
+  const filter = filterSky(scene.model, 'all');
+
+  const canvas = (hoverId: string | null, onDwell: jest.Mock, withScene = scene) => (
+    <SkyCanvas
+      scene={withScene}
+      positions={positions}
+      targetPositions={positions}
+      orbit={false}
+      filter={filter}
+      hoverId={hoverId}
+      selectedId={null}
+      onHover={jest.fn()}
+      onDwell={onDwell}
+      onToggle={jest.fn()}
+    />
+  );
+
+  it('reports the kind of a hovered concept or prompt after DWELL_MS, and nothing sooner', () => {
+    const onDwell = jest.fn();
+    const { rerender } = render(canvas('c-issuer', onDwell));
+
+    act(() => void jest.advanceTimersByTime(DWELL_MS - 1));
+    expect(onDwell).not.toHaveBeenCalled();
+    act(() => void jest.advanceTimersByTime(1));
+    expect(onDwell).toHaveBeenCalledTimes(1);
+    expect(onDwell).toHaveBeenLastCalledWith('concept');
+
+    rerender(canvas('p1', onDwell));
+    act(() => void jest.advanceTimersByTime(DWELL_MS));
+    expect(onDwell).toHaveBeenCalledTimes(2);
+    expect(onDwell).toHaveBeenLastCalledWith('prompt');
+  });
+
+  it('never reports a contribution', () => {
+    const onDwell = jest.fn();
+    render(canvas('k1', onDwell));
+
+    act(() => void jest.advanceTimersByTime(5000));
+    expect(onDwell).not.toHaveBeenCalled();
+  });
+
+  it('keeps one timer through a new scene or callback identity, and calls the latest callback', () => {
+    const first = jest.fn();
+    const second = jest.fn();
+    const { rerender } = render(canvas('c-issuer', first));
+
+    act(() => void jest.advanceTimersByTime(300));
+    rerender(canvas('c-issuer', second, buildScene(graph)));
+    act(() => void jest.advanceTimersByTime(199));
+    expect(second).not.toHaveBeenCalled();
+    act(() => void jest.advanceTimersByTime(1));
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
+
+    act(() => void jest.advanceTimersByTime(5000));
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels on leaving and on unmount', () => {
+    const onDwell = jest.fn();
+    const { rerender, unmount } = render(canvas('c-issuer', onDwell));
+
+    act(() => void jest.advanceTimersByTime(200));
+    rerender(canvas(null, onDwell));
+    act(() => void jest.advanceTimersByTime(1000));
+    expect(onDwell).not.toHaveBeenCalled();
+
+    rerender(canvas('c-issuer', onDwell));
+    act(() => void jest.advanceTimersByTime(200));
+    unmount();
+    act(() => void jest.advanceTimersByTime(1000));
+    expect(onDwell).not.toHaveBeenCalled();
   });
 });

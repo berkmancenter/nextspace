@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { Box, CircularProgress } from '@mui/material';
 import { ArtifactsBrowser } from '../../../components';
+import { useAnalytics } from '../../../hooks/useAnalytics';
 import { CheckAuthHeader } from '../../../utils';
 import { ArtifactContainer, AuthType } from '../../../types.internal';
 
@@ -26,6 +27,8 @@ export const getServerSideProps = async (context: { req: any }) => {
  */
 export default function TopicArtifactsPage({ authType }: { authType: AuthType }) {
   const router = useRouter();
+  // A series has no single conversation, so this is a page view only: no conversation id to attribute or tag.
+  useAnalytics({ pageType: 'artifacts_topic' });
   const topicId = typeof router.query.topicId === 'string' ? router.query.topicId : undefined;
   const passcodeFromUrl = typeof router.query.artifactPasscode === 'string' ? router.query.artifactPasscode : undefined;
   const selectedFromUrl = typeof router.query.artifact === 'string' ? router.query.artifact : undefined;

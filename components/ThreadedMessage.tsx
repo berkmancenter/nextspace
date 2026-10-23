@@ -193,8 +193,10 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
    */
   const rowClasses = [
     message.hidden ? 'message-hidden bg-gray-200' : '',
-    isThreadOpen ? `border-l-4 border-blue-400 pl-2 py-2 -ml-2 rounded-r-lg ${message.hidden ? '' : 'bg-blue-50'}` : '',
-    !isThreadOpen && showReplyButton && !message.hidden ? 'bg-white' : '',
+    isThreadOpen
+      ? `border-l-4 border-blue-400 pl-2 py-2 -ml-2 rounded-r-lg dark:border-nx-border-interactive ${message.hidden ? '' : 'bg-blue-50 dark:bg-nx-chrome'}`
+      : '',
+    !isThreadOpen && showReplyButton && !message.hidden ? 'bg-white dark:bg-nx-chrome' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -253,21 +255,21 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                   sx={{
                     width: 32,
                     height: 32,
-                    backgroundColor: 'white',
-                    border: '1.5px solid #d1d5db',
+                    backgroundColor: 'var(--nx-reply-btn-bg)',
+                    border: '1.5px solid var(--nx-reply-btn-border)',
                     boxShadow: '0 4px 6px rgba(0,0,0,0.15)',
                     transition: 'all 0.2s ease',
                     '&:hover': {
-                      backgroundColor: '#4A0979',
-                      borderColor: '#4A0979',
+                      backgroundColor: 'var(--nx-reply-btn-hover-bg)',
+                      borderColor: 'var(--nx-reply-btn-hover-border)',
                       boxShadow: '0 6px 12px rgba(74,9,121,0.3)',
                       '& svg': {
-                        color: 'white',
+                        color: 'var(--nx-reply-btn-hover-icon)',
                       },
                     },
                   }}
                 >
-                  <Reply sx={{ fontSize: 18, color: '#6b7280' }} />
+                  <Reply sx={{ fontSize: 18, color: 'var(--nx-reply-btn-icon)' }} />
                 </IconButton>
               )}
             </div>
@@ -285,7 +287,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                     width: '10px',
                     height: '10px',
                     borderRadius: '50%',
-                    backgroundColor: '#7C3AED',
+                    backgroundColor: 'var(--nx-unread-dot)',
                   }}
                 />
               )}
@@ -354,7 +356,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                   onTouchStart={() => setIsReplyIndicatorPressed(true)}
                   onTouchEnd={() => setIsReplyIndicatorPressed(false)}
                   style={metaStyle}
-                  className={`mt-2 -ml-3 px-3 py-2 text-xs text-gray-600 hover:bg-white active:bg-white transition-colors cursor-pointer flex items-center justify-between w-[calc(100%+0.75rem)] group ${isReplyIndicatorPressed ? 'bg-white' : ''} ${hasUnreadReplies && !isThreadOpen ? 'font-bold' : 'font-medium'}`}
+                  className={`mt-2 -ml-3 px-3 py-2 text-xs text-gray-600 hover:bg-white active:bg-white dark:hover:bg-nx-chrome dark:active:bg-nx-chrome transition-colors cursor-pointer flex items-center justify-between w-[calc(100%+0.75rem)] group ${isReplyIndicatorPressed ? 'bg-white dark:bg-nx-chrome' : ''} ${hasUnreadReplies && !isThreadOpen ? 'font-bold' : 'font-medium'}`}
                   // The unread dot and the bold weight are both visual-only, so the state
                   // reaches nobody using a screen reader unless the name carries it.
                   aria-label={`View ${replyCount - 1} more ${replyCount - 1 === 1 ? 'reply' : 'replies'}${
