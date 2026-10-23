@@ -106,7 +106,10 @@ describe('useConversationMessages', () => {
       });
 
       const introMessage = makeMessage({ id: 'assistant-intro', body: { type: 'intro' } });
-      const { result } = renderMessages({ agentIds: ['agent-1', 'agent-2'], assistantIntroRef: { current: [introMessage as any] } });
+      const { result } = renderMessages({
+        agentIds: ['agent-1', 'agent-2'],
+        assistantIntroRef: { current: [introMessage as any] },
+      });
 
       await act(async () => {
         await result.current.fetchAllAssistantMessages();
@@ -130,12 +133,12 @@ describe('useConversationMessages', () => {
     it('fetches and merges replies for messages with a replyCount', async () => {
       mockRetrieveData.mockImplementation((url: string) => {
         if (url === 'messages/conv-1?channel=direct-user-1-agent-1') {
-          return Promise.resolve([
-            makeMessage({ id: 'a1', createdAt: '2026-01-01T00:00:01.000Z', replyCount: 1 }),
-          ]);
+          return Promise.resolve([makeMessage({ id: 'a1', createdAt: '2026-01-01T00:00:01.000Z', replyCount: 1 })]);
         }
         if (url === 'messages/a1/replies') {
-          return Promise.resolve([makeMessage({ id: 'reply-1', parentMessage: 'a1', createdAt: '2026-01-01T00:00:02.000Z' })]);
+          return Promise.resolve([
+            makeMessage({ id: 'reply-1', parentMessage: 'a1', createdAt: '2026-01-01T00:00:02.000Z' }),
+          ]);
         }
         return Promise.resolve([]);
       });
@@ -187,6 +190,36 @@ describe('useConversationMessages', () => {
       });
 
       expect(result.current.chatMessages.map((m: any) => m.id)).toEqual(['chat-intro', 'c1']);
+    });
+
+    it('keeps a hide or unhide still waiting on the server over what the fetch read', async () => {
+      mockRetrieveData.mockImplementation((url: string) =>
+        Promise.resolve(
+          url === 'messages/conv-1?channel=chat,chat-pass'
+            ? [makeMessage({ id: 'c1' }), makeMessage({ id: 'c2', hidden: true }), makeMessage({ id: 'c3' })]
+            : [],
+        ),
+      );
+      const pendingHiddenRef = {
+        current: new Map([
+          ['c1', true],
+          ['c2', false],
+        ]),
+      };
+      const { result } = renderMessages({ pendingHiddenRef });
+
+      await act(async () => {
+        await result.current.fetchChatMessages();
+      });
+
+      const byId = Object.fromEntries(result.current.chatMessages.map((m: any) => [m.id, m.hidden]));
+      expect(byId).toEqual({ c1: true, c2: undefined, c3: undefined });
+
+      pendingHiddenRef.current.clear();
+      await act(async () => {
+        await result.current.fetchChatMessages();
+      });
+      expect(result.current.chatMessages.find((m: any) => m.id === 'c1')?.hidden).toBeUndefined();
     });
 
     it('does nothing when the fetched result is not an array', async () => {
@@ -273,10 +306,7 @@ describe('useConversationMessages', () => {
         expect(mockRetrieveData).toHaveBeenCalledWith('messages/conv-1?channel=chat,chat-pass', 'mock-access-token');
       });
 
-      expect(mockRetrieveData).toHaveBeenCalledWith(
-        'messages/conv-1?channel=direct-user-1-agent-1',
-        'mock-access-token',
-      );
+      expect(mockRetrieveData).toHaveBeenCalledWith('messages/conv-1?channel=direct-user-1-agent-1', 'mock-access-token');
     });
   });
 

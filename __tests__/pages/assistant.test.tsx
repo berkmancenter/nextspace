@@ -2819,6 +2819,117 @@ describe('EventAssistantRoom', () => {
     });
   });
 
+  describe('admin message hiding in the group chat', () => {
+    const chatMsg = (id: string, minute: number, extra: Record<string, any> = {}) => ({
+      id,
+      body: `chat ${id}`,
+      pseudonym: `User ${id}`,
+      owner: `owner-${id}`,
+      channels: ['chat'],
+      createdAt: `2024-01-01T10:0${minute}:00Z`,
+      ...extra,
+    });
+
+    const mockData = (account: any, chat: any[]) => {
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path === 'users/user/user-123') return Promise.resolve(account);
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+        }
+        if (path.includes('?channel=chat')) return Promise.resolve(chat);
+        return Promise.resolve([]);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+      });
+    };
+
+    const handlers = (event: string): Function[] =>
+      mockSocket.on.mock.calls.filter(([e]: [string]) => e === event).map(([, h]: [string, Function]) => h);
+
+    const renderChat = async () => {
+      await act(async () => {
+        render(<EventAssistantRoom authType={'user'} />);
+      });
+      await waitFor(() => expect(screen.getByText('chat a')).toBeInTheDocument());
+    };
+
+    it('shows hide controls to an admin', async () => {
+      mockData({ role: 'admin', pseudonyms: [] }, [chatMsg('a', 1)]);
+      await renderChat();
+      expect(await screen.findByRole('button', { name: 'Hide' })).toBeInTheDocument();
+    });
+
+    it('shows no controls to a member', async () => {
+      mockData({ role: 'user', pseudonyms: [] }, [chatMsg('a', 1)]);
+      await renderChat();
+      await waitFor(() => expect(RetrieveData).toHaveBeenCalledWith('users/user/user-123', expect.anything()));
+      expect(screen.queryByRole('button', { name: 'Hide' })).not.toBeInTheDocument();
+    });
+
+    it('shows no controls, and does not throw, when the account cannot be read', async () => {
+      mockData({ error: 'Forbidden', status: 403 }, [chatMsg('a', 1)]);
+      await renderChat();
+      await waitFor(() => expect(RetrieveData).toHaveBeenCalledWith('users/user/user-123', expect.anything()));
+      expect(screen.queryByRole('button', { name: 'Hide' })).not.toBeInTheDocument();
+    });
+
+    it('shows no controls to a signed-out viewer', async () => {
+      mockUseSessionJoin.mockReturnValue({
+        socket: mockSocket,
+        pseudonym: 'test-pseudonym',
+        userId: null,
+        isConnected: true,
+        errorMessage: null,
+      });
+      mockData({ role: 'admin', pseudonyms: [] }, [chatMsg('a', 1)]);
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+      expect(RetrieveData).not.toHaveBeenCalledWith('users/user/null', expect.anything());
+      expect(screen.queryByRole('button', { name: 'Hide' })).not.toBeInTheDocument();
+    });
+
+    it('drops a message a moderator hid from a member', async () => {
+      mockData({ role: 'user', pseudonyms: [] }, [chatMsg('a', 1), chatMsg('b', 2)]);
+      await renderChat();
+      act(() => {
+        handlers('message:hidden').forEach((h) => h({ messageIds: ['a'], hidden: true, display: 'omit' }));
+      });
+      expect(screen.queryByText('chat a')).not.toBeInTheDocument();
+      expect(screen.getByText('chat b')).toBeInTheDocument();
+    });
+
+    it('tells an author a moderator limited their message, for this conversation only', async () => {
+      mockData({ role: 'user', pseudonyms: [] }, [chatMsg('a', 1)]);
+      await renderChat();
+      act(() => {
+        handlers('message:hidden-notice').forEach((h) =>
+          h({ conversationId: 'another-conversation', scope: 'message', messageIds: ['a'] }),
+        );
+      });
+      expect(screen.queryByText(/limited the visibility/)).not.toBeInTheDocument();
+      act(() => {
+        handlers('message:hidden-notice').forEach((h) =>
+          h({ conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6', scope: 'message', messageIds: ['a'] }),
+        );
+      });
+      expect(await screen.findByText(/limited the visibility/)).toBeInTheDocument();
+    });
+
+    it('slots a live message in by createdAt and does not repeat one it already has', async () => {
+      mockData({ role: 'user', pseudonyms: [] }, [chatMsg('a', 1), chatMsg('c', 3)]);
+      await renderChat();
+      act(() => {
+        handlers('message:new').forEach((h) => h(chatMsg('b', 2)));
+        handlers('message:new').forEach((h) => h(chatMsg('c', 3)));
+      });
+      const order = screen.getAllByText(/^chat [abc]$/).map((el) => el.textContent);
+      expect(order).toEqual(['chat a', 'chat b', 'chat c']);
+    });
+  });
+
   describe('presentation view', () => {
     beforeEach(() => {
       (createConversationFromData as jest.Mock).mockResolvedValue({

@@ -16,3 +16,6 @@ export { useHallwayRooms } from './useHallwayRooms';
 export type { UseHallwayRoomsReturn } from './useHallwayRooms';
 export { useArtifacts } from './useArtifacts';
 export type { UseArtifactsParams, UseArtifactsReturn } from './useArtifacts';
+export { useMessageModeration } from './useMessageModeration';
+export type { UseMessageModerationParams, UseMessageModerationReturn, ModerationToast } from './useMessageModeration';
+export { useOpenThread } from './useOpenThread';

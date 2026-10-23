@@ -4,10 +4,12 @@ import remarkGfm from 'remark-gfm';
 import { MessageInput } from './MessageInput';
 import { ThreadedMessage } from './ThreadedMessage';
 import { ThreadPanel } from './ThreadPanel';
+import type { MessageModeration } from './ModerationControls';
 import { UserMessage } from './messages/UserMessage';
 import { PseudonymousMessage, ControlledInputConfig, FeedbackConfig } from '../types.internal';
 import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { useAutoScroll } from '../hooks/useAutoScroll';
+import { useOpenThread } from '../hooks/useOpenThread';
 import { BotIcon } from './BotIcon';
 import { createMentionsEnhancer } from './enhancers/mentionsEnhancer';
 import { getTimestampVisibility, normalizeAssistantPseudonym, parseMessageBody } from '../utils/Helpers';
@@ -30,7 +32,7 @@ const renderAssistantMessage = (text: string): React.ReactNode => {
         remarkPlugins={[remarkGfm]}
         components={{
           a: ({ node, ...props }) => (
-            <a {...props} className="text-medium-slate-blue" target="_blank" rel="noopener noreferrer" />
+            <a {...props} className="text-medium-slate-blue nx-message-link" target="_blank" rel="noopener noreferrer" />
           ),
         }}
       >
@@ -74,10 +76,14 @@ interface GroupChatPanelProps {
   inactive?: boolean;
   /** Shared-screen layout: presentation text sizes, and a composer that starts collapsed. */
   presentation?: boolean;
+  /** Whether the reader holds the admin role; hide controls are drawn only for an admin. */
+  isAdmin?: boolean;
+  /** Hide controls for the group chat. */
+  moderation?: MessageModeration;
 }
 
 export const GroupChatPanel: FC<GroupChatPanelProps> = ({
-  messages,
+  messages: allMessages,
   pseudonym,
   pseudonymFunFact,
   eventName,
@@ -94,9 +100,16 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   pollCounts = {},
   inactive = false,
   presentation = false,
+  isAdmin = false,
+  moderation,
 }) => {
-  // State for tracking which thread is open in split view
-  const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(null);
+  // The shared screen is read by the whole room: it carries no hide controls, and never shows hidden messages
+  // (an admin's feed includes them, greyed out, for the moderation view).
+  const adminModeration = isAdmin && !presentation ? moderation : undefined;
+  const messages = useMemo(
+    () => (presentation ? allMessages.filter((m) => !m.hidden) : allMessages),
+    [allMessages, presentation],
+  );
   // A composer open on a shared screen takes room from the messages, so it starts collapsed there.
   const [inputHidden, setInputHidden] = useState(presentation);
 
@@ -136,6 +149,9 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
     return { parentMessages: parents, threadMap: map };
   }, [messages]);
   const timestampVisibility = useMemo(() => getTimestampVisibility(parentMessages), [parentMessages]);
+
+  // Which thread is open in split view
+  const { selectedThreadId, selectedThread, setSelectedThreadId } = useOpenThread(parentMessages);
 
   // Auto-scroll based on any new messages, including threaded replies
   const { messagesEndRef, messagesContainerRef, isAtBottom, scrollToBottom } = useAutoScroll(messages);
@@ -217,7 +233,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             style={{
               backgroundColor: isHovered ? 'var(--nx-bubble-hover-bg)' : style.bubbleBg,
               width: '100%',
-              border: '1px solid var(--nx-bubble-border)',
+              border: 'var(--nx-bubble-border-width) solid var(--nx-bubble-border)',
             }}
           >
             {parsed.text && renderAssistantMessage(parsed.text)}
@@ -255,7 +271,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
           style={{
             backgroundColor: isHovered ? 'var(--nx-bubble-hover-bg)' : style.bubbleBg,
             width: '100%',
-            border: '1px solid var(--nx-bubble-border)',
+            border: 'var(--nx-bubble-border-width) solid var(--nx-bubble-border)',
           }}
         >
           {renderAssistantMessage(parsed.text)}
@@ -281,7 +297,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                         maxWidth: '100%',
                         height: 'auto',
                         borderRadius: '8px',
-                        border: '1px solid var(--nx-bubble-border)',
+                        border: 'var(--nx-bubble-border-width) solid var(--nx-bubble-border)',
                       }}
                     />
                   );
@@ -317,7 +333,6 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   };
 
   // Get the selected thread data
-  const selectedThread = selectedThreadId ? parentMessages.find((m) => m.id === selectedThreadId) : null;
   const selectedThreadReplies = selectedThreadId ? threadMap.get(selectedThreadId) || [] : [];
 
   return (
@@ -369,6 +384,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                     isThreadOpen={selectedThreadId === message.id}
                     hasUnreadReplies={message.id ? messagesWithUnreadReplies.has(message.id) : false}
                     presentation={presentation}
+                    moderation={adminModeration}
                   />
                 );
               })}
@@ -481,6 +497,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             feedbackConfig={feedbackConfig}
             waitingForResponse={!!(waitingForThreadedReply && lastMessage?.parentMessage === selectedThreadId)}
             presentation={presentation}
+            moderation={adminModeration}
           />
         </div>
       )}

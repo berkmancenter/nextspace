@@ -9,6 +9,8 @@ import { MessageFeedback } from './MessageFeedback';
 import { BotIcon } from './BotIcon';
 import { PRESENTATION_TEXT } from '../utils/presentationText';
 import { isReadersMessage } from './ThreadedMessage';
+import { HiddenMessagePlaceholder, isHiddenStub } from './HiddenMessagePlaceholder';
+import { MessageModeration, ModerationControls } from './ModerationControls';
 import { chipButtonSx, sendIconSx } from './inputButtonStyles';
 
 interface ThreadPanelProps {
@@ -31,6 +33,8 @@ interface ThreadPanelProps {
   replyLock?: React.ReactNode;
   /** Sets message text to the presentation view's size and enlarges names and timestamps. */
   presentation?: boolean;
+  /** Given only to an admin: draws the hide controls and shows hidden messages greyed out. */
+  moderation?: MessageModeration;
 }
 
 export const ThreadPanel: FC<ThreadPanelProps> = ({
@@ -49,9 +53,12 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
   waitingForResponse = false,
   replyLock,
   presentation = false,
+  moderation,
 }) => {
   const nameStyle = presentation ? PRESENTATION_TEXT.name : undefined;
   const metaStyle = presentation ? PRESENTATION_TEXT.meta : undefined;
+  const renderBody = (msg: PseudonymousMessage) =>
+    isHiddenStub(msg) ? <HiddenMessagePlaceholder /> : renderMessageContent(msg);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [isReplying, setIsReplying] = React.useState(true); // Start with reply input open
@@ -280,7 +287,10 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
               </div>
 
               {/* Message bubble */}
-              {renderMessageContent(parentMessage)}
+              <div className={`w-full ${parentMessage.hidden ? 'message-hidden rounded-lg bg-gray-200' : ''}`}>
+                {renderBody(parentMessage)}
+              </div>
+              {moderation && <ModerationControls message={parentMessage} moderation={moderation} />}
 
               {/* Feedback - rendered below the bubble for Event Assistant messages */}
               {parentMessage.fromAgent &&
@@ -337,7 +347,10 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                 </div>
 
                 {/* Message bubble */}
-                {renderMessageContent(reply)}
+                <div className={`w-full ${reply.hidden ? 'message-hidden rounded-lg bg-gray-200' : ''}`}>
+                  {renderBody(reply)}
+                </div>
+                {moderation && <ModerationControls message={reply} moderation={moderation} />}
 
                 {/* Feedback - rendered below the bubble for Event Assistant messages */}
                 {reply.fromAgent && reply.id && feedbackConfig && feedbackConfig.eligibleMessageIds.has(reply.id) && (

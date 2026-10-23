@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Box, CircularProgress, Drawer, Typography } from '@mui/material';
+import { Alert, Box, CircularProgress, Drawer, Snackbar, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import MenuIcon from '@mui/icons-material/Menu';
 import { Api, RetrieveData, SendData, emitWithTokenRefresh } from '../../utils';
 import { CheckAuthHeader } from '../../utils/Helpers';
 import { GIVE_FEEDBACK_URL } from '../../components/Header';
 import { AuthType, PendingRoomMessage, PseudonymousMessage, SaveRealNameResult, UserPseudonym } from '../../types.internal';
-import { useConversationMessages, useRoomSetup, useSessionJoin, useTabNavigation } from '../../hooks';
+import { insertMessageInOrder } from '../../utils/messageModeration';
+import { useConversationMessages, useMessageModeration, useRoomSetup, useSessionJoin, useTabNavigation } from '../../hooks';
 import { CommunityNavigationBar, CommunityNavTab } from '../../components/room/CommunityNavigationBar';
 import { CommunityGroupChatPanel } from '../../components/room/CommunityGroupChatPanel';
 import { CommunityAssistantPanel } from '../../components/room/CommunityAssistantPanel';
@@ -152,6 +153,9 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
   const chatIntroRef = useMemo(() => ({ current: [] as PseudonymousMessage[] }), []);
   const assistantIntroRef = useMemo(() => ({ current: [] as PseudonymousMessage[] }), []);
 
+  // Optimistic admin verdicts still waiting on the server, kept for fetches that land in the meantime.
+  const pendingHiddenRef = useRef(new Map<string, boolean>());
+
   const {
     assistantMessages,
     setAssistantMessages,
@@ -171,6 +175,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     chatIntroRef,
     assistantIntroRef,
     conversationId,
+    pendingHiddenRef,
   });
 
   // Nothing on the server records what anyone has read, so being in the room is what marks it read.
@@ -191,6 +196,15 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
    * Unlike an event, the room's chat channel has no passcode by design, so unlike
    * pages/assistant.tsx the channel is always pushed rather than gated on one being present.
    */
+  // Read inside the join callback below, which is created once per socket and would otherwise
+  // hold the fetchers of the render it was made in.
+  const refetchHistoryRef = useRef<() => void>(() => {});
+  refetchHistoryRef.current = () => {
+    fetchChatMessages().catch((err) => console.error('Error re-fetching chat messages:', err));
+    fetchAllAssistantMessages();
+  };
+  const hasJoinedOnceRef = useRef(false);
+
   useEffect(() => {
     if (!socket || !userId || !conversationId || !agentId) return;
 
@@ -206,9 +220,19 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
         socket,
         'conversation:join',
         { conversationId, token: Api.get().getAccessToken(), channels },
-        () => setInitialJoinComplete(true),
+        () => {
+          // A rejoin follows every reconnect, however short. Hide and unhide events sent while the
+          // socket was down are lost, and the gap-based refetch ignores gaps under ten seconds, so
+          // history is read again once the room is rejoined.
+          if (hasJoinedOnceRef.current) refetchHistoryRef.current();
+          hasJoinedOnceRef.current = true;
+          setInitialJoinComplete(true);
+        },
         (error: unknown) => {
           console.error('Failed to join room:', error);
+          // The attempt still opened a window in which events were missed, so a later successful
+          // join has to read history again rather than count as the first one.
+          hasJoinedOnceRef.current = true;
           setInitialJoinComplete(true);
         },
       );
@@ -249,11 +273,14 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     if (!socket) return;
 
     const onMessage = (data: PseudonymousMessage) => {
+      // The author's per-user room spans conversations, so a message can arrive for another one.
+      if (data.conversation && String(data.conversation) !== conversationId) return;
+      // Deduped by id and slotted in by createdAt: an unhidden message can arrive after newer ones.
       if (data.channels?.includes('chat')) {
-        setChatMessages((prev) => [...prev, data]);
+        setChatMessages((prev) => insertMessageInOrder(prev, data));
         if (data.fromAgent) setWaitingForChatResponse(false);
       } else {
-        setAssistantMessages((prev) => [...prev, data]);
+        setAssistantMessages((prev) => insertMessageInOrder(prev, data));
         if (data.fromAgent) {
           setWaitingForAssistantResponse(false);
           if (activeTabRef.current !== 'assistant') setUnseenAssistantCount((prev) => prev + 1);
@@ -265,7 +292,18 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
     return () => {
       socket.off('message:new', onMessage);
     };
-  }, [socket, setChatMessages, setAssistantMessages, activeTabRef, setUnseenAssistantCount]);
+  }, [socket, conversationId, setChatMessages, setAssistantMessages, activeTabRef, setUnseenAssistantCount]);
+
+  const { moderation, toast, clearToast } = useMessageModeration({
+    socket,
+    userId,
+    conversationId,
+    isAdmin,
+    chatMessages,
+    setChatMessages,
+    setAssistantMessages,
+    pendingHiddenRef,
+  });
 
   const deliverMessage = useCallback(
     async (queued: PendingRoomMessage) => {
@@ -521,6 +559,7 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
             waitingForResponse={waitingForChatResponse}
             messagesWithUnreadReplies={messagesWithUnreadReplies}
             onSendMessage={(message, parentMessageId) => sendMessage('chat', message, parentMessageId)}
+            moderation={moderation}
             onMarkAsRead={(messageId) => {
               setMessagesWithUnreadReplies((prev) => {
                 const next = new Set(prev);
@@ -540,6 +579,12 @@ export default function RoomPage({ authType }: { authType: AuthType }) {
         unreadAssistantCount={unseenAssistantCount}
         botName={botName}
       />
+
+      <Snackbar open={Boolean(toast)} autoHideDuration={6000} onClose={clearToast}>
+        <Alert severity={toast?.severity ?? 'info'} onClose={clearToast}>
+          {toast?.text}
+        </Alert>
+      </Snackbar>
 
       {(generalError || sendError) && (
         <div role="alert" className={styles.errorBanner}>

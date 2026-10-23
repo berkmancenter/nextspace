@@ -46,7 +46,7 @@ const renderMessageWithMentions = (text: string, contributors?: string[]): React
         key={index}
         options={{
           attributes: {
-            class: 'text-medium-slate-blue',
+            class: 'text-medium-slate-blue nx-message-link',
             target: '_blank',
             rel: 'noopener noreferrer',
           },
@@ -72,7 +72,7 @@ export const UserMessage: FC<UserMessageProps> = ({
       style={{
         backgroundColor: isHovered ? 'var(--nx-bubble-hover-bg)' : backgroundColor,
         width: '85%',
-        border: '1px solid var(--nx-bubble-border)',
+        border: 'var(--nx-bubble-border-width) solid var(--nx-bubble-border)',
       }}
     >
       {renderMessageWithMentions(parsed.text, contributors)}
@@ -99,7 +99,7 @@ export const UserMessage: FC<UserMessageProps> = ({
                     maxWidth: '100%',
                     height: 'auto',
                     borderRadius: '8px',
-                    border: '1px solid var(--nx-bubble-border)',
+                    border: 'var(--nx-bubble-border-width) solid var(--nx-bubble-border)',
                   }}
                 />
               );

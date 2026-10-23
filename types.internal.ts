@@ -79,7 +79,7 @@ export interface HeaderProps extends BaseComponentProps {
 /**
  * Message type for pseudonymous messages used by specific agents.
  * Extends the base Message schema with additional properties.
- * @property {any} body - The body of the message.
+ * @property {any} body - The body of the message. Null on a stub standing in for a hidden message.
  */
 export type PseudonymousMessage = components['schemas']['Message'] & {
   body: any;
@@ -96,7 +96,51 @@ export type PseudonymousMessage = components['schemas']['Message'] & {
    * Absent in any conversation that does not use real names.
    */
   ownerIsAdmin?: boolean;
+  /**
+   * True when a moderator has hidden this message. The server sets it only for admins, who still
+   * see the message; everyone else never receives a hidden message, or gets a body-less stub when
+   * the server's display policy is 'placeholder'. Declared here until types.ts is regenerated.
+   */
+  hidden?: boolean;
 };
+
+/** How a non-admin's feed treats a hidden message: drop it, or keep a body-less stub in its place. */
+export type HiddenDisplay = 'omit' | 'placeholder';
+
+/**
+ * Websocket `message:hidden`. The server resolves hide-all and reply cascades to concrete ids,
+ * and sends ids only, never bodies.
+ */
+export interface MessageHiddenEvent {
+  messageIds: string[];
+  hidden: boolean;
+  display: HiddenDisplay;
+}
+
+/**
+ * Websocket `message:hidden-notice`, sent only to the author of hidden messages. It travels on the
+ * author's per-user room, which spans every conversation, so `conversationId` says which one it is about.
+ */
+export interface MessageHiddenNoticeEvent {
+  conversationId: string;
+  scope: 'message' | 'user';
+  messageIds: string[];
+}
+
+/**
+ * Why an admin removed a message. Optional on every hide request. Kept local until openapi.json
+ * carries it and types.ts is regenerated.
+ */
+export type ModerationReason = 'pii' | 'harassment' | 'off-topic' | 'other';
+
+/** What a hide or unhide request returns: the ids whose state actually changed (empty for a no-op). */
+export interface HideResult {
+  conversationId: string;
+  messageIds: string[];
+  hidden: boolean;
+  /** Only on hide-all. */
+  userId?: string;
+}
 
 /**
  * Message type for moderator metrics messages.

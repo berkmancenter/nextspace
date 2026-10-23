@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GroupChatPanel } from '../../components/GroupChatPanel';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
@@ -448,6 +448,121 @@ describe('GroupChatPanel', () => {
 
     const messageBubble = container.querySelector('.rounded-2xl');
     expect(messageBubble).toBeInTheDocument();
+  });
+
+  describe('Admin moderation', () => {
+    const chatMessage = {
+      id: 'm1',
+      pseudonym: 'Alice',
+      owner: 'owner-1',
+      createdAt: '2025-10-17T12:00:00Z',
+      body: { text: 'Hello everyone' },
+      channels: ['chat'],
+      conversation: 'conv-1',
+      fromAgent: false,
+    } as any;
+    const reply = { ...chatMessage, id: 'm2', parentMessage: 'm1', body: { text: 'A reply' } } as any;
+    const moderation = {
+      onToggleHidden: jest.fn(),
+      onToggleHideAuthor: jest.fn(),
+      isAuthorHidden: jest.fn(() => false),
+    };
+
+    it('draws hide controls for an admin', () => {
+      render(<GroupChatPanel {...baseProps} messages={[chatMessage]} isAdmin moderation={moderation} />);
+      expect(screen.getByRole('button', { name: 'Hide' })).toBeInTheDocument();
+    });
+
+    it('draws no controls when the reader is not an admin, even if given moderation', () => {
+      render(<GroupChatPanel {...baseProps} messages={[chatMessage]} moderation={moderation} />);
+      expect(screen.queryByRole('button', { name: 'Hide' })).not.toBeInTheDocument();
+    });
+
+    it('draws no hide controls in the presentation view, even for an admin', () => {
+      render(<GroupChatPanel {...baseProps} messages={[chatMessage]} isAdmin moderation={moderation} presentation />);
+      expect(screen.getByText('Hello everyone')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Hide' })).not.toBeInTheDocument();
+    });
+
+    it('omits hidden messages and hidden replies from the presentation view, even for an admin', () => {
+      const hiddenMsg = { ...chatMessage, id: 'h1', hidden: true, body: { text: 'Secret words' } };
+      const hiddenReply = { ...reply, id: 'h2', parentMessage: 'm1', hidden: true, body: { text: 'Secret reply' } };
+      const { rerender } = render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[chatMessage, hiddenMsg, hiddenReply]}
+          isAdmin
+          moderation={moderation}
+          presentation
+        />,
+      );
+      expect(screen.getByText('Hello everyone')).toBeInTheDocument();
+      expect(screen.queryByText('Secret words')).not.toBeInTheDocument();
+      expect(screen.queryByText('Secret reply')).not.toBeInTheDocument();
+      // The admin's own (non-presentation) view still shows them.
+      rerender(<GroupChatPanel {...baseProps} messages={[chatMessage, hiddenMsg]} isAdmin moderation={moderation} />);
+      expect(screen.getByText('Secret words')).toBeInTheDocument();
+    });
+
+    it('draws no controls without moderation', () => {
+      render(<GroupChatPanel {...baseProps} messages={[chatMessage]} isAdmin />);
+      expect(screen.queryByRole('button', { name: 'Hide' })).not.toBeInTheDocument();
+    });
+
+    it('draws the controls on replies in the open thread panel', async () => {
+      render(<GroupChatPanel {...baseProps} messages={[chatMessage, reply]} isAdmin moderation={moderation} />);
+      // The reply button appears on hover; enter every ancestor since mouseenter does not bubble.
+      for (let el = screen.getByText('Hello everyone').parentElement; el; el = el.parentElement) fireEvent.mouseEnter(el);
+      fireEvent.click(await screen.findByRole('button', { name: 'Reply to Alice' }));
+      const panel = within(screen.getByTestId('thread-message-list'));
+      expect(panel.getAllByRole('button', { name: 'Hide' }).length).toBeGreaterThan(0);
+    });
+
+    describe('when the parent of the open thread is hidden', () => {
+      const openThread = async () => {
+        for (let el = screen.getByText('Hello everyone').parentElement; el; el = el.parentElement) fireEvent.mouseEnter(el);
+        fireEvent.click(await screen.findByRole('button', { name: 'Reply to Alice' }));
+        expect(screen.getByTestId('thread-message-list')).toBeInTheDocument();
+      };
+      const splitLayout = (container: HTMLElement) => container.querySelector('.md\\:w-1\\/2');
+
+      it('closes the thread when the parent leaves the list', async () => {
+        const { container, rerender } = render(<GroupChatPanel {...baseProps} messages={[chatMessage, reply]} />);
+        await openThread();
+        expect(splitLayout(container)).not.toBeNull();
+
+        rerender(<GroupChatPanel {...baseProps} messages={[]} />);
+        expect(screen.queryByTestId('thread-message-list')).not.toBeInTheDocument();
+        expect(splitLayout(container)).toBeNull();
+
+        // The message coming back (unhidden) does not reopen the thread by itself.
+        rerender(<GroupChatPanel {...baseProps} messages={[chatMessage, reply]} />);
+        expect(screen.queryByTestId('thread-message-list')).not.toBeInTheDocument();
+      });
+
+      it('keeps the thread open for the author, who still has their own hidden parent', async () => {
+        const { rerender } = render(<GroupChatPanel {...baseProps} messages={[chatMessage, reply]} />);
+        await openThread();
+        rerender(<GroupChatPanel {...baseProps} messages={[{ ...chatMessage, hidden: true }, reply]} />);
+        expect(screen.getByTestId('thread-message-list')).toBeInTheDocument();
+      });
+
+      it('keeps the thread open for an admin, who still has the parent', async () => {
+        const { rerender } = render(
+          <GroupChatPanel {...baseProps} messages={[chatMessage, reply]} isAdmin moderation={moderation} />,
+        );
+        await openThread();
+        rerender(
+          <GroupChatPanel
+            {...baseProps}
+            messages={[{ ...chatMessage, hidden: true }, reply]}
+            isAdmin
+            moderation={moderation}
+          />,
+        );
+        expect(screen.getByTestId('thread-message-list')).toBeInTheDocument();
+      });
+    });
   });
 
   describe('Visual message handling (media)', () => {

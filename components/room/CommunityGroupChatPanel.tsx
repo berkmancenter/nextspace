@@ -3,6 +3,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ThreadedMessage, isReadersMessage } from '../ThreadedMessage';
 import { ThreadPanel } from '../ThreadPanel';
+import type { MessageModeration } from '../ModerationControls';
 import { BotIcon } from '../BotIcon';
 import { CommunityMessageInput, RealNameGate } from './CommunityMessageInput';
 import { MemberIntroContent, PendingRoomMessage, PseudonymousMessage } from '../../types.internal';
@@ -11,6 +12,7 @@ import { PendingBubble, PendingMessage } from './PendingMessage';
 import { getTimestampVisibility, parseMessageBody } from '../../utils/Helpers';
 import { getRoomInitials } from '../../utils/roomAvatarUtils';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
+import { useOpenThread } from '../../hooks/useOpenThread';
 import styles from './communityRoom.module.css';
 
 interface CommunityGroupChatPanelProps {
@@ -39,6 +41,8 @@ interface CommunityGroupChatPanelProps {
   messagesWithUnreadReplies?: Set<string>;
   onSendMessage: (message: string, parentMessageId?: string) => Promise<boolean>;
   onMarkAsRead?: (messageId: string) => void;
+  /** Hide controls, drawn only when the reader is an admin. */
+  moderation?: MessageModeration;
 }
 
 const renderMarkdown = (text: string): React.ReactNode => (
@@ -105,8 +109,9 @@ export function CommunityGroupChatPanel({
   messagesWithUnreadReplies = new Set(),
   onSendMessage,
   onMarkAsRead,
+  moderation,
 }: CommunityGroupChatPanelProps) {
-  const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(null);
+  const adminModeration = isAdmin ? moderation : undefined;
 
   const { parentMessages, threadMap } = useMemo(() => {
     const parents = messages.filter((m) => !m.parentMessage);
@@ -122,6 +127,7 @@ export function CommunityGroupChatPanel({
     return { parentMessages: parents, threadMap: map };
   }, [messages]);
   const timestampVisibility = useMemo(() => getTimestampVisibility(parentMessages), [parentMessages]);
+  const { selectedThreadId, selectedThread, setSelectedThreadId } = useOpenThread(parentMessages);
 
   const isEmptyRoom = messages.length === 0 && pendingMessages.length === 0;
 
@@ -257,7 +263,6 @@ export function CommunityGroupChatPanel({
     onMarkAsRead?.(messageId);
   };
 
-  const selectedThread = selectedThreadId ? parentMessages.find((m) => m.id === selectedThreadId) : null;
   const selectedThreadReplies = selectedThreadId
     ? [...(threadMap.get(selectedThreadId) || []), ...pendingRepliesAsMessages(selectedThreadId)]
     : [];
@@ -350,6 +355,7 @@ export function CommunityGroupChatPanel({
                         renderNameBadge={renderNameBadge}
                         showTimestamp={showTimestamp}
                         isThreadOpen={selectedThreadId === message.id}
+                        moderation={adminModeration}
                         hasUnreadReplies={message.id ? messagesWithUnreadReplies.has(message.id) : false}
                       />
                     </React.Fragment>
@@ -420,6 +426,7 @@ export function CommunityGroupChatPanel({
             renderMessageContent={renderMessageContent}
             renderNameBadge={renderNameBadge}
             enhancers={[]}
+            moderation={adminModeration}
             botName={botName}
             waitingForResponse={!!(waitingForThreadedReply && lastMessage?.parentMessage === selectedThreadId)}
             replyLock={

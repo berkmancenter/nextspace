@@ -25,6 +25,11 @@ export interface UseConversationMessagesParams {
   assistantIntroRef: React.MutableRefObject<PseudonymousMessage[]>;
   /** The unique identifier for the current conversation, used to fetch messages. */
   conversationId: string | undefined;
+  /**
+   * Hide/unhide verdicts an admin has applied optimistically and the server has not yet answered,
+   * by message id. A fetch started before the answer would otherwise bring back the old flag.
+   */
+  pendingHiddenRef?: React.MutableRefObject<Map<string, boolean>>;
 }
 
 /**
@@ -100,6 +105,7 @@ export function useConversationMessages({
   chatIntroRef,
   assistantIntroRef,
   conversationId,
+  pendingHiddenRef,
 }: UseConversationMessagesParams): UseConversationMessagesReturn {
   const [assistantMessages, setAssistantMessages] = useState<PseudonymousMessage[]>([]);
   const [chatMessages, setChatMessages] = useState<PseudonymousMessage[]>([]);
@@ -199,12 +205,22 @@ export function useConversationMessages({
         const nonIntros = fetched.filter((m) => parseMessageBody(m.body)?.type !== 'intro');
         const messagesWithReplies = await fetchAndInsertReplies(nonIntros);
         await loadPollData(messagesWithReplies);
-        setChatMessages([...chatIntroRef.current, ...messagesWithReplies]);
+        // The fetch may have been answered before the server saw an admin's hide or unhide still in
+        // flight, so that verdict stays on top of what was read.
+        const pending = pendingHiddenRef?.current;
+        const settled = pending?.size
+          ? messagesWithReplies.map((m) => {
+              if (!m.id || !pending.has(m.id) || Boolean(m.hidden) === pending.get(m.id)) return m;
+              const { hidden: _read, ...rest } = m;
+              return pending.get(m.id) ? { ...rest, hidden: true } : rest;
+            })
+          : messagesWithReplies;
+        setChatMessages([...chatIntroRef.current, ...settled]);
       }
     } catch (error) {
       console.error('Error fetching chat messages:', error);
     }
-  }, [conversationId, chatPasscode, chatIntroRef]);
+  }, [conversationId, chatPasscode, chatIntroRef, pendingHiddenRef]);
 
   useEffect(() => {
     const { newReplyCounts, updatedUnreadSet } = trackReplyCountChanges(

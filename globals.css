@@ -40,6 +40,7 @@
   --nx-bubble-default-bg: #e8f0fe;
   --nx-bubble-hover-bg: white;
   --nx-bubble-border: rgb(0 0 0 / 0.1);
+  --nx-bubble-border-width: 1px;
   --nx-mention: #7c3aed;
   --nx-icon-muted: #4b5563;
   --nx-fab-bg: white;
@@ -147,7 +148,9 @@ html[data-presenter-theme='dark'] {
   --nx-bubble-assistant-bg: var(--nx-surface-raised);
   --nx-bubble-default-bg: var(--nx-surface-raised);
   --nx-bubble-hover-bg: var(--nx-bg-base);
-  --nx-bubble-border: var(--nx-border-strong);
+  --nx-bubble-border: #8155bb; /* 3.3:1 on the page, 3.5:1 on the bubble fill */
+  --nx-bubble-border-width: 1.5px;
+  --nx-message-link: #8fd0ff; /* 11.3:1 on the bubble */
   --nx-mention: var(--nx-text-secondary);
   --nx-icon-muted: var(--nx-text-primary);
   --nx-fab-bg: var(--nx-surface-raised);
@@ -310,6 +313,14 @@ html[data-presenter-theme='dark'] nav[aria-label='Main navigation'] button:focus
 html[data-presenter-theme='dark'] body {
   background-color: var(--nx-bg-base);
   color: var(--nx-text-primary);
+}
+
+/* Links inside message bubbles: light blue, with a heavier underline set further off the text. */
+html[data-presenter-theme='dark'] a.nx-message-link {
+  color: var(--nx-message-link);
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
 }
 
 /* Plain links with no color class of their own: the text/secondary color instead of the browser's. */

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import CloseIcon from '@mui/icons-material/Close';
 
@@ -16,16 +16,18 @@ import { Errors, ParamErrors, Transcript } from '../components/';
 import { NavigationBar } from '../components/NavigationBar';
 import { PreferencesPanel } from '../components/PreferencesPanel';
 import { PresentationHeader } from '../components/PresentationHeader';
+import { insertMessageInOrder } from '../utils/messageModeration';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
 import { CheckAuthHeader } from '../utils/Helpers';
 import { withStoredChannels } from '../utils/presentationChannels';
 import TokenManagerDefault from '../utils/TokenManager';
-import { Button, Dialog } from '@mui/material';
+import { Alert, Button, Dialog, Snackbar } from '@mui/material';
 import { Info } from '@mui/icons-material';
 import {
   useResources,
   useAnalytics,
   useConversationMessages,
+  useMessageModeration,
   useConversationSetup,
   useSessionJoin,
   useTabNavigation,
@@ -150,6 +152,9 @@ export function EventAssistantRoom({
     }
   }, [eventStatusLoaded, eventStatus]);
 
+  // Optimistic admin verdicts still waiting on the server, kept for fetches that land in the meantime.
+  const pendingHiddenRef = useRef(new Map<string, boolean>());
+
   const {
     assistantMessages,
     setAssistantMessages,
@@ -175,6 +180,7 @@ export function EventAssistantRoom({
     chatIntroRef,
     assistantIntroRef,
     conversationId: router.query.conversationId as string | undefined,
+    pendingHiddenRef,
   });
 
   const [waitingForResponse, setWaitingForResponse] = useState(false);
@@ -184,6 +190,7 @@ export function EventAssistantRoom({
   const [assistantInputValue, setAssistantInputValue] = useState<string>('');
   const [chatInputValue, setChatInputValue] = useState<string>('');
   const [pseudonymFunFact, setPseudonymFunFact] = useState<string | undefined>(undefined);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -191,9 +198,21 @@ export function EventAssistantRoom({
       if (user && !('error' in user)) {
         const activePseudonym = user.pseudonyms?.find((p: any) => p.active);
         if (activePseudonym?.funFact) setPseudonymFunFact(activePseudonym.funFact);
+        setIsAdmin(user.role === 'admin');
       }
     });
   }, [userId]);
+
+  const { moderation, toast, clearToast } = useMessageModeration({
+    socket,
+    userId,
+    conversationId: router.query.conversationId as string | undefined,
+    isAdmin,
+    chatMessages,
+    setChatMessages,
+    setAssistantMessages,
+    pendingHiddenRef,
+  });
 
   // Derive slash commands from the loaded conversation type's features.
   const slashCommands: SlashCommand[] = (conversationType?.features ?? [])
@@ -212,6 +231,7 @@ export function EventAssistantRoom({
   useEffect(() => {
     const messageHandler = (data: PseudonymousMessage) => {
       if (process.env.NODE_ENV !== 'production') console.log('New message:', data);
+      if (data.conversation && String(data.conversation) !== (router.query.conversationId as string | undefined)) return;
 
       if (data.fromAgent && data.bodyType === 'json') {
         const body = typeof data.body === 'string' ? JSON.parse(data.body as string) : (data.body as any);
@@ -222,7 +242,8 @@ export function EventAssistantRoom({
       }
 
       if (data.channels && data.channels.includes('chat')) {
-        setChatMessages((prev) => [...prev, data]);
+        // Deduped by id and slotted in by createdAt: an unhidden message can arrive after newer ones.
+        setChatMessages((prev) => insertMessageInOrder(prev, data));
         if (activeTabRef.current !== 'chat') {
           setUnseenChatCount((prev) => prev + 1);
         }
@@ -708,6 +729,8 @@ export function EventAssistantRoom({
                           pollCounts={pollCounts}
                           inactive={eventStatus !== 'active'}
                           presentation={presentation}
+                          isAdmin={isAdmin}
+                          moderation={moderation}
                         />
                       ) : activeTab === 'resources' ? (
                         <ResourcesPanel
@@ -772,6 +795,12 @@ export function EventAssistantRoom({
           </>
         )}
       </div>
+
+      <Snackbar open={Boolean(toast)} autoHideDuration={6000} onClose={clearToast}>
+        <Alert severity={toast?.severity ?? 'info'} onClose={clearToast}>
+          {toast?.text}
+        </Alert>
+      </Snackbar>
     </>
   );
 }

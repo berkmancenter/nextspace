@@ -122,8 +122,22 @@ export function useSessionJoin(
   useEffect(() => {
     if (!socket) return;
 
+    // The server delivers a user's own hidden notices and live messages to a per-user room that
+    // only this event joins. Room membership is dropped on disconnect, so it is sent on every
+    // connect. The server derives the user from the token, so the token is the whole payload.
+    const joinUserRoom = async () => {
+      try {
+        const token = await TokenManagerDefault.getValidToken();
+        if (!token) return;
+        socket.emit('user:join', { token });
+      } catch (err) {
+        console.error('Failed to join user room:', err);
+      }
+    };
+
     const handleConnect = () => {
       setIsConnected(true);
+      joinUserRoom();
 
       // If we have a recorded disconnect timestamp, check how long the gap was.
       // Only flag a "reconnect with gap" if the disconnection was long enough
