@@ -25,7 +25,7 @@ export const MessageContent: FC<MessageContentProps> = ({ text, isFeedback = fal
   const markdownComponents = useMemo(
     () => ({
       a: ({ node, ...props }: any) => (
-        <a {...props} className="text-medium-slate-blue" target="_blank" rel="noopener noreferrer" />
+        <a {...props} className="text-medium-slate-blue nx-message-link" target="_blank" rel="noopener noreferrer" />
       ),
       code: ({ node, className, children, ...props }: any) => {
         const lang = /language-(\w+)/.exec(className || '')?.[1];

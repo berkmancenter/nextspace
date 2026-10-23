@@ -32,7 +32,7 @@ const renderAssistantMessage = (text: string): React.ReactNode => {
         remarkPlugins={[remarkGfm]}
         components={{
           a: ({ node, ...props }) => (
-            <a {...props} className="text-medium-slate-blue" target="_blank" rel="noopener noreferrer" />
+            <a {...props} className="text-medium-slate-blue nx-message-link" target="_blank" rel="noopener noreferrer" />
           ),
         }}
       >
@@ -233,7 +233,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             style={{
               backgroundColor: isHovered ? 'var(--nx-bubble-hover-bg)' : style.bubbleBg,
               width: '100%',
-              border: '1px solid var(--nx-bubble-border)',
+              border: 'var(--nx-bubble-border-width) solid var(--nx-bubble-border)',
             }}
           >
             {parsed.text && renderAssistantMessage(parsed.text)}
@@ -271,7 +271,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
           style={{
             backgroundColor: isHovered ? 'var(--nx-bubble-hover-bg)' : style.bubbleBg,
             width: '100%',
-            border: '1px solid var(--nx-bubble-border)',
+            border: 'var(--nx-bubble-border-width) solid var(--nx-bubble-border)',
           }}
         >
           {renderAssistantMessage(parsed.text)}
@@ -297,7 +297,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
                         maxWidth: '100%',
                         height: 'auto',
                         borderRadius: '8px',
-                        border: '1px solid var(--nx-bubble-border)',
+                        border: 'var(--nx-bubble-border-width) solid var(--nx-bubble-border)',
                       }}
                     />
                   );
