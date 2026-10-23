@@ -500,9 +500,7 @@ describe('GroupChatPanel', () => {
       expect(screen.queryByText('Secret words')).not.toBeInTheDocument();
       expect(screen.queryByText('Secret reply')).not.toBeInTheDocument();
       // The admin's own (non-presentation) view still shows them.
-      rerender(
-        <GroupChatPanel {...baseProps} messages={[chatMessage, hiddenMsg]} isAdmin moderation={moderation} />,
-      );
+      rerender(<GroupChatPanel {...baseProps} messages={[chatMessage, hiddenMsg]} isAdmin moderation={moderation} />);
       expect(screen.getByText('Secret words')).toBeInTheDocument();
     });
 
