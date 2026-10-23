@@ -3,9 +3,14 @@
  * Refreshes the committed `openapi.json` snapshot from a URL or local file, then regenerates
  * `types.ts` from it.
  *
- *   npm run types:sync -- <url-or-path>
+ *   npm run types:sync -- <url-or-path> [--no-types]
  *
- * The spec is re-serialised with stable 2-space JSON so diffs stay reviewable.
+ * `--no-types` writes `openapi.json` only and skips regenerating `types.ts` (used by the
+ * types-drift workflow, where CI regenerates types itself). The flag may appear before or after
+ * the source; the source is the first non-flag argument.
+ *
+ * The spec is re-serialised as deterministic 2-space JSON (see spec-format.mjs) so diffs stay
+ * reviewable.
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -14,11 +19,13 @@ import { fileURLToPath } from 'node:url';
 import { canonicalizeSpec } from './spec-format.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const source = process.argv[2];
+const args = process.argv.slice(2);
+const skipTypes = args.includes('--no-types');
+const source = args.find((a) => !a.startsWith('--'));
 
 if (!source) {
   console.error(
-    'Usage: npm run types:sync -- <url-or-path-to-openapi.json>\n' +
+    'Usage: npm run types:sync -- <url-or-path-to-openapi.json> [--no-types]\n' +
       '  deployed API:  npm run types:sync -- $API_URL/openapi.json\n' +
       '  local backend: npm run types:sync -- http://localhost:3000/v1/openapi.json\n' +
       '  backend branch/PR checkout: run `yarn openapi:spec:generate` in llm_engine, then\n' +
@@ -49,6 +56,7 @@ try {
 }
 
 console.log('types:sync: wrote openapi.json');
+if (skipTypes) process.exit(0);
 const result = spawnSync(process.execPath, [join(root, 'scripts/ensure-types.mjs'), '--force'], {
   stdio: 'inherit',
 });

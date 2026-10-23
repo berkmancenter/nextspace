@@ -42,16 +42,9 @@ jobs:
             echo "Error: API_URL secret is not set" >&2
             exit 1
           fi
-          # Writes openapi.json only; types.ts is not needed here (CI regenerates it).
-          node -e '
-            const fs = require("fs");
-            (async () => {
-              const { canonicalizeSpec } = await import("./scripts/spec-format.mjs");
-              const res = await fetch(process.env.API_URL + "/openapi.json");
-              if (!res.ok) throw new Error("HTTP " + res.status);
-              fs.writeFileSync("openapi.json", canonicalizeSpec(await res.text()));
-            })().catch((e) => { console.error(e); process.exit(1); });
-          '
+          # Writes openapi.json only (--no-types); types.ts is not needed here (CI regenerates it).
+          # Reuses sync-types.mjs for the fetch timeout and the empty-spec guard.
+          node scripts/sync-types.mjs "$API_URL/openapi.json" --no-types
       - name: Open or update sync PR
         env:
           GH_TOKEN: ${{ github.token }}

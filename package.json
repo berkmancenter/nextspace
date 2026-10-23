@@ -25,6 +25,7 @@
     "start": "next start",
     "pretest": "npm run types:ensure",
     "test": "jest",
+    "pretest:watch": "npm run types:ensure",
     "test:watch": "jest --watch"
   },
   "dependencies": {
