@@ -104,6 +104,20 @@ describe('ThreadedMessage Component', () => {
       expect(screen.getByText('(You)').parentElement).not.toHaveStyle({ fontSize: '1.5rem' });
       expect(screen.getByText('12:00 PM')).not.toHaveStyle({ fontSize: '1.125rem' });
     });
+
+    it('does not render feedback under the collapsed reply preview, even for an eligible assistant reply', () => {
+      const assistantReplies = [{ ...mockReplies[0], fromAgent: true }, mockReplies[1]];
+      const feedbackConfig: FeedbackConfig = {
+        eligibleMessageIds: new Set([assistantReplies[0].id!]),
+        messageRatings: new Map(),
+        onPopulateFeedbackText: jest.fn(),
+        onSendRating: jest.fn(),
+      };
+
+      render(<ThreadedMessage {...defaultProps} replies={assistantReplies} feedbackConfig={feedbackConfig} presentation />);
+
+      expect(screen.queryByText('How did the bot do?')).not.toBeInTheDocument();
+    });
   });
 
   it('renders the message content', () => {
@@ -351,6 +365,36 @@ describe('ThreadedMessage Component', () => {
     render(<ThreadedMessage {...defaultProps} message={assistantMessage} feedbackConfig={feedbackConfig} />);
 
     expect(screen.getByText('How did the bot do?')).toBeInTheDocument();
+  });
+
+  it('renders feedback under the collapsed reply preview for an eligible assistant reply', () => {
+    const assistantReplies = [{ ...mockReplies[0], fromAgent: true }, mockReplies[1]];
+    const feedbackConfig: FeedbackConfig = {
+      eligibleMessageIds: new Set([assistantReplies[0].id!]),
+      messageRatings: new Map(),
+      onPopulateFeedbackText: jest.fn(),
+      onSendRating: jest.fn(),
+    };
+
+    render(<ThreadedMessage {...defaultProps} replies={assistantReplies} feedbackConfig={feedbackConfig} />);
+
+    expect(screen.getByText('How did the bot do?')).toBeInTheDocument();
+  });
+
+  it('does not render feedback in the presentation view, even for an eligible assistant message', () => {
+    const assistantMessage = { ...mockMessage, fromAgent: true };
+    const eligibleIds = new Set([assistantMessage.id!]);
+    const messageRatings = new Map();
+    const feedbackConfig: FeedbackConfig = {
+      eligibleMessageIds: eligibleIds,
+      messageRatings,
+      onPopulateFeedbackText: jest.fn(),
+      onSendRating: jest.fn(),
+    };
+
+    render(<ThreadedMessage {...defaultProps} message={assistantMessage} feedbackConfig={feedbackConfig} presentation />);
+
+    expect(screen.queryByText('How did the bot do?')).not.toBeInTheDocument();
   });
 
   it('does not render feedback for non-assistant messages', () => {

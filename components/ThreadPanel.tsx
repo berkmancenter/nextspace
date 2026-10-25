@@ -292,8 +292,10 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
               </div>
               {moderation && <ModerationControls message={parentMessage} moderation={moderation} />}
 
-              {/* Feedback - rendered below the bubble for Event Assistant messages */}
-              {parentMessage.fromAgent &&
+              {/* Feedback - rendered below the bubble for Event Assistant messages, except in the
+                  presentation view, where it's not the shared screen's business to collect. */}
+              {!presentation &&
+                parentMessage.fromAgent &&
                 parentMessage.id &&
                 feedbackConfig &&
                 feedbackConfig.eligibleMessageIds.has(parentMessage.id) && (
@@ -352,17 +354,22 @@ export const ThreadPanel: FC<ThreadPanelProps> = ({
                 </div>
                 {moderation && <ModerationControls message={reply} moderation={moderation} />}
 
-                {/* Feedback - rendered below the bubble for Event Assistant messages */}
-                {reply.fromAgent && reply.id && feedbackConfig && feedbackConfig.eligibleMessageIds.has(reply.id) && (
-                  <div className="mt-0" style={{ width: '85%' }}>
-                    <MessageFeedback
-                      messageId={reply.id}
-                      initialRating={feedbackConfig.messageRatings.get(reply.id)}
-                      onPopulateFeedbackText={feedbackConfig.onPopulateFeedbackText}
-                      onSendFeedbackRating={feedbackConfig.onSendRating}
-                    />
-                  </div>
-                )}
+                {/* Feedback - rendered below the bubble for Event Assistant messages, except in the
+                    presentation view, where it's not the shared screen's business to collect. */}
+                {!presentation &&
+                  reply.fromAgent &&
+                  reply.id &&
+                  feedbackConfig &&
+                  feedbackConfig.eligibleMessageIds.has(reply.id) && (
+                    <div className="mt-0" style={{ width: '85%' }}>
+                      <MessageFeedback
+                        messageId={reply.id}
+                        initialRating={feedbackConfig.messageRatings.get(reply.id)}
+                        onPopulateFeedbackText={feedbackConfig.onPopulateFeedbackText}
+                        onSendFeedbackRating={feedbackConfig.onSendRating}
+                      />
+                    </div>
+                  )}
               </div>
             </div>
           ))}
