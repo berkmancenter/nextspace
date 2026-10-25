@@ -388,6 +388,20 @@ describe('ThreadPanel Component', () => {
       expect(screen.getByText('How did the bot do?')).toBeInTheDocument();
     });
 
+    it('does not render feedback for parent message in the presentation view, even when eligible', () => {
+      const assistantParent = { ...mockParentMessage, fromAgent: true };
+      const feedbackConfig = {
+        eligibleMessageIds: new Set([assistantParent.id!]),
+        messageRatings: new Map(),
+        onPopulateFeedbackText: jest.fn(),
+        onSendRating: jest.fn(),
+      };
+
+      render(<ThreadPanel {...defaultProps} parentMessage={assistantParent} feedbackConfig={feedbackConfig} presentation />);
+
+      expect(screen.queryByText('How did the bot do?')).not.toBeInTheDocument();
+    });
+
     it('does not render feedback for parent message when not from agent', () => {
       const eligibleIds = new Set([mockParentMessage.id!]);
       const messageRatings = new Map();
@@ -434,6 +448,21 @@ describe('ThreadPanel Component', () => {
       render(<ThreadPanel {...defaultProps} replies={repliesWithAssistant} feedbackConfig={feedbackConfig} />);
 
       expect(screen.getByText('How did the bot do?')).toBeInTheDocument();
+    });
+
+    it('does not render feedback for reply messages in the presentation view, even when eligible', () => {
+      const assistantReply = { ...mockReplies[0], fromAgent: true };
+      const repliesWithAssistant = [assistantReply, mockReplies[1]];
+      const feedbackConfig = {
+        eligibleMessageIds: new Set([assistantReply.id!]),
+        messageRatings: new Map(),
+        onPopulateFeedbackText: jest.fn(),
+        onSendRating: jest.fn(),
+      };
+
+      render(<ThreadPanel {...defaultProps} replies={repliesWithAssistant} feedbackConfig={feedbackConfig} presentation />);
+
+      expect(screen.queryByText('How did the bot do?')).not.toBeInTheDocument();
     });
 
     it('passes initialRating from messageRatings map to parent message feedback', () => {

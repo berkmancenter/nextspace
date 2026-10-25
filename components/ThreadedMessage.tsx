@@ -315,8 +315,10 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
                   </div>
                   {moderation && <ModerationControls message={replies[0]} moderation={moderation} />}
 
-                  {/* Feedback - rendered below the bubble for Event Assistant messages */}
-                  {replies[0].fromAgent &&
+                  {/* Feedback - rendered below the bubble for Event Assistant messages, except in
+                      the presentation view, where it's not the shared screen's business to collect. */}
+                  {!presentation &&
+                    replies[0].fromAgent &&
                     replies[0].id &&
                     feedbackConfig &&
                     feedbackConfig.eligibleMessageIds.has(replies[0].id) && (
@@ -378,17 +380,22 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
             </div>
           )}
 
-          {/* Feedback - rendered below the bubble for Event Assistant messages */}
-          {isAssistant && message.id && feedbackConfig && feedbackConfig.eligibleMessageIds.has(message.id) && (
-            <div className="mt-0" style={{ width: '85%' }}>
-              <MessageFeedback
-                messageId={message.id}
-                initialRating={feedbackConfig.messageRatings.get(message.id)}
-                onPopulateFeedbackText={feedbackConfig.onPopulateFeedbackText}
-                onSendFeedbackRating={feedbackConfig.onSendRating}
-              />
-            </div>
-          )}
+          {/* Feedback - rendered below the bubble for Event Assistant messages, except in the
+              presentation view, where it's not the shared screen's business to collect. */}
+          {!presentation &&
+            isAssistant &&
+            message.id &&
+            feedbackConfig &&
+            feedbackConfig.eligibleMessageIds.has(message.id) && (
+              <div className="mt-0" style={{ width: '85%' }}>
+                <MessageFeedback
+                  messageId={message.id}
+                  initialRating={feedbackConfig.messageRatings.get(message.id)}
+                  onPopulateFeedbackText={feedbackConfig.onPopulateFeedbackText}
+                  onSendFeedbackRating={feedbackConfig.onSendRating}
+                />
+              </div>
+            )}
         </div>
       </div>
     </div>
