@@ -6,8 +6,10 @@
 import { Api } from './Helpers';
 import TokenManagerDefault from './TokenManager';
 import {
+  ConfirmOrganizerResult,
   ConsumeInviteResult,
   GetInviteResult,
+  GetOrganizerConfirmationResult,
   RequestPasswordResetResult,
   ResendInviteResult,
   ResetPasswordResult,
@@ -235,6 +237,59 @@ export const ResendInvite = async (token: string): Promise<ResendInviteResult> =
     return { status: 'error' };
   } catch (error) {
     console.error('Invite resend request failed:', error instanceof Error ? error.message : error);
+    return { status: 'error' };
+  }
+};
+
+/**
+ * Check an organizer-confirmation link and get the one-time nonce its submit must send back. Safe to call on page
+ * load: it never uses up the link, but each call replaces the previous nonce.
+ * @param token - The token from the confirmation link's query string.
+ * @returns The outcome; never throws.
+ */
+export const GetOrganizerConfirmation = async (token: string): Promise<GetOrganizerConfirmationResult> => {
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/organizer-confirmation?token=${encodeURIComponent(token)}`,
+    );
+
+    if (response.status === 410) return { status: 'dead' };
+    if (response.status === 400) return { status: 'incomplete' };
+    if (!response.ok) {
+      console.error(`Organizer confirmation check failed with status ${response.status}`);
+      return { status: 'error' };
+    }
+
+    return { status: 'valid', confirmation: await response.json() };
+  } catch (error) {
+    console.error('Organizer confirmation check request failed:', error instanceof Error ? error.message : error);
+    return { status: 'error' };
+  }
+};
+
+/**
+ * Confirm the organizer and activate the event: burns the single-use confirmation token. The nonce from the latest
+ * `GetOrganizerConfirmation` call must be sent, or the backend rejects with a stale nonce.
+ * @param token - The token from the confirmation link's query string.
+ * @param nonce - The nonce from the latest `GetOrganizerConfirmation` call for this token.
+ * @returns The outcome; never throws.
+ */
+export const ConfirmOrganizer = async (token: string, nonce: string): Promise<ConfirmOrganizerResult> => {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organizer-confirmation/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, nonce }),
+    });
+
+    if (response.ok) return { status: 'success', result: await response.json() };
+    if (response.status === 403) return { status: 'stale-nonce' };
+    if (response.status === 410) return { status: 'dead' };
+
+    console.error(`Organizer confirmation submit failed with status ${response.status}`);
+    return { status: 'error' };
+  } catch (error) {
+    console.error('Organizer confirmation submit request failed:', error instanceof Error ? error.message : error);
     return { status: 'error' };
   }
 };

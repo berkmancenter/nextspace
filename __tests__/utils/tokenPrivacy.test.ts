@@ -79,6 +79,10 @@ describe('isTokenPage', () => {
     expect(isTokenPage('/invite')).toBe(true);
   });
 
+  it('matches the organizer confirmation page', () => {
+    expect(isTokenPage('/confirm-organizer')).toBe(true);
+  });
+
   it('does not match other pages', () => {
     expect(isTokenPage('/login')).toBe(false);
   });

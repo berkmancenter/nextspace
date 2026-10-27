@@ -536,6 +536,39 @@ export type ConsumeInviteResult =
 /** The resend endpoint answers the same way whether or not it sent anything, so success only means it was received. */
 export type ResendInviteResult = { status: 'accepted' } | { status: 'error' };
 
+/** What `GET /organizer-confirmation` returns: the event being confirmed and a one-time nonce. */
+export interface OrganizerConfirmationDetails {
+  nonce: string;
+  conversation: { id: string; name: string; scheduledTime?: string };
+}
+
+/**
+ * Outcome of checking an organizer-confirmation link on page load.
+ * `dead` covers an expired, already-confirmed, or unknown link. `incomplete` means the backend could not read a token.
+ */
+export type GetOrganizerConfirmationResult =
+  | { status: 'valid'; confirmation: OrganizerConfirmationDetails }
+  | { status: 'dead' }
+  | { status: 'incomplete' }
+  | { status: 'error' };
+
+/** What `POST /organizer-confirmation/confirm` returns. `draft` true means some other required field is still missing. */
+export interface OrganizerConfirmed {
+  conversationId: string;
+  draft: boolean;
+}
+
+/**
+ * Outcome of confirming the organizer.
+ * `stale-nonce` means the one-time value from the page load expired or was replaced; fetching a new one and
+ * resubmitting is safe. `dead` means the link was already confirmed or expired in the meantime.
+ */
+export type ConfirmOrganizerResult =
+  | { status: 'success'; result: OrganizerConfirmed }
+  | { status: 'stale-nonce' }
+  | { status: 'dead' }
+  | { status: 'error' };
+
 /** Outcome of asking for a password reset email. `sent` does not mean an account uses the address. */
 export type RequestPasswordResetResult = { status: 'sent' } | { status: 'invalid-email' } | { status: 'error' };
 
