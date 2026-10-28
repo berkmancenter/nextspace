@@ -1,4 +1,4 @@
-import { deriveEventState, EDIT_LOCKOUT_MS, isValidZoomUrl } from '../../utils/eventState';
+import { deriveEventState, EDIT_LOCKOUT_MS, isInPreEventWindow, isValidZoomUrl } from '../../utils/eventState';
 
 describe('deriveEventState', () => {
   const scheduledTime = new Date('2026-08-01T16:00:00Z');
@@ -57,6 +57,55 @@ describe('deriveEventState', () => {
     expect(deriveEventState({ active: true, draft: false, scheduledTime: scheduledTime.toISOString(), endTime }, now)).toBe(
       'live',
     );
+  });
+});
+
+describe('isInPreEventWindow', () => {
+  const scheduledTime = new Date('2026-08-01T16:00:00Z');
+
+  it('returns true inside the window opened by preEventMinutes', () => {
+    const now = new Date('2026-08-01T15:50:00Z'); // 10 minutes before
+    expect(isInPreEventWindow({ active: false, scheduledTime: scheduledTime.toISOString(), preEventMinutes: 15 }, now)).toBe(
+      true,
+    );
+  });
+
+  it('returns false before the window opens', () => {
+    const now = new Date('2026-08-01T15:44:59Z'); // just over 15 minutes before
+    expect(isInPreEventWindow({ active: false, scheduledTime: scheduledTime.toISOString(), preEventMinutes: 15 }, now)).toBe(
+      false,
+    );
+  });
+
+  it('returns true at the exact instant the window opens', () => {
+    const now = new Date('2026-08-01T15:45:00Z'); // exactly 15 minutes before
+    expect(isInPreEventWindow({ active: false, scheduledTime: scheduledTime.toISOString(), preEventMinutes: 15 }, now)).toBe(
+      true,
+    );
+  });
+
+  it('returns false once scheduledTime has arrived, even if still inactive', () => {
+    const now = scheduledTime;
+    expect(isInPreEventWindow({ active: false, scheduledTime: scheduledTime.toISOString(), preEventMinutes: 15 }, now)).toBe(
+      false,
+    );
+  });
+
+  it('returns false once the conversation is active, even inside the window', () => {
+    const now = new Date('2026-08-01T15:50:00Z');
+    expect(isInPreEventWindow({ active: true, scheduledTime: scheduledTime.toISOString(), preEventMinutes: 15 }, now)).toBe(
+      false,
+    );
+  });
+
+  it('returns false with no scheduledTime', () => {
+    const now = new Date('2026-08-01T15:50:00Z');
+    expect(isInPreEventWindow({ active: false, scheduledTime: undefined, preEventMinutes: 15 }, now)).toBe(false);
+  });
+
+  it('returns false with no preEventMinutes configured', () => {
+    const now = new Date('2026-08-01T15:50:00Z');
+    expect(isInPreEventWindow({ active: false, scheduledTime: scheduledTime.toISOString() }, now)).toBe(false);
   });
 });
 

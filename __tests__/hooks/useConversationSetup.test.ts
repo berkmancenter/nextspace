@@ -396,6 +396,50 @@ describe('useConversationSetup', () => {
       expect(result.current.eventStatus).toBe('active');
       expect(result.current.showEventStatusDialog).toBe(false);
     });
+
+    describe('pre-event window', () => {
+      it('leaves eventStatus as active and skips the dialog inside the window', async () => {
+        const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes from now
+        mockCreateConversationFromData.mockResolvedValue(
+          makeConversation({ active: false, scheduledTime, preEventMinutes: 10 }), // window opens 10 min before
+        );
+
+        const { result } = renderSetup();
+
+        await waitFor(() => {
+          expect(result.current.eventStatusLoaded).toBe(true);
+        });
+
+        expect(result.current.eventStatus).toBe('active');
+        expect(result.current.showEventStatusDialog).toBe(false);
+      });
+
+      it('leaves the future dialog showing before the window opens', async () => {
+        const scheduledTime = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 minutes from now
+        mockCreateConversationFromData.mockResolvedValue(
+          makeConversation({ active: false, scheduledTime, preEventMinutes: 10 }), // window only opens 10 min before
+        );
+
+        const { result } = renderSetup();
+
+        await waitFor(() => {
+          expect(result.current.eventStatus).toBe('future');
+        });
+
+        expect(result.current.showEventStatusDialog).toBe(true);
+      });
+
+      it('leaves the future dialog showing when preEventMinutes is not configured', async () => {
+        const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        mockCreateConversationFromData.mockResolvedValue(makeConversation({ active: false, scheduledTime }));
+
+        const { result } = renderSetup();
+
+        await waitFor(() => {
+          expect(result.current.eventStatus).toBe('future');
+        });
+      });
+    });
   });
 
   describe('channel passcodes', () => {

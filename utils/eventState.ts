@@ -45,3 +45,21 @@ export function deriveEventState(
   const lockoutStart = new Date(conversation.scheduledTime).getTime() - EDIT_LOCKOUT_MS;
   return now.getTime() >= lockoutStart ? 'missed' : 'pending';
 }
+
+/**
+ * Whether `now` falls in the pre-event window the backend opens `preEventMinutes` before
+ * `scheduledTime` (conversation.service's scheduleConversationPreEventWindow). The conversation
+ * stays inactive throughout, but per-message-responsive agents are already awake and will answer,
+ * so the assistant page uses this to allow chatting before the event's official active start.
+ */
+export function isInPreEventWindow(
+  conversation: Pick<Conversation, 'active' | 'scheduledTime' | 'preEventMinutes'>,
+  now: Date = new Date(),
+): boolean {
+  if (conversation.active) return false;
+  if (!conversation.scheduledTime || typeof conversation.preEventMinutes !== 'number') return false;
+
+  const scheduledTime = new Date(conversation.scheduledTime).getTime();
+  const windowStart = scheduledTime - conversation.preEventMinutes * 60 * 1000;
+  return now.getTime() >= windowStart && now.getTime() < scheduledTime;
+}
