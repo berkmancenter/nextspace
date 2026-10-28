@@ -148,8 +148,8 @@ export default function ConfirmOrganizerPage() {
               This link isn&apos;t valid
             </Typography>
             <Alert severity="warning">
-              Confirmation links work once and expire after a while. If you still need to confirm this event, reach out to
-              whoever set it up for a new link.
+              If you already confirmed this event, you&apos;re all set. If not, this link has expired. Send the meeting
+              invitation again to set the event up from scratch.
             </Alert>
           </>
         );
