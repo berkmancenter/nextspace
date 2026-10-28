@@ -2558,6 +2558,217 @@
         }
       }
     },
+    "/conversations/{conversationId}/users/{userId}/hide-messages": {
+      "post": {
+        "summary": "Hide all of a user's messages in this conversation",
+        "description": "Admin only. Hides every message by this user in this conversation only (group `chat` channel only; their messages in other channels, such as a private assistant channel, are untouched), past and future, until reversed with DELETE. Admins still see them flagged `hidden: true`; the user keeps seeing their own messages normally and gets a `message:hidden-notice` event. Replies to hidden messages are hidden too. Messages already forwarded to an external adapter (Slack, Zoom, ...) cannot be recalled.",
+        "tags": [
+          "Conversation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "description": "The message `owner` id of the user to hide",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "$ref": "#/components/schemas/HideReason"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Concrete message ids that became hidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HideMessagesResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Unhide all of a user's messages in this conversation",
+        "description": "Admin only. Reverses POST. Messages hidden individually, or as replies to a hidden message, stay hidden.",
+        "tags": [
+          "Conversation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "description": "One of the hide reasons, or a short free-text note."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Concrete message ids that became visible again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HideMessagesResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/conversations/{conversationId}/moderation-events": {
+      "get": {
+        "summary": "List the hide/unhide activity log for a conversation",
+        "description": "Admin only. Append-only record of every hide and unhide that changed state in this conversation, newest first. Holds ids, the action, an optional reason and the acting admin's username; never message bodies. Events cannot be edited or deleted through the API.",
+        "tags": [
+          "Conversation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of events, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModerationEventPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed id, limit or page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/experiments": {
       "post": {
         "summary": "Create a new experiment",
@@ -3383,6 +3594,136 @@
                 }
               }
             }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/messages/{messageId}/hide": {
+      "post": {
+        "summary": "Hide a message from non-admins",
+        "description": "Admin only. Hides one message, and its replies, from everyone except admins (who still see it flagged `hidden: true`) and its author (who keeps seeing it normally). Scoped to the message's conversation and to the group `chat` channel: a message in any other channel is rejected with 400. Reversible with DELETE. A message already forwarded to an external adapter (Slack, Zoom, ...) cannot be recalled and stays visible there. Idempotent.",
+        "tags": [
+          "Message"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "$ref": "#/components/schemas/HideReason"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Concrete ids that became hidden (the message plus any replies that cascaded; ids that were already hidden are not repeated).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HideMessagesResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The message is not in the `chat` channel, or the id is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Unhide a message",
+        "description": "Admin only. Reverses POST. Messages that remain hidden for another reason (their author is hidden, or an ancestor is still hidden) are not unhidden and are not listed in the result.",
+        "tags": [
+          "Message"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "description": "One of the hide reasons, or a short free-text note."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Concrete ids that became visible again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HideMessagesResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -5943,6 +6284,141 @@
           },
           "replyCount": {
             "type": "integer"
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "Present (always true) only when an admin is shown a message that an admin hid, so it can be marked as hidden to everyone else. Never present for non-admins, nor for the message's own author, who keeps seeing it normally. With the `placeholder` hidden-display policy, non-admins instead get a stub of just `id`, `createdAt`, `parentMessage`, `hidden: true` and `body: null`."
+          }
+        }
+      },
+      "HideReason": {
+        "type": "string",
+        "enum": [
+          "pii",
+          "harassment",
+          "off-topic",
+          "other"
+        ],
+        "description": "Why an admin hid something. Optional on hide; unhide also accepts short free text."
+      },
+      "ModerationEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "conversation",
+          "actor",
+          "action",
+          "scope",
+          "messageIds",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "conversation": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string"
+              }
+            }
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "hide",
+              "unhide"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "message",
+              "user"
+            ]
+          },
+          "targetMessage": {
+            "type": "string",
+            "description": "Present when scope is message."
+          },
+          "targetUser": {
+            "type": "string",
+            "description": "The author whose messages were targeted (user id only)."
+          },
+          "messageIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Ids whose hidden state actually changed, as the REST call returned them."
+          },
+          "reason": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ModerationEventPage": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModerationEvent"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          },
+          "totalResults": {
+            "type": "integer"
+          }
+        }
+      },
+      "HideMessagesResult": {
+        "type": "object",
+        "required": [
+          "conversationId",
+          "messageIds",
+          "hidden"
+        ],
+        "properties": {
+          "conversationId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string",
+            "description": "Only for the hide-all-by-user endpoints."
+          },
+          "messageIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Concrete ids whose hidden state changed, with hide-all and reply cascades already resolved. Empty when nothing changed."
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "The state the ids moved to."
           }
         }
       },
@@ -8010,6 +8486,12 @@
             },
             "description": "Every conversation this concept came up in — the de-duplicated, order-preserving union of the conversations behind it, kept through same-label merges and size-cap folds. `provenance.conversationId` stays the first of them (where the concept originated). Ids only; resolve them against the payload's `sessions`."
           },
+          "analyticsId": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Opaque id, safe to send to analytics: the first 16 hex characters of an HMAC-SHA256 of this node's `id`, keyed with a server secret. Unlike `id`, which is derived from discussion text, it reveals nothing about the discussion and cannot be reversed by guessing text. Computed on every read and never stored; absent when the server has no ANALYTICS_ID_SECRET configured. Ignored if sent back on a write. Concepts and origin prompts only, never contributions.",
+            "example": "3f9a1c07b2d84e65"
+          },
           "provenance": {
             "$ref": "#/components/schemas/GraphNodeProvenance"
           }
@@ -8075,6 +8557,12 @@
           "text": {
             "type": "string",
             "example": "What has to be trustworthy for a credential to mean anything?"
+          },
+          "analyticsId": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Opaque id, safe to send to analytics: the first 16 hex characters of an HMAC-SHA256 of this node's `id`, keyed with a server secret. Unlike `id`, which is derived from discussion text, it reveals nothing about the discussion and cannot be reversed by guessing text. Computed on every read and never stored; absent when the server has no ANALYTICS_ID_SECRET configured. Ignored if sent back on a write. Concepts and origin prompts only, never contributions.",
+            "example": "3f9a1c07b2d84e65"
           },
           "provenance": {
             "$ref": "#/components/schemas/GraphNodeProvenance"
