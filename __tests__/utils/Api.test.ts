@@ -1,7 +1,9 @@
 import {
+  ConfirmOrganizer,
   ConsumeInvite,
   fetchWithTokenRefresh,
   GetInvite,
+  GetOrganizerConfirmation,
   RefreshToken,
   RequestPasswordReset,
   ResendInvite,
@@ -679,6 +681,110 @@ describe('invite requests', () => {
 
       expect(await ResendInvite('dead-token')).toEqual({ status: 'error' });
       expect(await ResendInvite('dead-token')).toEqual({ status: 'error' });
+    });
+  });
+});
+
+describe('organizer confirmation requests', () => {
+  const confirmation = {
+    nonce: 'nonce-1',
+    conversation: { id: 'conv-1', name: 'Office Hours', scheduledTime: '2026-11-03T16:00:00.000Z' },
+  };
+  const respond = (status: number, body: unknown = {}) =>
+    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: status < 300, status, json: async () => body });
+
+  beforeEach(() => {
+    (global.fetch as jest.Mock).mockReset();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  describe('GetOrganizerConfirmation', () => {
+    it('sends the token as an encoded query parameter', async () => {
+      respond(200, confirmation);
+
+      await GetOrganizerConfirmation('a+b/c=');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${process.env.NEXT_PUBLIC_API_URL}/organizer-confirmation?token=a%2Bb%2Fc%3D`,
+      );
+    });
+
+    it('returns the confirmation details when the link is live', async () => {
+      respond(200, confirmation);
+
+      expect(await GetOrganizerConfirmation('confirm-token')).toEqual({ status: 'valid', confirmation });
+    });
+
+    it('reports a dead link when the backend answers 410', async () => {
+      respond(410, { code: 410, message: 'Confirmation link is invalid or has expired' });
+
+      expect(await GetOrganizerConfirmation('confirm-token')).toEqual({ status: 'dead' });
+    });
+
+    it('reports an incomplete link when the backend answers 400', async () => {
+      respond(400);
+
+      expect(await GetOrganizerConfirmation('confirm-token')).toEqual({ status: 'incomplete' });
+    });
+
+    it('reports a generic error for any other status or a network failure', async () => {
+      respond(500);
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      expect(await GetOrganizerConfirmation('confirm-token')).toEqual({ status: 'error' });
+      expect(await GetOrganizerConfirmation('confirm-token')).toEqual({ status: 'error' });
+    });
+  });
+
+  describe('ConfirmOrganizer', () => {
+    it('posts the token and nonce, and nothing else', async () => {
+      respond(200, { conversationId: 'conv-1', draft: false });
+
+      await ConfirmOrganizer('confirm-token', 'nonce-1');
+
+      expect(global.fetch).toHaveBeenCalledWith(`${process.env.NEXT_PUBLIC_API_URL}/organizer-confirmation/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'confirm-token', nonce: 'nonce-1' }),
+      });
+    });
+
+    it('returns the result when the backend accepts the confirmation', async () => {
+      const result = { conversationId: 'conv-1', draft: false };
+      respond(200, result);
+
+      expect(await ConfirmOrganizer('confirm-token', 'nonce-1')).toEqual({ status: 'success', result });
+    });
+
+    it.each([
+      [403, 'stale-nonce'],
+      [410, 'dead'],
+      [400, 'error'],
+      [500, 'error'],
+    ])('maps a %i response to %s', async (status, outcome) => {
+      respond(status, { code: status, message: 'anything' });
+
+      expect(await ConfirmOrganizer('confirm-token', 'nonce-1')).toEqual({ status: outcome });
+    });
+
+    it('reports a generic error when the request never reaches the backend', async () => {
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      expect(await ConfirmOrganizer('confirm-token', 'nonce-1')).toEqual({ status: 'error' });
+    });
+
+    it('never logs the token or nonce', async () => {
+      respond(500);
+
+      await ConfirmOrganizer('confirm-token', 'nonce-1');
+
+      const logged = JSON.stringify((console.error as jest.Mock).mock.calls);
+      expect(logged).not.toContain('confirm-token');
+      expect(logged).not.toContain('nonce-1');
     });
   });
 });
