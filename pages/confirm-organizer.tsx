@@ -22,6 +22,28 @@ const formatDateTime = (isoString?: string) =>
     : null;
 
 /**
+ * A heading that takes focus when it appears, so a screen reader hears that the page's content
+ * changed. Needed because clicking Confirm (or Try again) unmounts the button that held focus,
+ * which would otherwise silently drop focus to the document body.
+ */
+function NoticeHeading({ children }: { children: React.ReactNode }) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => headingRef.current?.focus(), []);
+  return (
+    <Typography
+      ref={headingRef}
+      tabIndex={-1}
+      variant="h5"
+      component="h2"
+      gutterBottom
+      sx={{ textAlign: 'center', outline: 'none' }}
+    >
+      {children}
+    </Typography>
+  );
+}
+
+/**
  * Confirm Organizer Page
  *
  * Landing page for the link emailed when a relayed calendar invite can't fully trust who the
@@ -117,9 +139,7 @@ export default function ConfirmOrganizerPage() {
       case 'incomplete':
         return (
           <>
-            <Typography variant="h5" component="h2" gutterBottom sx={{ textAlign: 'center' }}>
-              This link is incomplete
-            </Typography>
+            <NoticeHeading>This link is incomplete</NoticeHeading>
             <Alert severity="warning">
               Open the link from your confirmation email again, or copy the whole address into your browser.
             </Alert>
@@ -128,9 +148,7 @@ export default function ConfirmOrganizerPage() {
       case 'load-error':
         return (
           <>
-            <Typography variant="h5" component="h2" gutterBottom sx={{ textAlign: 'center' }}>
-              We couldn&apos;t open your confirmation link
-            </Typography>
+            <NoticeHeading>We couldn&apos;t open your confirmation link</NoticeHeading>
             <Alert severity="error" sx={{ mb: 3 }}>
               Check your connection, then try again.
             </Alert>
@@ -144,9 +162,7 @@ export default function ConfirmOrganizerPage() {
       case 'dead':
         return (
           <>
-            <Typography variant="h5" component="h2" gutterBottom sx={{ textAlign: 'center' }}>
-              This link isn&apos;t valid
-            </Typography>
+            <NoticeHeading>This link isn&apos;t valid</NoticeHeading>
             <Alert severity="warning">
               If you already confirmed this event, you&apos;re all set. If not, this link has expired. Send the meeting
               invitation again to set the event up from scratch.
@@ -156,9 +172,7 @@ export default function ConfirmOrganizerPage() {
       case 'confirmed':
         return (
           <>
-            <Typography variant="h5" component="h2" gutterBottom sx={{ textAlign: 'center' }}>
-              You&apos;re confirmed as the organizer
-            </Typography>
+            <NoticeHeading>You&apos;re confirmed as the organizer</NoticeHeading>
             {confirmed?.draft ? (
               <Alert severity="info">
                 This event still needs a few more details filled in before it can go live. Check your email for next steps.

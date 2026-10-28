@@ -95,14 +95,14 @@ describe('ConfirmOrganizerPage', () => {
       mockGetConfirmation.mockResolvedValueOnce({ status: 'dead' });
       render(<ConfirmOrganizerPage />);
 
-      expect(await screen.findByRole('heading', { name: "This link isn't valid" })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: "This link isn't valid" })).toHaveFocus();
     });
 
     it('explains a link with no token without calling the backend', () => {
       mockTokenState = { status: 'missing' };
       render(<ConfirmOrganizerPage />);
 
-      expect(screen.getByRole('heading', { name: 'This link is incomplete' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'This link is incomplete' })).toHaveFocus();
       expect(mockGetConfirmation).not.toHaveBeenCalled();
     });
 
@@ -113,14 +113,16 @@ describe('ConfirmOrganizerPage', () => {
       expect(await screen.findByRole('heading', { name: 'This link is incomplete' })).toBeInTheDocument();
     });
 
-    it('offers to try again when the link could not be checked', async () => {
+    it('offers to try again when the link could not be checked, and moves focus to the error heading', async () => {
       mockGetConfirmation
         .mockResolvedValueOnce({ status: 'error' })
         .mockResolvedValueOnce({ status: 'valid', confirmation });
       render(<ConfirmOrganizerPage />);
-      const user = userEvent.setup();
 
-      await user.click(await screen.findByRole('button', { name: 'Try again' }));
+      expect(await screen.findByRole('heading', { name: "We couldn't open your confirmation link" })).toHaveFocus();
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'Try again' }));
 
       expect(await screen.findByRole('button', { name: 'Confirm' })).toBeInTheDocument();
       expect(mockGetConfirmation).toHaveBeenCalledTimes(2);
@@ -137,13 +139,13 @@ describe('ConfirmOrganizerPage', () => {
       expect(mockConfirmOrganizer).toHaveBeenCalledWith('confirm-token', 'nonce-1');
     });
 
-    it('shows success once confirmed', async () => {
+    it('shows success once confirmed, moving focus to the new heading since the Confirm button it replaces is gone', async () => {
       mockConfirmOrganizer.mockResolvedValueOnce({ status: 'success', result: { conversationId: 'conv-1', draft: false } });
       await renderPage();
 
       await confirm();
 
-      expect(await screen.findByRole('heading', { name: "You're confirmed as the organizer" })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: "You're confirmed as the organizer" })).toHaveFocus();
       expect(screen.getByText('This event is ready to go.')).toBeInTheDocument();
     });
 
