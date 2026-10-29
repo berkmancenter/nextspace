@@ -5,13 +5,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import { ArtifactVersionHistory, formatStamp } from './ArtifactVersionHistory';
 import { DocumentArtifactView } from './DocumentArtifactView';
 import { trackArtifactEvent } from '../../utils/artifactAnalytics';
-import {
-  Artifact,
-  ArtifactVersion,
-  AuthType,
-  ConceptGraphPayload,
-  DocumentPayload,
-} from '../../types.internal';
+import { Artifact, ArtifactVersion, AuthType, ConceptGraphPayload, DocumentPayload } from '../../types.internal';
 
 /* The graph renderer pulls in d3's force, zoom and scale modules and measures the DOM to
    lay itself out, so it is loaded on demand and never on the server. A conversation whose

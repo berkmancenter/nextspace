@@ -280,13 +280,35 @@ describe('GenerateGraphButton', () => {
   });
 
   it('tracks the click and the outcome, attributed to the conversation', async () => {
-    mockGenerate.mockResolvedValue({ generated: true, version: { versionNumber: 2 } });
-    render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} hasExistingGraph onGenerated={jest.fn()} />);
+    mockGenerate.mockResolvedValue({
+      generated: true,
+      artifact: { id: 'a1', generationStatus: 'pending', currentVersionNumber: 1 },
+      status: 'pending',
+    });
+    const ready = { id: 'a1', generationStatus: 'ready', currentVersionNumber: 1 } as Artifact;
+    const { rerender } = render(
+      <GenerateGraphButton container={{ conversationId: 'conv-1' }} artifact={ready} onGenerated={jest.fn()} />,
+    );
 
     await userEvent.click(screen.getByRole('button', { name: /regenerate concept graph/i }));
+    expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'artifact', 'generate_graph', 'regenerate', undefined);
+
+    rerender(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ ...ready, generationStatus: 'pending' } as Artifact}
+        onGenerated={jest.fn()}
+      />,
+    );
+    rerender(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ ...ready, currentVersionNumber: 2 } as Artifact}
+        onGenerated={jest.fn()}
+      />,
+    );
 
     await screen.findByText(/Wrote version 2/);
-    expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'artifact', 'generate_graph', 'regenerate', undefined);
     expect(trackConversationEvent).toHaveBeenCalledWith(
       'conv-1',
       'artifact',
@@ -297,11 +319,31 @@ describe('GenerateGraphButton', () => {
   });
 
   it('tracks a run that wrote nothing, and a refusal, as different outcomes', async () => {
-    mockGenerate.mockResolvedValueOnce({ generated: false });
-    render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} onGenerated={jest.fn()} />);
+    mockGenerate.mockResolvedValueOnce({
+      generated: true,
+      artifact: { id: 'a1', generationStatus: 'pending' },
+      status: 'pending',
+    });
+    const onGenerated = jest.fn();
+    const { rerender } = render(<GenerateGraphButton container={{ conversationId: 'conv-1' }} onGenerated={onGenerated} />);
     await userEvent.click(screen.getByRole('button', { name: /generate concept graph/i }));
-    await screen.findByText(/Nothing was written/);
     expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'artifact', 'generate_graph', 'generate', undefined);
+
+    rerender(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ id: 'a1', generationStatus: 'pending' } as Artifact}
+        onGenerated={onGenerated}
+      />,
+    );
+    rerender(
+      <GenerateGraphButton
+        container={{ conversationId: 'conv-1' }}
+        artifact={{ id: 'a1', generationStatus: 'failed', generationError: 'Too little' } as Artifact}
+        onGenerated={onGenerated}
+      />,
+    );
+    await screen.findByText(/Generation didn't produce a new version/);
     expect(trackConversationEvent).toHaveBeenCalledWith(
       'conv-1',
       'artifact',
@@ -311,18 +353,21 @@ describe('GenerateGraphButton', () => {
     );
 
     mockGenerate.mockRejectedValueOnce(new Error('Forbidden'));
-    await userEvent.click(screen.getByRole('button', { name: /generate concept graph/i }));
+    await userEvent.click(screen.getByRole('button', { name: /regenerate concept graph/i }));
     await screen.findByText('Forbidden');
     expect(trackConversationEvent).toHaveBeenCalledWith('conv-1', 'artifact', 'generate_graph_result', 'error', undefined);
   });
 
   it('tracks without attribution for a series, which has no single conversation', async () => {
-    mockGenerate.mockResolvedValue({ generated: false });
+    mockGenerate.mockResolvedValue({
+      generated: true,
+      artifact: { id: 'a1', generationStatus: 'pending' },
+      status: 'pending',
+    });
     render(<GenerateGraphButton container={{ topicId: 'topic-1' }} onGenerated={jest.fn()} />);
 
     await userEvent.click(screen.getByRole('button', { name: /generate series graph/i }));
 
-    await screen.findByText(/Nothing was written/);
     expect(trackEvent).toHaveBeenCalledWith('artifact', 'generate_graph', 'generate', undefined);
     expect(trackConversationEvent).not.toHaveBeenCalled();
   });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, CircularProgress } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { generateConceptGraph } from '../../utils';
@@ -53,7 +53,11 @@ export const GenerateGraphButton = ({ container, artifact, onGenerated }: Genera
   const awaitingResultRef = useRef(false);
   const previousStatusRef = useRef<GraphStatus>(status);
 
-  const track = (action: string, name: string) => trackArtifactEvent(container.conversationId, 'artifact', action, name);
+  const conversationId = container.conversationId;
+  const track = useCallback(
+    (action: string, name: string) => trackArtifactEvent(conversationId, 'artifact', action, name),
+    [conversationId],
+  );
 
   useEffect(() => {
     const previous = previousStatusRef.current;
@@ -72,7 +76,7 @@ export const GenerateGraphButton = ({ container, artifact, onGenerated }: Genera
         message: `Generation didn't produce a new version. ${artifact?.generationError ?? 'There was too little of the event record to map.'}`,
       });
     }
-  }, [status, artifact]);
+  }, [status, artifact, track]);
 
   const run = async () => {
     setSubmitting(true);
