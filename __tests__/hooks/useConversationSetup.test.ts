@@ -439,6 +439,21 @@ describe('useConversationSetup', () => {
           expect(result.current.eventStatus).toBe('future');
         });
       });
+
+      it('leaves the future dialog showing for a draft conversation, even inside the window', async () => {
+        const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes from now
+        mockCreateConversationFromData.mockResolvedValue(
+          makeConversation({ active: false, draft: true, scheduledTime, preEventMinutes: 10 }),
+        );
+
+        const { result } = renderSetup();
+
+        await waitFor(() => {
+          expect(result.current.eventStatus).toBe('future');
+        });
+
+        expect(result.current.showEventStatusDialog).toBe(true);
+      });
     });
   });
 

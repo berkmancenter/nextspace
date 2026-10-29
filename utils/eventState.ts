@@ -51,12 +51,14 @@ export function deriveEventState(
  * `scheduledTime` (conversation.service's scheduleConversationPreEventWindow). The conversation
  * stays inactive throughout, but per-message-responsive agents are already awake and will answer,
  * so the assistant page uses this to allow chatting before the event's official active start.
+ * A draft conversation never gets its agents woken (the backend's openConversationWindow job
+ * skips drafts), so this returns false for one even if the time window would otherwise be open.
  */
 export function isInPreEventWindow(
-  conversation: Pick<Conversation, 'active' | 'scheduledTime' | 'preEventMinutes'>,
+  conversation: Pick<Conversation, 'active' | 'draft' | 'scheduledTime' | 'preEventMinutes'>,
   now: Date = new Date(),
 ): boolean {
-  if (conversation.active) return false;
+  if (conversation.active || conversation.draft) return false;
   if (!conversation.scheduledTime || typeof conversation.preEventMinutes !== 'number') return false;
 
   const scheduledTime = new Date(conversation.scheduledTime).getTime();

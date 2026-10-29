@@ -98,6 +98,16 @@ describe('isInPreEventWindow', () => {
     );
   });
 
+  it('returns false for a draft conversation, even inside the window, since the backend never wakes its agents', () => {
+    const now = new Date('2026-08-01T15:50:00Z');
+    expect(
+      isInPreEventWindow(
+        { active: false, draft: true, scheduledTime: scheduledTime.toISOString(), preEventMinutes: 15 },
+        now,
+      ),
+    ).toBe(false);
+  });
+
   it('returns false with no scheduledTime', () => {
     const now = new Date('2026-08-01T15:50:00Z');
     expect(isInPreEventWindow({ active: false, scheduledTime: undefined, preEventMinutes: 15 }, now)).toBe(false);
