@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Transcript } from '../../components/Transcript';
 import { RetrieveData, SendData } from '../../utils';
@@ -540,6 +540,40 @@ describe('Transcript', () => {
 
     // Transcript should still be closed
     expect(screen.getByRole('button', { name: /Open transcript/i })).toBeInTheDocument();
+  });
+
+  it('keeps highlighted text selected when a new chunk arrives', async () => {
+    render(<Transcript {...baseProps} />);
+    const highlightedTextNode = (await screen.findByText('Hello world')).firstChild as Text;
+    const range = document.createRange();
+    range.selectNodeContents(highlightedTextNode);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
+    act(() => {
+      messageHandler({
+        id: 'm3',
+        channels: ['transcript'],
+        createdAt: '2025-10-17T12:03:00Z',
+        body: { text: 'New socket message' },
+      });
+    });
+    await screen.findByText('New socket message');
+
+    expect(selection.toString()).toBe('Hello world');
+    expect(document.getElementById('transcript-message-m1')?.contains(selection.anchorNode)).toBe(true);
+  });
+
+  it('marks each chunk with its message id', async () => {
+    render(<Transcript {...baseProps} />);
+
+    const firstChunk = (await screen.findByText('Hello world')).closest('[data-message-id]');
+    const secondChunk = screen.getByText('Second message').closest('[data-message-id]');
+
+    expect(firstChunk).toHaveAttribute('data-message-id', 'm1');
+    expect(secondChunk).toHaveAttribute('data-message-id', 'm2');
   });
 
   // Tests for transcript controls (pause, resume, delete, download)
