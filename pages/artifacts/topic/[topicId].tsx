@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { Box, CircularProgress } from '@mui/material';
 import { ArtifactsBrowser } from '../../../components';
 import { useAnalytics } from '../../../hooks/useAnalytics';
+import { useSessionJoin } from '../../../hooks';
 import { CheckAuthHeader } from '../../../utils';
 import { ArtifactContainer, AuthType } from '../../../types.internal';
 
@@ -21,9 +22,8 @@ export const getServerSideProps = async (context: { req: any }) => {
  * knows), so its version history is a record of how the group's understanding developed, and
  * a concept returned to across sessions is one node with a high degree rather than several.
  *
- * There is no socket here, deliberately: topic-scoped artifacts are broadcast nowhere,
- * because there is no topic-wide room to broadcast into. The browser offers a refresh instead
- * of pretending something will arrive on its own.
+ * The series' own room gets `artifact:version` and `artifact:generationFailed` notices the
+ * same way a conversation's room does, so a series graph regenerating updates live here too.
  */
 export default function TopicArtifactsPage({ authType }: { authType: AuthType }) {
   const router = useRouter();
@@ -35,6 +35,8 @@ export default function TopicArtifactsPage({ authType }: { authType: AuthType })
 
   const [submittedPasscode, setSubmittedPasscode] = useState<string | undefined>();
   const artifactPasscode = passcodeFromUrl ?? submittedPasscode;
+
+  const { socket } = useSessionJoin(true);
 
   const container = useMemo<ArtifactContainer | null>(() => (topicId ? { topicId } : null), [topicId]);
 
@@ -58,6 +60,7 @@ export default function TopicArtifactsPage({ authType }: { authType: AuthType })
         container={container}
         artifactPasscode={artifactPasscode}
         authType={authType}
+        socket={socket}
         selectedArtifactId={selectedFromUrl}
         onSelectArtifact={(artifactId) => setQuery({ artifact: artifactId })}
         onPasscodeSubmit={(passcode) => {

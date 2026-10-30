@@ -5,7 +5,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import { ArtifactVersionHistory, formatStamp } from './ArtifactVersionHistory';
 import { DocumentArtifactView } from './DocumentArtifactView';
 import { trackArtifactEvent } from '../../utils/artifactAnalytics';
-import { Artifact, ArtifactVersion, ConceptGraphPayload, DocumentPayload } from '../../types.internal';
+import { Artifact, ArtifactVersion, AuthType, ConceptGraphPayload, DocumentPayload } from '../../types.internal';
 
 /* The graph renderer pulls in d3's force, zoom and scale modules and measures the DOM to
    lay itself out, so it is loaded on demand and never on the server. A conversation whose
@@ -24,12 +24,14 @@ const ConceptGraphView = dynamic(() => import('./ConceptGraphView').then((m) => 
  * @property artifact - The artifact to show, at its latest version.
  * @property artifactPasscode - The container's read passcode, threaded through to the history calls.
  * @property conversationId - The conversation the artifact belongs to, for analytics attribution. Absent on a series.
+ * @property authType - The reader's auth type. The raw generation error is server text, so only an admin sees it.
  * @property isLive - True when a new version of this artifact arrived over the socket during this visit.
  */
 interface ArtifactViewProps {
   artifact: Artifact;
   artifactPasscode?: string;
   conversationId?: string;
+  authType?: AuthType;
   isLive?: boolean;
 }
 
@@ -46,7 +48,7 @@ const TYPE_LABEL: Record<string, string> = {
  * latest version they simply see the new one; when they have stepped back into the history
  * the view stays where they put it and the arrival is offered as a link rather than taken.
  */
-export const ArtifactView = ({ artifact, artifactPasscode, conversationId, isLive }: ArtifactViewProps) => {
+export const ArtifactView = ({ artifact, artifactPasscode, conversationId, authType, isLive }: ArtifactViewProps) => {
   const [viewingVersion, setViewingVersion] = useState<ArtifactVersion | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
@@ -167,6 +169,10 @@ export const ArtifactView = ({ artifact, artifactPasscode, conversationId, isLiv
         </Typography>
         <Chip size="small" variant="outlined" label={TYPE_LABEL[artifact.type] ?? artifact.type} />
         {artifact.locked && <Chip size="small" variant="outlined" label="locked" />}
+        {artifact.generationStatus === 'pending' && (
+          <Chip size="small" color="primary" variant="outlined" label="generating…" />
+        )}
+        {artifact.generationStatus === 'failed' && <Chip size="small" color="error" variant="outlined" label="failed" />}
         {isLive && !isHistorical && <Chip size="small" color="primary" variant="outlined" label="updated just now" />}
       </Box>
 
@@ -207,7 +213,17 @@ export const ArtifactView = ({ artifact, artifactPasscode, conversationId, isLiv
       )}
 
       {!version ? (
-        <Alert severity="warning">This artifact has no readable version yet.</Alert>
+        artifact.generationStatus === 'pending' ? (
+          <Alert severity="info">Generating…</Alert>
+        ) : artifact.generationStatus === 'failed' ? (
+          <Alert severity="warning">
+            {authType === 'admin' && artifact.generationError
+              ? artifact.generationError
+              : 'Generation failed to produce a version.'}
+          </Alert>
+        ) : (
+          <Alert severity="warning">This artifact has no readable version yet.</Alert>
+        )
       ) : artifact.type === 'DocumentArtifact' ? (
         <DocumentArtifactView payload={version.payload as DocumentPayload} />
       ) : (
