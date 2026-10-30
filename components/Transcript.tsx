@@ -518,7 +518,8 @@ export function Transcript(props: TranscriptProps) {
           }
         }
 
-        setMessages((prev) => [data, ...prev]);
+        // The socket can deliver a message the history fetch already returned
+        setMessages((prev) => (prev.some((message) => message.id === data.id) ? prev : [data, ...prev]));
       }
     };
 

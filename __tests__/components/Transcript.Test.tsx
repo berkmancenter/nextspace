@@ -576,6 +576,23 @@ describe('Transcript', () => {
     expect(secondChunk).toHaveAttribute('data-message-id', 'm2');
   });
 
+  it('shows a message once when the socket delivers one that is already on screen', async () => {
+    const { container } = render(<Transcript {...baseProps} />);
+    await screen.findByText('Hello world');
+
+    const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
+    act(() => {
+      messageHandler({
+        id: 'm1',
+        channels: ['transcript'],
+        createdAt: '2025-10-17T12:01:00Z',
+        body: { text: 'Hello world' },
+      });
+    });
+
+    expect(container.querySelectorAll('[data-message-id="m1"]')).toHaveLength(1);
+  });
+
   // Tests for transcript controls (pause, resume, delete, download)
   describe('Transcript Controls', () => {
     const controlsProps = {
