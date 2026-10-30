@@ -518,7 +518,8 @@ export function Transcript(props: TranscriptProps) {
           }
         }
 
-        setMessages((prev) => [data, ...prev]);
+        // The socket can deliver a message the history fetch already returned
+        setMessages((prev) => (prev.some((message) => message.id === data.id) ? prev : [data, ...prev]));
       }
     };
 
@@ -685,19 +686,22 @@ export function Transcript(props: TranscriptProps) {
       )}
 
       {/* Messages */}
+      {/* Scroll anchoring is off because new chunks are inserted at the bottom, and the browser would push the
+          view up instead of following them. preserveScrollRef keeps the reader's place when scrolled up. */}
       {isOpen && (
         <div
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col-reverse min-h-0 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-nx-scroll-track [&::-webkit-scrollbar-thumb]:bg-nx-scroll-thumb [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-nx-scroll-thumb-hover"
+          className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col-reverse min-h-0 [overflow-anchor:none] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-nx-scroll-track [&::-webkit-scrollbar-thumb]:bg-nx-scroll-thumb [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-nx-scroll-thumb-hover"
         >
           <div ref={topRef} />
-          {messages.map((message, i) => {
+          {messages.map((message) => {
             const isBot = message.fromAgent;
 
             return (
               <div
                 id={`transcript-message-${message.id}`}
-                key={`message-${i}`}
+                data-message-id={message.id}
+                key={message.id}
                 className={`mb-4 ${focusedMessageIds.includes(message.id!) ? 'bg-nx-focus-row dark:shadow-[inset_4px_0_0_var(--nx-border-interactive)]' : ''}`}
               >
                 <div
