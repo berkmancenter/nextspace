@@ -21,6 +21,29 @@ import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import EditIcon from '@mui/icons-material/Edit';
 import { PRESENTATION_TEXT } from '../utils/presentationText';
 
+// Goal names come from backend config the frontend never loads, so colors are assigned by hashing
+// the label rather than from a known list — the same goal always lands on the same color.
+const GOAL_DOT_COLORS = ['#4845D2', '#0F7A4E', '#B81E30', '#7E6017', '#0E7490', '#9D174D'];
+const colorForGoal = (label: string): string => {
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) | 0;
+  return GOAL_DOT_COLORS[Math.abs(hash) % GOAL_DOT_COLORS.length];
+};
+
+/** Pill naming the goal a proactive agent message was generated to serve. Uses the app's own
+ * pill tokens (bg-nx-pill/text-nx-pill-text, as in PresentationHeader's badge) so it reads
+ * correctly in both themes without hand-picked colors that only work in one. */
+const GoalPill: FC<{ label: string }> = ({ label }) => (
+  <div
+    className="mb-1.5 inline-flex w-fit items-center gap-1.5 rounded-full bg-nx-pill px-2.5 py-1 text-[11px] font-medium text-nx-pill-text"
+    role="note"
+    aria-label={`Generated for goal: ${label}`}
+  >
+    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: colorForGoal(label) }} aria-hidden="true" />
+    {label}
+  </div>
+);
+
 /**
  * Render assistant message with markdown support
  * Converts markdown formatting (bold, italic, lists, etc.) to HTML
@@ -228,6 +251,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
       const counts = pollCounts[pollBody.pollId] ?? null;
       return (
         <div style={{ width: '85%' }}>
+          {parsed.goal && <GoalPill label={parsed.goal} />}
           <div
             className="rounded-2xl px-2 py-1 text-gray-800 self-start"
             style={{
@@ -253,6 +277,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
 
     return (
       <div style={{ width: '85%' }}>
+        {parsed.goal && <GoalPill label={parsed.goal} />}
         {sourceContextText && (
           <div
             className="text-xs text-gray-600 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded"

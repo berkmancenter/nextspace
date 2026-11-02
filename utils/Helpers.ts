@@ -22,6 +22,8 @@ export interface ParsedMessageBody {
   source?: string;
   sourceMessage?: string;
   content?: any;
+  /** The readable label of the goal a proactive agent message was generated to serve, if any. */
+  goal?: string;
 }
 
 /**
@@ -42,6 +44,7 @@ export const parseMessageBody = (body: string | object): ParsedMessageBody => {
       source: obj.source?.toString(),
       sourceMessage: obj.sourceMessage?.toString(),
       content: obj.content,
+      goal: obj.goal?.toString(),
     };
   }
 

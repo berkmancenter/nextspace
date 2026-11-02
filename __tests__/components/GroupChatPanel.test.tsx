@@ -1975,6 +1975,74 @@ describe('GroupChatPanel', () => {
     });
   });
 
+  describe('Goal pill', () => {
+    const agentMessage = (body: Record<string, unknown>) => ({
+      id: '1',
+      pseudonym: 'Event Assistant',
+      createdAt: '2025-10-17T12:00:00Z',
+      body,
+      channels: ['chat'],
+      conversation: 'conv-1',
+      pseudonymId: 'ea-1',
+      fromAgent: true,
+      pause: false,
+      visible: true,
+      upVotes: [],
+      downVotes: [],
+    });
+
+    it('shows a pill naming the goal when body.goal is present', () => {
+      render(
+        <GroupChatPanel {...baseProps} messages={[agentMessage({ text: 'Nudge', goal: 'Encourage participation' })]} />,
+      );
+
+      expect(screen.getByText('Encourage participation')).toBeInTheDocument();
+      expect(screen.getByRole('note', { name: 'Generated for goal: Encourage participation' })).toBeInTheDocument();
+    });
+
+    it('shows no pill when body.goal is absent', () => {
+      render(<GroupChatPanel {...baseProps} messages={[agentMessage({ text: 'Just a normal response' })]} />);
+
+      expect(screen.queryByRole('note', { name: /Generated for goal/ })).not.toBeInTheDocument();
+    });
+
+    it('gives the same goal label the same dot color across messages', () => {
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[
+            agentMessage({ id: '1', text: 'First nudge', goal: 'Encourage participation' }),
+            agentMessage({ id: '2', text: 'Second nudge', goal: 'Encourage participation' }),
+          ]}
+        />,
+      );
+
+      const pills = screen.getAllByRole('note', { name: 'Generated for goal: Encourage participation' });
+      expect(pills).toHaveLength(2);
+      const dotColor = (pill: HTMLElement) => (pill.querySelector('span')?.getAttribute('style') ?? '').trim();
+      expect(dotColor(pills[0])).toBe(dotColor(pills[1]));
+    });
+
+    it('shows a pill on a goal-generated poll message too', () => {
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[
+            agentMessage({
+              type: 'poll',
+              text: 'Quick check-in',
+              goal: 'Gauge sentiment',
+              pollId: 'poll-1',
+              choices: ['Yes', 'No'],
+            }),
+          ]}
+        />,
+      );
+
+      expect(screen.getByText('Gauge sentiment')).toBeInTheDocument();
+    });
+  });
+
   describe('Thinking Bot Icon', () => {
     it('shows thinking bot icon when waiting for non-threaded response', () => {
       const messages = [
