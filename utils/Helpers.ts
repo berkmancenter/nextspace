@@ -322,6 +322,12 @@ function generateEventUrls(conversationData: Conversation, botName: string): Eve
   const chatPasscode = conversationData.channels.find((channel) => channel.name === 'chat')?.passcode;
   const hasChat = Boolean(chatPasscode);
 
+  // Present only on a conversation with a pre-event window configured (preEventMinutes). Always
+  // included alongside chat, same as transcript — the frontend decides at load time whether the
+  // pre-event window is actually open and which of the two passcodes to use.
+  const pregamePasscode = conversationData.channels.find((channel) => channel.name === 'pregame')?.passcode;
+  const hasPregame = Boolean(pregamePasscode);
+
   const modPasscode = conversationData.channels.find((channel) => channel.name === 'moderator')?.passcode;
 
   const modUrl = modPasscode
@@ -349,7 +355,7 @@ function generateEventUrls(conversationData: Conversation, botName: string): Eve
     // The presentation view joins as a participant, so it carries exactly the participant's channels.
     const participantChannels = `?conversationId=${conversationData.id}${
       hasTranscript ? `&channel=transcript,${transcriptPasscode}` : ''
-    }${hasChat ? `&channel=chat,${chatPasscode}` : ''}`;
+    }${hasChat ? `&channel=chat,${chatPasscode}` : ''}${hasPregame ? `&channel=pregame,${pregamePasscode}` : ''}`;
     participant.push({ label: botName, url: `${urlPrefix}/assistant/${participantChannels}` });
     presentation.push({ label: 'Presentation view', url: `${urlPrefix}/present/${participantChannels}` });
     if (modPasscode) {

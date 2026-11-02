@@ -454,6 +454,189 @@ describe('useConversationSetup', () => {
 
         expect(result.current.showEventStatusDialog).toBe(true);
       });
+
+      describe('eventScheduledTime', () => {
+        it('is populated from the conversation fetch, for driving a pre-event countdown', async () => {
+          const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+          mockCreateConversationFromData.mockResolvedValue(
+            makeConversation({ active: false, scheduledTime, preEventMinutes: 10 }),
+          );
+
+          const { result } = renderSetup({
+            query: { conversationId: 'test-conversation-id', channel: 'chat,chat-pass' },
+          });
+
+          await waitFor(() => {
+            expect(result.current.eventStatusLoaded).toBe(true);
+          });
+
+          expect(result.current.eventScheduledTime).toBe(scheduledTime);
+        });
+
+        it('stays null when the conversation has no scheduledTime', async () => {
+          mockCreateConversationFromData.mockResolvedValue(makeConversation({ active: true }));
+
+          const { result } = renderSetup({
+            query: { conversationId: 'test-conversation-id', channel: 'chat,chat-pass' },
+          });
+
+          await waitFor(() => {
+            expect(result.current.eventStatusLoaded).toBe(true);
+          });
+
+          expect(result.current.eventScheduledTime).toBeNull();
+        });
+      });
+
+      describe('group chat channel', () => {
+        it('uses the pregame channel and its passcode inside the window, when the URL carries one', async () => {
+          const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+          mockCreateConversationFromData.mockResolvedValue(
+            makeConversation({ active: false, scheduledTime, preEventMinutes: 10 }),
+          );
+          mockGetChannelPasscode.mockImplementation((channel: string) =>
+            channel === 'pregame' ? 'pregame-pass' : 'chat-pass',
+          );
+
+          const { result } = renderSetup({
+            query: { conversationId: 'test-conversation-id', channel: ['chat,chat-pass', 'pregame,pregame-pass'] },
+          });
+
+          await waitFor(() => {
+            expect(result.current.groupChatChannelName).toBe('pregame');
+          });
+
+          expect(result.current.chatPasscode).toBe('pregame-pass');
+        });
+
+        it('falls back to the chat channel inside the window when the URL has no pregame passcode', async () => {
+          const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+          mockCreateConversationFromData.mockResolvedValue(
+            makeConversation({ active: false, scheduledTime, preEventMinutes: 10 }),
+          );
+          mockGetChannelPasscode.mockImplementation((channel: string) => (channel === 'chat' ? 'chat-pass' : null));
+
+          const { result } = renderSetup({
+            query: { conversationId: 'test-conversation-id', channel: 'chat,chat-pass' },
+          });
+
+          await waitFor(() => {
+            expect(result.current.eventStatusLoaded).toBe(true);
+          });
+
+          expect(result.current.groupChatChannelName).toBe('chat');
+          expect(result.current.chatPasscode).toBe('chat-pass');
+        });
+
+        it('uses the chat channel outside the window, even when a pregame passcode is present', async () => {
+          const scheduledTime = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // outside a 10-minute window
+          mockCreateConversationFromData.mockResolvedValue(
+            makeConversation({ active: false, scheduledTime, preEventMinutes: 10 }),
+          );
+          mockGetChannelPasscode.mockImplementation((channel: string) =>
+            channel === 'pregame' ? 'pregame-pass' : 'chat-pass',
+          );
+
+          const { result } = renderSetup({
+            query: { conversationId: 'test-conversation-id', channel: ['chat,chat-pass', 'pregame,pregame-pass'] },
+          });
+
+          await waitFor(() => {
+            expect(result.current.eventStatus).toBe('future');
+          });
+
+          expect(result.current.groupChatChannelName).toBe('chat');
+          expect(result.current.chatPasscode).toBe('chat-pass');
+        });
+
+        it('defaults to the chat channel when the conversation is active', async () => {
+          mockGetChannelPasscode.mockReturnValue('chat-pass');
+
+          const { result } = renderSetup({
+            query: { conversationId: 'test-conversation-id', channel: 'chat,chat-pass' },
+          });
+
+          await waitFor(() => {
+            expect(result.current.eventStatusLoaded).toBe(true);
+          });
+
+          expect(result.current.groupChatChannelName).toBe('chat');
+        });
+
+        describe('markEventStarted', () => {
+          it('switches from pregame to the real chat channel and its own passcode', async () => {
+            const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+            mockCreateConversationFromData.mockResolvedValue(
+              makeConversation({ active: false, scheduledTime, preEventMinutes: 10 }),
+            );
+            mockGetChannelPasscode.mockImplementation((channel: string) =>
+              channel === 'pregame' ? 'pregame-pass' : 'chat-pass',
+            );
+
+            const { result } = renderSetup({
+              query: { conversationId: 'test-conversation-id', channel: ['chat,chat-pass', 'pregame,pregame-pass'] },
+            });
+
+            await waitFor(() => {
+              expect(result.current.groupChatChannelName).toBe('pregame');
+            });
+
+            act(() => {
+              result.current.markEventStarted();
+            });
+
+            expect(result.current.groupChatChannelName).toBe('chat');
+            expect(result.current.chatPasscode).toBe('chat-pass');
+          });
+
+          it('drops hasJoinedConvRef so the join effect re-emits conversation:join for the new channel', async () => {
+            const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+            mockCreateConversationFromData.mockResolvedValue(
+              makeConversation({ active: false, scheduledTime, preEventMinutes: 10 }),
+            );
+            mockGetChannelPasscode.mockImplementation((channel: string) =>
+              channel === 'pregame' ? 'pregame-pass' : 'chat-pass',
+            );
+
+            const { result } = renderSetup({
+              query: { conversationId: 'test-conversation-id', channel: ['chat,chat-pass', 'pregame,pregame-pass'] },
+            });
+
+            await waitFor(() => {
+              expect(result.current.groupChatChannelName).toBe('pregame');
+            });
+
+            result.current.hasJoinedConvRef.current = true;
+
+            act(() => {
+              result.current.markEventStarted();
+            });
+
+            expect(result.current.hasJoinedConvRef.current).toBe(false);
+          });
+
+          it('is a no-op when already on the chat channel', async () => {
+            mockGetChannelPasscode.mockReturnValue('chat-pass');
+
+            const { result } = renderSetup({
+              query: { conversationId: 'test-conversation-id', channel: 'chat,chat-pass' },
+            });
+
+            await waitFor(() => {
+              expect(result.current.eventStatusLoaded).toBe(true);
+            });
+
+            result.current.hasJoinedConvRef.current = true;
+
+            act(() => {
+              result.current.markEventStarted();
+            });
+
+            expect(result.current.groupChatChannelName).toBe('chat');
+            expect(result.current.hasJoinedConvRef.current).toBe(true);
+          });
+        });
+      });
     });
   });
 
