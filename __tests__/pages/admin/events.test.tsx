@@ -1040,6 +1040,40 @@ describe('Events Page - Missed badge', () => {
     expect(document.querySelector('.bg-yellow-100')).not.toBeInTheDocument();
   });
 
+  it('does not show Missed badge within the auto-start grace window just after scheduledTime', async () => {
+    const justPastScheduled = new Date(Date.now() - 5 * 1000).toISOString(); // 5s ago, inside the grace window
+    await renderWithEvent({
+      id: 'about-to-start',
+      name: 'About To Start Event',
+      active: false,
+      scheduledTime: justPastScheduled,
+      createdAt: justPastScheduled,
+      owner: mockUserId,
+      platformTypes: [],
+      type: { name: 'eventAssistant', label: 'Test Agent' },
+      eventUrls: { zoom: null, moderator: [], participant: [] },
+    });
+    await waitFor(() => expect(screen.getByText('About To Start Event')).toBeInTheDocument());
+    expect(document.querySelector('.bg-yellow-100')).not.toBeInTheDocument();
+  });
+
+  it('shows Missed badge once scheduledTime is past the auto-start grace window', async () => {
+    const wellPastScheduled = new Date(Date.now() - 60 * 1000).toISOString(); // 60s ago, past the grace window
+    await renderWithEvent({
+      id: 'truly-missed',
+      name: 'Truly Missed Event',
+      active: false,
+      scheduledTime: wellPastScheduled,
+      createdAt: wellPastScheduled,
+      owner: mockUserId,
+      platformTypes: [],
+      type: { name: 'eventAssistant', label: 'Test Agent' },
+      eventUrls: { zoom: null, moderator: [], participant: [] },
+    });
+    await waitFor(() => expect(screen.getByText('Truly Missed Event')).toBeInTheDocument());
+    expect(document.querySelector('.bg-yellow-100')).toBeInTheDocument();
+  });
+
   it('does not show Missed badge for an upcoming scheduled event', async () => {
     const futureTime = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
     (Request as jest.Mock).mockResolvedValue([

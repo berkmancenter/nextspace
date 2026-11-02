@@ -54,6 +54,11 @@ import {
   generateAndDownloadDirectMessageResponsesReport,
 } from '../../utils/eventReportGenerator';
 
+// The backend auto-starts a conversation via a job that polls every 10 seconds, so scheduledTime
+// can pass a few seconds before startTime is actually stamped. Padding the "missed" check past
+// that lag keeps an about-to-start event from flashing as missed in that window.
+const AUTO_START_GRACE_MS = 30 * 1000;
+
 const EventCard = ({
   event,
   currentUserId,
@@ -81,7 +86,7 @@ const EventCard = ({
     !event.active &&
     !event.startTime &&
     !event.endTime &&
-    (!event.scheduledTime || new Date(event.scheduledTime) <= new Date());
+    (!event.scheduledTime || new Date(event.scheduledTime).getTime() + AUTO_START_GRACE_MS <= Date.now());
   const canEdit = !event.active && !eventStarted && !!event.type?.name;
 
   const handleCopyLink = async (url: string) => {
