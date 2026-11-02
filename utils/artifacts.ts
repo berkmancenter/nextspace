@@ -154,20 +154,23 @@ export const fetchArtifactPasscode = async (container: ArtifactContainer): Promi
 };
 
 /**
- * Builds a concept graph from a finished event, or folds a whole series into one.
- *
- * Administrators only, and safe to re-run: a second run appends a version to the existing
- * graph rather than replacing it or creating a duplicate, so a poor extraction can be redone
- * with both attempts left readable and comparable.
+ * Claims (or creates) the concept graph for a finished event, or for a whole series, and
+ * enqueues a background job to build it. Administrators only, and safe to call again while
+ * one is already running: an in-flight claim is a no-op, and once idle a re-run appends a
+ * version to the existing graph rather than replacing it or creating a duplicate — so a poor
+ * extraction can be redone with both attempts left readable and comparable.
  *
  * A topic container asks for the series graph, which is refined rather than rebuilt — each
  * event merges into what the series already knows — so its version history is a record of how
  * the group's understanding developed. Running it on a topic also backfills a series that
  * predates the feature.
  *
+ * Generation happens in a background job, not inline in this call: the response only
+ * confirms the claim (`artifact.generationStatus: 'pending'`), it never carries the result.
  * A run that finds too little to map, or whose output does not survive the Chatham House
- * checks, comes back with `generated: false` and a reason. That is a result, not an error,
- * and has to be shown as one.
+ * checks, resolves later as `generationStatus: 'failed'` with a reason, same as a real error
+ * — poll `fetchArtifact` or listen for the `artifact:version` / `artifact:generationFailed`
+ * socket events to see it resolve.
  *
  * @param container - Exactly one of `conversationId` (one event) or `topicId` (the series).
  */

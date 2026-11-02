@@ -7542,6 +7542,10 @@
             "type": "string",
             "format": "date-time"
           },
+          "preEventMinutes": {
+            "type": "number",
+            "description": "Minutes before scheduledTime that the preEvent window opens."
+          },
           "startTime": {
             "type": "string",
             "format": "date-time"

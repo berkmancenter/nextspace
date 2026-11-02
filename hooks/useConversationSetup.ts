@@ -5,6 +5,7 @@ import { PseudonymousMessage } from '../types.internal';
 import { components } from '../types';
 import { Api, RetrieveData, GetChannelPasscode, QueryParamsError } from '../utils';
 import { createConversationFromData, resolveConversationBotName } from '../utils/Helpers';
+import { isInPreEventWindow } from '../utils/eventState';
 import type { ConversationType } from '../context/ConversationTypeContext';
 import { withStoredChannels } from '../utils/presentationChannels';
 
@@ -177,8 +178,16 @@ export function useConversationSetup({
 
         // Check if the event is not active, and if it's not begun (no endTime)
         if (conversation.active === false) {
-          setEventStatus(conversation.endTime ? 'ended' : 'future');
-          setShowEventStatusDialog(true);
+          if (conversation.endTime) {
+            setEventStatus('ended');
+            setShowEventStatusDialog(true);
+          } else if (!isInPreEventWindow(conversation)) {
+            setEventStatus('future');
+            setShowEventStatusDialog(true);
+          }
+          // Inside the pre-event window, eventStatus is left at its default 'active': the backend
+          // already allows joining and chatting there (it wakes per-message agents ahead of the
+          // official start), so only the blocking dialog above was ever frontend-enforced.
         }
 
         setEventStatusLoaded(true);

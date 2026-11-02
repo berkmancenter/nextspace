@@ -3259,6 +3259,67 @@ describe('EventAssistantRoom', () => {
     });
   });
 
+  describe('Pre-event window', () => {
+    const mockInactiveConversation = (conversation: Record<string, unknown>) => {
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({
+            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+            active: false,
+            ...conversation,
+          });
+        }
+        return Promise.resolve([]);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        active: false,
+        ...conversation,
+      });
+    };
+
+    it('allows chat and skips the Event Not Started notice inside the pre-event window', async () => {
+      const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes from now
+      mockInactiveConversation({ scheduledTime, preEventMinutes: 10 }); // window opens 10 minutes before
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText('Event Not Started')).not.toBeInTheDocument();
+        expect(screen.queryByText('This event is not active.')).not.toBeInTheDocument();
+      });
+    });
+
+    it('still shows the Event Not Started notice before the pre-event window opens', async () => {
+      const scheduledTime = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 minutes from now
+      mockInactiveConversation({ scheduledTime, preEventMinutes: 10 }); // window only opens 10 minutes before
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Event Not Started')).toBeInTheDocument();
+      });
+    });
+
+    it('still shows the Event Not Started notice when preEventMinutes is not configured', async () => {
+      const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      mockInactiveConversation({ scheduledTime }); // no preEventMinutes
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Event Not Started')).toBeInTheDocument();
+      });
+    });
+  });
+
   describe('Event has ended dialog', () => {
     it('displays the event has ended dialog when the conversation is not active and in past (has endTime)', async () => {
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
