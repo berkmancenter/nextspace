@@ -5,6 +5,7 @@ import { Socket } from 'socket.io-client';
 import { PseudonymousMessage } from '../types.internal';
 import { Api, RetrieveData, SendData } from '../utils';
 import { trackFeatureUsage, trackConversationEvent } from '../utils/analytics';
+import { insertMessageInOrder } from '../utils/messageModeration';
 import { useVisibilityAwareDuration } from '../hooks/useVisibilityAwareDuration';
 import { BotIcon } from './BotIcon';
 import { getAssistantAvatarStyle } from '../utils/avatarUtils';
@@ -124,7 +125,7 @@ export function Transcript(props: TranscriptProps) {
       setFocusedMessageIds(messageIds as string[]);
 
       if (shouldScroll) {
-        const earliestMessage = messagesInRange[messagesInRange.length - 1];
+        const earliestMessage = messagesInRange[0];
         setTimeout(() => {
           document.getElementById(`transcript-message-${earliestMessage.id}`)?.scrollIntoView({
             behavior: 'smooth',
@@ -381,12 +382,11 @@ export function Transcript(props: TranscriptProps) {
       }
 
       if (Array.isArray(transcriptMessages)) {
-        const reversedMessages = transcriptMessages.reverse();
-        setMessages(reversedMessages);
+        setMessages(transcriptMessages);
 
         if (props.focusTimeRange) {
           setTimeout(() => {
-            applyFocusAndScroll(reversedMessages);
+            applyFocusAndScroll(transcriptMessages);
           }, 0);
         } else if (isOpen) {
           scrollToBottom();
@@ -518,8 +518,7 @@ export function Transcript(props: TranscriptProps) {
           }
         }
 
-        // The socket can deliver a message the history fetch already returned
-        setMessages((prev) => (prev.some((message) => message.id === data.id) ? prev : [data, ...prev]));
+        setMessages((prev) => insertMessageInOrder(prev, data));
       }
     };
 
@@ -694,14 +693,15 @@ export function Transcript(props: TranscriptProps) {
           className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col-reverse min-h-0 [overflow-anchor:none] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-nx-scroll-track [&::-webkit-scrollbar-thumb]:bg-nx-scroll-thumb [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-nx-scroll-thumb-hover"
         >
           <div ref={topRef} />
-          {messages.map((message) => {
+          {/* flex-col-reverse draws the first element at the bottom, so the newest message goes first */}
+          {[...messages].reverse().map((message, i) => {
             const isBot = message.fromAgent;
 
             return (
               <div
                 id={`transcript-message-${message.id}`}
                 data-message-id={message.id}
-                key={message.id}
+                key={message.id || `message-${i}`}
                 className={`mb-4 ${focusedMessageIds.includes(message.id!) ? 'bg-nx-focus-row dark:shadow-[inset_4px_0_0_var(--nx-border-interactive)]' : ''}`}
               >
                 <div

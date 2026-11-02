@@ -593,6 +593,59 @@ describe('Transcript', () => {
     expect(container.querySelectorAll('[data-message-id="m1"]')).toHaveLength(1);
   });
 
+  it('shows every new message that arrives without an id', async () => {
+    render(<Transcript {...baseProps} />);
+    await screen.findByText('Hello world');
+
+    const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
+    act(() => {
+      messageHandler({ channels: ['transcript'], createdAt: '2025-10-17T12:03:00Z', body: { text: 'First without id' } });
+      messageHandler({ channels: ['transcript'], createdAt: '2025-10-17T12:04:00Z', body: { text: 'Second without id' } });
+    });
+
+    expect(screen.getByText('First without id')).toBeInTheDocument();
+    expect(screen.getByText('Second without id')).toBeInTheDocument();
+  });
+
+  it('replaces a message on screen when the socket delivers a newer copy of it', async () => {
+    const { container } = render(<Transcript {...baseProps} />);
+    await screen.findByText('Hello world');
+
+    const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
+    act(() => {
+      messageHandler({
+        id: 'm1',
+        channels: ['transcript'],
+        createdAt: '2025-10-17T12:01:00Z',
+        body: { text: 'Hello world, corrected' },
+      });
+    });
+
+    expect(screen.getByText('Hello world, corrected')).toBeInTheDocument();
+    expect(screen.queryByText('Hello world')).not.toBeInTheDocument();
+    expect(container.querySelectorAll('[data-message-id="m1"]')).toHaveLength(1);
+  });
+
+  it('shows the newest message at the start of the list', async () => {
+    const { container } = render(<Transcript {...baseProps} />);
+    await screen.findByText('Hello world');
+
+    const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
+    act(() => {
+      messageHandler({
+        id: 'm3',
+        channels: ['transcript'],
+        createdAt: '2025-10-17T12:03:00Z',
+        body: { text: 'New socket message' },
+      });
+    });
+
+    const renderedIds = [...container.querySelectorAll('[data-message-id]')].map((chunk) =>
+      chunk.getAttribute('data-message-id'),
+    );
+    expect(renderedIds).toEqual(['m3', 'm2', 'm1']);
+  });
+
   // Tests for transcript controls (pause, resume, delete, download)
   describe('Transcript Controls', () => {
     const controlsProps = {
