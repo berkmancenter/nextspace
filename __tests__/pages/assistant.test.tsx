@@ -3531,38 +3531,43 @@ describe('EventAssistantRoom', () => {
 
       // Each join's response carries that channel's own intro, so the test can tell which
       // channel the component actually joined from what shows up in the chat panel.
+      // mockImplementationOnce, not mockImplementation: this test's own join (pregame) and
+      // rejoin (chat, after conversation:started) are the only two calls it expects, and
+      // clearAllMocks (in the top-level beforeEach) doesn't reset a mockImplementation, so a
+      // persistent one here would leak into every later test in this file.
       const { emitWithTokenRefresh } = require('../../utils');
-      (emitWithTokenRefresh as jest.Mock).mockImplementation(
-        (socket: any, event: string, data: any, onSuccess: Function) => {
-          const channelNames = (data.channels || []).map((c: any) => c.name);
-          let intros: any[] = [];
-          if (channelNames.includes('chat')) {
-            intros = [
-              {
-                id: 'chat-intro',
-                body: { type: 'intro', text: 'Chat intro' },
-                pseudonym: 'Berkie',
-                fromAgent: true,
-                channels: ['chat'],
-                createdAt: '2024-01-01T10:01:00Z',
-              },
-            ];
-          } else if (channelNames.includes('pregame')) {
-            intros = [
-              {
-                id: 'pregame-intro',
-                body: { type: 'intro', text: 'Pregame intro' },
-                pseudonym: 'Berkie',
-                fromAgent: true,
-                channels: ['pregame'],
-                createdAt: '2024-01-01T09:59:00Z',
-              },
-            ];
-          }
-          if (onSuccess) onSuccess({ intros });
-          socket.emit(event, data);
-        },
-      );
+      const joinWithChannelIntro = (socket: any, event: string, data: any, onSuccess: Function) => {
+        const channelNames = (data.channels || []).map((c: any) => c.name);
+        let intros: any[] = [];
+        if (channelNames.includes('chat')) {
+          intros = [
+            {
+              id: 'chat-intro',
+              body: { type: 'intro', text: 'Chat intro' },
+              pseudonym: 'Berkie',
+              fromAgent: true,
+              channels: ['chat'],
+              createdAt: '2024-01-01T10:01:00Z',
+            },
+          ];
+        } else if (channelNames.includes('pregame')) {
+          intros = [
+            {
+              id: 'pregame-intro',
+              body: { type: 'intro', text: 'Pregame intro' },
+              pseudonym: 'Berkie',
+              fromAgent: true,
+              channels: ['pregame'],
+              createdAt: '2024-01-01T09:59:00Z',
+            },
+          ];
+        }
+        if (onSuccess) onSuccess({ intros });
+        socket.emit(event, data);
+      };
+      (emitWithTokenRefresh as jest.Mock)
+        .mockImplementationOnce(joinWithChannelIntro)
+        .mockImplementationOnce(joinWithChannelIntro);
 
       await act(async () => {
         render(<EventAssistantRoom authType={'guest'} />);
