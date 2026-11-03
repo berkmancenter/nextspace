@@ -205,8 +205,6 @@ export function EventAssistantRoom({
   const [waitingForResponse, setWaitingForResponse] = useState(false);
   const [waitingForChatResponse, setWaitingForChatResponse] = useState(false);
   const [eventStartedToastOpen, setEventStartedToastOpen] = useState(false);
-  const [pregameCountdownLabel, setPregameCountdownLabel] = useState<string | null>(null);
-  const [pregameCountdownUrgent, setPregameCountdownUrgent] = useState(false);
   const [messageRatings, setMessageRatings] = useState<Map<string, string>>(new Map());
   const [controlledMode, setControlledMode] = useState<ControlledInputConfig | null>(null);
   const [assistantInputValue, setAssistantInputValue] = useState<string>('');
@@ -344,38 +342,6 @@ export function EventAssistantRoom({
       setUserId(pseudonym);
     }
   }, [pseudonym]);
-
-  // Ticks a pre-event countdown off the local clock. The actual switch to the live chat channel
-  // still waits on the conversation:started socket event, not this countdown reaching zero, so a
-  // few seconds of server lag just shows "starting any moment" instead of a frozen 0:00.
-  useEffect(() => {
-    if (groupChatChannelName !== 'pregame' || !eventScheduledTime) {
-      setPregameCountdownLabel(null);
-      return;
-    }
-
-    const target = new Date(eventScheduledTime).getTime();
-
-    const tick = () => {
-      const remainingMs = target - Date.now();
-      if (remainingMs <= 0) {
-        setPregameCountdownLabel('The event is starting any moment…');
-        setPregameCountdownUrgent(true);
-        return;
-      }
-      const totalSeconds = Math.floor(remainingMs / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      setPregameCountdownLabel(
-        `Event starts in ${minutes}:${seconds.toString().padStart(2, '0')}. Group chat will switch automatically. Your draft message will still be here.`,
-      );
-      setPregameCountdownUrgent(remainingMs <= 30000);
-    };
-
-    tick();
-    const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
-  }, [groupChatChannelName, eventScheduledTime]);
 
   // Join conversation when socket, agentId, and userId are all available.
   // Also re-joins automatically on every socket reconnection.
@@ -842,8 +808,7 @@ export function EventAssistantRoom({
                           presentation={presentation}
                           isAdmin={isAdmin}
                           moderation={moderation}
-                          countdownLabel={pregameCountdownLabel}
-                          countdownUrgent={pregameCountdownUrgent}
+                          eventScheduledTime={groupChatChannelName === 'pregame' ? eventScheduledTime : null}
                         />
                       ) : activeTab === 'resources' ? (
                         <ResourcesPanel
