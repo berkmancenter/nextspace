@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { PseudonymousMessage } from '../types.internal';
 import { Api, RetrieveData, getPollResponseCounts, inspectPoll } from '../utils';
 import { parseMessageBody } from '../utils/Helpers';
@@ -117,6 +117,13 @@ export function useConversationMessages({
   const [assistantPreviousReplyCounts, setAssistantPreviousReplyCounts] = useState<Map<string, number>>(new Map());
   const [messagesWithUnreadReplies, setMessagesWithUnreadReplies] = useState<Set<string>>(new Set());
   const [assistantMessagesWithUnreadReplies, setAssistantMessagesWithUnreadReplies] = useState<Set<string>>(new Set());
+  // Mirrors groupChatChannelName for fetchChatMessages' in-flight requests: a pregame history
+  // fetch still running when the channel switches to chat would otherwise resolve last and
+  // overwrite the live channel's history with stale pregame messages.
+  const groupChatChannelNameRef = useRef(groupChatChannelName);
+  useEffect(() => {
+    groupChatChannelNameRef.current = groupChatChannelName;
+  }, [groupChatChannelName]);
 
   const trackReplyCountChanges = (
     messages: PseudonymousMessage[],
@@ -198,11 +205,15 @@ export function useConversationMessages({
   }, [userId, agentId, agentIds, conversationId, assistantIntroRef]);
 
   const fetchChatMessages = useCallback(async (): Promise<void> => {
+    const fetchedForChannel = groupChatChannelName;
     try {
       const fetched = await RetrieveData(
         `messages/${conversationId}?channel=${groupChatChannelName},${chatPasscode}`,
         Api.get().getAccessToken(),
       );
+      // The channel switched (e.g. pregame -> chat) while this request was in flight; applying
+      // its result now would overwrite the live channel's history with stale pregame messages.
+      if (fetchedForChannel !== groupChatChannelNameRef.current) return;
 
       if (Array.isArray(fetched)) {
         const nonIntros = fetched.filter((m) => parseMessageBody(m.body)?.type !== 'intro');
