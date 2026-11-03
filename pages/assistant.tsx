@@ -41,6 +41,10 @@ export const getServerSideProps = async (context: { req: any }) => {
 
 const NO_AGENT_IDS: string[] = [];
 
+// Both the live channel and its pre-event stand-in count as "group chat" for incoming messages,
+// since a reply can still land on the channel just switched away from (see eventStartedHandler).
+const GROUP_CHAT_CHANNELS = ['chat', 'pregame'];
+
 export function EventAssistantRoom({
   authType: _authType,
   presentation = false,
@@ -252,7 +256,7 @@ export function EventAssistantRoom({
         }
       }
 
-      if (data.channels && data.channels.includes(groupChatChannelName)) {
+      if (data.channels && data.channels.some((c) => GROUP_CHAT_CHANNELS.includes(c))) {
         // Deduped by id and slotted in by createdAt: an unhidden message can arrive after newer ones.
         setChatMessages((prev) => insertMessageInOrder(prev, data));
         if (activeTabRef.current !== 'chat') {
@@ -266,7 +270,7 @@ export function EventAssistantRoom({
       }
 
       if (data.fromAgent) {
-        if (data.channels && data.channels.includes(groupChatChannelName)) {
+        if (data.channels && data.channels.some((c) => GROUP_CHAT_CHANNELS.includes(c))) {
           setWaitingForChatResponse(false);
         } else {
           setWaitingForResponse(false);
@@ -283,6 +287,9 @@ export function EventAssistantRoom({
     const eventStartedHandler = () => {
       if (groupChatChannelName !== 'pregame') return;
       setChatMessages([]);
+      setWaitingForChatResponse(false);
+      setMessagesWithUnreadReplies(new Set());
+      setUnseenChatCount(0);
       pendingGroupChatIntroSwapRef.current = true;
       markEventStarted();
       setEventStartedToastOpen(true);
