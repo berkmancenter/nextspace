@@ -165,6 +165,13 @@ export function EventAssistantRoom({
   // own intro. Consumed by the join callback, which fires asynchronously, so it can land before
   // or after fetchChatMessages's REST read of chatIntroRef without either dropping the swap.
   const pendingGroupChatIntroSwapRef = useRef(false);
+  // Mirrors groupChatChannelName for the join effect's async response callback, which closes over
+  // whichever channel it was joining for — a stale response for a channel already left (e.g. a
+  // slow pregame join resolving after the switch to chat) is detected by comparing against this.
+  const groupChatChannelNameRef = useRef(groupChatChannelName);
+  useEffect(() => {
+    groupChatChannelNameRef.current = groupChatChannelName;
+  }, [groupChatChannelName]);
 
   const {
     assistantMessages,
@@ -405,6 +412,7 @@ export function EventAssistantRoom({
     const joinConversation = () => {
       if (hasJoinedConvRef.current) return;
       hasJoinedConvRef.current = true;
+      const joinedChannelName = groupChatChannelName;
       console.log('Joining conversation');
       emitWithTokenRefresh(
         socket,
@@ -416,6 +424,11 @@ export function EventAssistantRoom({
           ...(presentation && { observer: true }),
         },
         (response) => {
+          // A slow join for a channel we've since left (e.g. pregame, after the switch to chat)
+          // lands after the fresh join for the current channel — ignore it rather than re-apply
+          // its now-stale intros.
+          if (joinedChannelName !== groupChatChannelNameRef.current) return;
+
           console.log('Successfully joined conversation');
 
           const intros: PseudonymousMessage[] = response?.intros ?? [];
