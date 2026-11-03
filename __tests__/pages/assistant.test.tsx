@@ -3280,6 +3280,12 @@ describe('EventAssistantRoom', () => {
     };
 
     it('allows chat and skips the Event Not Started notice inside the pre-event window', async () => {
+      // A pregame passcode in the link, same as a real link minted after this feature shipped —
+      // see the "stale link" test below for one without it.
+      mockRouter.query = {
+        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
+        channel: ['chat,chat-pass', 'pregame,pregame-pass'],
+      };
       const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes from now
       mockInactiveConversation({ scheduledTime, preEventMinutes: 10 }); // window opens 10 minutes before
 
@@ -3290,6 +3296,21 @@ describe('EventAssistantRoom', () => {
       await waitFor(() => {
         expect(screen.queryByText('Event Not Started')).not.toBeInTheDocument();
         expect(screen.queryByText('This event is not active.')).not.toBeInTheDocument();
+      });
+    });
+
+    it('shows the Event Not Started notice for a stale link with no pregame passcode, inside the pre-event window', async () => {
+      // Minted before the pregame channel existed: a chat passcode, but no pregame one.
+      mockRouter.query = { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6', channel: 'chat,chat-pass' };
+      const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes from now
+      mockInactiveConversation({ scheduledTime, preEventMinutes: 10 }); // window opens 10 minutes before
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Event Not Started')).toBeInTheDocument();
       });
     });
 

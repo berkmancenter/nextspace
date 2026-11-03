@@ -174,6 +174,11 @@ export function useConversationSetup({
         const inPreEventWindow = isInPreEventWindow(conversation);
         if (conversation?.scheduledTime) setEventScheduledTime(conversation.scheduledTime as string);
 
+        // A link minted before the pregame channel existed has no pregame passcode. Joining live
+        // chat with it during the pre-event window would split the room into two groups that
+        // can't see each other, so treat this the same as the event not having started yet.
+        let missingPregameAccess = false;
+
         if (query.channel) {
           const transcriptPasscodeParam = GetChannelPasscode('transcript', query, setGeneralError);
           if (transcriptPasscodeParam) setTranscriptPasscode(transcriptPasscodeParam);
@@ -190,8 +195,18 @@ export function useConversationSetup({
           } else {
             setGroupChatChannelName('chat');
             if (chatPasscodeParam) setChatPasscode(chatPasscodeParam);
+            missingPregameAccess = inPreEventWindow && !pregamePasscodeParam;
           }
         }
+
+        // The clock-based window closes the instant client-clock time passes scheduledTime, but
+        // the backend's actual flip to active/startTime can lag a few seconds behind. Someone
+        // arriving in that gap would otherwise hit the (unclosable) Event Not Started dialog for
+        // an event that's actually about to let them in — so this gap alone never blocks.
+        const pastScheduledTimeUnconfirmed =
+          !!conversation?.scheduledTime &&
+          new Date(conversation.scheduledTime as string).getTime() <= Date.now() &&
+          !conversation.startTime;
 
         const eventAsstAgent = conversation.agents.find(
           (agent: components['schemas']['Agent']) => agent.agentType === 'eventAssistant',
@@ -210,7 +225,7 @@ export function useConversationSetup({
           if (conversation.endTime) {
             setEventStatus('ended');
             setShowEventStatusDialog(true);
-          } else if (!inPreEventWindow) {
+          } else if (missingPregameAccess || (!inPreEventWindow && !pastScheduledTimeUnconfirmed)) {
             setEventStatus('future');
             setShowEventStatusDialog(true);
           }
