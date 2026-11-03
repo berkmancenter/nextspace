@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { getUserTimezone } from '../../utils';
 import { CheckAuthHeader, getConversation } from '../../utils/Helpers';
+import { isEventMissed } from '../../utils/eventState';
 import { useSessionJoin } from '../../hooks/useSessionJoin';
 
 import React from 'react';
@@ -54,11 +55,6 @@ import {
   generateAndDownloadDirectMessageResponsesReport,
 } from '../../utils/eventReportGenerator';
 
-// The backend auto-starts a conversation via a job that polls every 10 seconds, so scheduledTime
-// can pass a few seconds before startTime is actually stamped. Padding the "missed" check past
-// that lag keeps an about-to-start event from flashing as missed in that window.
-const AUTO_START_GRACE_MS = 30 * 1000;
-
 const EventCard = ({
   event,
   currentUserId,
@@ -82,11 +78,7 @@ const EventCard = ({
   // Edit is available for future inactive events with a known type
   const eventStarted = !!event.startTime;
   const isPast = !!event.endTime;
-  const isMissed =
-    !event.active &&
-    !event.startTime &&
-    !event.endTime &&
-    (!event.scheduledTime || new Date(event.scheduledTime).getTime() + AUTO_START_GRACE_MS <= Date.now());
+  const isMissed = isEventMissed(event);
   const canEdit = !event.active && !eventStarted && !!event.type?.name;
 
   const handleCopyLink = async (url: string) => {
@@ -546,9 +538,9 @@ function EventScreen({ authType }: { authType: AuthType }) {
       if (sortBy === SortOptions.Status) {
         const getStatusRank = (conv: components['schemas']['Conversation']) => {
           if (conv.active) return 1;
-          if (conv.scheduledTime && new Date(conv.scheduledTime) > now) return 2;
           if (conv.endTime) return 3;
-          return 4; // missed: no startTime, no endTime, schedule passed or never scheduled
+          if (!isEventMissed(conv, now)) return 2; // scheduled in the future, or still within the auto-start grace period
+          return 4; // missed
         };
         const diff = getStatusRank(a) - getStatusRank(b);
         if (diff !== 0) return diff;
@@ -595,8 +587,8 @@ function EventScreen({ authType }: { authType: AuthType }) {
       if (endDateFilter && eventTime > endDateFilter) return false;
 
       if (conv.active) return statusFilters.includes('active');
-      if (conv.scheduledTime && new Date(conv.scheduledTime) > now) return statusFilters.includes('upcoming');
       if (conv.endTime) return statusFilters.includes('past');
+      if (!isEventMissed(conv, now)) return statusFilters.includes('upcoming');
       return statusFilters.includes('missed');
     });
   };
