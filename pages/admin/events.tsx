@@ -759,6 +759,41 @@ function EventScreen({ authType }: { authType: AuthType }) {
     setFilteredConversations(sortConversations(applyFilters(loadedConversations)));
   }, [loadedConversations]);
 
+  // conversation:started/stopped only broadcast to clients that joined that conversation's own
+  // socket room, which this list never does — so a card can freeze on a pre-start snapshot (e.g.
+  // Missed) after the real event has started or finished. Poll instead: keep re-fetching anything
+  // without an endTime yet; once an event ends it never changes again, so it drops out for good.
+  const loadedConversationsRef = useRef<Conversation[]>([]);
+  useEffect(() => {
+    loadedConversationsRef.current = loadedConversations;
+  }, [loadedConversations]);
+
+  useEffect(() => {
+    const POLL_INTERVAL_MS = 30 * 1000;
+    const poll = async () => {
+      const unsettled = loadedConversationsRef.current.filter((c) => !c.endTime);
+      if (unsettled.length === 0) return;
+
+      const refreshed = await Promise.all(
+        unsettled.map(async (c) => {
+          try {
+            return await getConversation(c.id!);
+          } catch (err) {
+            console.error(`Failed to refresh conversation ${c.id}:`, err);
+            return null;
+          }
+        }),
+      );
+
+      const byId = new Map(refreshed.filter((c): c is Conversation => !!c).map((c) => [c.id, c]));
+      if (byId.size === 0) return;
+      setLoadedConversations((prev) => prev.map((c) => byId.get(c.id!) ?? c));
+    };
+
+    const interval = setInterval(poll, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <>
       <Snackbar
