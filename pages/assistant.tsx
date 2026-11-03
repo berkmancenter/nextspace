@@ -500,12 +500,17 @@ export function EventAssistantRoom({
     RetrieveData(`conversations/${router.query.conversationId}`, Api.get().getAccessToken())
       .then((data) => {
         if (Array.isArray(data?.resources)) setResources(data.resources);
+        // A client asleep or reconnecting right at the official start can miss the one-time
+        // conversation:started broadcast entirely; this catches that case too (a no-op if
+        // already on the live channel, since markEventStarted checks groupChatChannelName itself).
+        if (data?.active === true) markEventStarted();
       })
       .catch((err) => console.error('Error re-fetching resources after reconnect:', err));
 
     fetchAllAssistantMessages();
     fetchChatMessages();
-    // fetchAllAssistantMessages, fetchChatMessages, setResources are stable (useCallback / setState).
+    // fetchAllAssistantMessages, fetchChatMessages, setResources, markEventStarted are stable
+    // (useCallback / setState).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastReconnectTime, router.query.conversationId, chatPasscode, initialJoinComplete, eventStatus]);
 
