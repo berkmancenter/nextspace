@@ -46,6 +46,55 @@ const GoalPill: FC<{ label: string }> = ({ label }) => (
 );
 
 /**
+ * The pregame "three facts" card: a one-off styled moment rather than a plain assistant bubble,
+ * since its job is to get people excited before an event starts, not blend into the stream.
+ * `facts` is rendered as a true list (no bullet-parsing out of prose) and the optional
+ * `invitation` line is the one piece of LLM-written prose left, inviting a reply.
+ */
+const ThreeFactsCard: FC<{ facts: string[]; invitation?: string }> = ({ facts, invitation }) => (
+  <div
+    className="relative w-full overflow-hidden rounded-2xl border border-[#D7DAFC] bg-gradient-to-br from-[#EEF0FE] to-[#F8EEFC] px-4 py-3.5 dark:border-[#5A1A93] dark:from-[#3B0A6B] dark:to-[#450F74]"
+    style={{ boxShadow: '0 10px 24px -14px rgba(72, 69, 210, 0.45)' }}
+  >
+    <div
+      className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[#4845D2] via-[#9254DE] to-[#4845D2] dark:from-[#B5AAEF] dark:via-[#8B6FD1] dark:to-[#B5AAEF]"
+      aria-hidden="true"
+    />
+    <div className="mb-3 flex items-center gap-2 text-[15px] font-bold text-[#4845D2] dark:text-nx-text">
+      <span
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#4845D2] to-[#9254DE] text-[13px] dark:from-[#B5AAEF] dark:to-[#8B6FD1]"
+        style={{ boxShadow: '0 2px 6px -1px rgba(72, 69, 210, 0.5)' }}
+        aria-hidden="true"
+      >
+        ✨
+      </span>
+      Fun Facts
+    </div>
+    <div className="flex flex-col overflow-hidden rounded-lg bg-white/70 dark:bg-black/20">
+      {facts.map((fact, i) => (
+        <div
+          key={i}
+          className={`flex items-start gap-2.5 px-2.5 py-2 ${i % 2 === 1 ? 'bg-[#4845D2]/20 dark:bg-[#B5AAEF]/25' : ''}`}
+        >
+          <span
+            className="mt-0.5 flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#4845D2] to-[#9254DE] text-[11px] font-bold text-white dark:from-[#B5AAEF] dark:to-[#8B6FD1] dark:text-[#2A0449]"
+            style={{ boxShadow: '0 2px 5px -1px rgba(72, 69, 210, 0.45)' }}
+          >
+            {i + 1}
+          </span>
+          <p className="m-0 leading-[1.48] text-gray-800">{fact}</p>
+        </div>
+      ))}
+    </div>
+    {invitation && (
+      <p className="relative z-[1] m-0 mt-2.5 border-t border-[#4845D2]/20 pt-2.5 font-medium text-[#4845D2] dark:border-[#B5AAEF]/25 dark:text-nx-text-secondary">
+        {invitation}
+      </p>
+    )}
+  </div>
+);
+
+/**
  * Render assistant message with markdown support
  * Converts markdown formatting (bold, italic, lists, etc.) to HTML
  */
@@ -267,6 +316,15 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             {parsed.text && renderAssistantMessage(parsed.text)}
             <PollMessage body={pollBody} counts={counts} presentation={presentation} />
           </div>
+        </div>
+      );
+    }
+
+    // Pregame "three facts" intro — its own styled card rather than a plain assistant bubble
+    if (parsed.type === 'threeFacts' && parsed.facts && parsed.facts.length > 0) {
+      return (
+        <div style={{ width: '85%' }}>
+          <ThreeFactsCard facts={parsed.facts} invitation={parsed.invitation} />
         </div>
       );
     }
