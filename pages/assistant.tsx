@@ -18,7 +18,7 @@ import { PreferencesPanel } from '../components/PreferencesPanel';
 import { PresentationHeader } from '../components/PresentationHeader';
 import { insertMessageInOrder } from '../utils/messageModeration';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
-import { CheckAuthHeader } from '../utils/Helpers';
+import { CheckAuthHeader, parseMessageBody } from '../utils/Helpers';
 import { withStoredChannels } from '../utils/presentationChannels';
 import TokenManagerDefault from '../utils/TokenManager';
 import { Alert, Button, Dialog, Snackbar } from '@mui/material';
@@ -40,6 +40,10 @@ export const getServerSideProps = async (context: { req: any }) => {
 };
 
 const NO_AGENT_IDS: string[] = [];
+
+// Both the live channel and its pre-event stand-in count as "group chat" for incoming messages,
+// since a reply can still land on the channel just switched away from (see eventStartedHandler).
+const GROUP_CHAT_CHANNELS = ['chat', 'pregame'];
 
 export function EventAssistantRoom({
   authType: _authType,
@@ -117,6 +121,8 @@ export function EventAssistantRoom({
     feedbackFrequency,
     transcriptPasscode,
     chatPasscode,
+    groupChatChannelName,
+    eventScheduledTime,
     initialJoinComplete,
     setInitialJoinComplete,
     chatIntroRef,
@@ -127,6 +133,7 @@ export function EventAssistantRoom({
     showEventStatusDialog,
     setShowEventStatusDialog,
     markEventEnded,
+    markEventStarted,
   } = useConversationSetup({
     socket,
     userId,
@@ -154,6 +161,17 @@ export function EventAssistantRoom({
 
   // Optimistic admin verdicts still waiting on the server, kept for fetches that land in the meantime.
   const pendingHiddenRef = useRef(new Map<string, boolean>());
+  // Set when the pregame->chat switch needs the group chat intro swapped for the chat channel's
+  // own intro. Consumed by the join callback, which fires asynchronously, so it can land before
+  // or after fetchChatMessages's REST read of chatIntroRef without either dropping the swap.
+  const pendingGroupChatIntroSwapRef = useRef(false);
+  // Mirrors groupChatChannelName for the join effect's async response callback, which closes over
+  // whichever channel it was joining for — a stale response for a channel already left (e.g. a
+  // slow pregame join resolving after the switch to chat) is detected by comparing against this.
+  const groupChatChannelNameRef = useRef(groupChatChannelName);
+  useEffect(() => {
+    groupChatChannelNameRef.current = groupChatChannelName;
+  }, [groupChatChannelName]);
 
   const {
     assistantMessages,
@@ -176,6 +194,7 @@ export function EventAssistantRoom({
     agentId,
     agentIds: privateChatAgentIds,
     chatPasscode,
+    groupChatChannelName,
     initialJoinComplete,
     chatIntroRef,
     assistantIntroRef,
@@ -185,6 +204,7 @@ export function EventAssistantRoom({
 
   const [waitingForResponse, setWaitingForResponse] = useState(false);
   const [waitingForChatResponse, setWaitingForChatResponse] = useState(false);
+  const [eventStartedToastOpen, setEventStartedToastOpen] = useState(false);
   const [messageRatings, setMessageRatings] = useState<Map<string, string>>(new Map());
   const [controlledMode, setControlledMode] = useState<ControlledInputConfig | null>(null);
   const [assistantInputValue, setAssistantInputValue] = useState<string>('');
@@ -241,7 +261,7 @@ export function EventAssistantRoom({
         }
       }
 
-      if (data.channels && data.channels.includes('chat')) {
+      if (data.channels && data.channels.some((c) => GROUP_CHAT_CHANNELS.includes(c))) {
         // Deduped by id and slotted in by createdAt: an unhidden message can arrive after newer ones.
         setChatMessages((prev) => insertMessageInOrder(prev, data));
         if (activeTabRef.current !== 'chat') {
@@ -255,7 +275,7 @@ export function EventAssistantRoom({
       }
 
       if (data.fromAgent) {
-        if (data.channels && data.channels.includes('chat')) {
+        if (data.channels && data.channels.some((c) => GROUP_CHAT_CHANNELS.includes(c))) {
           setWaitingForChatResponse(false);
         } else {
           setWaitingForResponse(false);
@@ -265,6 +285,20 @@ export function EventAssistantRoom({
 
     const resourcesUpdatedHandler = (payload: { resources: Resource[] }) =>
       handleResourcesUpdated(payload, activeTabRef.current === 'resources');
+
+    // Pregame messages stay in their own channel rather than carrying over, so clear them here
+    // instead of waiting on the live channel's history fetch — a toast explains why chat just
+    // emptied, since the fetch landing in a stale-looking panel would read as a loss, not a handoff.
+    const eventStartedHandler = () => {
+      if (groupChatChannelName !== 'pregame') return;
+      setChatMessages([]);
+      setWaitingForChatResponse(false);
+      setMessagesWithUnreadReplies(new Set());
+      setUnseenChatCount(0);
+      pendingGroupChatIntroSwapRef.current = true;
+      markEventStarted();
+      setEventStartedToastOpen(true);
+    };
 
     const pollChoiceHandler = (data: { pollId: string; counts: Record<string, number> }) => {
       if (!data?.pollId || !data?.counts) return;
@@ -277,6 +311,7 @@ export function EventAssistantRoom({
     socket.on('resources:updated', resourcesUpdatedHandler);
     socket.on('conversation:ending', handleConversationEnding);
     socket.on('conversation:stopped', markEventEnded);
+    socket.on('conversation:started', eventStartedHandler);
     socket.on('choice:new', pollChoiceHandler);
 
     console.log('Socket event listeners registered');
@@ -286,11 +321,20 @@ export function EventAssistantRoom({
       socket.off('resources:updated', resourcesUpdatedHandler);
       socket.off('conversation:ending', handleConversationEnding);
       socket.off('conversation:stopped', markEventEnded);
+      socket.off('conversation:started', eventStartedHandler);
       socket.off('choice:new', pollChoiceHandler);
     };
     // activeTabRef is a ref; the remaining omitted values are stable state setters from hooks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, socket?.connected, handleResourcesUpdated, handleConversationEnding, markEventEnded]);
+  }, [
+    socket,
+    socket?.connected,
+    groupChatChannelName,
+    handleResourcesUpdated,
+    handleConversationEnding,
+    markEventEnded,
+    markEventStarted,
+  ]);
 
   // Track user ID in analytics when pseudonym is available
   useEffect(() => {
@@ -322,7 +366,7 @@ export function EventAssistantRoom({
     const channels: components['schemas']['Channel'][] = [...agentChannels];
     if (chatPasscode) {
       channels.push({
-        name: 'chat',
+        name: groupChatChannelName,
         passcode: chatPasscode,
         direct: false,
       });
@@ -334,6 +378,7 @@ export function EventAssistantRoom({
     const joinConversation = () => {
       if (hasJoinedConvRef.current) return;
       hasJoinedConvRef.current = true;
+      const joinedChannelName = groupChatChannelName;
       console.log('Joining conversation');
       emitWithTokenRefresh(
         socket,
@@ -345,11 +390,18 @@ export function EventAssistantRoom({
           ...(presentation && { observer: true }),
         },
         (response) => {
+          // A slow join for a channel we've since left (e.g. pregame, after the switch to chat)
+          // lands after the fresh join for the current channel — ignore it rather than re-apply
+          // its now-stale intros.
+          if (joinedChannelName !== groupChatChannelNameRef.current) return;
+
           console.log('Successfully joined conversation');
 
           const intros: PseudonymousMessage[] = response?.intros ?? [];
 
-          chatIntroRef.current = intros.filter((m) => Array.isArray(m.channels) && m.channels.includes('chat'));
+          chatIntroRef.current = intros.filter(
+            (m) => Array.isArray(m.channels) && m.channels.includes(groupChatChannelName),
+          );
           assistantIntroRef.current = intros.filter(
             (m) => Array.isArray(m.channels) && m.channels.some((c) => c.includes(`-${agentId}`)),
           );
@@ -361,6 +413,14 @@ export function EventAssistantRoom({
             }
             return true;
           });
+
+          if (pendingGroupChatIntroSwapRef.current) {
+            pendingGroupChatIntroSwapRef.current = false;
+            setChatMessages((prev) => [
+              ...chatIntroRef.current,
+              ...prev.filter((m) => parseMessageBody(m.body)?.type !== 'intro'),
+            ]);
+          }
         },
         (error) => {
           console.error('Failed to join conversation:', error);
@@ -385,7 +445,17 @@ export function EventAssistantRoom({
     // chatIntroRef, assistantIntroRef, hasJoinedConvRef are refs; the remaining omitted values
     // are stable setters from hooks. This matches the original join effect behavior.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, agentId, agentActive, privateChatAgentIds, presentation, userId, chatPasscode, router.query.conversationId]);
+  }, [
+    socket,
+    agentId,
+    agentActive,
+    privateChatAgentIds,
+    presentation,
+    userId,
+    chatPasscode,
+    groupChatChannelName,
+    router.query.conversationId,
+  ]);
 
   // Re-fetch all message history when the socket reconnects after a significant gap.
   // Cross-cutting: uses messages (fetchChatMessages, fetchAllAssistantMessages) + resources (setResources)
@@ -409,12 +479,17 @@ export function EventAssistantRoom({
     RetrieveData(`conversations/${router.query.conversationId}`, Api.get().getAccessToken())
       .then((data) => {
         if (Array.isArray(data?.resources)) setResources(data.resources);
+        // A client asleep or reconnecting right at the official start can miss the one-time
+        // conversation:started broadcast entirely; this catches that case too (a no-op if
+        // already on the live channel, since markEventStarted checks groupChatChannelName itself).
+        if (data?.active === true) markEventStarted();
       })
       .catch((err) => console.error('Error re-fetching resources after reconnect:', err));
 
     fetchAllAssistantMessages();
     fetchChatMessages();
-    // fetchAllAssistantMessages, fetchChatMessages, setResources are stable (useCallback / setState).
+    // fetchAllAssistantMessages, fetchChatMessages, setResources, markEventStarted are stable
+    // (useCallback / setState).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastReconnectTime, router.query.conversationId, chatPasscode, initialJoinComplete, eventStatus]);
 
@@ -443,7 +518,9 @@ export function EventAssistantRoom({
     const effectiveTab = activeTab === 'transcript' ? 'assistant' : activeTab;
 
     let channels =
-      effectiveTab === 'chat' ? [{ name: 'chat', passcode: chatPasscode }] : [{ name: `direct-${userId}-${agentId}` }];
+      effectiveTab === 'chat'
+        ? [{ name: groupChatChannelName, passcode: chatPasscode }]
+        : [{ name: `direct-${userId}-${agentId}` }];
 
     if (effectiveTab !== 'chat' && parentMessageId) {
       const parentMessage = assistantMessages.find((m) => m.id === parentMessageId);
@@ -731,6 +808,7 @@ export function EventAssistantRoom({
                           presentation={presentation}
                           isAdmin={isAdmin}
                           moderation={moderation}
+                          eventScheduledTime={groupChatChannelName === 'pregame' ? eventScheduledTime : null}
                         />
                       ) : activeTab === 'resources' ? (
                         <ResourcesPanel
@@ -799,6 +877,12 @@ export function EventAssistantRoom({
       <Snackbar open={Boolean(toast)} autoHideDuration={6000} onClose={clearToast}>
         <Alert severity={toast?.severity ?? 'info'} onClose={clearToast}>
           {toast?.text}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar open={eventStartedToastOpen} autoHideDuration={6000} onClose={() => setEventStartedToastOpen(false)}>
+        <Alert severity="info" onClose={() => setEventStartedToastOpen(false)}>
+          The event has started. Group chat has switched to the live channel.
         </Alert>
       </Snackbar>
     </>

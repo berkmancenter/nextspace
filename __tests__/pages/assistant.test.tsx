@@ -3280,6 +3280,12 @@ describe('EventAssistantRoom', () => {
     };
 
     it('allows chat and skips the Event Not Started notice inside the pre-event window', async () => {
+      // A pregame passcode in the link, same as a real link minted after this feature shipped —
+      // see the "stale link" test below for one without it.
+      mockRouter.query = {
+        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
+        channel: ['chat,chat-pass', 'pregame,pregame-pass'],
+      };
       const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes from now
       mockInactiveConversation({ scheduledTime, preEventMinutes: 10 }); // window opens 10 minutes before
 
@@ -3290,6 +3296,21 @@ describe('EventAssistantRoom', () => {
       await waitFor(() => {
         expect(screen.queryByText('Event Not Started')).not.toBeInTheDocument();
         expect(screen.queryByText('This event is not active.')).not.toBeInTheDocument();
+      });
+    });
+
+    it('shows the Event Not Started notice for a stale link with no pregame passcode, inside the pre-event window', async () => {
+      // Minted before the pregame channel existed: a chat passcode, but no pregame one.
+      mockRouter.query = { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6', channel: 'chat,chat-pass' };
+      const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes from now
+      mockInactiveConversation({ scheduledTime, preEventMinutes: 10 }); // window opens 10 minutes before
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Event Not Started')).toBeInTheDocument();
       });
     });
 
@@ -3317,6 +3338,251 @@ describe('EventAssistantRoom', () => {
       await waitFor(() => {
         expect(screen.getByText('Event Not Started')).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('pregame countdown banner', () => {
+    const setupPregame = (scheduledOffsetMs: number) => {
+      const scheduledTime = new Date(Date.now() + scheduledOffsetMs).toISOString();
+      mockRouter.query = {
+        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
+        channel: ['chat,chat-pass', 'pregame,pregame-pass'],
+      };
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({
+            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+            active: false,
+            scheduledTime,
+            preEventMinutes: 10,
+          });
+        }
+        return Promise.resolve([]);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        active: false,
+        scheduledTime,
+        preEventMinutes: 10,
+      });
+    };
+
+    it('counts down toward the scheduled start and turns urgent in the final stretch', async () => {
+      jest.useFakeTimers();
+      try {
+        setupPregame(65_000); // 1:05 remaining
+
+        await act(async () => {
+          render(<EventAssistantRoom authType={'guest'} />);
+        });
+
+        expect(screen.getByText(/Event starts in 1:05/)).toBeInTheDocument();
+
+        act(() => {
+          jest.advanceTimersByTime(36_000); // down to 0:29, inside the 30s urgent window
+        });
+
+        const banner = screen.getByText(/Event starts in 0:29/);
+        expect(banner).toHaveClass('bg-amber-100');
+
+        act(() => {
+          jest.advanceTimersByTime(29_000); // past zero
+        });
+
+        expect(screen.getByText(/starting any moment/i)).toBeInTheDocument();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('does not show a countdown once on the chat (not pregame) channel', async () => {
+      mockRouter.query = { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6', channel: 'chat,chat-pass' };
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }], active: true });
+        }
+        return Promise.resolve([]);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        active: true,
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      expect(screen.queryByText(/Event starts in/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('conversation:started socket event (pregame channel switch)', () => {
+    const pregameMsg = (id: string) => ({
+      id,
+      body: `msg ${id}`,
+      pseudonym: `User ${id}`,
+      channels: ['pregame'],
+      createdAt: '2024-01-01T10:00:00Z',
+    });
+
+    const handlers = (event: string): Function[] =>
+      mockSocket.on.mock.calls.filter(([e]: [string]) => e === event).map(([, h]: [string, Function]) => h);
+
+    const lastJoinCall = () =>
+      mockSocket.emit.mock.calls.filter(([event]: [string]) => event === 'conversation:join').at(-1);
+
+    beforeEach(async () => {
+      const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // inside the window
+      mockRouter.query = {
+        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
+        channel: ['chat,chat-pass', 'pregame,pregame-pass'],
+      };
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({
+            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+            active: false,
+            scheduledTime,
+            preEventMinutes: 10,
+          });
+        }
+        return Promise.resolve([]);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        active: false,
+        scheduledTime,
+        preEventMinutes: 10,
+      });
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      await waitFor(() => expect(mockSocket.on).toHaveBeenCalledWith('conversation:started', expect.any(Function)));
+      // Confirms the initial join actually used pregame, so the later re-join assertion is meaningful.
+      await waitFor(() => {
+        expect(lastJoinCall()?.[1].channels).toContainEqual({ name: 'pregame', passcode: 'pregame-pass', direct: false });
+      });
+    });
+
+    it('registers the conversation:started handler on the socket', () => {
+      expect(handlers('conversation:started').length).toBeGreaterThan(0);
+    });
+
+    it('clears pregame messages and shows a toast when the event starts', async () => {
+      act(() => {
+        handlers('message:new').forEach((h) => h(pregameMsg('p1')));
+      });
+      expect(await screen.findByText('msg p1')).toBeInTheDocument();
+
+      act(() => {
+        handlers('conversation:started').forEach((h) => h());
+      });
+
+      expect(screen.queryByText('msg p1')).not.toBeInTheDocument();
+      expect(await screen.findByText(/The event has started/i)).toBeInTheDocument();
+    });
+
+    it('re-joins with the chat channel and its own passcode after the event starts', async () => {
+      act(() => {
+        handlers('conversation:started').forEach((h) => h());
+      });
+
+      await waitFor(() => {
+        expect(lastJoinCall()?.[1].channels).toContainEqual({ name: 'chat', passcode: 'chat-pass', direct: false });
+      });
+    });
+  });
+
+  describe('conversation:started group chat intro swap', () => {
+    const handlers = (event: string): Function[] =>
+      mockSocket.on.mock.calls.filter(([e]: [string]) => e === event).map(([, h]: [string, Function]) => h);
+
+    it('replaces the pregame intro with the chat channel intro once the event starts', async () => {
+      const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // inside the window
+      mockRouter.query = {
+        conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6',
+        channel: ['chat,chat-pass', 'pregame,pregame-pass'],
+      };
+
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.startsWith('conversations/')) {
+          return Promise.resolve({
+            agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+            active: false,
+            scheduledTime,
+            preEventMinutes: 10,
+          });
+        }
+        return Promise.resolve([]);
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        active: false,
+        scheduledTime,
+        preEventMinutes: 10,
+      });
+
+      // Each join's response carries that channel's own intro, so the test can tell which
+      // channel the component actually joined from what shows up in the chat panel.
+      // mockImplementationOnce, not mockImplementation: this test's own join (pregame) and
+      // rejoin (chat, after conversation:started) are the only two calls it expects, and
+      // clearAllMocks (in the top-level beforeEach) doesn't reset a mockImplementation, so a
+      // persistent one here would leak into every later test in this file.
+      const { emitWithTokenRefresh } = require('../../utils');
+      const joinWithChannelIntro = (socket: any, event: string, data: any, onSuccess: Function) => {
+        const channelNames = (data.channels || []).map((c: any) => c.name);
+        let intros: any[] = [];
+        if (channelNames.includes('chat')) {
+          intros = [
+            {
+              id: 'chat-intro',
+              body: { type: 'intro', text: 'Chat intro' },
+              pseudonym: 'Berkie',
+              fromAgent: true,
+              channels: ['chat'],
+              createdAt: '2024-01-01T10:01:00Z',
+            },
+          ];
+        } else if (channelNames.includes('pregame')) {
+          intros = [
+            {
+              id: 'pregame-intro',
+              body: { type: 'intro', text: 'Pregame intro' },
+              pseudonym: 'Berkie',
+              fromAgent: true,
+              channels: ['pregame'],
+              createdAt: '2024-01-01T09:59:00Z',
+            },
+          ];
+        }
+        if (onSuccess) onSuccess({ intros });
+        socket.emit(event, data);
+      };
+      (emitWithTokenRefresh as jest.Mock)
+        .mockImplementationOnce(joinWithChannelIntro)
+        .mockImplementationOnce(joinWithChannelIntro);
+
+      await act(async () => {
+        render(<EventAssistantRoom authType={'guest'} />);
+      });
+
+      expect(await screen.findByText('Pregame intro')).toBeInTheDocument();
+
+      act(() => {
+        handlers('conversation:started').forEach((h) => h());
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Chat intro')).toBeInTheDocument();
+      });
+      expect(screen.queryByText('Pregame intro')).not.toBeInTheDocument();
     });
   });
 

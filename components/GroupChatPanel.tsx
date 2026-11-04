@@ -1,6 +1,7 @@
 import React, { FC, useEffect, useMemo, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { CountdownBanner } from './CountdownBanner';
 import { MessageInput } from './MessageInput';
 import { ThreadedMessage } from './ThreadedMessage';
 import { ThreadPanel } from './ThreadPanel';
@@ -103,6 +104,8 @@ interface GroupChatPanelProps {
   isAdmin?: boolean;
   /** Hide controls for the group chat. */
   moderation?: MessageModeration;
+  /** ISO timestamp for the pre-event countdown banner; omit once the event has started. */
+  eventScheduledTime?: string | null;
 }
 
 export const GroupChatPanel: FC<GroupChatPanelProps> = ({
@@ -125,6 +128,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   presentation = false,
   isAdmin = false,
   moderation,
+  eventScheduledTime,
 }) => {
   // The shared screen is read by the whole room: it carries no hide controls, and never shows hidden messages
   // (an admin's feed includes them, greyed out, for the moderation view).
@@ -449,6 +453,8 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             </Tooltip>
           )}
         </div>
+
+        {eventScheduledTime && <CountdownBanner eventScheduledTime={eventScheduledTime} presentation={presentation} />}
 
         {/* MessageInput*/}
         {inactive ? (

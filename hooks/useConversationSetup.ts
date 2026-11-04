@@ -45,6 +45,16 @@ export interface UseConversationSetupReturn {
   showEventStatusDialog: boolean;
   setShowEventStatusDialog: React.Dispatch<React.SetStateAction<boolean>>;
   markEventEnded: () => void;
+  /**
+   * Which channel group chat actually uses on the wire: 'pregame' inside the pre-event window (if
+   * that channel's passcode is in the URL), 'chat' otherwise. `chatPasscode` is whichever passcode
+   * goes with it, so callers don't need to branch between two passcodes themselves.
+   */
+  groupChatChannelName: 'chat' | 'pregame';
+  /** Switches group chat from pregame to chat on the backend's conversation:started event. */
+  markEventStarted: () => void;
+  /** The event's scheduled start time, for driving a pre-event countdown. Null until loaded. */
+  eventScheduledTime: string | null;
   setInitialJoinComplete: React.Dispatch<React.SetStateAction<boolean>>;
   chatIntroRef: React.MutableRefObject<PseudonymousMessage[]>;
   assistantIntroRef: React.MutableRefObject<PseudonymousMessage[]>;
@@ -80,6 +90,8 @@ export function useConversationSetup({
   const [feedbackFrequency, setFeedbackFrequency] = useState<number>(1);
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>('');
   const [chatPasscode, setChatPasscode] = useState<string>('');
+  const [eventScheduledTime, setEventScheduledTime] = useState<string | null>(null);
+  const [groupChatChannelName, setGroupChatChannelName] = useState<'chat' | 'pregame'>('chat');
   const [initialJoinComplete, setInitialJoinComplete] = useState(false);
 
   const [eventStatusLoaded, setEventStatusLoaded] = useState<boolean>(false);
@@ -89,6 +101,9 @@ export function useConversationSetup({
   const chatIntroRef = useRef<PseudonymousMessage[]>([]);
   const assistantIntroRef = useRef<PseudonymousMessage[]>([]);
   const hasJoinedConvRef = useRef(false);
+  // The real chat channel's own passcode, kept even while pregame is the active channel, so
+  // markEventStarted can switch back to it without needing a fresh conversation fetch.
+  const chatChannelPasscodeRef = useRef<string>('');
 
   /* Clear the shared conversation type and bot name when the event changes so
      the Quick Guide doesn't show stale values while the new conversation loads. */
@@ -156,13 +171,42 @@ export function useConversationSetup({
         setBotName(resolvedBotName);
         setBotNameContext(resolvedBotName);
 
+        const inPreEventWindow = isInPreEventWindow(conversation);
+        if (conversation?.scheduledTime) setEventScheduledTime(conversation.scheduledTime as string);
+
+        // A link minted before the pregame channel existed has no pregame passcode. Joining live
+        // chat with it during the pre-event window would split the room into two groups that
+        // can't see each other, so treat this the same as the event not having started yet.
+        let missingPregameAccess = false;
+
         if (query.channel) {
           const transcriptPasscodeParam = GetChannelPasscode('transcript', query, setGeneralError);
           if (transcriptPasscodeParam) setTranscriptPasscode(transcriptPasscodeParam);
 
           const chatPasscodeParam = GetChannelPasscode('chat', query, setGeneralError);
-          if (chatPasscodeParam) setChatPasscode(chatPasscodeParam);
+          if (chatPasscodeParam) chatChannelPasscodeRef.current = chatPasscodeParam;
+          // Not every link carries a pregame passcode (older links, or a conversation with no
+          // pregame window configured), so its absence is normal — never routed through setGeneralError.
+          const pregamePasscodeParam = GetChannelPasscode('pregame', query);
+
+          if (inPreEventWindow && pregamePasscodeParam) {
+            setGroupChatChannelName('pregame');
+            setChatPasscode(pregamePasscodeParam);
+          } else {
+            setGroupChatChannelName('chat');
+            if (chatPasscodeParam) setChatPasscode(chatPasscodeParam);
+            missingPregameAccess = inPreEventWindow && !pregamePasscodeParam;
+          }
         }
+
+        // The clock-based window closes the instant client-clock time passes scheduledTime, but
+        // the backend's actual flip to active/startTime can lag a few seconds behind. Someone
+        // arriving in that gap would otherwise hit the (unclosable) Event Not Started dialog for
+        // an event that's actually about to let them in — so this gap alone never blocks.
+        const pastScheduledTimeUnconfirmed =
+          !!conversation?.scheduledTime &&
+          new Date(conversation.scheduledTime as string).getTime() <= Date.now() &&
+          !conversation.startTime;
 
         const eventAsstAgent = conversation.agents.find(
           (agent: components['schemas']['Agent']) => agent.agentType === 'eventAssistant',
@@ -181,7 +225,7 @@ export function useConversationSetup({
           if (conversation.endTime) {
             setEventStatus('ended');
             setShowEventStatusDialog(true);
-          } else if (!isInPreEventWindow(conversation)) {
+          } else if (missingPregameAccess || (!inPreEventWindow && !pastScheduledTimeUnconfirmed)) {
             setEventStatus('future');
             setShowEventStatusDialog(true);
           }
@@ -214,6 +258,18 @@ export function useConversationSetup({
     setShowEventStatusDialog(true);
   }, []);
 
+  // Called when the backend sends conversation:started — the real, official start, as opposed to
+  // the pre-event window a pregame-connected tab has been chatting in. Switches group chat over
+  // to the real chat channel and its own passcode, and drops hasJoinedConvRef so the join effect
+  // re-emits conversation:join with the new channel (receiving chat's live messages needs an
+  // actual room join, not just an updated passcode). A no-op if already on chat.
+  const markEventStarted = useCallback(() => {
+    if (groupChatChannelName !== 'pregame') return;
+    if (chatChannelPasscodeRef.current) setChatPasscode(chatChannelPasscodeRef.current);
+    setGroupChatChannelName('chat');
+    hasJoinedConvRef.current = false;
+  }, [groupChatChannelName]);
+
   return {
     generalError,
     setGeneralError,
@@ -230,6 +286,8 @@ export function useConversationSetup({
     feedbackFrequency,
     transcriptPasscode,
     chatPasscode,
+    groupChatChannelName,
+    eventScheduledTime,
     initialJoinComplete,
     setInitialJoinComplete,
     chatIntroRef,
@@ -240,5 +298,6 @@ export function useConversationSetup({
     showEventStatusDialog,
     setShowEventStatusDialog,
     markEventEnded,
+    markEventStarted,
   };
 }

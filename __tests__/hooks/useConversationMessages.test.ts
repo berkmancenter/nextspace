@@ -276,6 +276,28 @@ describe('useConversationMessages', () => {
 
       consoleError.mockRestore();
     });
+
+    it('fetches from the pregame channel instead of chat when groupChatChannelName is pregame', async () => {
+      mockRetrieveData.mockResolvedValue([]);
+      const { result } = renderMessages({ groupChatChannelName: 'pregame' });
+
+      await act(async () => {
+        await result.current.fetchChatMessages();
+      });
+
+      expect(mockRetrieveData).toHaveBeenCalledWith('messages/conv-1?channel=pregame,chat-pass', 'mock-access-token');
+    });
+
+    it('defaults to the chat channel when groupChatChannelName is not given', async () => {
+      mockRetrieveData.mockResolvedValue([]);
+      const { result } = renderMessages();
+
+      await act(async () => {
+        await result.current.fetchChatMessages();
+      });
+
+      expect(mockRetrieveData).toHaveBeenCalledWith('messages/conv-1?channel=chat,chat-pass', 'mock-access-token');
+    });
   });
 
   describe('auto-fetch effects driven by initialJoinComplete', () => {

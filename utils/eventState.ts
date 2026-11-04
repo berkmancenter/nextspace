@@ -65,3 +65,26 @@ export function isInPreEventWindow(
   const windowStart = scheduledTime - conversation.preEventMinutes * 60 * 1000;
   return now.getTime() >= windowStart && now.getTime() < scheduledTime;
 }
+
+// The backend auto-starts a conversation via a job that polls every 10 seconds, so scheduledTime
+// can pass a few seconds before startTime is actually stamped. Padding the "missed" check past
+// that lag keeps an about-to-start event from flashing as missed in that window.
+const AUTO_START_GRACE_MS = 30 * 1000;
+
+/**
+ * Whether an unconfirmed, inactive event has fully missed its auto-start — past its scheduled
+ * time by more than the backend's auto-start polling lag, with no startTime or endTime stamped.
+ * Shared by the admin events page's Missed badge, status filter, and status sort, so the three
+ * never disagree about whether an event counts as missed for a few seconds around that lag.
+ */
+export function isEventMissed(
+  conversation: Pick<Conversation, 'active' | 'startTime' | 'endTime' | 'scheduledTime'>,
+  now: Date = new Date(),
+): boolean {
+  return (
+    !conversation.active &&
+    !conversation.startTime &&
+    !conversation.endTime &&
+    (!conversation.scheduledTime || new Date(conversation.scheduledTime).getTime() + AUTO_START_GRACE_MS <= now.getTime())
+  );
+}

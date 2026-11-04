@@ -1040,6 +1040,40 @@ describe('Events Page - Missed badge', () => {
     expect(document.querySelector('.bg-yellow-100')).not.toBeInTheDocument();
   });
 
+  it('does not show Missed badge within the auto-start grace window just after scheduledTime', async () => {
+    const justPastScheduled = new Date(Date.now() - 5 * 1000).toISOString(); // 5s ago, inside the grace window
+    await renderWithEvent({
+      id: 'about-to-start',
+      name: 'About To Start Event',
+      active: false,
+      scheduledTime: justPastScheduled,
+      createdAt: justPastScheduled,
+      owner: mockUserId,
+      platformTypes: [],
+      type: { name: 'eventAssistant', label: 'Test Agent' },
+      eventUrls: { zoom: null, moderator: [], participant: [] },
+    });
+    await waitFor(() => expect(screen.getByText('About To Start Event')).toBeInTheDocument());
+    expect(document.querySelector('.bg-yellow-100')).not.toBeInTheDocument();
+  });
+
+  it('shows Missed badge once scheduledTime is past the auto-start grace window', async () => {
+    const wellPastScheduled = new Date(Date.now() - 60 * 1000).toISOString(); // 60s ago, past the grace window
+    await renderWithEvent({
+      id: 'truly-missed',
+      name: 'Truly Missed Event',
+      active: false,
+      scheduledTime: wellPastScheduled,
+      createdAt: wellPastScheduled,
+      owner: mockUserId,
+      platformTypes: [],
+      type: { name: 'eventAssistant', label: 'Test Agent' },
+      eventUrls: { zoom: null, moderator: [], participant: [] },
+    });
+    await waitFor(() => expect(screen.getByText('Truly Missed Event')).toBeInTheDocument());
+    expect(document.querySelector('.bg-yellow-100')).toBeInTheDocument();
+  });
+
   it('does not show Missed badge for an upcoming scheduled event', async () => {
     const futureTime = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
     (Request as jest.Mock).mockResolvedValue([
@@ -1068,6 +1102,122 @@ describe('Events Page - Missed badge', () => {
     });
     await waitFor(() => expect(screen.getByText('Upcoming Event')).toBeInTheDocument());
     expect(screen.queryByText('Missed')).not.toBeInTheDocument();
+  });
+});
+
+describe('Events Page - live status refresh', () => {
+  const mockUserId = 'user-123';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useSessionJoin as jest.Mock).mockReturnValue({ userId: mockUserId });
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => [] });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  // Adds a status to the default ['active', 'upcoming'] filters (rather than replacing them), so
+  // an event stays visible across a status transition during the test (e.g. missed -> active).
+  const addStatusFilter = async (user: ReturnType<typeof userEvent.setup>, status: string) => {
+    await user.click(screen.getByRole('button', { name: /filters/i }));
+    const statusSelect = await screen.findByLabelText('Status');
+    await user.click(statusSelect);
+    await user.click(await screen.findByRole('option', { name: new RegExp(status, 'i') }));
+    await user.keyboard('{Escape}');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  };
+
+  it('replaces a frozen pre-start browser snapshot with fresh data, clearing a wrongly-shown Missed badge', async () => {
+    jest.useFakeTimers();
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    try {
+      // The conversation itself started on time on the backend — this models the browser
+      // simply not knowing that yet, e.g. because it fetched before that happened and never
+      // refetched since. Not a claim that the backend took 60s to start.
+      const scheduledTime = new Date(Date.now() - 60 * 1000).toISOString();
+      const frozenBrowserSnapshot = {
+        id: 'e1',
+        name: 'Polled Event',
+        active: false,
+        scheduledTime,
+        createdAt: scheduledTime,
+        owner: mockUserId,
+        platformTypes: [],
+        type: { name: 'eventAssistant', label: 'Test Agent' },
+        eventUrls: { zoom: null, moderator: [], participant: [] },
+      };
+      (Request as jest.Mock).mockResolvedValue([frozenBrowserSnapshot]);
+      (getConversation as jest.Mock).mockResolvedValue(frozenBrowserSnapshot);
+
+      await act(async () => {
+        render(<EventsPage authType={'user'} />);
+      });
+
+      await addStatusFilter(user, 'missed');
+
+      expect(await screen.findByText('Polled Event')).toBeInTheDocument();
+      expect(document.querySelector('.bg-yellow-100')).toBeInTheDocument();
+      const callsBeforePoll = (getConversation as jest.Mock).mock.calls.length;
+
+      // The next poll finally reflects the backend's actual (and long-since-true) state.
+      (getConversation as jest.Mock).mockResolvedValue({
+        ...frozenBrowserSnapshot,
+        active: true,
+        startTime: new Date(Date.now() - 30 * 1000).toISOString(),
+      });
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(30 * 1000);
+      });
+
+      expect(document.querySelector('.bg-yellow-100')).not.toBeInTheDocument();
+      expect((getConversation as jest.Mock).mock.calls.length).toBeGreaterThan(callsBeforePoll);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('stops re-fetching a conversation once it has an endTime', async () => {
+    jest.useFakeTimers();
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    try {
+      const pastTime = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      const endedEvent = {
+        id: 'e2',
+        name: 'Finished Event',
+        active: false,
+        scheduledTime: pastTime,
+        startTime: pastTime,
+        endTime: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        createdAt: pastTime,
+        owner: mockUserId,
+        platformTypes: [],
+        type: { name: 'eventAssistant', label: 'Test Agent' },
+        eventUrls: { zoom: null, moderator: [], participant: [] },
+      };
+      (Request as jest.Mock).mockResolvedValue([endedEvent]);
+      (getConversation as jest.Mock).mockResolvedValue(endedEvent);
+
+      await act(async () => {
+        render(<EventsPage authType={'user'} />);
+      });
+
+      await addStatusFilter(user, 'past');
+
+      expect(await screen.findByText('Finished Event')).toBeInTheDocument();
+      const callsAfterInitialLoad = (getConversation as jest.Mock).mock.calls.length;
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(30 * 1000);
+      });
+
+      expect((getConversation as jest.Mock).mock.calls.length).toBe(callsAfterInitialLoad);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

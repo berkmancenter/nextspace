@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { getUserTimezone } from '../../utils';
 import { CheckAuthHeader, getConversation } from '../../utils/Helpers';
+import { isEventMissed } from '../../utils/eventState';
 import { useSessionJoin } from '../../hooks/useSessionJoin';
 
 import React from 'react';
@@ -77,11 +78,7 @@ const EventCard = ({
   // Edit is available for future inactive events with a known type
   const eventStarted = !!event.startTime;
   const isPast = !!event.endTime;
-  const isMissed =
-    !event.active &&
-    !event.startTime &&
-    !event.endTime &&
-    (!event.scheduledTime || new Date(event.scheduledTime) <= new Date());
+  const isMissed = isEventMissed(event);
   const canEdit = !event.active && !eventStarted && !!event.type?.name;
 
   const handleCopyLink = async (url: string) => {
@@ -541,9 +538,9 @@ function EventScreen({ authType }: { authType: AuthType }) {
       if (sortBy === SortOptions.Status) {
         const getStatusRank = (conv: components['schemas']['Conversation']) => {
           if (conv.active) return 1;
-          if (conv.scheduledTime && new Date(conv.scheduledTime) > now) return 2;
           if (conv.endTime) return 3;
-          return 4; // missed: no startTime, no endTime, schedule passed or never scheduled
+          if (!isEventMissed(conv, now)) return 2; // scheduled in the future, or still within the auto-start grace period
+          return 4; // missed
         };
         const diff = getStatusRank(a) - getStatusRank(b);
         if (diff !== 0) return diff;
@@ -590,8 +587,8 @@ function EventScreen({ authType }: { authType: AuthType }) {
       if (endDateFilter && eventTime > endDateFilter) return false;
 
       if (conv.active) return statusFilters.includes('active');
-      if (conv.scheduledTime && new Date(conv.scheduledTime) > now) return statusFilters.includes('upcoming');
       if (conv.endTime) return statusFilters.includes('past');
+      if (!isEventMissed(conv, now)) return statusFilters.includes('upcoming');
       return statusFilters.includes('missed');
     });
   };
@@ -761,6 +758,41 @@ function EventScreen({ authType }: { authType: AuthType }) {
   useEffect(() => {
     setFilteredConversations(sortConversations(applyFilters(loadedConversations)));
   }, [loadedConversations]);
+
+  // conversation:started/stopped only broadcast to clients that joined that conversation's own
+  // socket room, which this list never does — so a card can freeze on a pre-start snapshot (e.g.
+  // Missed) after the real event has started or finished. Poll instead: keep re-fetching anything
+  // without an endTime yet; once an event ends it never changes again, so it drops out for good.
+  const loadedConversationsRef = useRef<Conversation[]>([]);
+  useEffect(() => {
+    loadedConversationsRef.current = loadedConversations;
+  }, [loadedConversations]);
+
+  useEffect(() => {
+    const POLL_INTERVAL_MS = 30 * 1000;
+    const poll = async () => {
+      const unsettled = loadedConversationsRef.current.filter((c) => !c.endTime);
+      if (unsettled.length === 0) return;
+
+      const refreshed = await Promise.all(
+        unsettled.map(async (c) => {
+          try {
+            return await getConversation(c.id!);
+          } catch (err) {
+            console.error(`Failed to refresh conversation ${c.id}:`, err);
+            return null;
+          }
+        }),
+      );
+
+      const byId = new Map(refreshed.filter((c): c is Conversation => !!c).map((c) => [c.id, c]));
+      if (byId.size === 0) return;
+      setLoadedConversations((prev) => prev.map((c) => byId.get(c.id!) ?? c));
+    };
+
+    const interval = setInterval(poll, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <>

@@ -344,6 +344,34 @@ describe('generateEventUrls (via createConversationFromData)', () => {
     expect(url).toContain('channel=chat,chat-pass');
   });
 
+  it('includes a pregame param when the conversation has a pregame channel', async () => {
+    const data = {
+      ...baseConversation,
+      channels: [
+        { name: 'transcript', passcode: 'tx-pass' },
+        { name: 'chat', passcode: 'chat-pass' },
+        { name: 'pregame', passcode: 'pregame-pass' },
+      ],
+    };
+    const result = await createConversationFromData(data as any);
+    const url = result.eventUrls.participant[0]?.url;
+    expect(url).toContain('channel=chat,chat-pass');
+    expect(url).toContain('channel=pregame,pregame-pass');
+  });
+
+  it('omits the pregame param when the conversation has no pregame channel configured', async () => {
+    const data = {
+      ...baseConversation,
+      channels: [
+        { name: 'transcript', passcode: 'tx-pass' },
+        { name: 'chat', passcode: 'chat-pass' },
+      ],
+    };
+    const result = await createConversationFromData(data as any);
+    const url = result.eventUrls.participant[0]?.url;
+    expect(url).not.toContain('pregame');
+  });
+
   it('builds a presentation URL with the same channels as the participant URL', async () => {
     const data = {
       ...baseConversation,

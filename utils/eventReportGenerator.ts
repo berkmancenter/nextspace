@@ -234,7 +234,7 @@ async function fetchUserMetricsReport(conversationId: string): Promise<string> {
   const params = new URLSearchParams({
     reportName: 'userMetrics',
     format: 'csv',
-    additionalChannels: 'chat',
+    additionalChannels: 'chat,pregame',
     agent: 'eventAssistant',
   });
 
@@ -460,7 +460,7 @@ export async function generateAndDownloadDirectMessageResponsesReport(conversati
   const params = new URLSearchParams({
     reportName: 'directMessageResponses',
     format: 'text',
-    additionalChannels: 'chat',
+    additionalChannels: 'chat,pregame',
   });
 
   const urlSuffix = `conversations/${conversationId}/report?${params.toString()}`;
