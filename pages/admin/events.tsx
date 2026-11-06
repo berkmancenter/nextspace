@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { getUserTimezone } from '../../utils';
 import { CheckAuthHeader, getConversation } from '../../utils/Helpers';
-import { isEventMissed } from '../../utils/eventState';
+import { isEventMissed, isInPreEventWindow } from '../../utils/eventState';
 import { useSessionJoin } from '../../hooks/useSessionJoin';
 
 import React from 'react';
@@ -75,11 +75,13 @@ const EventCard = ({
   // Check if current user is the owner of this event (used for "My Event" badge only)
   const isOwner = currentUserId && event.owner === currentUserId;
 
-  // Edit is available for future inactive events with a known type
+  // Edit is available for future inactive events with a known type. A confirmed event's
+  // pre-event window leaves `active` false and `startTime` unset (the backend already lets
+  // people chat there), so it must be excluded explicitly or it would otherwise read as editable.
   const eventStarted = !!event.startTime;
   const isPast = !!event.endTime;
   const isMissed = isEventMissed(event);
-  const canEdit = !event.active && !eventStarted && !!event.type?.name;
+  const canEdit = !event.active && !eventStarted && !isInPreEventWindow(event) && !!event.type?.name;
 
   const handleCopyLink = async (url: string) => {
     try {
