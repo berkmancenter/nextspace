@@ -22,6 +22,14 @@ export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
 
+// Which moderator-channel messages this view renders, shared by the initial fetch and the
+// gap-reconnect refetch so the two never disagree on which message shapes to keep.
+const isModeratorViewMessage = (message: PseudonymousMessage) =>
+  message.channels![0] === 'moderator' &&
+  (message.body.hasOwnProperty('insights') ||
+    message.body.hasOwnProperty('metrics') ||
+    message.body.type === 'questionResults');
+
 function ModeratorScreen({ authType }: { authType: AuthType }) {
   const router = useRouter();
 
@@ -156,15 +164,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
         else setGeneralError(conversationMessagesResponse.message?.message || 'Failed to fetch conversation messages.');
         return;
       } else if (Array.isArray(conversationMessagesResponse)) {
-        setMessages(
-          (conversationMessagesResponse as PseudonymousMessage[]).filter(
-            (message) =>
-              message.channels![0] === 'moderator' &&
-              (message.body.hasOwnProperty('insights') ||
-                message.body.hasOwnProperty('metrics') ||
-                message.body.type === 'questionResults'),
-          ),
-        );
+        setMessages((conversationMessagesResponse as PseudonymousMessage[]).filter(isModeratorViewMessage));
       }
 
       // Conversation join is handled by the dedicated useEffect below,
@@ -188,15 +188,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
     RetrieveData(`messages/${router.query.conversationId}?channel=moderator,${modPasscode}`, Api.get().getAccessToken())
       .then((msgs) => {
         if (Array.isArray(msgs)) {
-          setMessages(
-            (msgs as PseudonymousMessage[]).filter(
-              (message) =>
-                message.channels![0] === 'moderator' &&
-                (message.body.hasOwnProperty('insights') ||
-                  message.body.hasOwnProperty('metrics') ||
-                  message.body.type === 'questionResults'),
-            ),
-          );
+          setMessages((msgs as PseudonymousMessage[]).filter(isModeratorViewMessage));
         }
       })
       .catch((err) => console.error('Error re-fetching moderator messages:', err));
