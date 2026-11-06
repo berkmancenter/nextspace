@@ -399,6 +399,51 @@ const mockConfig = {
         },
       ],
     },
+    {
+      name: 'warmUpType',
+      label: 'Warm-Up Type',
+      description: 'A conversation type exercising enum/array feature sub-properties',
+      properties: [
+        {
+          name: 'zoomMeetingUrl',
+          type: 'string',
+          label: 'Zoom Meeting URL',
+          required: true,
+        },
+      ],
+      features: [
+        {
+          name: 'warmUp',
+          label: 'Warm-Up Questions',
+          description: 'Ask a warm-up question before the event',
+          userControlled: false,
+          default: false,
+          properties: [
+            {
+              name: 'questionFormat',
+              type: 'enum',
+              label: 'Warm-Up Question Format',
+              description: 'Open-ended text, or a single-choice question with fixed options.',
+              required: false,
+              // No validationKeys: options are plain {value, label} pairs, and `default` is the
+              // bare value rather than a full option object.
+              options: [
+                { value: 'text', label: 'Open-ended text' },
+                { value: 'singleChoice', label: 'Single choice' },
+              ],
+              default: 'text',
+            },
+            {
+              name: 'tags',
+              type: 'array',
+              label: 'Tags',
+              description: 'Free-form tags for this feature',
+              required: false,
+            },
+          ],
+        },
+      ],
+    },
   ],
 };
 
@@ -1281,6 +1326,18 @@ describe('EventCreationForm Component', () => {
     await waitFor(() => screen.getByLabelText(/Bot Name/i));
   };
 
+  // Helper to navigate to Step 3 with Warm-Up Type selected (exercises enum/array
+  // feature sub-properties in isolation from Back Channel's fixtures)
+  const navigateToStep3WithWarmUpType = async (user: ReturnType<typeof userEvent.setup>) => {
+    await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
+    await user.click(screen.getByRole('button', { name: /next/i }));
+    await waitFor(() => screen.getByText('NextSpace'));
+    await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
+    await user.click(screen.getByRole('radio', { name: /warm-up type/i }));
+    await user.click(screen.getByRole('button', { name: /next/i }));
+    await waitFor(() => screen.getByText('Customize your conversation settings'));
+  };
+
   describe('Features', () => {
     it('displays the Features section on Step 3 when the conversation type has features', async () => {
       const user = userEvent.setup();
@@ -1508,6 +1565,170 @@ describe('EventCreationForm Component', () => {
       // After the onWheel handler calls blur(), the input should no longer have focus.
       // Before the fix, there is no handler and the input stays focused.
       expect(numberInput).not.toHaveFocus();
+    });
+
+    describe('Enum sub-property with value/label options and no validationKeys', () => {
+      it('pre-selects the default option', async () => {
+        const user = userEvent.setup();
+        await act(async () => {
+          render(<EventCreationForm />);
+        });
+
+        await navigateToStep3WithWarmUpType(user);
+        await user.click(screen.getByRole('checkbox', { name: /warm-up questions/i }));
+
+        expect(screen.getByRole('radio', { name: /open-ended text/i })).toBeChecked();
+        expect(screen.getByRole('radio', { name: /single choice/i })).not.toBeChecked();
+      });
+
+      it('selects a different option on click', async () => {
+        const user = userEvent.setup();
+        await act(async () => {
+          render(<EventCreationForm />);
+        });
+
+        await navigateToStep3WithWarmUpType(user);
+        await user.click(screen.getByRole('checkbox', { name: /warm-up questions/i }));
+
+        await user.click(screen.getByRole('radio', { name: /single choice/i }));
+
+        expect(screen.getByRole('radio', { name: /single choice/i })).toBeChecked();
+        expect(screen.getByRole('radio', { name: /open-ended text/i })).not.toBeChecked();
+      });
+
+      it('includes the selected option in the submission payload', async () => {
+        const user = userEvent.setup();
+        (Request as jest.Mock).mockImplementation(
+          makeRequestMock({
+            id: 'conv-warmup',
+            name: 'Test Event',
+            channels: [],
+            agents: [],
+            adapters: [],
+            conversationType: 'warmUpType',
+          }),
+        );
+
+        await act(async () => {
+          render(<EventCreationForm />);
+        });
+
+        await navigateToStep3WithWarmUpType(user);
+        await user.click(screen.getByRole('checkbox', { name: /warm-up questions/i }));
+        await user.click(screen.getByRole('radio', { name: /single choice/i }));
+
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('About the Speakers'));
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Reading & Resources'));
+        await user.click(screen.getByRole('button', { name: /create conversation/i }));
+
+        await waitFor(() => {
+          expect(Request).toHaveBeenCalledWith(
+            'conversations/from-type',
+            expect.objectContaining({
+              features: expect.arrayContaining([
+                { name: 'warmUp', enabled: true, config: { questionFormat: 'singleChoice' } },
+              ]),
+            }),
+          );
+        });
+      });
+    });
+
+    describe('Array sub-property (free-form, comma-separated)', () => {
+      it('renders as a text field rather than a fixed set of options', async () => {
+        const user = userEvent.setup();
+        await act(async () => {
+          render(<EventCreationForm />);
+        });
+
+        await navigateToStep3WithWarmUpType(user);
+        await user.click(screen.getByRole('checkbox', { name: /warm-up questions/i }));
+
+        expect(screen.getByLabelText(/^Tags/i)).toBeInTheDocument();
+      });
+
+      it('splits comma-separated input into a trimmed string array in the submission payload', async () => {
+        const user = userEvent.setup();
+        (Request as jest.Mock).mockImplementation(
+          makeRequestMock({
+            id: 'conv-warmup-tags',
+            name: 'Test Event',
+            channels: [],
+            agents: [],
+            adapters: [],
+            conversationType: 'warmUpType',
+          }),
+        );
+
+        await act(async () => {
+          render(<EventCreationForm />);
+        });
+
+        await navigateToStep3WithWarmUpType(user);
+        await user.click(screen.getByRole('checkbox', { name: /warm-up questions/i }));
+        await user.type(screen.getByLabelText(/^Tags/i), 'alpha, beta ,, gamma');
+
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('About the Speakers'));
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Reading & Resources'));
+        await user.click(screen.getByRole('button', { name: /create conversation/i }));
+
+        await waitFor(() => {
+          expect(Request).toHaveBeenCalledWith(
+            'conversations/from-type',
+            expect.objectContaining({
+              features: expect.arrayContaining([
+                {
+                  name: 'warmUp',
+                  enabled: true,
+                  config: { questionFormat: 'text', tags: ['alpha', 'beta', 'gamma'] },
+                },
+              ]),
+            }),
+          );
+        });
+      });
+
+      it('omits the property from the payload when left empty', async () => {
+        const user = userEvent.setup();
+        (Request as jest.Mock).mockImplementation(
+          makeRequestMock({
+            id: 'conv-warmup-no-tags',
+            name: 'Test Event',
+            channels: [],
+            agents: [],
+            adapters: [],
+            conversationType: 'warmUpType',
+          }),
+        );
+
+        await act(async () => {
+          render(<EventCreationForm />);
+        });
+
+        await navigateToStep3WithWarmUpType(user);
+        await user.click(screen.getByRole('checkbox', { name: /warm-up questions/i }));
+
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('About the Speakers'));
+        await user.click(screen.getByRole('button', { name: /next/i }));
+        await waitFor(() => screen.getByText('Reading & Resources'));
+        await user.click(screen.getByRole('button', { name: /create conversation/i }));
+
+        await waitFor(() => {
+          expect(Request).toHaveBeenCalledWith(
+            'conversations/from-type',
+            expect.objectContaining({
+              features: expect.arrayContaining([
+                { name: 'warmUp', enabled: true, config: { questionFormat: 'text' } },
+              ]),
+            }),
+          );
+        });
+      });
     });
   });
 
