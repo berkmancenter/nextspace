@@ -82,7 +82,7 @@ const ThreeFactsCard: FC<{ facts: string[]; invitation?: string }> = ({ facts, i
           >
             {i + 1}
           </span>
-          <p className="m-0 leading-[1.48] text-gray-800">{fact}</p>
+          <p className="m-0 leading-[1.48] text-gray-800 dark:text-nx-text">{fact}</p>
         </div>
       ))}
     </div>
