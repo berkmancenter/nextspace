@@ -299,8 +299,12 @@ export function useConversationSetup({
   useEffect(() => {
     if (pendingGateRecheckAt === null) return;
 
-    const delay = Math.max(pendingGateRecheckAt - Date.now(), 0);
+    // setTimeout's delay is a 32-bit signed int; beyond ~24.8 days it fires almost immediately
+    // instead of waiting, so clamp to that limit. A tab still open past the clamp just needs a
+    // refresh — not worth re-arming the timer for.
+    const delay = Math.min(Math.max(pendingGateRecheckAt - Date.now(), 0), 2147483647);
     const timer = setTimeout(() => {
+      if (Date.now() < pendingGateRecheckAt) return;
       if (pendingGateRecheckKindRef.current === 'preEventWindow') {
         if (pregameChannelPasscodeRef.current) setChatPasscode(pregameChannelPasscodeRef.current);
         setGroupChatChannelName('pregame');
