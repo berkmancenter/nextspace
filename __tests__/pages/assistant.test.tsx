@@ -108,12 +108,17 @@ jest.mock('../../hooks/useSessionJoin', () => ({
 
 // Mock message components
 jest.mock('../../components/messages', () => ({
-  AssistantMessage: ({ message, onPopulateFeedbackText, onSendFeedbackRating, messageType }: any) => {
+  AssistantMessage: ({ message, onPopulateFeedbackText, onSendFeedbackRating, messageType, onPromptSelect }: any) => {
     const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
 
     return (
       <div data-testid="assistant-message">
         {messageText}
+        {message.prompt && (
+          <button data-testid={`prompt-answer-${message.id}`} onClick={() => onPromptSelect?.('test-answer', message.id)}>
+            Answer
+          </button>
+        )}
         {message.id && !messageType && (
           <div data-testid="message-feedback" data-message-id={message.id}>
             <button data-testid="rating-button-3" onClick={() => onSendFeedbackRating?.(message.id, 3)}>
@@ -1694,9 +1699,18 @@ describe('EventAssistantRoom', () => {
         expect(screen.getAllByText('Do you need assistance?').length).toBeGreaterThan(0);
       });
 
-      // The component would render prompt buttons, but our mock doesn't render them
-      // In a real scenario, clicking a prompt button would trigger handlePromptSelect
-      // which would call sendMessage with messageSource: "promptResponse" and promptQuestionId
+      await user.click(screen.getByTestId('prompt-answer-prompt-msg-1'));
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          'messages',
+          expect.objectContaining({ body: 'test-answer', answersPrompt: 'prompt-msg-1' }),
+        );
+      });
+
+      // A prompt answer isn't a question to the bot, so it must never show the thinking indicator
+      // the way sending a normal message would.
+      expect(screen.queryByText('thinking...')).not.toBeInTheDocument();
     });
 
     it('filters out messages with answersPrompt from display', async () => {

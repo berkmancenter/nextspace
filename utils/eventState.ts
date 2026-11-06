@@ -66,6 +66,20 @@ export function isInPreEventWindow(
   return now.getTime() >= windowStart && now.getTime() < scheduledTime;
 }
 
+/**
+ * Whether an event can still be edited from the admin events list: not live, not already
+ * started, and not in its pre-event window (which the backend already treats as effectively
+ * live) — plus having a known conversation type to edit against.
+ */
+export function isEventEditable(
+  conversation: Pick<Conversation, 'active' | 'startTime' | 'scheduledTime' | 'preEventMinutes' | 'draft' | 'type'>,
+  now: Date = new Date(),
+): boolean {
+  return (
+    !conversation.active && !conversation.startTime && !isInPreEventWindow(conversation, now) && !!conversation.type?.name
+  );
+}
+
 // The backend auto-starts a conversation via a job that polls every 10 seconds, so scheduledTime
 // can pass a few seconds before startTime is actually stamped. Padding the "missed" check past
 // that lag keeps an about-to-start event from flashing as missed in that window.

@@ -22,6 +22,10 @@ export interface ParsedMessageBody {
   source?: string;
   sourceMessage?: string;
   content?: any;
+  /** Exactly three facts for a pregame "threeFacts" message, rendered as a structured list rather than parsed out of prose. */
+  facts?: string[];
+  /** The LLM-written line inviting people to chat, shown at the end of a "threeFacts" message. */
+  invitation?: string;
   /** The readable label of the goal a proactive agent message was generated to serve, if any. */
   goal?: string;
 }
@@ -44,6 +48,8 @@ export const parseMessageBody = (body: string | object): ParsedMessageBody => {
       source: obj.source?.toString(),
       sourceMessage: obj.sourceMessage?.toString(),
       content: obj.content,
+      facts: Array.isArray(obj.facts) ? obj.facts : undefined,
+      invitation: obj.invitation?.toString(),
       goal: obj.goal?.toString(),
     };
   }

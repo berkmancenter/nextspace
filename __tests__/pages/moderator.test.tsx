@@ -752,6 +752,153 @@ describe('ModeratorScreen', () => {
     consoleLogSpy.mockRestore();
   });
 
+  describe('questionResults messages', () => {
+    const warmUpQuestionResultsMessage = {
+      id: '8',
+      pseudonym: 'Moderator Notifier',
+      createdAt: '2026-03-13T05:00:00Z',
+      channels: ['moderator'],
+      body: {
+        type: 'questionResults',
+        questionResults: {
+          questionType: 'warmUpQuestion',
+          question: 'What brings you here today?',
+          format: 'text',
+          results: [
+            { label: 'Curiosity about the topic', count: 3, examples: ['mostly curiosity'] },
+            { label: 'Came via social connection', count: 1 },
+          ],
+        },
+        timestamp: {
+          start: 1773361630922,
+          end: 1773361881969,
+        },
+      },
+    };
+
+    it('renders a Warm-up Results badge, the question, and each result with its count', async () => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith('conversations/')) return Promise.resolve(mockConversation);
+        return Promise.resolve([warmUpQuestionResultsMessage]);
+      });
+
+      await act(async () => {
+        render(<ModeratorScreen authType={'user'} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Warm-up Results')).toBeInTheDocument();
+        expect(screen.getByText('What brings you here today?')).toBeInTheDocument();
+        expect(screen.getByText('Curiosity about the topic')).toBeInTheDocument();
+        expect(screen.getByText('3 (75%)')).toBeInTheDocument();
+        expect(screen.getByText('Came via social connection')).toBeInTheDocument();
+        expect(screen.getByText('1 (25%)')).toBeInTheDocument();
+      });
+    });
+
+    it('never shows example quotes for warm-up results, even when the message includes them', async () => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith('conversations/')) return Promise.resolve(mockConversation);
+        return Promise.resolve([warmUpQuestionResultsMessage]);
+      });
+
+      await act(async () => {
+        render(<ModeratorScreen authType={'user'} />);
+      });
+
+      await waitFor(() => screen.getByText('Curiosity about the topic'));
+      expect(screen.queryByText('“mostly curiosity”')).not.toBeInTheDocument();
+    });
+
+    it('shows example quotes for a non-warm-up question type', async () => {
+      const pollQuestionResultsMessage = {
+        ...warmUpQuestionResultsMessage,
+        id: '11',
+        body: {
+          ...warmUpQuestionResultsMessage.body,
+          questionResults: {
+            ...warmUpQuestionResultsMessage.body.questionResults,
+            questionType: 'eventPoll',
+          },
+        },
+      };
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith('conversations/')) return Promise.resolve(mockConversation);
+        return Promise.resolve([pollQuestionResultsMessage]);
+      });
+
+      await act(async () => {
+        render(<ModeratorScreen authType={'user'} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('“mostly curiosity”')).toBeInTheDocument();
+      });
+    });
+
+    it('renders a generic Question Results badge for a non-warmUpQuestion type', async () => {
+      const pollQuestionResultsMessage = {
+        ...warmUpQuestionResultsMessage,
+        id: '9',
+        body: {
+          ...warmUpQuestionResultsMessage.body,
+          questionResults: {
+            ...warmUpQuestionResultsMessage.body.questionResults,
+            questionType: 'eventPoll',
+          },
+        },
+      };
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith('conversations/')) return Promise.resolve(mockConversation);
+        return Promise.resolve([pollQuestionResultsMessage]);
+      });
+
+      await act(async () => {
+        render(<ModeratorScreen authType={'user'} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Question Results')).toBeInTheDocument();
+        expect(screen.queryByText('Warm-up Results')).not.toBeInTheDocument();
+      });
+    });
+
+    it('renders singleChoice results without an examples list', async () => {
+      const singleChoiceMessage = {
+        ...warmUpQuestionResultsMessage,
+        id: '10',
+        body: {
+          ...warmUpQuestionResultsMessage.body,
+          questionResults: {
+            questionType: 'warmUpQuestion',
+            question: 'Have you attended one of these before?',
+            format: 'singleChoice',
+            results: [
+              { label: 'Yes', count: 2 },
+              { label: 'No', count: 1 },
+            ],
+          },
+        },
+      };
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith('conversations/')) return Promise.resolve(mockConversation);
+        return Promise.resolve([singleChoiceMessage]);
+      });
+
+      await act(async () => {
+        render(<ModeratorScreen authType={'user'} />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Have you attended one of these before?')).toBeInTheDocument();
+        expect(screen.getByText('Yes')).toBeInTheDocument();
+        expect(screen.getByText('2 (67%)')).toBeInTheDocument();
+        expect(screen.getByText('No')).toBeInTheDocument();
+        expect(screen.getByText('1 (33%)')).toBeInTheDocument();
+      });
+    });
+  });
+
   describe('shared bot name context', () => {
     function BotNameProbe() {
       return <div data-testid="bot-name-probe">{useBotName()}</div>;

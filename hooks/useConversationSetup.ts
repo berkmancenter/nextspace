@@ -97,6 +97,10 @@ export function useConversationSetup({
   const [eventStatusLoaded, setEventStatusLoaded] = useState<boolean>(false);
   const [eventStatus, setEventStatus] = useState<'active' | 'future' | 'ended'>('active');
   const [showEventStatusDialog, setShowEventStatusDialog] = useState<boolean>(false);
+  // Epoch ms at which a 'future' gate set below should lift on its own, with no page refresh —
+  // either the pre-event window opening or (for missingPregameAccess) the event's actual
+  // scheduledTime. Null whenever there's nothing time-based left to wait for.
+  const [pendingGateRecheckAt, setPendingGateRecheckAt] = useState<number | null>(null);
 
   const chatIntroRef = useRef<PseudonymousMessage[]>([]);
   const assistantIntroRef = useRef<PseudonymousMessage[]>([]);
@@ -104,6 +108,12 @@ export function useConversationSetup({
   // The real chat channel's own passcode, kept even while pregame is the active channel, so
   // markEventStarted can switch back to it without needing a fresh conversation fetch.
   const chatChannelPasscodeRef = useRef<string>('');
+  // The pregame channel's own passcode, captured even when the pre-event window isn't open yet at
+  // fetch time, so the recheck timer below can switch into it once the window opens.
+  const pregameChannelPasscodeRef = useRef<string>('');
+  // Which kind of gate pendingGateRecheckAt is waiting on, read once the timer fires (a ref, not
+  // state, since only the timeout callback needs it — it shouldn't itself trigger a re-render).
+  const pendingGateRecheckKindRef = useRef<'preEventWindow' | 'eventStart' | null>(null);
 
   /* Clear the shared conversation type and bot name when the event changes so
      the Quick Guide doesn't show stale values while the new conversation loads. */
@@ -188,6 +198,7 @@ export function useConversationSetup({
           // Not every link carries a pregame passcode (older links, or a conversation with no
           // pregame window configured), so its absence is normal — never routed through setGeneralError.
           const pregamePasscodeParam = GetChannelPasscode('pregame', query);
+          if (pregamePasscodeParam) pregameChannelPasscodeRef.current = pregamePasscodeParam;
 
           if (inPreEventWindow && pregamePasscodeParam) {
             setGroupChatChannelName('pregame');
@@ -221,18 +232,50 @@ export function useConversationSetup({
         setAgentIds(ids);
 
         // Check if the event is not active, and if it's not begun (no endTime)
-        if (conversation.active === false) {
-          if (conversation.endTime) {
-            setEventStatus('ended');
-            setShowEventStatusDialog(true);
-          } else if (missingPregameAccess || (!inPreEventWindow && !pastScheduledTimeUnconfirmed)) {
-            setEventStatus('future');
-            setShowEventStatusDialog(true);
+        let recheckAt: number | null = null;
+        let recheckKind: 'preEventWindow' | 'eventStart' | null = null;
+        if (conversation.active === false && conversation.endTime) {
+          setEventStatus('ended');
+          setShowEventStatusDialog(true);
+        } else if (
+          conversation.active === false &&
+          (missingPregameAccess || (!inPreEventWindow && !pastScheduledTimeUnconfirmed))
+        ) {
+          setEventStatus('future');
+          setShowEventStatusDialog(true);
+
+          // Gated purely on client-clock time, so the gate can be scheduled to lift itself once
+          // that time arrives, without the user having to refresh. A conversation with no
+          // pre-event window configured (no preEventMinutes) or with missingPregameAccess (no
+          // pregame passcode to switch into) can only resolve at the event's real start; a
+          // properly-configured window instead just waits for the window itself to open. A draft
+          // conversation never auto-starts on its own — isInPreEventWindow won't open for one
+          // regardless of clock time, and its scheduledTime isn't a commitment either — so there's
+          // nothing time-based to wait for there at all.
+          if (!conversation.draft) {
+            const scheduledTimeMs = conversation.scheduledTime
+              ? new Date(conversation.scheduledTime as string).getTime()
+              : null;
+            if (
+              missingPregameAccess ||
+              !pregameChannelPasscodeRef.current ||
+              typeof conversation.preEventMinutes !== 'number'
+            ) {
+              recheckAt = scheduledTimeMs;
+              recheckKind = 'eventStart';
+            } else if (scheduledTimeMs !== null) {
+              recheckAt = scheduledTimeMs - conversation.preEventMinutes * 60 * 1000;
+              recheckKind = 'preEventWindow';
+            }
           }
-          // Inside the pre-event window, eventStatus is left at its default 'active': the backend
-          // already allows joining and chatting there (it wakes per-message agents ahead of the
-          // official start), so only the blocking dialog above was ever frontend-enforced.
+        } else {
+          // Either the event is confirmed active, or we're inside its pre-event window (which the
+          // backend already allows chatting in) — in either case the blocking gate does not apply.
+          setEventStatus('active');
+          setShowEventStatusDialog(false);
         }
+        pendingGateRecheckKindRef.current = recheckKind;
+        setPendingGateRecheckAt(recheckAt);
 
         setEventStatusLoaded(true);
       } catch (error) {
@@ -249,6 +292,30 @@ export function useConversationSetup({
     // router.query.view and other view-only params are intentionally excluded.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, router.isReady, router.query.conversationId, channelDep]);
+
+  // Lifts a 'future' gate set above once its target time arrives, so a tab left open through the
+  // pre-event window's opening (or, for missingPregameAccess, the event's real start) updates on
+  // its own instead of leaving the user stuck on the "Event Not Started" dialog until they refresh.
+  useEffect(() => {
+    if (pendingGateRecheckAt === null) return;
+
+    // setTimeout's delay is a 32-bit signed int; beyond ~24.8 days it fires almost immediately
+    // instead of waiting, so clamp to that limit. A tab still open past the clamp just needs a
+    // refresh — not worth re-arming the timer for.
+    const delay = Math.min(Math.max(pendingGateRecheckAt - Date.now(), 0), 2147483647);
+    const timer = setTimeout(() => {
+      if (Date.now() < pendingGateRecheckAt) return;
+      if (pendingGateRecheckKindRef.current === 'preEventWindow') {
+        if (pregameChannelPasscodeRef.current) setChatPasscode(pregameChannelPasscodeRef.current);
+        setGroupChatChannelName('pregame');
+      }
+      setEventStatus('active');
+      setShowEventStatusDialog(false);
+      setPendingGateRecheckAt(null);
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [pendingGateRecheckAt]);
 
   // Called when the backend sends conversation:stopped so open tabs disconnect
   // their sockets instead of reconnecting indefinitely. If the event later
