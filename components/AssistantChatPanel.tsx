@@ -257,79 +257,49 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
 
     // Assistant messages
     if (isAssistant) {
-      if (hasPromptOptions) {
-        return (
-          <div style={{ width: '85%' }}>
-            {sourceContextText && (
-              <div className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded">
-                <span className="font-medium">In reply to: </span>
-                {sourceContextText}
-              </div>
-            )}
-            {/* Same outer bubble as a plain assistant message (and the same layering PollMessage
-                gets in GroupChatPanel): AssistantMessage's own white poll-style card sits inside
-                this colored bubble, rather than floating on the page background. */}
-            <div
-              className="rounded-2xl px-2 py-1 text-gray-800 self-start"
-              style={{
-                backgroundColor: style.bubbleBg,
-                width: '100%',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
-              }}
-            >
-              <AssistantMessage
-                message={{
-                  ...msg,
-                  body: bodyText,
-                }}
-                media={parsed.media}
-                messageType={messageType}
-                onPromptSelect={onPromptSelect}
-                onImageClick={handleImageClick}
-                onMarkmapClick={handleMarkmapClick}
-                initialSelectedPrompt={
-                  msg.id
-                    ? (() => {
-                        const response = messages.find((m) => m.answersPrompt === msg.id);
-                        return response ? parseMessageBody(response.body).text : undefined;
-                      })()
-                    : undefined
-                }
-              />
+      return (
+        <div style={{ width: '85%' }}>
+          {sourceContextText && (
+            <div className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded">
+              <span className="font-medium">In reply to: </span>
+              {sourceContextText}
             </div>
-          </div>
-        );
-      } else {
-        return (
-          <div style={{ width: '85%' }}>
-            {sourceContextText && (
-              <div className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded">
-                <span className="font-medium">In reply to: </span>
-                {sourceContextText}
-              </div>
-            )}
-            <div
-              className="rounded-2xl px-2 py-1 text-gray-800 self-start"
-              style={{
-                backgroundColor: style.bubbleBg,
-                width: '100%',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
+          )}
+          {/* Same outer bubble as a plain assistant message (and the same layering PollMessage
+              gets in GroupChatPanel): AssistantMessage's own white poll-style card sits inside
+              this colored bubble, rather than floating on the page background. */}
+          <div
+            className="rounded-2xl px-2 py-1 text-gray-800 self-start"
+            style={{
+              backgroundColor: style.bubbleBg,
+              width: '100%',
+              border: '1px solid rgba(0, 0, 0, 0.1)',
+            }}
+          >
+            <AssistantMessage
+              message={{
+                ...msg,
+                body: bodyText,
               }}
-            >
-              <AssistantMessage
-                message={{
-                  ...msg,
-                  body: bodyText,
-                }}
-                media={parsed.media}
-                onPromptSelect={onPromptSelect}
-                onImageClick={handleImageClick}
-                onMarkmapClick={handleMarkmapClick}
-              />
-            </div>
+              media={parsed.media}
+              onPromptSelect={onPromptSelect}
+              onImageClick={handleImageClick}
+              onMarkmapClick={handleMarkmapClick}
+              {...(hasPromptOptions
+                ? {
+                    messageType,
+                    initialSelectedPrompt: msg.id
+                      ? (() => {
+                          const response = messages.find((m) => m.answersPrompt === msg.id);
+                          return response ? parseMessageBody(response.body).text : undefined;
+                        })()
+                      : undefined,
+                  }
+                : {})}
+            />
           </div>
-        );
-      }
+        </div>
+      );
     }
 
     const isModSuggested = msg.id ? moderatorSuggestedIds.has(msg.id) : false;
