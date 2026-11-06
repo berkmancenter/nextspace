@@ -455,6 +455,132 @@ describe('useConversationSetup', () => {
         expect(result.current.showEventStatusDialog).toBe(true);
       });
 
+      describe("auto-recheck when the gate's target time arrives", () => {
+        it('flips eventStatus to active once the pre-event window opens, without a refetch', async () => {
+          const preEventMinutes = 10;
+          const scheduledTime = new Date(Date.now() + preEventMinutes * 60 * 1000 + 500).toISOString();
+          mockCreateConversationFromData.mockResolvedValue(
+            makeConversation({ active: false, scheduledTime, preEventMinutes }),
+          );
+
+          const { result } = renderSetup();
+
+          await waitFor(() => {
+            expect(result.current.eventStatus).toBe('future');
+          });
+          const fetchCallsBeforeWindow = mockRetrieveData.mock.calls.length;
+
+          await waitFor(
+            () => {
+              expect(result.current.eventStatus).toBe('active');
+            },
+            { timeout: 3000 },
+          );
+
+          expect(result.current.showEventStatusDialog).toBe(false);
+          // Purely a local clock-based transition — no extra conversation fetch was needed.
+          expect(mockRetrieveData.mock.calls.length).toBe(fetchCallsBeforeWindow);
+        });
+
+        it('switches to the pregame channel and its passcode once the window opens', async () => {
+          const preEventMinutes = 10;
+          const scheduledTime = new Date(Date.now() + preEventMinutes * 60 * 1000 + 500).toISOString();
+          mockCreateConversationFromData.mockResolvedValue(
+            makeConversation({ active: false, scheduledTime, preEventMinutes }),
+          );
+          mockGetChannelPasscode.mockImplementation((channel: string) =>
+            channel === 'pregame' ? 'pregame-pass' : 'chat-pass',
+          );
+
+          const { result } = renderSetup({
+            query: { conversationId: 'test-conversation-id', channel: ['chat,chat-pass', 'pregame,pregame-pass'] },
+          });
+
+          await waitFor(() => {
+            expect(result.current.eventStatus).toBe('future');
+          });
+          expect(result.current.groupChatChannelName).toBe('chat');
+
+          await waitFor(
+            () => {
+              expect(result.current.groupChatChannelName).toBe('pregame');
+            },
+            { timeout: 3000 },
+          );
+
+          expect(result.current.chatPasscode).toBe('pregame-pass');
+          expect(result.current.eventStatus).toBe('active');
+        });
+
+        it('flips eventStatus to active at the real start for missingPregameAccess, leaving the chat channel alone', async () => {
+          const scheduledTime = new Date(Date.now() + 500).toISOString(); // already inside the window
+          mockCreateConversationFromData.mockResolvedValue(
+            makeConversation({ active: false, scheduledTime, preEventMinutes: 10 }),
+          );
+          mockGetChannelPasscode.mockImplementation((channel: string) => (channel === 'chat' ? 'chat-pass' : null));
+
+          const { result } = renderSetup({
+            query: { conversationId: 'test-conversation-id', channel: 'chat,chat-pass' },
+          });
+
+          await waitFor(() => {
+            expect(result.current.eventStatus).toBe('future');
+          });
+          expect(result.current.groupChatChannelName).toBe('chat');
+
+          await waitFor(
+            () => {
+              expect(result.current.eventStatus).toBe('active');
+            },
+            { timeout: 3000 },
+          );
+
+          expect(result.current.groupChatChannelName).toBe('chat');
+          expect(result.current.chatPasscode).toBe('chat-pass');
+        });
+
+        it('flips eventStatus to active at the real start when no pre-event window is configured', async () => {
+          const scheduledTime = new Date(Date.now() + 500).toISOString();
+          mockCreateConversationFromData.mockResolvedValue(makeConversation({ active: false, scheduledTime })); // no preEventMinutes
+          mockGetChannelPasscode.mockImplementation((channel: string) => (channel === 'chat' ? 'chat-pass' : null));
+
+          const { result } = renderSetup({
+            query: { conversationId: 'test-conversation-id', channel: 'chat,chat-pass' },
+          });
+
+          await waitFor(() => {
+            expect(result.current.eventStatus).toBe('future');
+          });
+          expect(result.current.groupChatChannelName).toBe('chat');
+
+          await waitFor(
+            () => {
+              expect(result.current.eventStatus).toBe('active');
+            },
+            { timeout: 3000 },
+          );
+
+          expect(result.current.groupChatChannelName).toBe('chat');
+          expect(result.current.chatPasscode).toBe('chat-pass');
+        });
+
+        it('never auto-recovers a draft conversation, even once the window would otherwise have opened', async () => {
+          const scheduledTime = new Date(Date.now() + 500).toISOString();
+          mockCreateConversationFromData.mockResolvedValue(
+            makeConversation({ active: false, draft: true, scheduledTime, preEventMinutes: 10 }),
+          );
+
+          const { result } = renderSetup();
+
+          await waitFor(() => {
+            expect(result.current.eventStatus).toBe('future');
+          });
+
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          expect(result.current.eventStatus).toBe('future');
+        });
+      });
+
       describe('eventScheduledTime', () => {
         it('is populated from the conversation fetch, for driving a pre-event countdown', async () => {
           const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();

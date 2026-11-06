@@ -1633,6 +1633,16 @@ describe('Events Page - Admin Actions', () => {
     expect(screen.queryByText(/edit event/i)).not.toBeInTheDocument();
   });
 
+  it('does not show an edit button for a confirmed event inside its pre-event window', async () => {
+    // scheduledTime is 5 minutes out with a 10-minute pre-event window, so the window is
+    // already open — active is still false and startTime isn't stamped until the real start.
+    const preEventTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    await renderWithEvent(makeConversation({ scheduledTime: preEventTime, preEventMinutes: 10 }));
+    const menuButton = screen.getByRole('button', { name: `actions-menu-ev-1` });
+    await userEvent.click(menuButton);
+    expect(screen.queryByText(/edit event/i)).not.toBeInTheDocument();
+  });
+
   it('does not show an edit button for an event with no type set', async () => {
     /* Legacy events may have no type object, which would produce /admin/undefined/edit/<id>
        if the edit button were shown. The canEdit guard prevents this. */
