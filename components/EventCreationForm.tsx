@@ -62,6 +62,9 @@ const sortedStringify = (obj: Record<string, unknown>): string =>
  */
 const getEnumIdentity = (option: unknown, validationKeys?: string[]): unknown => {
   if (validationKeys) {
+    if (validationKeys.length === 1 && (typeof option !== 'object' || option === null)) {
+      return { [validationKeys[0]]: option };
+    }
     const identity: Record<string, unknown> = {};
     validationKeys.forEach((key) => {
       if (typeof option === 'object' && option !== null && key in option) {
