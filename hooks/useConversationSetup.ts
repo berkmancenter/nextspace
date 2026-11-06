@@ -256,7 +256,11 @@ export function useConversationSetup({
             const scheduledTimeMs = conversation.scheduledTime
               ? new Date(conversation.scheduledTime as string).getTime()
               : null;
-            if (missingPregameAccess || typeof conversation.preEventMinutes !== 'number') {
+            if (
+              missingPregameAccess ||
+              !pregameChannelPasscodeRef.current ||
+              typeof conversation.preEventMinutes !== 'number'
+            ) {
               recheckAt = scheduledTimeMs;
               recheckKind = 'eventStart';
             } else if (scheduledTimeMs !== null) {
