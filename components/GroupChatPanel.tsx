@@ -286,7 +286,9 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   const renderMessageContent = (message: PseudonymousMessage, isHovered?: boolean) => {
     const isCurrentUser = message.pseudonym === pseudonym;
     const isAssistant = message.fromAgent;
-    const parsed = parseMessageBody(message.body);
+    const rawBody =
+      message.bodyType === 'json' && typeof message.body === 'string' ? JSON.parse(message.body) : message.body;
+    const parsed = parseMessageBody(rawBody);
 
     const style = isAssistant ? getAssistantAvatarStyle() : getAvatarStyle(message.pseudonym || '', isCurrentUser);
 
@@ -299,7 +301,6 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
 
     // Poll messages — rendered as an inline poll widget below the agent's intro text
     if (parsed.type === 'poll') {
-      const rawBody = typeof message.body === 'string' ? JSON.parse(message.body) : message.body;
       const pollBody = rawBody as PollMessageBody;
       const counts = pollCounts[pollBody.pollId] ?? null;
       return (
