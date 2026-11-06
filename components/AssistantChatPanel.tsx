@@ -228,7 +228,14 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     const messageType = parsed.type;
     const style = isAssistant ? getAssistantAvatarStyle() : getAvatarStyle(msg.pseudonym, isCurrentUser);
 
-    const hasPromptOptions = msg.prompt?.options && msg.prompt.options.length > 0 && msg.prompt.type === 'singleChoice';
+    // Mirrors AssistantMessage's own hasChoiceOptions/isTextPrompt split: a text prompt has no
+    // options, so checking options alone (as this used to) left it out of the answer-linking
+    // branch below, meaning a refresh never restored its prior answer via initialSelectedPrompt.
+    // Applies to any message with this shape, regardless of why it has one — messageType is only
+    // used further down to scope AssistantMessage's "Starting point" label to warm-up questions.
+    const hasChoiceOptions = msg.prompt?.options && msg.prompt.options.length > 0 && msg.prompt.type === 'singleChoice';
+    const isTextPrompt = msg.prompt?.type === 'text';
+    const hasPromptOptions = hasChoiceOptions || isTextPrompt;
 
     const bodyText = parsed.text;
 
@@ -250,15 +257,25 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
 
     // Assistant messages
     if (isAssistant) {
-      if (hasPromptOptions) {
-        return (
-          <div style={{ width: '85%' }}>
-            {sourceContextText && (
-              <div className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded">
-                <span className="font-medium">In reply to: </span>
-                {sourceContextText}
-              </div>
-            )}
+      return (
+        <div style={{ width: '85%' }}>
+          {sourceContextText && (
+            <div className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded">
+              <span className="font-medium">In reply to: </span>
+              {sourceContextText}
+            </div>
+          )}
+          {/* Same outer bubble as a plain assistant message (and the same layering PollMessage
+              gets in GroupChatPanel): AssistantMessage's own white poll-style card sits inside
+              this colored bubble, rather than floating on the page background. */}
+          <div
+            className="rounded-2xl px-2 py-1 text-gray-800 self-start"
+            style={{
+              backgroundColor: style.bubbleBg,
+              width: '100%',
+              border: '1px solid rgba(0, 0, 0, 0.1)',
+            }}
+          >
             <AssistantMessage
               message={{
                 ...msg,
@@ -268,48 +285,21 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
               onPromptSelect={onPromptSelect}
               onImageClick={handleImageClick}
               onMarkmapClick={handleMarkmapClick}
-              initialSelectedPrompt={
-                msg.id
-                  ? (() => {
-                      const response = messages.find((m) => m.answersPrompt === msg.id);
-                      return response ? parseMessageBody(response.body).text : undefined;
-                    })()
-                  : undefined
-              }
+              {...(hasPromptOptions
+                ? {
+                    messageType,
+                    initialSelectedPrompt: msg.id
+                      ? (() => {
+                          const response = messages.find((m) => m.answersPrompt === msg.id);
+                          return response ? parseMessageBody(response.body).text : undefined;
+                        })()
+                      : undefined,
+                  }
+                : {})}
             />
           </div>
-        );
-      } else {
-        return (
-          <div style={{ width: '85%' }}>
-            {sourceContextText && (
-              <div className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded">
-                <span className="font-medium">In reply to: </span>
-                {sourceContextText}
-              </div>
-            )}
-            <div
-              className="rounded-2xl px-2 py-1 text-gray-800 self-start"
-              style={{
-                backgroundColor: style.bubbleBg,
-                width: '100%',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
-              }}
-            >
-              <AssistantMessage
-                message={{
-                  ...msg,
-                  body: bodyText,
-                }}
-                media={parsed.media}
-                onPromptSelect={onPromptSelect}
-                onImageClick={handleImageClick}
-                onMarkmapClick={handleMarkmapClick}
-              />
-            </div>
-          </div>
-        );
-      }
+        </div>
+      );
     }
 
     const isModSuggested = msg.id ? moderatorSuggestedIds.has(msg.id) : false;

@@ -599,7 +599,9 @@ export function EventAssistantRoom({
   const handlePromptSelect = async (value: string, promptMessageId?: string) => {
     const promptMessage = assistantMessages.find((msg) => msg.id === promptMessageId);
     const threadParentId = promptMessage?.parentMessage;
-    await sendMessage(value, true, threadParentId, false, 'promptResponse', promptMessageId);
+    // A prompt answer isn't a question to the bot, so don't show the thinking indicator while
+    // waiting on it like a normal message — the backend never generates a reply to wait for.
+    await sendMessage(value, false, threadParentId, false, 'promptResponse', promptMessageId);
   };
 
   const assistantFeedbackConfig: FeedbackConfig = {
