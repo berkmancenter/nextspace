@@ -357,10 +357,10 @@ describe('AssistantMessage Component', () => {
         },
       };
 
-      const { getByText } = render(<AssistantMessage message={message} onPromptSelect={mockOnPromptSelect} />);
+      const { getByRole } = render(<AssistantMessage message={message} onPromptSelect={mockOnPromptSelect} />);
 
-      const button1 = getByText('Option 1');
-      const button2 = getByText('Option 2');
+      const button1 = getByRole('button', { name: 'Option 1' });
+      const button2 = getByRole('button', { name: 'Option 2' });
 
       expect(button1).not.toBeDisabled();
       expect(button2).not.toBeDisabled();
@@ -519,8 +519,8 @@ describe('AssistantMessage Component', () => {
 
       render(<AssistantMessage message={message} initialSelectedPrompt="opt1" />);
 
-      const button1 = screen.getByText('Option 1');
-      const button2 = screen.getByText('Option 2');
+      const button1 = screen.getByRole('button', { name: 'Option 1' });
+      const button2 = screen.getByRole('button', { name: 'Option 2' });
 
       expect(button1).toBeDisabled();
       expect(button2).toBeDisabled();
@@ -579,15 +579,15 @@ describe('AssistantMessage Component', () => {
       const { rerender } = render(<AssistantMessage message={message} initialSelectedPrompt="a" />);
 
       // Both should be disabled initially
-      expect(screen.getByText('Option A')).toBeDisabled();
-      expect(screen.getByText('Option B')).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Option A' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Option B' })).toBeDisabled();
 
       // Rerender with different initialSelectedPrompt
       rerender(<AssistantMessage message={message} initialSelectedPrompt="b" />);
 
       // Should still be disabled, but selection changed
-      expect(screen.getByText('Option A')).toBeDisabled();
-      expect(screen.getByText('Option B')).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Option A' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Option B' })).toBeDisabled();
     });
 
     it('does not call onPromptSelect when a button is clicked if already selected', () => {
@@ -614,7 +614,7 @@ describe('AssistantMessage Component', () => {
 
       render(<AssistantMessage message={message} onPromptSelect={mockOnPromptSelect} initialSelectedPrompt="opt1" />);
 
-      const button1 = screen.getByText('Option 1');
+      const button1 = screen.getByRole('button', { name: 'Option 1' });
 
       // Button is disabled, so click won't work
       // But we verify that it's disabled which prevents the handler from being called

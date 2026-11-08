@@ -1,5 +1,5 @@
 import { FC, useState, useEffect } from 'react';
-import { Box, Button, alpha } from '@mui/material';
+import { Box, Button } from '@mui/material';
 import { Check } from '@mui/icons-material';
 import { MessageContent } from './MessageContent';
 import { MessageProps, MediaItem } from '../../types.internal';
@@ -133,59 +133,74 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
 
         <div style={{ padding: '0.625rem 0.875rem 0.75rem' }}>
           {hasChoiceOptions && (
-            <Box display="flex" flexWrap="wrap" gap="0.5rem">
-              {message.prompt!.options!.map((option, index) => (
-                <Button
-                  key={`prompt-${message.id}-${index}`}
-                  variant="outlined"
-                  size="small"
-                  onClick={() => handlePromptClick(option.value)}
-                  disabled={selectedPrompt !== null}
-                  className={
-                    selectedPrompt === option.value
-                      ? 'border-2 border-primary text-primary'
-                      : 'border-2 border-gray-300 text-gray-700'
-                  }
-                  sx={{
-                    minWidth: '64px',
-                    height: '40px',
-                    paddingX: '16px',
-                    borderRadius: '6px',
-                    backgroundColor: (theme) =>
-                      selectedPrompt === option.value ? alpha(theme.palette.primary.main, 0.08) : 'white',
-                    textTransform: 'none',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    '&:hover': {
-                      borderWidth: '2px',
-                      backgroundColor: (theme) =>
-                        selectedPrompt === option.value
-                          ? alpha(theme.palette.primary.main, 0.12)
-                          : theme.palette.action.hover,
-                    },
-                    '&:focus-visible': {
-                      outline: '2px solid',
-                      outlineColor: 'primary.main',
-                      outlineOffset: '2px',
-                    },
-                    '&.Mui-disabled': {
-                      borderWidth: '2px',
-                      borderColor: (theme) => theme.palette.action.disabled,
-                      color: (theme) => theme.palette.text.disabled,
-                      backgroundColor: 'transparent',
-                    },
-                  }}
-                >
-                  {selectedPrompt === option.value ? (
-                    <>
-                      <Check fontSize="small" aria-hidden="true" sx={{ mr: 0.5 }} />
+            // Styled like PollMessage's own choice rows (radio dot, row divider, selected-row
+            // tint) rather than as discrete buttons — keeps a real <button> underneath for
+            // keyboard/AT support, just with the button chrome stripped off.
+            <Box display="flex" flexDirection="column">
+              {message.prompt!.options!.map((option, index) => {
+                const isSelected = selectedPrompt === option.value;
+                return (
+                  <Button
+                    key={`prompt-${message.id}-${index}`}
+                    disableRipple
+                    onClick={() => handlePromptClick(option.value)}
+                    disabled={selectedPrompt !== null}
+                    sx={{
+                      justifyContent: 'flex-start',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      width: '100%',
+                      borderRadius: 0,
+                      borderTop: index > 0 ? '1px solid var(--nx-poll-row-divider)' : 'none',
+                      padding: '0.5rem 0',
+                      textTransform: 'none',
+                      textAlign: 'left',
+                      fontSize: '0.9375rem',
+                      fontWeight: isSelected ? 600 : 400,
+                      color: isSelected ? 'var(--nx-poll-text)' : 'var(--nx-poll-choice)',
+                      backgroundColor: isSelected ? 'var(--nx-poll-selected-bg)' : 'transparent',
+                      '&:hover': {
+                        backgroundColor: isSelected ? 'var(--nx-poll-selected-bg)' : 'action.hover',
+                      },
+                      '&:focus-visible': {
+                        outline: '2px solid',
+                        outlineColor: 'primary.main',
+                        outlineOffset: '-2px',
+                      },
+                      '&.Mui-disabled': {
+                        color: isSelected ? 'var(--nx-poll-text)' : 'var(--nx-poll-choice)',
+                        opacity: isSelected ? 1 : 0.65,
+                      },
+                    }}
+                  >
+                    <Box
+                      component="span"
+                      sx={{
+                        flexShrink: 0,
+                        width: 16,
+                        height: 16,
+                        borderRadius: '50%',
+                        border: `2px solid ${isSelected ? 'var(--nx-poll-check-bg)' : 'var(--nx-poll-check-border)'}`,
+                        backgroundColor: isSelected ? 'var(--nx-poll-check-bg)' : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {isSelected && (
+                        <Check
+                          fontSize="small"
+                          aria-hidden="true"
+                          sx={{ fontSize: '0.65rem', color: 'var(--nx-poll-check-fg)' }}
+                        />
+                      )}
+                    </Box>
+                    <Box component="span" sx={{ flex: 1 }}>
                       {option.label}
-                    </>
-                  ) : (
-                    option.label
-                  )}
-                </Button>
-              ))}
+                    </Box>
+                  </Button>
+                );
+              })}
             </Box>
           )}
 
