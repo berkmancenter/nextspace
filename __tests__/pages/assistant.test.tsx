@@ -2930,6 +2930,112 @@ describe('EventAssistantRoom', () => {
     });
   });
 
+  describe('Unpacker', () => {
+    const TIP = 'Lost the thread? Select any passage and Berkie will unpack it while you keep listening.';
+    const chunk = {
+      id: 'chunk-1',
+      channels: ['transcript'],
+      createdAt: '2025-10-17T10:43:00Z',
+      body: 'Precedential weight concentrates in a few circuits.',
+    };
+
+    const withUnpacker = (features: { name: string; enabled?: boolean }[], typeDefault = false) => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        features,
+        type: {
+          name: 'eventAssistant',
+          features: [{ name: 'unpacker', label: 'Unpacker', default: typeDefault, agents: [], userControlled: true }],
+        },
+        name: 'Legal Telescopes',
+      });
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.includes('channel=transcript')) return Promise.resolve([chunk]);
+        if (path.startsWith('messages/')) return Promise.resolve([]);
+        return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+      });
+    };
+
+    const renderRoom = async () => {
+      await act(async () => {
+        render(
+          <ConversationTypeProvider>
+            <EventAssistantRoom authType={'guest'} />
+          </ConversationTypeProvider>,
+        );
+      });
+    };
+
+    it('offers the Unpacker on the transcript when the event turns it on', async () => {
+      withUnpacker([{ name: 'unpacker', enabled: true }]);
+      await renderRoom();
+
+      expect(await screen.findByText(TIP)).toBeInTheDocument();
+    });
+
+    it("hides the Unpacker when the event doesn't turn it on, since it is off by default", async () => {
+      withUnpacker([]);
+      await renderRoom();
+      await screen.findByText(chunk.body);
+
+      expect(screen.queryByText(TIP)).not.toBeInTheDocument();
+    });
+
+    it('hides the Unpacker when the event turns it off', async () => {
+      withUnpacker([{ name: 'unpacker', enabled: false }], true);
+      await renderRoom();
+      await screen.findByText(chunk.body);
+
+      expect(screen.queryByText(TIP)).not.toBeInTheDocument();
+    });
+
+    it('hides the Unpacker on the presentation screen', async () => {
+      withUnpacker([{ name: 'unpacker', enabled: true }]);
+      await act(async () => {
+        render(<PresentationRoom authType={'guest'} />);
+      });
+      await userEvent.click(screen.getAllByLabelText('Transcript')[0]);
+      await screen.findByText(chunk.body);
+
+      expect(screen.queryByText(TIP)).not.toBeInTheDocument();
+    });
+
+    it('opens Private Chat from the popover after sending from Group Chat', async () => {
+      withUnpacker([{ name: 'unpacker', enabled: true }]);
+      (SendData as jest.Mock).mockImplementation((path: string) =>
+        path.endsWith('/send') ? Promise.resolve({ askId: 'ask-1', status: 'sent' }) : new Promise(() => {}),
+      );
+      const user = userEvent.setup();
+      await renderRoom();
+      const chunkElement = (await screen.findByText(chunk.body)).closest('[data-message-id]') as HTMLElement;
+
+      chunkElement.focus();
+      await user.keyboard('{Enter}');
+      await user.click(screen.getByRole('button', { name: 'Send to my Private Chat' }));
+      await user.click(await screen.findByRole('button', { name: 'Open Private Chat' }));
+
+      expect(await screen.findByPlaceholderText('Enter your message here')).toBeInTheDocument();
+    });
+
+    it('leaves out Open Private Chat when Private Chat is already beside the transcript', async () => {
+      withUnpacker([{ name: 'unpacker', enabled: true }]);
+      (SendData as jest.Mock).mockImplementation((path: string) =>
+        path.endsWith('/send') ? Promise.resolve({ askId: 'ask-1', status: 'sent' }) : new Promise(() => {}),
+      );
+      const user = userEvent.setup();
+      await renderRoom();
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
+      const chunkElement = (await screen.findByText(chunk.body)).closest('[data-message-id]') as HTMLElement;
+
+      chunkElement.focus();
+      await user.keyboard('{Enter}');
+      await user.click(screen.getByRole('button', { name: 'Send to my Private Chat' }));
+
+      expect(await screen.findByText('Your explanation is in your Private Chat.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Open Private Chat' })).not.toBeInTheDocument();
+    });
+  });
+
   describe('presentation view', () => {
     beforeEach(() => {
       (createConversationFromData as jest.Mock).mockResolvedValue({

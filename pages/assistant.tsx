@@ -247,6 +247,13 @@ export function EventAssistantRoom({
       value: `/${f.slashCommand} `,
     }));
 
+  // A feature saved on the event overrides its type's default, which leaves the unpacker off.
+  const savedUnpacker = conversationFeatures.find((f) => f.name === 'unpacker');
+  const unpackerOn = savedUnpacker
+    ? savedUnpacker.enabled !== false
+    : !!conversationType?.features?.find((f) => f.name === 'unpacker')?.default;
+  const privateChatOnScreen = activeTab === 'assistant' && router.query.view !== 'preferences';
+
   // Socket event listeners — cross-cutting: messages + tab badges + loading state + resources
   useEffect(() => {
     const messageHandler = (data: PseudonymousMessage) => {
@@ -730,6 +737,11 @@ export function EventAssistantRoom({
                     lastReconnectTime={lastReconnectTime}
                     hideToggle={presentation || (router.query.view !== 'preferences' && activeTab === 'transcript')}
                     presentation={presentation}
+                    unpack={
+                      unpackerOn && !presentation
+                        ? { onOpenPrivateChat: privateChatOnScreen ? undefined : () => handleTabChange('assistant') }
+                        : undefined
+                    }
                   />
                 </div>
               )}

@@ -1,5 +1,6 @@
 import { components, operations } from './types';
 import type { ReactNode } from 'react';
+import type { PopperProps } from '@mui/material';
 
 /**
  * Authentication type for user sessions
@@ -606,4 +607,53 @@ export interface PasswordFormProps {
   submitLabel: string;
   onSubmit: (password: string) => Promise<string | void>;
   purpose?: 'new' | 'current';
+}
+
+export type UnpackSelection = components['schemas']['UnpackSelection'];
+export type UnpackPreview = components['schemas']['UnpackPreview'];
+export type UnpackPreviewExplanation = UnpackPreview['explanation'];
+export type UnpackErrorReason = NonNullable<components['schemas']['UnpackError']['reason']>;
+
+/** The text of one transcript chunk as shown on the page, which is also what the server's offsets point into. */
+export interface TranscriptChunkText {
+  id: string;
+  text: string;
+}
+
+/** A selection widened to whole sentences, with the quote it covers. */
+export interface WidenedPassage {
+  range: UnpackSelection;
+  quote: string;
+}
+
+export type UnpackPreviewState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ready'; explanation: UnpackPreviewExplanation }
+  | { status: 'error'; reason?: UnpackErrorReason };
+
+/** pending means Berkie posts the card once the explanation is written. */
+export type UnpackSendOutcome = { ok: true; status: 'sent' | 'pending' } | { ok: false; reason?: UnpackErrorReason };
+
+/** What a participant highlighted in the transcript. */
+export interface TranscriptSelection {
+  selection: UnpackSelection;
+  /** The highlighted text, without the timestamps between chunks. */
+  text: string;
+  /** A copy of the browser's range, for placing the popover next to it. */
+  range: Range;
+}
+
+/** The passage the Unpacker popover is about, and what to place the popover next to. */
+export interface UnpackTarget {
+  selection: UnpackSelection;
+  /** An element, or a virtual one wrapping the selected text (see MUI Popper's anchorEl). */
+  anchor: PopperProps['anchorEl'];
+}
+
+export type UnpackCloseReason = 'escape' | 'closeButton' | 'clickAway';
+
+export interface OpenUnpackTarget extends UnpackTarget {
+  /** The chunk a keyboard user opened the popover from; focus goes back to it on close. */
+  openedFrom?: HTMLElement;
 }

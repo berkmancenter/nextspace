@@ -1,8 +1,14 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Pause, PlayArrow, Delete, ReportProblem, Download } from '@mui/icons-material';
+import React, { useEffect, useRef, useState, useCallback, useId, useMemo } from 'react';
+import { ChevronLeft, ChevronRight, Close, Pause, PlayArrow, Delete, ReportProblem, Download } from '@mui/icons-material';
 import { Dialog, Button } from '@mui/material';
 import { Socket } from 'socket.io-client';
-import { PseudonymousMessage } from '../types.internal';
+import {
+  OpenUnpackTarget,
+  PseudonymousMessage,
+  TranscriptChunkText,
+  TranscriptSelection,
+  UnpackCloseReason,
+} from '../types.internal';
 import { Api, RetrieveData, SendData } from '../utils';
 import { trackFeatureUsage, trackConversationEvent } from '../utils/analytics';
 import { insertMessageInOrder } from '../utils/messageModeration';
@@ -12,6 +18,8 @@ import { getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { normalizeAssistantPseudonym } from '../utils/Helpers';
 import { PRESENTATION_TEXT } from '../utils/presentationText';
 import { useBotName } from '../context/ConversationTypeContext';
+import { useTranscriptSelection } from '../hooks/useTranscriptSelection';
+import { UnpackPopover } from './UnpackPopover';
 
 interface TranscriptProps {
   /** The time range to focus on in the transcript */
@@ -45,6 +53,14 @@ interface TranscriptProps {
   lastReconnectTime?: number | null;
   /** Function to set an error message */
   setErrorMessage?: (message: string | null) => void;
+  /**
+   * Turns on the Unpacker: participants highlight a passage, or press Enter on a chunk, to ask Berkie
+   * about it. Leave unset when the event's unpacker feature is off. Ignored in the presentation view.
+   */
+  unpack?: {
+    /** Leave out when Private Chat is already on screen beside the transcript. */
+    onOpenPrivateChat?: () => void;
+  };
 }
 
 /**
@@ -57,6 +73,14 @@ interface TranscriptProps {
  */
 const botColor = getAssistantAvatarStyle().avatarBg;
 const botBadgeBackground = `color-mix(in srgb, ${botColor} 40%, transparent)`;
+
+const chunkText = (message: PseudonymousMessage): string => String(message.body.text ? message.body.text : message.body);
+
+/** Popper reads this rect on every update, so the popover follows the passage as the transcript scrolls. */
+const anchorForRange = (range: Range) => ({
+  contextElement: range.startContainer.parentElement ?? undefined,
+  getBoundingClientRect: () => range.getBoundingClientRect(),
+});
 
 export function Transcript(props: TranscriptProps) {
   const botName = useBotName();
@@ -76,6 +100,10 @@ export function Transcript(props: TranscriptProps) {
     scrollTop: number;
   } | null>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const unpackEnabled = !!props.unpack && !props.presentation;
+  const [unpackTarget, setUnpackTarget] = useState<OpenUnpackTarget | null>(null);
+  const [unpackTipDismissed, setUnpackTipDismissed] = useState(false);
+  const unpackHintId = useId();
 
   // Use visibility-aware duration hooks
   const transcriptOpenDuration = useVisibilityAwareDuration();
@@ -182,6 +210,37 @@ export function Transcript(props: TranscriptProps) {
       autoScrollDuration.start();
     }
   }, [isInManualScrollMode, props.conversationId, manualScrollDuration, autoScrollDuration]);
+
+  const chunkTexts = useMemo<TranscriptChunkText[]>(
+    () => messages.filter((message) => message.id).map((message) => ({ id: message.id!, text: chunkText(message) })),
+    [messages],
+  );
+
+  const handleTranscriptSelection = useCallback(({ selection, range }: TranscriptSelection) => {
+    setUnpackTarget({ selection, anchor: anchorForRange(range) });
+  }, []);
+  useTranscriptSelection(messagesContainerRef, unpackEnabled && isOpen, handleTranscriptSelection);
+
+  useEffect(() => {
+    if (!isOpen) setUnpackTarget(null);
+  }, [isOpen]);
+
+  const handleChunkKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, message: PseudonymousMessage) => {
+    if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    const id = message.id!;
+    setUnpackTarget({
+      selection: { startMessageId: id, startOffset: 0, endMessageId: id, endOffset: chunkText(message).length },
+      anchor: event.currentTarget,
+      openedFrom: event.currentTarget,
+    });
+  };
+
+  const closeUnpack = (reason: UnpackCloseReason) => {
+    // A click elsewhere already chose where focus goes next.
+    if (reason !== 'clickAway') unpackTarget?.openedFrom?.focus();
+    setUnpackTarget(null);
+  };
 
   // Recording indicator component
   const RecordingIndicator = ({ size = 'w-3 h-3' }: { size?: string }) => (
@@ -684,6 +743,23 @@ export function Transcript(props: TranscriptProps) {
         </div>
       )}
 
+      {unpackEnabled && isOpen && !unpackTipDismissed && (
+        <div className="mx-4 mt-3 flex flex-shrink-0 items-center justify-between gap-3 rounded-lg bg-[#EEF0FF] px-3.5 py-2.5 text-[13px] text-[#312E81]">
+          <p className="m-0 flex items-center gap-2">
+            <span aria-hidden="true">💡</span>
+            <span>Lost the thread? Select any passage and Berkie will unpack it while you keep listening.</span>
+          </p>
+          <button
+            type="button"
+            aria-label="Dismiss tip"
+            onClick={() => setUnpackTipDismissed(true)}
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-0 bg-transparent text-[#312E81] hover:bg-black/5"
+          >
+            <Close fontSize="small" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+
       {/* Messages */}
       {/* Scroll anchoring is off because new chunks are inserted at the bottom, and the browser would push the
           view up instead of following them. preserveScrollRef keeps the reader's place when scrolled up. */}
@@ -698,13 +774,22 @@ export function Transcript(props: TranscriptProps) {
           <div>
             {messages.map((message, i) => {
               const isBot = message.fromAgent;
+              const canUnpack = unpackEnabled && !!message.id;
 
               return (
                 <div
                   id={`transcript-message-${message.id}`}
                   data-message-id={message.id}
                   key={message.id || `message-${i}`}
-                  className={`mb-4 ${focusedMessageIds.includes(message.id!) ? 'bg-nx-focus-row dark:shadow-[inset_4px_0_0_var(--nx-border-interactive)]' : ''}`}
+                  className={`mb-4 ${focusedMessageIds.includes(message.id!) ? 'bg-nx-focus-row dark:shadow-[inset_4px_0_0_var(--nx-border-interactive)]' : ''} ${canUnpack ? 'rounded cursor-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white' : ''}`}
+                  {...(canUnpack && {
+                    tabIndex: 0,
+                    role: 'button',
+                    'aria-haspopup': 'dialog' as const,
+                    'aria-expanded': !!unpackTarget?.openedFrom && unpackTarget.selection.startMessageId === message.id,
+                    'aria-describedby': unpackHintId,
+                    onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => handleChunkKeyDown(event, message),
+                  })}
                 >
                   <div
                     className="flex items-center gap-2 text-gray-300 text-sm mb-1"
@@ -722,10 +807,7 @@ export function Transcript(props: TranscriptProps) {
                     {isBot && (
                       <span
                         className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold"
-                        style={{
-                          backgroundColor: botBadgeBackground,
-                          color: 'var(--nx-transcript-badge-fg)',
-                        }}
+                        style={{ backgroundColor: botBadgeBackground, color: 'var(--nx-transcript-badge-fg)' }}
                       >
                         <BotIcon size={12} color="var(--nx-transcript-badge-fg)" />
                         {normalizeAssistantPseudonym(message, botName)}
@@ -733,16 +815,34 @@ export function Transcript(props: TranscriptProps) {
                     )}
                   </div>
                   <p
+                    data-chunk-text
                     className="text-white text-base dark:text-nx-text"
                     style={props.presentation ? PRESENTATION_TEXT.message : undefined}
                   >
-                    {message.body.text ? message.body.text : message.body}
+                    {chunkText(message)}
                   </p>
                 </div>
               );
             })}
           </div>
         </div>
+      )}
+
+      {unpackEnabled && (
+        <>
+          <span id={unpackHintId} hidden>
+            Press Enter to unpack this with Berkie.
+          </span>
+          <UnpackPopover
+            conversationId={props.conversationId}
+            target={unpackTarget}
+            chunks={chunkTexts}
+            onClose={closeUnpack}
+            onOpenPrivateChat={props.unpack?.onOpenPrivateChat}
+            focusOnOpen={!!unpackTarget?.openedFrom}
+            layoutVersion={messages.length}
+          />
+        </>
       )}
 
       {/* Delete Confirmation Modal */}
