@@ -679,6 +679,11 @@ export const EventCreationForm: React.FC<{
     setSpeakers(updated);
   };
 
+  // A property's `showForPlatforms` hint, when set, means it's only relevant to some platforms —
+  // show it only once the selection includes at least one of them.
+  const isVisibleForSelectedPlatforms = (prop: components['schemas']['ConfigProperty']) =>
+    !prop.showForPlatforms || prop.showForPlatforms.some((platform) => selectedPlatforms.includes(platform));
+
   // Helper function to render dynamic property fields.
   // Pass `namespace` (feature name) to scope sub-property keys and prevent
   // collisions when multiple features share the same property name.
@@ -787,9 +792,8 @@ export const EventCreationForm: React.FC<{
               <FormLabel
                 component="legend"
                 sx={{
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  color: 'rgba(0, 0, 0, 0.87)',
+                  fontSize: '0.75rem',
+                  color: 'text.secondary',
                 }}
               >
                 {prop.label}
@@ -1692,6 +1696,7 @@ export const EventCreationForm: React.FC<{
               {conversationTypes
                 ?.find((type) => type.name === selectedConvType)
                 ?.properties?.filter((prop) => prop.name !== 'zoomMeetingUrl')
+                .filter(isVisibleForSelectedPlatforms)
                 .map((prop) => renderDynamicPropertyField(prop))}
 
               {(() => {
@@ -1744,7 +1749,9 @@ export const EventCreationForm: React.FC<{
                           }
                         />
                         {dynamicPropertyValues[feature.name] &&
-                          feature.properties?.map((prop) => renderDynamicPropertyField(prop, feature.name))}
+                          feature.properties
+                            ?.filter(isVisibleForSelectedPlatforms)
+                            .map((prop) => renderDynamicPropertyField(prop, feature.name))}
                       </Box>
                     ))}
                   </Box>

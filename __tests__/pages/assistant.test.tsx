@@ -3210,6 +3210,82 @@ describe('EventAssistantRoom', () => {
     });
   });
 
+  describe('bot presence panel', () => {
+    const originalBotMediaUrl = process.env.NEXT_PUBLIC_BOT_MEDIA_URL;
+
+    beforeEach(() => {
+      process.env.NEXT_PUBLIC_BOT_MEDIA_URL = 'https://bot-media.example.com';
+    });
+
+    afterEach(() => {
+      process.env.NEXT_PUBLIC_BOT_MEDIA_URL = originalBotMediaUrl;
+    });
+
+    const renderPresentationWithFeatures = async (features: { name: string; config?: object }[]) => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        name: 'Legal Telescopes',
+        features,
+      });
+
+      await act(async () => {
+        render(<PresentationRoom authType={'guest'} />);
+      });
+    };
+
+    it('plays audio by default, with no voiceOutput feature set', async () => {
+      await renderPresentationWithFeatures([]);
+
+      const iframe = await screen.findByTitle('Berkie presence');
+      expect(iframe).toHaveAttribute('src', expect.not.stringContaining('audio=false'));
+      // mockRouter.query carries channel: ['transcript,MJqaT2ii', ...] by default (see top-level beforeEach).
+      expect(iframe).toHaveAttribute('src', expect.stringContaining('transcriptPasscode=MJqaT2ii'));
+    });
+
+    it('does not request bot-media-server until the conversation has finished loading, so the first request already carries the transcript passcode', async () => {
+      let resolveConversation: (value: unknown) => void;
+      (createConversationFromData as jest.Mock).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveConversation = resolve;
+          }),
+      );
+
+      await act(async () => {
+        render(<PresentationRoom authType={'guest'} />);
+      });
+
+      expect(screen.queryByTitle(/presence$/)).not.toBeInTheDocument();
+
+      await act(async () => {
+        resolveConversation!({
+          agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+          type: { name: 'eventAssistant' },
+          name: 'Legal Telescopes',
+          features: [],
+        });
+      });
+
+      expect(await screen.findByTitle('Berkie presence')).toHaveAttribute(
+        'src',
+        expect.stringContaining('transcriptPasscode=MJqaT2ii'),
+      );
+    });
+
+    it('plays audio when the organizer routed the bot voice to the presentation', async () => {
+      await renderPresentationWithFeatures([{ name: 'voiceOutput', config: { voiceDestination: 'presentation' } }]);
+
+      expect(await screen.findByTitle('Berkie presence')).toHaveAttribute('src', expect.not.stringContaining('audio=false'));
+    });
+
+    it('stays muted when the organizer routed the bot voice to Zoom, to avoid double audio', async () => {
+      await renderPresentationWithFeatures([{ name: 'voiceOutput', config: { voiceDestination: 'zoom' } }]);
+
+      expect(await screen.findByTitle('Berkie presence')).toHaveAttribute('src', expect.stringContaining('audio=false'));
+    });
+  });
+
   describe('Event not started dialog', () => {
     it('displays the event not started dialog when the conversation is not active and in future (has startTime)', async () => {
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {

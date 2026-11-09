@@ -35,7 +35,7 @@ export interface UseConversationSetupReturn {
   agentId: string | null;
   agentActive: boolean;
   agentIds: string[];
-  conversationFeatures: { name: string; enabled?: boolean }[];
+  conversationFeatures: { name: string; enabled?: boolean; config?: { [key: string]: unknown } }[];
   feedbackFrequency: number;
   transcriptPasscode: string;
   chatPasscode: string;
@@ -86,7 +86,9 @@ export function useConversationSetup({
   const [agentId, setAgentId] = useState<string | null>(null);
   const [agentActive, setAgentActive] = useState<boolean>(true);
   const [agentIds, setAgentIds] = useState<string[]>([]);
-  const [conversationFeatures, setConversationFeatures] = useState<{ name: string; enabled?: boolean }[]>([]);
+  const [conversationFeatures, setConversationFeatures] = useState<
+    { name: string; enabled?: boolean; config?: { [key: string]: unknown } }[]
+  >([]);
   const [feedbackFrequency, setFeedbackFrequency] = useState<number>(1);
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>('');
   const [chatPasscode, setChatPasscode] = useState<string>('');
