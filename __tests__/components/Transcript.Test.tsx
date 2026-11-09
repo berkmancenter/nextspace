@@ -568,6 +568,86 @@ describe('Transcript', () => {
     expect(document.getElementById('transcript-message-m1')?.contains(selection.anchorNode)).toBe(true);
   });
 
+  it('shows a placeholder chunk with no body as empty, instead of crashing', async () => {
+    (RetrieveData as jest.Mock).mockImplementation((url: string) =>
+      Promise.resolve(
+        url.startsWith('messages/')
+          ? [...transcriptMessages, { id: 'stub', channels: ['transcript'], createdAt: '2025-10-17T12:03:00Z', body: null }]
+          : { transcript: { status: 'active' } },
+      ),
+    );
+    const { container } = render(<Transcript {...baseProps} />);
+    await screen.findByText('Hello world');
+
+    expect(container.querySelector('[data-message-id="stub"] [data-chunk-text]')).toBeEmptyDOMElement();
+  });
+
+  it('never shows [object Object] for a chunk whose body has no text', async () => {
+    (RetrieveData as jest.Mock).mockImplementation((url: string) =>
+      Promise.resolve(
+        url.startsWith('messages/')
+          ? [{ id: 'm9', channels: ['transcript'], createdAt: '2025-10-17T12:03:00Z', body: { type: 'caption' } }]
+          : { transcript: { status: 'active' } },
+      ),
+    );
+    const { container } = render(<Transcript {...baseProps} />);
+    await waitFor(() => expect(container.querySelector('[data-message-id="m9"]')).toBeInTheDocument());
+
+    expect(screen.queryByText('[object Object]')).not.toBeInTheDocument();
+  });
+
+  it('keeps chunks that arrive while the transcript history is loading', async () => {
+    let finishLoading: (messages: unknown) => void = () => {};
+    (RetrieveData as jest.Mock).mockImplementation((url: string) =>
+      url.startsWith('messages/')
+        ? new Promise((resolve) => (finishLoading = resolve))
+        : Promise.resolve({ transcript: { status: 'active' } }),
+    );
+    render(<Transcript {...baseProps} />);
+    await waitFor(() => expect(mockSocket.on.mock.calls.some((call) => call[0] === 'message:new')).toBe(true));
+    const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
+    act(() => {
+      messageHandler({
+        id: 'm3',
+        channels: ['transcript'],
+        createdAt: '2025-10-17T12:03:00Z',
+        body: { text: 'Live chunk' },
+      });
+    });
+
+    await act(async () => finishLoading(transcriptMessages));
+
+    expect(screen.getByText('Hello world')).toBeInTheDocument();
+    expect(screen.getByText('Live chunk')).toBeInTheDocument();
+  });
+
+  it('does not jump the scroll position with a saved position left over from before a reconnect', async () => {
+    const { container, rerender } = render(<Transcript {...baseProps} />);
+    await screen.findByText('Hello world');
+    const list = container.querySelector('[data-message-id]')!.parentElement!.parentElement!;
+    let scrollHeight = 1000;
+    Object.defineProperty(list, 'scrollHeight', { configurable: true, get: () => scrollHeight });
+    list.scrollTop = -100;
+    const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
+    // A placeholder for a chunk already on screen changes nothing, so the saved position is never used.
+    act(() => {
+      messageHandler({ id: 'm1', channels: ['transcript'], createdAt: '2025-10-17T12:01:00Z', body: null });
+    });
+    scrollHeight = 1200;
+    (RetrieveData as jest.Mock).mockImplementation((url: string) =>
+      Promise.resolve(
+        url.startsWith('messages/')
+          ? [...transcriptMessages, { id: 'm3', channels: ['transcript'], createdAt: '2025-10-17T12:03:00Z', body: 'Later' }]
+          : { transcript: { status: 'active' } },
+      ),
+    );
+
+    rerender(<Transcript {...baseProps} lastReconnectTime={Date.now()} />);
+    await screen.findByText('Later');
+
+    expect(list.scrollTop).toBe(-100);
+  });
+
   it('marks each chunk with its message id', async () => {
     render(<Transcript {...baseProps} />);
 

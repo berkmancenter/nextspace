@@ -15,7 +15,7 @@ import { insertMessageInOrder } from '../utils/messageModeration';
 import { useVisibilityAwareDuration } from '../hooks/useVisibilityAwareDuration';
 import { BotIcon } from './BotIcon';
 import { getAssistantAvatarStyle } from '../utils/avatarUtils';
-import { normalizeAssistantPseudonym } from '../utils/Helpers';
+import { normalizeAssistantPseudonym, parseMessageBody } from '../utils/Helpers';
 import { PRESENTATION_TEXT } from '../utils/presentationText';
 import { useBotName } from '../context/ConversationTypeContext';
 import { useTranscriptSelection } from '../hooks/useTranscriptSelection';
@@ -74,7 +74,8 @@ interface TranscriptProps {
 const botColor = getAssistantAvatarStyle().avatarBg;
 const botBadgeBackground = `color-mix(in srgb, ${botColor} 40%, transparent)`;
 
-const chunkText = (message: PseudonymousMessage): string => String(message.body.text ? message.body.text : message.body);
+// A placeholder for a hidden chunk arrives with a null body.
+const chunkText = (message: PseudonymousMessage): string => (message.body ? parseMessageBody(message.body).text : '');
 
 /** Popper reads this rect on every update, so the popover follows the passage as the transcript scrolls. */
 const anchorForRange = (range: Range) => ({
@@ -441,7 +442,8 @@ export function Transcript(props: TranscriptProps) {
       }
 
       if (Array.isArray(transcriptMessages)) {
-        setMessages(transcriptMessages);
+        // Chunks the socket delivered while this request was out are not in its response.
+        setMessages((current) => transcriptMessages.reduce(insertMessageInOrder, current));
 
         if (props.focusTimeRange) {
           setTimeout(() => {
@@ -484,6 +486,8 @@ export function Transcript(props: TranscriptProps) {
     console.log('Transcript re-fetching history after gap-reconnect...');
     fetchTranscriptData();
   }, [props.lastReconnectTime]);
+    // A position saved before a reconnect no longer matches the list this fetch is about to show.
+    preserveScrollRef.current = null;
 
   // Effect: Add scroll event listener
   useEffect(() => {
