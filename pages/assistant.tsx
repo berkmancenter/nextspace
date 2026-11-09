@@ -734,7 +734,7 @@ export function EventAssistantRoom({
                     hideToggle={presentation || (router.query.view !== 'preferences' && activeTab === 'transcript')}
                     presentation={presentation}
                     unpack={
-                      unpackerOn && !presentation
+                      unpackerOn
                         ? { onOpenPrivateChat: privateChatOnScreen ? undefined : () => handleTabChange('assistant') }
                         : undefined
                     }
