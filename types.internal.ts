@@ -613,6 +613,7 @@ export type UnpackSelection = components['schemas']['UnpackSelection'];
 export type UnpackPreview = components['schemas']['UnpackPreview'];
 export type UnpackPreviewExplanation = UnpackPreview['explanation'];
 export type UnpackErrorReason = NonNullable<components['schemas']['UnpackError']['reason']>;
+export type UnpackExplanation = components['schemas']['UnpackExplanation'];
 
 /** The text of one transcript chunk as shown on the page, which is also what the server's offsets point into. */
 export interface TranscriptChunkText {

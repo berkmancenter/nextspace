@@ -2044,9 +2044,8 @@ describe('AssistantChatPanel', () => {
       createdAt: '2025-10-17T10:43:05Z',
       body: {
         type: 'unpack_explanation',
-        mode: 'lastMinute',
+        mode: 'passage',
         destination: 'privateChat',
-        requestMessage: 'request-1',
         chunkIds: ['chunk-1'],
         passage: { start: '2025-10-17T10:42:10Z', end: '2025-10-17T10:43:00Z' },
         quote: 'Courts read the Fourth Amendment narrowly.',
@@ -2073,6 +2072,17 @@ describe('AssistantChatPanel', () => {
         'The speaker says courts give phone records less protection.',
       );
       expect(screen.queryByTestId('assistant-message')).not.toBeInTheDocument();
+    });
+
+    it('leaves a Catch me up answer out of the passage card', () => {
+      const catchUpAnswer = {
+        ...unpackExplanation,
+        body: { ...unpackExplanation.body, mode: 'lastMinute', requestMessage: 'request-1' },
+      };
+
+      render(<AssistantChatPanel {...baseProps} messages={[catchUpAnswer]} />);
+
+      expect(screen.queryByTestId('unpack-explanation-message')).not.toBeInTheDocument();
     });
   });
 });

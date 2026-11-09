@@ -5,7 +5,7 @@ import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { AssistantMessage, UserMessage, JargonClarificationMessage, UnpackExplanationMessage } from '../components/messages';
 import { MessageInput } from './MessageInput';
 import { SlashCommand, createSlashCommandEnhancer } from './enhancers/slashCommandEnhancer';
-import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
+import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig, UnpackExplanation } from '../types.internal';
 import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { getTimestampVisibility, parseMessageBody } from '../utils/Helpers';
@@ -248,7 +248,8 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
       return <JargonClarificationMessage message={msg} />;
     }
 
-    if (messageType === 'unpack_explanation') {
+    // A Catch me up answer has the same type but no passage of its own, so it isn't this card.
+    if (messageType === 'unpack_explanation' && (msg.body as UnpackExplanation).mode === 'passage') {
       return <UnpackExplanationMessage message={msg} />;
     }
 
