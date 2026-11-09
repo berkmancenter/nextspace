@@ -3286,6 +3286,26 @@ describe('EventAssistantRoom', () => {
     });
   });
 
+  describe('QR join code in presentation view', () => {
+    it('shows a QR code for the participant link via the presentation header by default', async () => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        name: 'Legal Telescopes',
+        features: [],
+        eventUrls: {
+          participant: [{ label: 'Berkie', url: 'https://example.com/assistant/?conversationId=a1b2c3d4e5f6a1b2c3d4e5f6' }],
+        },
+      });
+
+      await act(async () => {
+        render(<PresentationRoom authType={'guest'} />);
+      });
+
+      expect(await screen.findByRole('img', { name: 'Scan to join as a participant' })).toBeInTheDocument();
+    });
+  });
+
   describe('Event not started dialog', () => {
     it('displays the event not started dialog when the conversation is not active and in future (has startTime)', async () => {
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {

@@ -36,6 +36,7 @@ export interface UseConversationSetupReturn {
   agentActive: boolean;
   agentIds: string[];
   conversationFeatures: { name: string; enabled?: boolean; config?: { [key: string]: unknown } }[];
+  participantUrl: string;
   feedbackFrequency: number;
   transcriptPasscode: string;
   chatPasscode: string;
@@ -89,6 +90,7 @@ export function useConversationSetup({
   const [conversationFeatures, setConversationFeatures] = useState<
     { name: string; enabled?: boolean; config?: { [key: string]: unknown } }[]
   >([]);
+  const [participantUrl, setParticipantUrl] = useState<string>('');
   const [feedbackFrequency, setFeedbackFrequency] = useState<number>(1);
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>('');
   const [chatPasscode, setChatPasscode] = useState<string>('');
@@ -165,6 +167,7 @@ export function useConversationSetup({
         const conversation = await createConversationFromData(conversationData);
         setConversationType(conversation.type);
         setConversationFeatures(conversation.features ?? []);
+        setParticipantUrl(conversation.eventUrls?.participant?.[0]?.url ?? '');
         if (conversation.name) setEventName(conversation.name);
 
         const frequency = (conversation?.properties?.feedbackFrequency as number) || 1;
@@ -352,6 +355,7 @@ export function useConversationSetup({
     agentActive,
     agentIds,
     conversationFeatures,
+    participantUrl,
     feedbackFrequency,
     transcriptPasscode,
     chatPasscode,
