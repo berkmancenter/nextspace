@@ -18,7 +18,7 @@ import { PreferencesPanel } from '../components/PreferencesPanel';
 import { PresentationHeader } from '../components/PresentationHeader';
 import { insertMessageInOrder } from '../utils/messageModeration';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
-import { CheckAuthHeader, parseMessageBody } from '../utils/Helpers';
+import { CheckAuthHeader, isFeatureEnabled, parseMessageBody } from '../utils/Helpers';
 import { withStoredChannels } from '../utils/presentationChannels';
 import TokenManagerDefault from '../utils/TokenManager';
 import { Alert, Button, Dialog, Snackbar } from '@mui/material';
@@ -247,11 +247,7 @@ export function EventAssistantRoom({
       value: `/${f.slashCommand} `,
     }));
 
-  // A feature saved on the event overrides its type's default, which leaves the unpacker off.
-  const savedUnpacker = conversationFeatures.find((f) => f.name === 'unpacker');
-  const unpackerOn = savedUnpacker
-    ? savedUnpacker.enabled !== false
-    : !!conversationType?.features?.find((f) => f.name === 'unpacker')?.default;
+  const unpackerOn = isFeatureEnabled('unpacker', conversationFeatures, conversationType?.features);
   const privateChatOnScreen = activeTab === 'assistant' && router.query.view !== 'preferences';
 
   // Socket event listeners — cross-cutting: messages + tab badges + loading state + resources

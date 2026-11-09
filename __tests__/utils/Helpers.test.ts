@@ -8,6 +8,7 @@ import {
   GetChannelPasscode,
   SendData,
   Api,
+  isFeatureEnabled,
 } from '../../utils/Helpers';
 
 describe('resolveConversationBotName', () => {
@@ -524,7 +525,6 @@ describe('SendData', () => {
 
     expect(response).toEqual({ error: true, status: 502, message: 'Bad Gateway' });
   });
-});
 
   it('logs nothing when the caller cancels the request', async () => {
     const logError = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -544,3 +544,29 @@ describe('SendData', () => {
 
     expect(logError).toHaveBeenCalled();
   });
+});
+
+describe('isFeatureEnabled', () => {
+  const typeFeatures = [
+    { name: 'unpacker', default: false },
+    { name: 'polls', default: true },
+  ];
+
+  it("uses the type's default when the event saved nothing for the feature", () => {
+    expect(isFeatureEnabled('unpacker', [], typeFeatures)).toBe(false);
+    expect(isFeatureEnabled('polls', [], typeFeatures)).toBe(true);
+  });
+
+  it("lets the event's saved setting override the default", () => {
+    expect(isFeatureEnabled('unpacker', [{ name: 'unpacker', enabled: true }], typeFeatures)).toBe(true);
+    expect(isFeatureEnabled('polls', [{ name: 'polls', enabled: false }], typeFeatures)).toBe(false);
+  });
+
+  it('treats a saved feature with no enabled flag as on', () => {
+    expect(isFeatureEnabled('unpacker', [{ name: 'unpacker' }], typeFeatures)).toBe(true);
+  });
+
+  it('is off when neither the event nor its type knows the feature', () => {
+    expect(isFeatureEnabled('missing', undefined, undefined)).toBe(false);
+  });
+});

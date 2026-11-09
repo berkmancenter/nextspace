@@ -279,6 +279,20 @@ export const SendData = async (
   }
 };
 
+/**
+ * Whether an event has a feature on. A setting saved on the event wins; otherwise the conversation
+ * type's default applies, as in the backend's getFeatures().
+ */
+export const isFeatureEnabled = (
+  name: string,
+  savedFeatures: { name: string; enabled?: boolean }[] | undefined,
+  typeFeatures: { name: string; default?: boolean }[] | undefined,
+): boolean => {
+  const saved = savedFeatures?.find((feature) => feature.name === name);
+  if (saved) return saved.enabled !== false;
+  return !!typeFeatures?.find((feature) => feature.name === name)?.default;
+};
+
 // Default easing class for animations
 export const DefaultEase = ' ease-[cubic-bezier(0.075, 0.820, 0.165, 1.000)]';
 

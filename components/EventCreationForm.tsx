@@ -39,7 +39,7 @@ import { useRouter } from 'next/router';
 import { Request } from '../utils';
 import { components } from '../types';
 import { Conversation } from '../types.internal';
-import { Api, SendData, updateConversation } from '../utils/Helpers';
+import { Api, SendData, isFeatureEnabled, updateConversation } from '../utils/Helpers';
 import SessionManager from '../utils/SessionManager';
 import { NewTopicForm, NewTopicFormValues } from './NewTopicForm';
 
@@ -412,19 +412,20 @@ export const EventCreationForm: React.FC<{
         if (key !== 'zoomMeetingUrl') dynamicPrefill[key] = value;
       });
     }
-    /* Start each feature at its type default. The saved event's features array
-       overrides this below, but features that aren't in the array stay at the
-       default. This matches what getFeatures() in the backend does for legacy events
-       whose features were never persisted, and for events created before a feature
-       was added to the type. */
+    /* A feature missing from the saved event's features array starts at its type
+       default, which covers legacy events whose features were never persisted and
+       events created before a feature was added to the type. */
     const savedTypeName = initialEvent.type?.name ?? (initialEvent as any).conversationType;
     const typeDefinition = conversationTypes?.find((t) => t.name === savedTypeName);
-    typeDefinition?.features?.forEach((featureDef) => {
-      dynamicPrefill[featureDef.name] = Boolean(featureDef.default);
+    const featureNames = new Set([
+      ...(typeDefinition?.features ?? []).map((featureDef) => featureDef.name),
+      ...(initialEvent.features ?? []).map((f) => f.name),
+    ]);
+    featureNames.forEach((name) => {
+      dynamicPrefill[name] = isFeatureEnabled(name, initialEvent.features, typeDefinition?.features);
     });
 
     initialEvent.features?.forEach((f) => {
-      dynamicPrefill[f.name] = f.enabled !== false;
       Object.entries(f.config || {}).forEach(([key, value]) => {
         dynamicPrefill[`${f.name}.${key}`] = value;
       });
