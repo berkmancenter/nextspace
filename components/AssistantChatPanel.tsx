@@ -1,19 +1,23 @@
-import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
-import { useTheme, useMediaQuery, IconButton, Tooltip } from '@mui/material';
+import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTheme, useMediaQuery, Button, IconButton, Tooltip } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import { AssistantMessage, UserMessage, JargonClarificationMessage } from '../components/messages';
+import { AssistantMessage, UserMessage, JargonClarificationMessage, CatchUpSummaryMessage } from '../components/messages';
 import { MessageInput } from './MessageInput';
 import { SlashCommand, createSlashCommandEnhancer } from './enhancers/slashCommandEnhancer';
 import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
 import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { getTimestampVisibility, parseMessageBody } from '../utils/Helpers';
+import { describeCatchUpRequest, formatTime } from '../utils/catchUp';
+import { components } from '../types';
 import { BotIcon } from './BotIcon';
 import { MediaLightbox } from './MediaLightbox';
 import { ThreadedMessage } from './ThreadedMessage';
 import { ThreadPanel } from './ThreadPanel';
 import { ModSuggestButton } from './messages/ModSuggestButton';
+
+type UnpackRequestBody = components['schemas']['UnpackRequestBody'];
 
 interface AssistantChatPanelProps {
   messages: PseudonymousMessage[];
@@ -34,6 +38,10 @@ interface AssistantChatPanelProps {
   messagesWithUnreadReplies?: Set<string>;
   onMarkAsRead?: (messageId: string) => void;
   inactive?: boolean;
+  /** Called with no argument for a fresh catch-up, or with the failed request to resend it. */
+  onCatchUp?: (retryOf?: UnpackRequestBody) => void;
+  /** Looked up by ID to list the passages in a catch-up request. */
+  transcriptChunks?: PseudonymousMessage[];
 }
 
 export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
@@ -55,7 +63,14 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   messagesWithUnreadReplies = new Set(),
   onMarkAsRead,
   inactive = false,
+  onCatchUp,
+  transcriptChunks = [],
 }) => {
+  const catchUpButtonRef = useRef<HTMLButtonElement>(null);
+  const transcriptChunksById = useMemo(
+    () => new Map(transcriptChunks.map((chunk) => [chunk.id, chunk])),
+    [transcriptChunks],
+  );
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [inputHidden, setInputHidden] = useState(false);
   const theme = useTheme();
@@ -199,6 +214,20 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   const lastMessage = messages[messages.length - 1];
   const waitingForThreadedReply = waitingForResponse && lastMessage?.parentMessage;
 
+  // The refusal carries no link to its request, so resend the newest request posted before it.
+  const retryCatchUp = (refusal: PseudonymousMessage) => {
+    if (waitingForResponse || !onCatchUp) return;
+    const refusalIndex = messages.indexOf(refusal);
+    const failedRequest = messages
+      .slice(0, refusalIndex)
+      .reverse()
+      .find((message) => message.body?.type === 'unpack_request');
+    if (failedRequest) onCatchUp(failedRequest.body as UnpackRequestBody);
+    else onCatchUp();
+    // Try again disappears once the new request posts, which would drop focus to the page.
+    catchUpButtonRef.current?.focus();
+  };
+
   // Create enhancers for thread input (slash commands only)
   const threadEnhancers = [];
   if (slashCommands.length > 0) {
@@ -247,6 +276,54 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     if (messageType === 'jargon_clarification') {
       return <JargonClarificationMessage message={msg} />;
     }
+
+    if (messageType === 'catch_up_summary') {
+      return <CatchUpSummaryMessage message={msg} />;
+    }
+
+    if (messageType === 'unpack_request') {
+      const requestChunkIds = [...new Set<string>(msg.body?.chunkIds ?? [])];
+      const passages = requestChunkIds
+        .map((chunkId) => transcriptChunksById.get(chunkId))
+        .filter((chunk): chunk is PseudonymousMessage => chunk !== undefined);
+      // The server, not the browser clock, knows whether these passages came from before the last minute.
+      const summary = messages.find(
+        (message) => message.body?.type === 'catch_up_summary' && message.body?.requestMessage === msg.id,
+      );
+      const description = describeCatchUpRequest({
+        passages,
+        requestedCount: requestChunkIds.length,
+        earlierSpeech: summary?.body?.earlierSpeech === true,
+      });
+      return (
+        <div className="w-fit max-w-[85%] rounded-xl border border-[#C8C6F2] bg-[#EEEDFB] px-3 py-2 text-sm text-gray-800">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#2E2BA8]">Catch me up</p>
+          {description && <p className="text-xs text-gray-700">{description}</p>}
+          {passages.length > 0 && (
+            <ul className="mt-2 flex flex-col gap-1">
+              {passages.map((chunk) => {
+                const time = formatTime(new Date(chunk.createdAt ?? Number.NaN));
+                return (
+                  <li key={chunk.id}>
+                    {time && <span className="mr-2 text-xs text-gray-600">{time}</span>}
+                    {parseMessageBody(chunk.body).text}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      );
+    }
+
+    // Retrying only helps when the AI call failed, and only the newest failure should offer it.
+    const canRetryCatchUp =
+      messageType === 'catch_up_refused' &&
+      msg.body?.reason === 'unpackFailed' &&
+      onCatchUp !== undefined &&
+      !inactive &&
+      msg.id !== undefined &&
+      msg.id === lastMessage?.id;
 
     // Assistant messages
     if (isAssistant) {
@@ -307,6 +384,17 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                 onMarkmapClick={handleMarkmapClick}
               />
             </div>
+            {canRetryCatchUp && (
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => retryCatchUp(msg)}
+                aria-disabled={waitingForResponse}
+                sx={{ marginTop: '6px', textTransform: 'none' }}
+              >
+                Try again
+              </Button>
+            )}
           </div>
         );
       }
@@ -395,7 +483,19 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-end border-t border-gray-200 px-2 py-0.5 bg-white">
+              <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-2 py-0.5 bg-white">
+                {onCatchUp && (
+                  <Button
+                    ref={catchUpButtonRef}
+                    size="small"
+                    variant="outlined"
+                    onClick={() => !waitingForResponse && onCatchUp()}
+                    aria-disabled={waitingForResponse}
+                    sx={{ marginRight: 'auto', textTransform: 'none' }}
+                  >
+                    Catch me up
+                  </Button>
+                )}
                 <Tooltip title={inputHidden ? 'Show input' : 'Hide input'}>
                   <IconButton
                     size="small"

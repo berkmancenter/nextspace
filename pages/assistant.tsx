@@ -20,6 +20,7 @@ import { insertMessageInOrder } from '../utils/messageModeration';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
 import { CheckAuthHeader, parseMessageBody } from '../utils/Helpers';
 import { withStoredChannels } from '../utils/presentationChannels';
+import { buildCatchUpRequest, pickCatchUpChunks } from '../utils/catchUp';
 import TokenManagerDefault from '../utils/TokenManager';
 import { Alert, Button, Dialog, Snackbar } from '@mui/material';
 import { Info } from '@mui/icons-material';
@@ -34,6 +35,9 @@ import {
 } from '../hooks';
 
 type Resource = components['schemas']['Resource'];
+type UnpackRequestBody = components['schemas']['UnpackRequestBody'];
+
+const CATCH_UP_TIMEOUT_MS = 2 * 60 * 1000; // 2 min
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -234,6 +238,25 @@ export function EventAssistantRoom({
     pendingHiddenRef,
   });
 
+  // An event saved before the unpacker setting existed has no entry for it, which means off.
+  const unpackerFeature = conversationFeatures.find((feature) => feature.name === 'unpacker');
+  const unpackerEnabled = !presentation && unpackerFeature !== undefined && unpackerFeature.enabled !== false;
+  const [catchUpAnnouncement, setCatchUpAnnouncement] = useState<{ id: string; refusal: string | null } | null>(null);
+  // Tracked apart from waitingForResponse, which any Berkie reply clears, even one to an earlier question.
+  const [catchUpPending, setCatchUpPending] = useState(false);
+  // Null until the transcript history loads, so a catch-up can't go out with an incomplete list.
+  const [transcriptChunks, setTranscriptChunks] = useState<PseudonymousMessage[] | null>(null);
+  const catchUpReady = unpackerEnabled && (!transcriptPasscode || transcriptChunks !== null);
+
+  useEffect(() => {
+    if (!catchUpPending) return;
+    const timeout = setTimeout(() => {
+      setCatchUpPending(false);
+      setGeneralError(`${botName} didn't answer your catch-up. Please try again.`);
+    }, CATCH_UP_TIMEOUT_MS);
+    return () => clearTimeout(timeout);
+  }, [catchUpPending, botName, setGeneralError]);
+
   // Derive slash commands from the loaded conversation type's features.
   const slashCommands: SlashCommand[] = (conversationType?.features ?? [])
     .filter((f) => {
@@ -258,6 +281,13 @@ export function EventAssistantRoom({
         if (body?.type === 'poll' && body.whenResultsVisible === 'always') {
           const zeroCounts = Object.fromEntries((body.choices as string[]).map((c) => [c, 0]));
           setPollCounts((prev) => ({ ...prev, [body.pollId]: zeroCounts }));
+        }
+        if (body?.type === 'catch_up_summary' || body?.type === 'catch_up_refused') {
+          setCatchUpPending(false);
+          // On Private Chat the message list already reads the reply out.
+          if (activeTabRef.current !== 'assistant' && data.id) {
+            setCatchUpAnnouncement({ id: data.id, refusal: body.type === 'catch_up_refused' ? body.text : null });
+          }
         }
       }
 
@@ -554,30 +584,70 @@ export function EventAssistantRoom({
       }
     }
 
-    try {
-      const response = await SendData('messages', {
-        body: finalMessage,
-        bodyType: 'text',
-        conversation: router.query.conversationId,
-        channels,
-        ...(parentMessageId !== undefined && { parentMessage: parentMessageId }),
-        ...(messageSource === 'promptResponse' && promptQuestionId && { answersPrompt: promptQuestionId }),
-      });
+    const sent = await submitMessage(finalMessage, 'text', channels, {
+      ...(parentMessageId !== undefined && { parentMessage: parentMessageId }),
+      ...(messageSource === 'promptResponse' && promptQuestionId && { answersPrompt: promptQuestionId }),
+    });
+    if (!sent) {
+      setWaitingForResponse(false);
+      setWaitingForChatResponse(false);
+    } else if (controlledMode) {
+      setControlledMode(null);
+    }
+    return sent;
+  }
 
-      if (response && response.error && response.message.toLocaleLowerCase().includes('incorrect passcode')) {
-        setGeneralError('Incorrect chat passcode. Message could not be sent.');
-        setWaitingForResponse(false);
-        return false;
-      }
+  /**
+   * Posts a message and shows an error when the server rejects it or can't be reached.
+   * @param body The message body: plain text, or a structured request such as a catch-up.
+   * @param bodyType How the server should read the body.
+   * @param channels The channels to post to.
+   * @param extraFields Other message fields, such as the parent message of a thread reply.
+   * @returns Whether the server accepted the message.
+   */
+  async function submitMessage(
+    body: string | UnpackRequestBody,
+    bodyType: 'text' | 'json',
+    channels: { name: string; passcode?: string }[],
+    extraFields: Record<string, string> = {},
+  ) {
+    const response = await SendData('messages', {
+      body,
+      bodyType,
+      conversation: router.query.conversationId,
+      channels,
+      ...extraFields,
+    });
 
-      if (controlledMode) setControlledMode(null);
-
-      return true;
-    } catch (error) {
-      console.error('Error sending message:', error);
+    if (response?.error && response.message?.toLocaleLowerCase().includes('incorrect passcode')) {
+      setGeneralError('Incorrect chat passcode. Message could not be sent.');
       return false;
     }
+    if (!response || response.error) {
+      console.error('Error sending message:', response);
+      setGeneralError('Message could not be sent. Please try again.');
+      return false;
+    }
+    return true;
   }
+
+  const catchUp = async (retryOf?: UnpackRequestBody) => {
+    if (!Api.get().GetTokens() || !initialJoinComplete) {
+      setGeneralError('Still connecting. Please try again in a moment.');
+      return;
+    }
+
+    const request = retryOf ?? buildCatchUpRequest(pickCatchUpChunks(transcriptChunks ?? []));
+    trackConversationEvent(
+      router.query.conversationId as string,
+      'assistant',
+      'command_sent',
+      retryOf ? 'catch_up_retry' : 'catch_up',
+    );
+    setCatchUpPending(true);
+    const sent = await submitMessage(request, 'json', [{ name: `direct-${userId}-${agentId}` }]);
+    if (!sent) setCatchUpPending(false);
+  };
 
   const enterControlledMode = (config: ControlledInputConfig) => {
     setControlledMode(config);
@@ -730,6 +800,7 @@ export function EventAssistantRoom({
                     lastReconnectTime={lastReconnectTime}
                     hideToggle={presentation || (router.query.view !== 'preferences' && activeTab === 'transcript')}
                     presentation={presentation}
+                    onMessagesChange={unpackerEnabled ? setTranscriptChunks : undefined}
                   />
                 </div>
               )}
@@ -826,7 +897,7 @@ export function EventAssistantRoom({
                           messages={assistantMessages}
                           pseudonym={pseudonym}
                           pseudonymFunFact={pseudonymFunFact}
-                          waitingForResponse={waitingForResponse}
+                          waitingForResponse={waitingForResponse || catchUpPending}
                           controlledMode={controlledMode}
                           slashCommands={slashCommands}
                           eventName={eventName}
@@ -842,6 +913,8 @@ export function EventAssistantRoom({
                           userId={userId}
                           feedbackConfig={assistantFeedbackConfig}
                           inactive={!agentActive || eventStatus !== 'active'}
+                          onCatchUp={catchUpReady ? catchUp : undefined}
+                          transcriptChunks={transcriptChunks ?? undefined}
                           messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
                           onMarkAsRead={(messageId) => {
                             setAssistantMessagesWithUnreadReplies((prev) => {
@@ -871,6 +944,16 @@ export function EventAssistantRoom({
               ) : null}
             </div>
           </>
+        )}
+      </div>
+
+      <div role="status" className="sr-only">
+        {catchUpAnnouncement && (
+          <span key={catchUpAnnouncement.id}>
+            {catchUpAnnouncement.refusal === null
+              ? `${botName} posted your catch-up.`
+              : `${botName} couldn't catch you up. ${catchUpAnnouncement.refusal}`}
+          </span>
         )}
       </div>
 
