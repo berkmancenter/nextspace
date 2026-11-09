@@ -525,3 +525,22 @@ describe('SendData', () => {
     expect(response).toEqual({ error: true, status: 502, message: 'Bad Gateway' });
   });
 });
+
+  it('logs nothing when the caller cancels the request', async () => {
+    const logError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = jest.fn().mockRejectedValue(new DOMException('The operation was aborted.', 'AbortError'));
+
+    const response = await SendData('unpack/conv-1/preview', {});
+
+    expect(response).toBeUndefined();
+    expect(logError).not.toHaveBeenCalled();
+  });
+
+  it('still logs a request that failed for another reason', async () => {
+    const logError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = jest.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+
+    await SendData('messages', {});
+
+    expect(logError).toHaveBeenCalled();
+  });

@@ -273,6 +273,8 @@ export const SendData = async (
     const data = await response.json();
     return data;
   } catch (error) {
+    // The caller cancelled it on purpose, for example because a newer request replaced it.
+    if (error instanceof DOMException && error.name === 'AbortError') return;
     console.error('There was a problem with the send operation:', error);
   }
 };
