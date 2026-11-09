@@ -5,6 +5,7 @@ import { axe } from 'jest-axe';
 import { UnpackPopover } from '../../components/UnpackPopover';
 import { SendData } from '../../utils';
 import { TranscriptChunkText, UnpackSelection } from '../../types.internal';
+import { ConversationTypeProvider } from '../../context/ConversationTypeContext';
 
 jest.mock('../../utils', () => ({
   SendData: jest.fn(),
@@ -65,6 +66,8 @@ const neverAnswerPreview = (sendResponse: unknown = { askId: 'ask-1', status: 's
     url.endsWith('/preview') ? new Promise(() => {}) : Promise.resolve(sendResponse),
   );
 
+const passcode = 'transcript-passcode';
+
 const previewCalls = () => mockSendData.mock.calls.filter(([url]) => url.endsWith('/preview'));
 const sendCalls = () => mockSendData.mock.calls.filter(([url]) => url.endsWith('/send'));
 
@@ -75,7 +78,14 @@ function renderPopover(props: Partial<React.ComponentProps<typeof UnpackPopover>
   const utils = render(
     <div>
       <button type="button">Outside</button>
-      <UnpackPopover conversationId="conv-1" target={{ selection, anchor }} chunks={chunks} {...handlers} {...props} />
+      <UnpackPopover
+        conversationId="conv-1"
+        transcriptPasscode={passcode}
+        target={{ selection, anchor }}
+        chunks={chunks}
+        {...handlers}
+        {...props}
+      />
     </div>,
   );
   return { ...utils, ...handlers };
@@ -101,7 +111,7 @@ describe('UnpackPopover', () => {
 
     await waitFor(() => expect(previewCalls()).toHaveLength(1));
     expect(previewCalls()[0][0]).toBe('unpack/conv-1/preview');
-    expect(JSON.parse(previewCalls()[0][3].body)).toEqual(widenedRange);
+    expect(JSON.parse(previewCalls()[0][3].body)).toEqual({ ...widenedRange, transcriptPasscode: passcode });
   });
 
   it("shows the opening of Berkie's explanation and what the full one also covers", async () => {
@@ -131,10 +141,49 @@ describe('UnpackPopover', () => {
 
     await user.click(screen.getByRole('button', { name: 'Send to my Private Chat' }));
 
-    expect(sendCalls()).toEqual([['unpack/conv-1/send', { ...widenedRange, destination: 'privateChat' }, 'token']]);
+    expect(sendCalls()).toEqual([
+      ['unpack/conv-1/send', { ...widenedRange, transcriptPasscode: passcode, destination: 'privateChat' }, 'token'],
+    ]);
     expect(await screen.findByText('Your explanation is in your Private Chat.')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Open Private Chat' }));
+  });
+
+  it('moves focus to Open Private Chat once the explanation is sent', async () => {
+    neverAnswerPreview();
+    const user = userEvent.setup();
+    renderPopover({ focusOnOpen: true });
+
+    await user.click(screen.getByRole('button', { name: 'Send to my Private Chat' }));
+
+    expect(await screen.findByRole('button', { name: 'Open Private Chat' })).toHaveFocus();
+  });
+
+  it('moves focus to the confirmation when Private Chat is already on screen', async () => {
+    neverAnswerPreview();
+    const user = userEvent.setup();
+    renderPopover({ onOpenPrivateChat: undefined });
+
+    await user.click(screen.getByRole('button', { name: 'Send to my Private Chat' }));
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveFocus());
+  });
+
+  it('keeps the confirmation area on the page before sending, so screen readers announce it', () => {
+    neverAnswerPreview();
+    renderPopover();
+
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
+  it('opens Private Chat and closes the popover', async () => {
+    neverAnswerPreview();
+    const user = userEvent.setup();
+    const { onOpenPrivateChat, onClose } = renderPopover();
+    await user.click(screen.getByRole('button', { name: 'Send to my Private Chat' }));
+
+    await user.click(await screen.findByRole('button', { name: 'Open Private Chat' }));
+
     expect(onOpenPrivateChat).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledWith('openPrivateChat');
   });
 
   it('sends only once when Send is clicked twice', async () => {
@@ -147,6 +196,8 @@ describe('UnpackPopover', () => {
     const send = screen.getByRole('button', { name: 'Send to my Private Chat' });
 
     await user.click(send);
+    expect(send).toHaveAttribute('aria-disabled', 'true');
+    expect(send).toHaveFocus();
     await user.click(send);
     finishSending({ askId: 'ask-1', status: 'sent' });
 
@@ -189,7 +240,7 @@ describe('UnpackPopover', () => {
     });
 
     expect(screen.getByText('Select a shorter passage.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send to my Private Chat' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send to my Private Chat' })).toHaveAttribute('aria-disabled', 'true');
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect(previewCalls()).toHaveLength(0);
   });
@@ -201,10 +252,21 @@ describe('UnpackPopover', () => {
     renderPopover();
 
     expect(await screen.findByText("Berkie couldn't unpack this just now.")).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send to my Private Chat' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Send to my Private Chat' })).not.toHaveAttribute('aria-disabled', 'true');
     await user.click(screen.getByRole('button', { name: 'Try again' }));
 
     expect(await screen.findByText('The full explanation also covers why it matters and 2 key terms.')).toBeInTheDocument();
+  });
+
+  it('keeps focus in the popover after Try again', async () => {
+    mockSendData.mockResolvedValueOnce({ error: true, status: 503, reason: 'unpackFailed' });
+    mockSendData.mockImplementation(() => new Promise(() => {}));
+    const user = userEvent.setup();
+    renderPopover();
+
+    await user.click(await screen.findByRole('button', { name: 'Try again' }));
+
+    expect(screen.getByRole('dialog')).toContainElement(document.activeElement as HTMLElement);
   });
 
   it('explains a refused send and blocks sending again when it cannot work', async () => {
@@ -217,7 +279,19 @@ describe('UnpackPopover', () => {
     expect(
       await screen.findByText("Berkie couldn't find your Private Chat. Reload the page, then try again."),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send to my Private Chat' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send to my Private Chat' })).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('lets the participant send again after a rate limit', async () => {
+    neverAnswerPreview({ error: true, status: 429, reason: 'rateLimited' });
+    const user = userEvent.setup();
+    renderPopover();
+
+    await user.click(screen.getByRole('button', { name: 'Send to my Private Chat' }));
+    await screen.findByText("You've asked about a lot of passages this minute. Wait a moment, then try again.");
+    await user.click(screen.getByRole('button', { name: 'Send to my Private Chat' }));
+
+    expect(sendCalls()).toHaveLength(2);
   });
 
   it('closes with Escape, with the close button, and with a click outside', async () => {
@@ -230,6 +304,55 @@ describe('UnpackPopover', () => {
     fireEvent.mouseDown(screen.getByRole('button', { name: 'Outside' }));
 
     expect(onClose).toHaveBeenCalledTimes(3);
+  });
+
+  it('ignores Escape pressed somewhere else on the page', () => {
+    neverAnswerPreview();
+    const { onClose } = renderPopover();
+    const outside = screen.getByRole('button', { name: 'Outside' });
+    outside.focus();
+
+    fireEvent.keyDown(outside, { key: 'Escape' });
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('closes when Tab moves past the last control, instead of jumping to the end of the page', async () => {
+    neverAnswerPreview();
+    const user = userEvent.setup();
+    const { onClose } = renderPopover({ focusOnOpen: true });
+    screen.getByRole('button', { name: 'Send to my Private Chat' }).focus();
+
+    await user.tab();
+
+    expect(onClose).toHaveBeenCalledWith('tabOut');
+  });
+
+  it('closes when Shift+Tab moves back out of the popover', async () => {
+    neverAnswerPreview();
+    const user = userEvent.setup();
+    const { onClose } = renderPopover({ focusOnOpen: true });
+
+    await user.tab({ shift: true });
+
+    expect(onClose).toHaveBeenCalledWith('tabOut');
+  });
+
+  it("names the event's assistant", () => {
+    neverAnswerPreview();
+    render(
+      <ConversationTypeProvider initialBotName="Juniper">
+        <UnpackPopover
+          conversationId="conv-1"
+          target={{ selection, anchor: document.body }}
+          chunks={chunks}
+          onClose={jest.fn()}
+        />
+      </ConversationTypeProvider>,
+    );
+
+    expect(screen.getByRole('dialog', { name: 'Unpack this with Juniper' })).toBeInTheDocument();
+    expect(screen.getByText('Juniper is reading this…')).toBeInTheDocument();
   });
 
   it('moves focus into the popover when it was opened from the keyboard', () => {

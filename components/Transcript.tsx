@@ -54,7 +54,7 @@ interface TranscriptProps {
   /** Function to set an error message */
   setErrorMessage?: (message: string | null) => void;
   /**
-   * Turns on the Unpacker: participants highlight a passage, or press Enter on a chunk, to ask Berkie
+   * Turns on the Unpacker: participants highlight a passage, or press Enter on a chunk, to ask the assistant
    * about it. Leave unset when the event's unpacker feature is off. Ignored in the presentation view.
    */
   unpack?: {
@@ -101,9 +101,12 @@ export function Transcript(props: TranscriptProps) {
     scrollTop: number;
   } | null>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const unpackEnabled = !!props.unpack && !props.presentation;
   const [unpackTarget, setUnpackTarget] = useState<OpenUnpackTarget | null>(null);
   const [unpackTipDismissed, setUnpackTipDismissed] = useState(false);
+  // The one chunk Tab reaches; the arrow keys move between the rest.
+  const [activeChunkId, setActiveChunkId] = useState<string | null>(null);
   const unpackHintId = useId();
 
   // Use visibility-aware duration hooks
@@ -226,20 +229,85 @@ export function Transcript(props: TranscriptProps) {
     if (!isOpen) setUnpackTarget(null);
   }, [isOpen]);
 
-  const handleChunkKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, message: PseudonymousMessage) => {
-    if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
-    event.preventDefault();
+  useEffect(() => {
+    if (!unpackTarget) return;
+    const ids = new Set(chunkTexts.map(({ id }) => id));
+    const { startMessageId, endMessageId } = unpackTarget.selection;
+    if (!ids.has(startMessageId) || !ids.has(endMessageId)) setUnpackTarget(null);
+  }, [chunkTexts, unpackTarget]);
+
+  // On narrow screens the page hides the transcript with display: none when another tab opens, and the
+  // popover, which lives outside it, would otherwise jump to the corner of the page.
+  const hasUnpackTarget = !!unpackTarget;
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!hasUnpackTarget || !root || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry && entry.contentRect.width === 0 && entry.contentRect.height === 0) setUnpackTarget(null);
+    });
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [hasUnpackTarget]);
+
+  const chunkElement = (id: string) => document.getElementById(`transcript-message-${id}`);
+  const tabStopChunkId =
+    activeChunkId && chunkTexts.some(({ id }) => id === activeChunkId)
+      ? activeChunkId
+      : (chunkTexts[chunkTexts.length - 1]?.id ?? null);
+
+  const openUnpackForChunk = (message: PseudonymousMessage, element: HTMLElement) => {
     const id = message.id!;
     setUnpackTarget({
       selection: { startMessageId: id, startOffset: 0, endMessageId: id, endOffset: chunkText(message).length },
-      anchor: event.currentTarget,
-      openedFrom: event.currentTarget,
+      anchor: element,
+      openedFrom: element,
     });
   };
 
+  const moveChunkFocus = (fromId: string, key: string): boolean => {
+    const index = chunkTexts.findIndex(({ id }) => id === fromId);
+    const next =
+      key === 'ArrowUp'
+        ? index - 1
+        : key === 'ArrowDown'
+          ? index + 1
+          : key === 'Home'
+            ? 0
+            : key === 'End'
+              ? chunkTexts.length - 1
+              : null;
+    if (next === null) return false;
+    const target = chunkTexts[Math.max(0, Math.min(next, chunkTexts.length - 1))];
+    setActiveChunkId(target.id);
+    chunkElement(target.id)?.focus();
+    return true;
+  };
+
+  const handleChunkKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, message: PseudonymousMessage) => {
+    if (event.target !== event.currentTarget) return;
+    if (moveChunkFocus(message.id!, event.key)) {
+      event.preventDefault();
+      return;
+    }
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openUnpackForChunk(message, event.currentTarget);
+  };
+
+  // Screen readers in browse mode send a click with no mouse button count instead of the Enter key. A real
+  // click (detail of 1 or more) is left alone, since mouse users unpack by highlighting.
+  const handleChunkClick = (event: React.MouseEvent<HTMLDivElement>, message: PseudonymousMessage) => {
+    if (event.detail !== 0) return;
+    openUnpackForChunk(message, event.currentTarget);
+  };
+
   const closeUnpack = (reason: UnpackCloseReason) => {
-    // A click elsewhere already chose where focus goes next.
-    if (reason !== 'clickAway') unpackTarget?.openedFrom?.focus();
+    // A click elsewhere, or opening Private Chat, already chose where focus goes next.
+    if (reason !== 'clickAway' && reason !== 'openPrivateChat' && unpackTarget) {
+      const chunk = unpackTarget.openedFrom ?? chunkElement(unpackTarget.selection.startMessageId);
+      setActiveChunkId(unpackTarget.selection.startMessageId);
+      chunk?.focus();
+    }
     setUnpackTarget(null);
   };
 
@@ -417,6 +485,8 @@ export function Transcript(props: TranscriptProps) {
   // on initial mount and when a gap-reconnect signals missed messages.
   const fetchTranscriptData = async () => {
     if (!props.conversationId || !Api.get().getAccessToken() || !props.transcriptPasscode) return;
+    // A position saved before a reconnect no longer matches the list this fetch is about to show.
+    preserveScrollRef.current = null;
 
     try {
       const conversationResponse: any = await RetrieveData(
@@ -486,8 +556,6 @@ export function Transcript(props: TranscriptProps) {
     console.log('Transcript re-fetching history after gap-reconnect...');
     fetchTranscriptData();
   }, [props.lastReconnectTime]);
-    // A position saved before a reconnect no longer matches the list this fetch is about to show.
-    preserveScrollRef.current = null;
 
   // Effect: Add scroll event listener
   useEffect(() => {
@@ -623,6 +691,7 @@ export function Transcript(props: TranscriptProps) {
 
   return (
     <div
+      ref={rootRef}
       className={`bg-nx-transcript text-white dark:text-nx-text transition-all duration-300 ease-in-out flex flex-col ${
         props.hideToggle ? 'h-full w-full' : isOpen ? 'h-[40vh] lg:h-full lg:w-[33vw]' : 'flex-shrink-0 lg:h-full lg:w-16'
       }`}
@@ -751,7 +820,7 @@ export function Transcript(props: TranscriptProps) {
         <div className="mx-4 mt-3 flex flex-shrink-0 items-center justify-between gap-3 rounded-lg bg-[#EEF0FF] px-3.5 py-2.5 text-[13px] text-[#312E81]">
           <p className="m-0 flex items-center gap-2">
             <span aria-hidden="true">💡</span>
-            <span>Lost the thread? Select any passage and Berkie will unpack it while you keep listening.</span>
+            <span>Lost the thread? Select any passage and {botName} will unpack it while you keep listening.</span>
           </p>
           <button
             type="button"
@@ -787,12 +856,14 @@ export function Transcript(props: TranscriptProps) {
                   key={message.id || `message-${i}`}
                   className={`mb-4 ${focusedMessageIds.includes(message.id!) ? 'bg-nx-focus-row dark:shadow-[inset_4px_0_0_var(--nx-border-interactive)]' : ''} ${canUnpack ? 'rounded cursor-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white' : ''}`}
                   {...(canUnpack && {
-                    tabIndex: 0,
+                    tabIndex: message.id === tabStopChunkId ? 0 : -1,
                     role: 'button',
                     'aria-haspopup': 'dialog' as const,
                     'aria-expanded': !!unpackTarget?.openedFrom && unpackTarget.selection.startMessageId === message.id,
                     'aria-describedby': unpackHintId,
                     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => handleChunkKeyDown(event, message),
+                    onClick: (event: React.MouseEvent<HTMLDivElement>) => handleChunkClick(event, message),
+                    onFocus: () => setActiveChunkId(message.id!),
                   })}
                 >
                   <div
@@ -835,10 +906,11 @@ export function Transcript(props: TranscriptProps) {
       {unpackEnabled && (
         <>
           <span id={unpackHintId} hidden>
-            Press Enter to unpack this with Berkie.
+            Press Enter to unpack this with {botName}. Use the arrow keys to move between passages.
           </span>
           <UnpackPopover
             conversationId={props.conversationId}
+            transcriptPasscode={props.transcriptPasscode}
             target={unpackTarget}
             chunks={chunkTexts}
             onClose={closeUnpack}

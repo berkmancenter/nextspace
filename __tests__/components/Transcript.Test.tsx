@@ -1885,7 +1885,9 @@ describe('Transcript', () => {
       chunk.focus();
       expect(chunk).toHaveFocus();
       expect(chunk).toHaveAttribute('role', 'button');
-      expect(chunk).toHaveAccessibleDescription('Press Enter to unpack this with Berkie.');
+      expect(chunk).toHaveAccessibleDescription(
+        'Press Enter to unpack this with Berkie. Use the arrow keys to move between passages.',
+      );
       await user.keyboard('{Enter}');
 
       const dialog = screen.getByRole('dialog', { name: 'Unpack this with Berkie' });
@@ -1899,7 +1901,9 @@ describe('Transcript', () => {
       expect(chunk).toHaveFocus();
     });
 
-    it('reaches chunks with the Tab key', async () => {
+    const chunkElement = (body: string) => screen.getByText(body).closest('[data-message-id]') as HTMLElement;
+
+    it('makes the transcript one Tab stop, starting at the newest chunk', async () => {
       const user = setupUser();
       render(<Transcript {...baseProps} unpack={{}} hideToggle />);
       await screen.findByText(unpackMessages[0].body);
@@ -1907,7 +1911,124 @@ describe('Transcript', () => {
       await user.tab();
       await user.tab();
 
-      expect(document.activeElement).toHaveAttribute('data-message-id');
+      expect(chunkElement(unpackMessages[1].body)).toHaveFocus();
+      await user.tab();
+      expect(document.activeElement?.closest('[data-message-id]')).toBeNull();
+    });
+
+    it('moves between chunks with the arrow keys', async () => {
+      const user = setupUser();
+      render(<Transcript {...baseProps} unpack={{}} hideToggle />);
+      await screen.findByText(unpackMessages[0].body);
+      chunkElement(unpackMessages[1].body).focus();
+
+      await user.keyboard('{ArrowUp}');
+
+      expect(chunkElement(unpackMessages[0].body)).toHaveFocus();
+      expect(chunkElement(unpackMessages[0].body)).toHaveAttribute('tabindex', '0');
+      expect(chunkElement(unpackMessages[1].body)).toHaveAttribute('tabindex', '-1');
+      await user.keyboard('{End}');
+      expect(chunkElement(unpackMessages[1].body)).toHaveFocus();
+      await user.keyboard('{Home}');
+      expect(chunkElement(unpackMessages[0].body)).toHaveFocus();
+    });
+
+    it('opens the popover when a screen reader activates a chunk', async () => {
+      render(<Transcript {...baseProps} unpack={{}} />);
+      await screen.findByText(unpackMessages[1].body);
+
+      fireEvent.click(chunkElement(unpackMessages[1].body), { detail: 0 });
+
+      expect(screen.getByRole('dialog', { name: 'Unpack this with Berkie' })).toBeInTheDocument();
+    });
+
+    it('does not open the popover for a mouse click on a chunk', async () => {
+      render(<Transcript {...baseProps} unpack={{}} />);
+      await screen.findByText(unpackMessages[1].body);
+
+      fireEvent.click(chunkElement(unpackMessages[1].body), { detail: 1 });
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    const highlight = (body: string, from: string, to: string) => {
+      const text = screen.getByText(body).firstChild as Text;
+      const range = document.createRange();
+      range.setStart(text, body.indexOf(from));
+      range.setEnd(text, body.indexOf(to));
+      window.getSelection()!.removeAllRanges();
+      window.getSelection()!.addRange(range);
+      act(() => {
+        document.dispatchEvent(new Event('selectionchange'));
+      });
+    };
+
+    it('puts focus on the passage when a popover opened by highlighting is closed', async () => {
+      const user = setupUser();
+      render(<Transcript {...baseProps} unpack={{}} />);
+      await screen.findByText(unpackMessages[0].body);
+      highlight(unpackMessages[0].body, 'Caselaw', '.');
+
+      await user.click(screen.getByRole('button', { name: 'Close' }));
+
+      expect(chunkElement(unpackMessages[0].body)).toHaveFocus();
+    });
+
+    it('closes the popover when its passage leaves the transcript', async () => {
+      render(<Transcript {...baseProps} unpack={{}} />);
+      await screen.findByText(unpackMessages[0].body);
+      highlight(unpackMessages[0].body, 'Caselaw', '.');
+      const statusHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'transcript:status')?.[1];
+
+      act(() => statusHandler({ status: 'deleted' }));
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('closes the popover when the transcript is hidden, such as by switching tabs on a phone', async () => {
+      let reportResize: ResizeObserverCallback = () => {};
+      const originalResizeObserver = global.ResizeObserver;
+      global.ResizeObserver = jest.fn((callback: ResizeObserverCallback) => {
+        reportResize = callback;
+        return { observe: jest.fn(), unobserve: jest.fn(), disconnect: jest.fn() };
+      }) as unknown as typeof ResizeObserver;
+      try {
+        render(<Transcript {...baseProps} unpack={{}} />);
+        await screen.findByText(unpackMessages[0].body);
+        highlight(unpackMessages[0].body, 'Caselaw', '.');
+
+        act(() => reportResize([{ contentRect: { width: 0, height: 0 } } as ResizeObserverEntry], {} as ResizeObserver));
+
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      } finally {
+        global.ResizeObserver = originalResizeObserver;
+      }
+    });
+
+    it('sends the transcript passcode with the preview request', async () => {
+      render(<Transcript {...baseProps} unpack={{}} />);
+      await screen.findByText(unpackMessages[0].body);
+      highlight(unpackMessages[0].body, 'Caselaw', '.');
+
+      await waitFor(() => expect((SendData as jest.Mock).mock.calls.some(([url]) => url.endsWith('/preview'))).toBe(true));
+      const [, , , options] = (SendData as jest.Mock).mock.calls.find(([url]) => url.endsWith('/preview'))!;
+      expect(JSON.parse(options.body)).toMatchObject({ transcriptPasscode: 'passcode' });
+    });
+
+    it("names the event's assistant in the tip and the chunk hint", async () => {
+      render(
+        <ConversationTypeProvider initialBotName="Juniper">
+          <Transcript {...baseProps} unpack={{}} />
+        </ConversationTypeProvider>,
+      );
+      await screen.findByText(unpackMessages[0].body);
+
+      expect(
+        screen.getByText('Lost the thread? Select any passage and Juniper will unpack it while you keep listening.'),
+      ).toBeInTheDocument();
+      expect(chunkElement(unpackMessages[0].body)).toHaveAccessibleDescription(
+        'Press Enter to unpack this with Juniper. Use the arrow keys to move between passages.',
+      );
     });
 
     it('opens the popover with the passage widened to whole sentences when text is highlighted', async () => {
@@ -1942,6 +2063,7 @@ describe('Transcript', () => {
       await user.click(await screen.findByRole('button', { name: 'Open Private Chat' }));
 
       expect(onOpenPrivateChat).toHaveBeenCalled();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
     it.each([

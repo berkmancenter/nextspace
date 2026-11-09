@@ -16,10 +16,12 @@ function offsetWithin(element: Element, node: Node, offset: number): number {
  * Only text inside `[data-chunk-text]` elements counts, so a selection that starts on a timestamp
  * starts at the beginning of that chunk's text.
  * @param container - the element holding the transcript chunks, each inside a `[data-message-id]` element
- * @returns the selection, or null when it is empty or outside every chunk
+ * @returns the selection, or null when it is empty, starts outside the container, or misses every chunk
  */
 export function readTranscriptSelection(container: HTMLElement, selection: Selection | null): TranscriptSelection | null {
   if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+  // Select All, or a drag from elsewhere on the page, starts outside and isn't a request about the transcript.
+  if (!selection.anchorNode || !container.contains(selection.anchorNode)) return null;
   const range = selection.getRangeAt(0);
 
   const pieces = Array.from(container.querySelectorAll(CHUNK_TEXT_SELECTOR)).flatMap((element) => {
@@ -42,11 +44,29 @@ export function readTranscriptSelection(container: HTMLElement, selection: Selec
   };
 }
 
+type SelectionEnds = Pick<Selection, 'anchorNode' | 'anchorOffset' | 'focusNode' | 'focusOffset'>;
+
+const selectionEnds = (selection: Selection | null): SelectionEnds | null =>
+  selection && {
+    anchorNode: selection.anchorNode,
+    anchorOffset: selection.anchorOffset,
+    focusNode: selection.focusNode,
+    focusOffset: selection.focusOffset,
+  };
+
+const sameEnds = (a: SelectionEnds | null, b: SelectionEnds | null) =>
+  !!a &&
+  !!b &&
+  a.anchorNode === b.anchorNode &&
+  a.anchorOffset === b.anchorOffset &&
+  a.focusNode === b.focusNode &&
+  a.focusOffset === b.focusOffset;
+
 /**
  * Calls onSelect when the participant highlights at least UNPACK_MIN_WORDS words of the transcript.
- * A mouse selection is reported when the button is released, so the popover doesn't chase the pointer
- * mid-drag; a keyboard selection is reported as it changes. An emptied selection reports nothing, since
- * clicking a popover button clears the selection and must not close the popover.
+ * Mouse selections report on release, so the popover doesn't chase the pointer; keyboard ones as they change.
+ * An emptied selection, or a press that leaves it unchanged, reports nothing: clicking a popover button or
+ * inside the highlight must not reopen or close the popover.
  */
 export function useTranscriptSelection(
   containerRef: RefObject<HTMLElement | null>,
@@ -60,29 +80,38 @@ export function useTranscriptSelection(
     const container = containerRef.current;
     if (!enabled || !container) return;
     let pointerIsDown = false;
+    let endsAtPress: SelectionEnds | null = null;
 
     const report = () => {
       const result = readTranscriptSelection(container, window.getSelection());
       if (result && countWords(result.text) >= UNPACK_MIN_WORDS) onSelectRef.current(result);
     };
-    const handlePointerDown = () => {
+    const handlePointerDown = (event: PointerEvent) => {
+      // Only the scroll bar sits on the container itself; every chunk is a child of it.
+      if (event.target === container) return;
       pointerIsDown = true;
+      endsAtPress = selectionEnds(window.getSelection());
     };
     const handlePointerUp = () => {
       if (!pointerIsDown) return;
       pointerIsDown = false;
-      report();
+      if (!sameEnds(endsAtPress, selectionEnds(window.getSelection()))) report();
+    };
+    const handlePointerCancel = () => {
+      pointerIsDown = false;
     };
     const handleSelectionChange = () => {
       if (!pointerIsDown) report();
     };
 
-    container.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('pointerdown', handlePointerDown);
     document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('pointercancel', handlePointerCancel);
     document.addEventListener('selectionchange', handleSelectionChange);
     return () => {
-      container.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('pointerup', handlePointerUp);
+      document.removeEventListener('pointercancel', handlePointerCancel);
       document.removeEventListener('selectionchange', handleSelectionChange);
     };
   }, [containerRef, enabled]);

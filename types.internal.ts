@@ -621,10 +621,22 @@ export interface TranscriptChunkText {
   text: string;
 }
 
-/** A selection widened to whole sentences, with the quote it covers. */
 export interface WidenedPassage {
   range: UnpackSelection;
   quote: string;
+}
+
+export type UnpackRefusal = { error: true; status?: number; reason?: UnpackErrorReason };
+
+/** What SendData resolves to for an unpack request: the body, a refusal, or undefined when the request failed. */
+export type UnpackResponse = UnpackRefusal | Record<string, unknown> | undefined;
+
+export interface UnpackErrorCopy {
+  message: string;
+  /** Asking again for the same passage can work. */
+  canRetry: boolean;
+  /** Sending this passage to Private Chat can still work. */
+  canSend: boolean;
 }
 
 export type UnpackPreviewState =
@@ -636,7 +648,6 @@ export type UnpackPreviewState =
 /** pending means Berkie posts the card once the explanation is written. */
 export type UnpackSendOutcome = { ok: true; status: 'sent' | 'pending' } | { ok: false; reason?: UnpackErrorReason };
 
-/** What a participant highlighted in the transcript. */
 export interface TranscriptSelection {
   selection: UnpackSelection;
   /** The highlighted text, without the timestamps between chunks. */
@@ -652,7 +663,10 @@ export interface UnpackTarget {
   anchor: PopperProps['anchorEl'];
 }
 
-export type UnpackCloseReason = 'escape' | 'closeButton' | 'clickAway';
+/** tabOut: Tab or Shift+Tab moved past the popover's first or last control. */
+export type UnpackCloseReason = 'escape' | 'closeButton' | 'clickAway' | 'tabOut' | 'openPrivateChat';
+
+export type UnpackSendState = { phase: 'idle' } | { phase: 'sending' } | { phase: 'done'; outcome: UnpackSendOutcome };
 
 export interface OpenUnpackTarget extends UnpackTarget {
   /** The chunk a keyboard user opened the popover from; focus goes back to it on close. */

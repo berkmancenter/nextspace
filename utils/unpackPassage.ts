@@ -1,4 +1,4 @@
-import { TranscriptChunkText, UnpackErrorReason, UnpackSelection, WidenedPassage } from '../types.internal';
+import { TranscriptChunkText, UnpackErrorCopy, UnpackErrorReason, UnpackSelection, WidenedPassage } from '../types.internal';
 
 /** Matches the server's limit (llm_engine UNPACK_PASSAGE_MAX_CHARACTERS) on the widened quote. */
 export const UNPACK_MAX_PASSAGE_CHARACTERS = 2000;
@@ -8,26 +8,45 @@ export const UNPACK_MIN_WORDS = 3;
 
 const PREVIEW_MAX_CHARACTERS = 240;
 
-const sentences = new Intl.Segmenter('en', { granularity: 'sentence' });
+// Firefox before 125 and Safari before 14.1 lack Intl.Segmenter; creating it at import would break every page.
+let segmenter: Intl.Segmenter | null | undefined;
+const getSegmenter = () => {
+  if (segmenter === undefined) {
+    segmenter = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter('en', { granularity: 'sentence' }) : null;
+  }
+  return segmenter;
+};
+
+// Intl.Segmenter ends a sentence at any period before a capital letter, so "Dr. Patel" would split in two
+const ENDS_WITH_ABBREVIATION = /(?:\b(?:Dr|Mr|Mrs|Ms|Prof|St|Jr|Sr|Gen|Sen|Rep|Gov|vs)\.|\b(?:[A-Z]\.){2,})\s*$/;
 const isSpace = (character: string) => /\s/.test(character);
 
 /*
- * sentenceStart, sentenceEnd and the space skipping copy llm_engine's buildPassage
+ * sentenceSpans, sentenceStart, sentenceEnd and the space skipping copy llm_engine's buildPassage
  * (src/agents/eventAssistant/unpackPassage.ts) so the instant quote matches the one the server explains.
  */
-function sentenceStart(text: string, offset: number): number {
+function sentenceSpans(text: string): { start: number; end: number }[] {
+  const sentences = getSegmenter();
+  if (!sentences) return [{ start: 0, end: text.length }];
+  const spans: { start: number; end: number }[] = [];
   for (const { index, segment } of sentences.segment(text)) {
-    if (offset < index + segment.length) return index;
+    const previous = spans[spans.length - 1];
+    if (previous && ENDS_WITH_ABBREVIATION.test(text.slice(previous.start, previous.end))) {
+      previous.end = index + segment.length;
+    } else {
+      spans.push({ start: index, end: index + segment.length });
+    }
   }
-  return text.length;
+  return spans;
+}
+
+function sentenceStart(text: string, offset: number): number {
+  return sentenceSpans(text).find(({ end }) => offset < end)?.start ?? text.length;
 }
 
 function sentenceEnd(text: string, offset: number): number {
   if (offset === 0) return 0;
-  for (const { index, segment } of sentences.segment(text)) {
-    if (offset <= index + segment.length) return index + segment.length;
-  }
-  return text.length;
+  return sentenceSpans(text).find(({ end }) => offset <= end)?.end ?? text.length;
 }
 
 function skipSpacesForward(text: string, from: number, to: number): number {
@@ -75,13 +94,16 @@ export function widenSelection(chunks: TranscriptChunkText[], selection: UnpackS
   };
 }
 
+export const passageKey = ({ startMessageId, startOffset, endMessageId, endOffset }: UnpackSelection): string =>
+  `${startMessageId}:${startOffset}-${endMessageId}:${endOffset}`;
+
 export const countWords = (text: string): number => text.split(/\s+/).filter(Boolean).length;
 
 export const isPassageTooLong = (quote: string): boolean => quote.length > UNPACK_MAX_PASSAGE_CHARACTERS;
 
 /** The opening one or two sentences of the explanation, cut from the real text so the preview is its true start. */
 export function previewOpening(whatTheyreSaying: string): string {
-  const all = [...sentences.segment(whatTheyreSaying)].map(({ segment }) => segment);
+  const all = sentenceSpans(whatTheyreSaying).map(({ start, end }) => whatTheyreSaying.slice(start, end));
   const twoSentences = all.slice(0, 2).join('').trim();
   const opening = twoSentences.length > PREVIEW_MAX_CHARACTERS ? all[0].trim() : twoSentences;
   return opening.length < whatTheyreSaying.trim().length ? `${opening}…` : opening;
@@ -93,41 +115,39 @@ export function alsoCoversLine(termCount: number): string {
   return `The full explanation also covers why it matters and ${terms}.`;
 }
 
-export interface UnpackErrorCopy {
-  message: string;
-  /** Asking again for the same passage can work. */
-  canRetry: boolean;
-  /** Sending this passage to Private Chat can still work. */
-  canSend: boolean;
-}
-
-const UNREADABLE_SELECTION: UnpackErrorCopy = {
-  message: "Berkie couldn't read that selection. Try selecting it again.",
-  canRetry: false,
-  canSend: false,
-};
-
-const ERROR_COPY: Record<UnpackErrorReason, UnpackErrorCopy> = {
-  selectionTooLong: { message: 'Select a shorter passage.', canRetry: false, canSend: false },
-  unpackFailed: { message: "Berkie couldn't unpack this just now.", canRetry: true, canSend: true },
-  rateLimited: {
-    message: "You've asked about a lot of passages this minute. Wait a moment, then try again.",
-    canRetry: true,
-    canSend: false,
-  },
-  unpackerOff: { message: 'Unpacking passages is turned off for this event.', canRetry: false, canSend: false },
-  noAssistant: { message: 'This event has no assistant to unpack passages.', canRetry: false, canSend: false },
-  noPrivateChat: {
-    message: "Berkie couldn't find your Private Chat. Reload the page, then try again.",
+const errorCopy = (botName: string): Record<UnpackErrorReason, UnpackErrorCopy> => {
+  const unreadableSelection = {
+    message: `${botName} couldn't read that selection. Try selecting it again.`,
     canRetry: false,
     canSend: false,
-  },
-  chunkNotInTranscript: UNREADABLE_SELECTION,
-  offsetPastEnd: UNREADABLE_SELECTION,
-  selectionBackwards: UNREADABLE_SELECTION,
+  };
+  return {
+    selectionTooLong: { message: 'Select a shorter passage.', canRetry: false, canSend: false },
+    unpackFailed: { message: `${botName} couldn't unpack this just now.`, canRetry: true, canSend: true },
+    rateLimited: {
+      message: "You've asked about a lot of passages this minute. Wait a moment, then try again.",
+      canRetry: true,
+      canSend: true,
+    },
+    unpackerOff: { message: 'Unpacking passages is turned off for this event.', canRetry: false, canSend: false },
+    noAssistant: { message: 'This event has no assistant to unpack passages.', canRetry: false, canSend: false },
+    noPrivateChat: {
+      message: `${botName} couldn't find your Private Chat. Reload the page, then try again.`,
+      canRetry: false,
+      canSend: false,
+    },
+    wrongPasscode: {
+      message: "This page's transcript link has changed. Reload the page, then try again.",
+      canRetry: false,
+      canSend: false,
+    },
+    chunkNotInTranscript: unreadableSelection,
+    offsetPastEnd: unreadableSelection,
+    selectionBackwards: unreadableSelection,
+  };
 };
 
 const GENERAL_ERROR: UnpackErrorCopy = { message: 'Something went wrong. Try again.', canRetry: true, canSend: true };
 
-export const unpackErrorCopy = (reason: UnpackErrorReason | undefined): UnpackErrorCopy =>
-  (reason && ERROR_COPY[reason]) || GENERAL_ERROR;
+export const unpackErrorCopy = (reason: UnpackErrorReason | undefined, botName: string): UnpackErrorCopy =>
+  (reason && errorCopy(botName)[reason]) || GENERAL_ERROR;

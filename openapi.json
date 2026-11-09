@@ -5248,7 +5248,7 @@
     "/unpack/{conversationId}/preview": {
       "post": {
         "summary": "Preview an explanation of a transcript passage",
-        "description": "Explains the passage a participant selected and records their ask. The browser sends only chunk IDs and character positions; the server rebuilds the quote from the saved transcript and widens it to whole sentences, so people who select roughly the same words share one saved explanation. The first request for a passage waits for the AI model; later ones are answered from the saved copy. Each participant can preview a limited number of different passages per minute.\n",
+        "description": "Explains the passage a participant selected and records their ask. The browser sends only chunk IDs and character positions; the server rebuilds the quote from the saved transcript and widens it to whole sentences, so people who select roughly the same words share one saved explanation. The first request for a passage waits for the AI model, up to about 25 seconds before answering unpackFailed; the explanation is still saved for a retry. Later requests are answered from the saved copy. Each participant can preview a limited number of different passages per minute.\n",
         "tags": [
           "Unpack"
         ],
@@ -5272,7 +5272,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UnpackSelection"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/UnpackSelection"
+                  },
+                  {
+                    "$ref": "#/components/schemas/UnpackTranscriptPasscode"
+                  }
+                ]
               }
             }
           }
@@ -5315,7 +5322,7 @@
     "/unpack/{conversationId}/send": {
       "post": {
         "summary": "Send a passage's explanation",
-        "description": "Posts the saved explanation of a passage to the chosen destination as an `unpack_explanation` card from the event assistant. Works before the preview has finished, or without one: the choice is stored and the card posts as soon as the explanation is written (`status: pending`). Sending the same passage again posts nothing new and returns the existing card's message ID. Only `privateChat` is accepted for now.\n",
+        "description": "Posts the saved explanation of a passage to the chosen destination as an `unpack_explanation` card from the event assistant. Works before the preview has finished, or without one: the choice is stored and the card posts as soon as the explanation is written (`status: pending`). Sending the same passage again posts nothing new and returns the existing card's message ID. If the card can't be posted, for example because the event is locked, the request fails and can be sent again. Only `privateChat` is accepted for now.\n",
         "tags": [
           "Unpack"
         ],
@@ -5342,6 +5349,9 @@
                 "allOf": [
                   {
                     "$ref": "#/components/schemas/UnpackSelection"
+                  },
+                  {
+                    "$ref": "#/components/schemas/UnpackTranscriptPasscode"
                   },
                   {
                     "type": "object",
@@ -6845,6 +6855,15 @@
           }
         }
       },
+      "UnpackTranscriptPasscode": {
+        "type": "object",
+        "properties": {
+          "transcriptPasscode": {
+            "type": "string",
+            "description": "The transcript channel's passcode, the same one the client uses to read the transcript. Required when the transcript has one."
+          }
+        }
+      },
       "UnpackVisual": {
         "type": "object",
         "required": [
@@ -6995,9 +7014,10 @@
               "offsetPastEnd",
               "selectionBackwards",
               "selectionTooLong",
-              "unpackFailed"
+              "unpackFailed",
+              "wrongPasscode"
             ],
-            "description": "Why the request was refused. rateLimited (429), too many passages in the last minute. unpackerOff (403), the event's unpacker feature is off. noAssistant (409), the event has no assistant. noPrivateChat (409), the participant has no Private Chat with the assistant. chunkNotInTranscript (400), a chunk ID is not in this event's transcript. offsetPastEnd (400), a position is past the end of its chunk. selectionBackwards (400), the selection starts after it ends or holds no words. selectionTooLong (400), the widened passage is too long. unpackFailed (503), the AI model call failed; trying again can work. Missing or malformed fields are refused with 400 and no reason."
+            "description": "Why the request was refused. rateLimited (429), too many passages in the last minute. unpackerOff (403), the event's unpacker feature is off. noAssistant (409), the event has no assistant. wrongPasscode (403), the transcript has a passcode and the request did not give it. noPrivateChat (409), the participant has no Private Chat with the assistant. chunkNotInTranscript (400), a chunk ID is not in this event's transcript. offsetPastEnd (400), a position is past the end of its chunk. selectionBackwards (400), the selection starts after it ends or holds no words. selectionTooLong (400), the widened passage is too long. unpackFailed (503), the AI model call failed or ran too long; trying again can work. Missing or malformed fields are refused with 400 and no reason."
           }
         }
       },

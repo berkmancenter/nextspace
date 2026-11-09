@@ -93,6 +93,14 @@ describe('readTranscriptSelection', () => {
     expect(readTranscriptSelection(getByTestId('transcript'), select(outside, 0, outside, 20))).toBeNull();
   });
 
+  it('ignores a selection that starts outside the transcript, such as Select All', () => {
+    const { getByTestId } = render(<Fixture onSelect={jest.fn()} />);
+    const container = getByTestId('transcript');
+    const outside = getByTestId('outside').firstChild!;
+
+    expect(readTranscriptSelection(container, select(outside, 0, chunkTextNode(container, 'c2'), 12))).toBeNull();
+  });
+
   it('ignores an empty selection', () => {
     const { getByTestId } = render(<Fixture onSelect={jest.fn()} />);
     const container = getByTestId('transcript');
@@ -138,6 +146,75 @@ describe('useTranscriptSelection', () => {
     const text = chunkTextNode(getByTestId('transcript'), 'c1');
 
     select(text, 0, text, 'We built'.length);
+    fireEvent(document, new Event('selectionchange'));
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('still reports keyboard selections after a touch scroll is cancelled', () => {
+    const onSelect = jest.fn();
+    const { getByTestId } = render(<Fixture onSelect={onSelect} />);
+    const text = chunkTextNode(getByTestId('transcript'), 'c1');
+
+    fireEvent.pointerDown(text.parentElement!);
+    fireEvent.pointerCancel(document);
+    select(text, 0, text, 'We built on'.length);
+    fireEvent(document, new Event('selectionchange'));
+
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ text: 'We built on' }));
+  });
+
+  it('does not report the same highlight again when it is clicked', () => {
+    const onSelect = jest.fn();
+    const { getByTestId } = render(<Fixture onSelect={onSelect} />);
+    const text = chunkTextNode(getByTestId('transcript'), 'c2');
+    fireEvent.pointerDown(text.parentElement!);
+    select(text, 0, text, SECOND.indexOf(' in a few'));
+    fireEvent.pointerUp(document);
+    onSelect.mockClear();
+
+    fireEvent.pointerDown(text.parentElement!);
+    fireEvent.pointerUp(document);
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('ignores a press on the transcript scroll bar', () => {
+    const onSelect = jest.fn();
+    const { getByTestId } = render(<Fixture onSelect={onSelect} />);
+    const container = getByTestId('transcript');
+    const text = chunkTextNode(container, 'c2');
+    select(text, 0, text, SECOND.indexOf(' in a few'));
+    onSelect.mockClear();
+
+    fireEvent.pointerDown(container);
+    select(text, 0, text, SECOND.indexOf(' a few'));
+    fireEvent.pointerUp(document);
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('ignores a drag that starts outside the transcript', () => {
+    const onSelect = jest.fn();
+    const { getByTestId } = render(<Fixture onSelect={onSelect} />);
+    const outside = getByTestId('outside');
+    const text = chunkTextNode(getByTestId('transcript'), 'c1');
+
+    fireEvent.pointerDown(outside);
+    select(outside.firstChild!, 0, text, FIRST.length);
+    fireEvent(document, new Event('selectionchange'));
+    fireEvent.pointerUp(document);
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('waits for the release when a press outside the transcript is followed by a selection inside it', () => {
+    const onSelect = jest.fn();
+    const { getByTestId } = render(<Fixture onSelect={onSelect} />);
+    const text = chunkTextNode(getByTestId('transcript'), 'c1');
+
+    fireEvent.pointerDown(getByTestId('outside'));
+    select(text, 0, text, 'We built on'.length);
     fireEvent(document, new Event('selectionchange'));
 
     expect(onSelect).not.toHaveBeenCalled();

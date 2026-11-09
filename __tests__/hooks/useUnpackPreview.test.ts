@@ -11,6 +11,7 @@ jest.mock('../../utils', () => ({
 const mockSendData = SendData as jest.Mock;
 
 const range: UnpackSelection = { startMessageId: 'c1', startOffset: 0, endMessageId: 'c1', endOffset: 40 };
+const passcode = 'transcript-passcode';
 const otherRange: UnpackSelection = { startMessageId: 'c2', startOffset: 0, endMessageId: 'c2', endOffset: 30 };
 
 const preview = {
@@ -42,7 +43,7 @@ describe('useUnpackPreview', () => {
 
   it('waits until the selection has been still for the delay before asking for a preview', async () => {
     mockSendData.mockResolvedValue(preview);
-    const { result } = renderHook(() => useUnpackPreview('conv-1', range));
+    const { result } = renderHook(() => useUnpackPreview('conv-1', range, passcode));
 
     expect(result.current.state).toEqual({ status: 'loading' });
     act(() => jest.advanceTimersByTime(UNPACK_PREVIEW_DELAY_MS - 1));
@@ -52,13 +53,13 @@ describe('useUnpackPreview', () => {
 
     expect(mockSendData).toHaveBeenCalledTimes(1);
     expect(mockSendData.mock.calls[0][0]).toBe('unpack/conv-1/preview');
-    expect(requestBody(mockSendData.mock.calls[0])).toEqual(range);
+    expect(requestBody(mockSendData.mock.calls[0])).toEqual({ ...range, transcriptPasscode: passcode });
     expect(result.current.state).toEqual({ status: 'ready', explanation: preview.explanation });
   });
 
   it('asks only about the newest selection when it changes before the delay ends', async () => {
     mockSendData.mockResolvedValue(preview);
-    const { rerender } = renderHook(({ selected }) => useUnpackPreview('conv-1', selected), {
+    const { rerender } = renderHook(({ selected }) => useUnpackPreview('conv-1', selected, passcode), {
       initialProps: { selected: range },
     });
 
@@ -67,12 +68,12 @@ describe('useUnpackPreview', () => {
     await act(async () => jest.advanceTimersByTime(UNPACK_PREVIEW_DELAY_MS));
 
     expect(mockSendData).toHaveBeenCalledTimes(1);
-    expect(requestBody(mockSendData.mock.calls[0])).toEqual(otherRange);
+    expect(requestBody(mockSendData.mock.calls[0])).toEqual({ ...otherRange, transcriptPasscode: passcode });
   });
 
   it('cancels a request that is still running when a newer selection replaces it', async () => {
     mockSendData.mockImplementation(() => new Promise(() => {}));
-    const { rerender } = renderHook(({ selected }) => useUnpackPreview('conv-1', selected), {
+    const { rerender } = renderHook(({ selected }) => useUnpackPreview('conv-1', selected, passcode), {
       initialProps: { selected: range },
     });
     await act(async () => jest.advanceTimersByTime(UNPACK_PREVIEW_DELAY_MS));
@@ -85,7 +86,7 @@ describe('useUnpackPreview', () => {
 
   it('does not ask again when the same range comes back as a new object', async () => {
     mockSendData.mockResolvedValue(preview);
-    const { rerender } = renderHook(({ selected }) => useUnpackPreview('conv-1', selected), {
+    const { rerender } = renderHook(({ selected }) => useUnpackPreview('conv-1', selected, passcode), {
       initialProps: { selected: range },
     });
     await act(async () => jest.advanceTimersByTime(UNPACK_PREVIEW_DELAY_MS));
@@ -97,7 +98,7 @@ describe('useUnpackPreview', () => {
   });
 
   it('asks for nothing when there is no range', () => {
-    const { result } = renderHook(() => useUnpackPreview('conv-1', null));
+    const { result } = renderHook(() => useUnpackPreview('conv-1', null, passcode));
     act(() => jest.advanceTimersByTime(UNPACK_PREVIEW_DELAY_MS));
 
     expect(mockSendData).not.toHaveBeenCalled();
@@ -106,16 +107,33 @@ describe('useUnpackPreview', () => {
 
   it("reports the server's reason when the preview is refused", async () => {
     mockSendData.mockResolvedValue({ error: true, status: 503, message: 'Service Unavailable', reason: 'unpackFailed' });
-    const { result } = renderHook(() => useUnpackPreview('conv-1', range));
+    const { result } = renderHook(() => useUnpackPreview('conv-1', range, passcode));
 
     await act(async () => jest.advanceTimersByTime(UNPACK_PREVIEW_DELAY_MS));
 
     expect(result.current.state).toEqual({ status: 'error', reason: 'unpackFailed' });
   });
 
+  it('logs a refused preview with its reason, but not the passcode', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockSendData.mockResolvedValue({ error: true, status: 429, reason: 'rateLimited' });
+    renderHook(() => useUnpackPreview('conv-1', range, passcode));
+
+    await act(async () => jest.advanceTimersByTime(UNPACK_PREVIEW_DELAY_MS));
+
+    expect(warn).toHaveBeenCalledWith('Unpack preview refused', {
+      conversationId: 'conv-1',
+      range,
+      status: 429,
+      reason: 'rateLimited',
+    });
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(passcode);
+    warn.mockRestore();
+  });
+
   it('reports an error with no reason when the request never got an answer', async () => {
     mockSendData.mockResolvedValue(undefined);
-    const { result } = renderHook(() => useUnpackPreview('conv-1', range));
+    const { result } = renderHook(() => useUnpackPreview('conv-1', range, passcode));
 
     await act(async () => jest.advanceTimersByTime(UNPACK_PREVIEW_DELAY_MS));
 
@@ -125,7 +143,7 @@ describe('useUnpackPreview', () => {
   it('asks again right away when the participant retries', async () => {
     mockSendData.mockResolvedValueOnce({ error: true, status: 503, reason: 'unpackFailed' });
     mockSendData.mockResolvedValueOnce(preview);
-    const { result } = renderHook(() => useUnpackPreview('conv-1', range));
+    const { result } = renderHook(() => useUnpackPreview('conv-1', range, passcode));
     await act(async () => jest.advanceTimersByTime(UNPACK_PREVIEW_DELAY_MS));
 
     await act(async () => result.current.retry());
@@ -141,27 +159,46 @@ describe('sendUnpackToPrivateChat', () => {
   it('sends the passage with Private Chat as the destination', async () => {
     mockSendData.mockResolvedValue({ askId: 'ask-1', status: 'sent', messageId: 'msg-1' });
 
-    const result = await sendUnpackToPrivateChat('conv-1', range);
+    const result = await sendUnpackToPrivateChat('conv-1', range, passcode);
 
-    expect(mockSendData).toHaveBeenCalledWith('unpack/conv-1/send', { ...range, destination: 'privateChat' }, 'token');
+    expect(mockSendData).toHaveBeenCalledWith(
+      'unpack/conv-1/send',
+      { ...range, transcriptPasscode: passcode, destination: 'privateChat' },
+      'token',
+    );
     expect(result).toEqual({ ok: true, status: 'sent' });
   });
 
   it('says when the card will post once the explanation is written', async () => {
     mockSendData.mockResolvedValue({ askId: 'ask-1', status: 'pending' });
 
-    expect(await sendUnpackToPrivateChat('conv-1', range)).toEqual({ ok: true, status: 'pending' });
+    expect(await sendUnpackToPrivateChat('conv-1', range, passcode)).toEqual({ ok: true, status: 'pending' });
   });
 
   it("returns the server's reason when sending is refused", async () => {
     mockSendData.mockResolvedValue({ error: true, status: 409, reason: 'noPrivateChat' });
 
-    expect(await sendUnpackToPrivateChat('conv-1', range)).toEqual({ ok: false, reason: 'noPrivateChat' });
+    expect(await sendUnpackToPrivateChat('conv-1', range, passcode)).toEqual({ ok: false, reason: 'noPrivateChat' });
+  });
+
+  it('logs a refused send with its reason, even when no popover is left to show it', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockSendData.mockResolvedValue({ error: true, status: 403, reason: 'unpackerOff' });
+
+    await sendUnpackToPrivateChat('conv-1', range, passcode);
+
+    expect(warn).toHaveBeenCalledWith('Unpack send refused', {
+      conversationId: 'conv-1',
+      range,
+      status: 403,
+      reason: 'unpackerOff',
+    });
+    warn.mockRestore();
   });
 
   it('returns a failure with no reason when the request never got an answer', async () => {
     mockSendData.mockResolvedValue(undefined);
 
-    expect(await sendUnpackToPrivateChat('conv-1', range)).toEqual({ ok: false, reason: undefined });
+    expect(await sendUnpackToPrivateChat('conv-1', range, passcode)).toEqual({ ok: false, reason: undefined });
   });
 });

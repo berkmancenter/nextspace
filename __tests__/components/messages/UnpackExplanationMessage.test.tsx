@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { axe } from 'jest-axe';
 import { UnpackExplanationMessage } from '../../../components/messages/UnpackExplanationMessage';
 import { PseudonymousMessage } from '../../../types.internal';
+import { ConversationTypeProvider } from '../../../context/ConversationTypeContext';
 
 // Built from local time so the "Said at" assertion holds in any time zone.
 const passageStart = new Date(2025, 9, 17, 10, 43, 5).toISOString();
@@ -98,14 +99,27 @@ describe('UnpackExplanationMessage', () => {
     ).toBeInTheDocument();
   });
 
-  it('still renders a Catch me up answer, which has a request message and no headline', () => {
+  it("names the event's assistant in the note about checking claims", () => {
     render(
-      <UnpackExplanationMessage
-        message={makeExplanationMessage({ mode: 'lastMinute', requestMessage: 'request-1', headline: undefined })}
-      />,
+      <ConversationTypeProvider initialBotName="Juniper">
+        <UnpackExplanationMessage message={makeExplanationMessage()} />
+      </ConversationTypeProvider>,
     );
 
-    expect(screen.getByRole('heading', { name: 'In plain words' })).toBeInTheDocument();
+    expect(
+      screen.getByText("Juniper unpacks what the speaker said. It doesn't check whether the claim is correct."),
+    ).toBeInTheDocument();
+  });
+
+  it('shows every term when the same term appears twice', () => {
+    const logError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const term = { term: 'Metadata', text: 'Information about a call.' };
+
+    render(<UnpackExplanationMessage message={makeExplanationMessage({ terms: [term, term] })} />);
+
+    expect(screen.getAllByRole('term')).toHaveLength(2);
+    expect(logError.mock.calls.flat().map(String).join(' ')).not.toContain('same key');
+    logError.mockRestore();
   });
 
   it('has no accessibility violations', async () => {
