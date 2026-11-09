@@ -107,6 +107,9 @@ describe('widenSelection', () => {
     ['initials', 'The U.S. Supreme Court agreed. Lower courts did not.', 'Supreme', 'The U.S. Supreme Court agreed.'],
     ['a decimal number', 'It has 6.7 million decisions. Most are short.', 'million', 'It has 6.7 million decisions.'],
     ['versus', 'Smith vs. Jones changed that. Then came appeals.', 'Jones', 'Smith vs. Jones changed that.'],
+    ['"e.g."', 'Some cities, e.g. Paris, cap rents. Others do not.', 'cap rents', 'Some cities, e.g. Paris, cap rents.'],
+    ['"i.e."', 'One owner, i.e. Bob, signs off. Then it ships.', 'signs off', 'One owner, i.e. Bob, signs off.'],
+    ['"cf."', 'Read the ruling, cf. Marbury on review. Then compare.', 'ruling', 'Read the ruling, cf. Marbury on review.'],
   ])('keeps the sentence whole after %s', (_case, text, word, quote) => {
     const at = text.indexOf(word);
 

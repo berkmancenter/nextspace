@@ -17,8 +17,10 @@ const getSegmenter = () => {
   return segmenter;
 };
 
-// Intl.Segmenter ends a sentence at any period before a capital letter, so "Dr. Patel" would split in two
-const ENDS_WITH_ABBREVIATION = /(?:\b(?:Dr|Mr|Mrs|Ms|Prof|St|Jr|Sr|Gen|Sen|Rep|Gov|vs)\.|\b(?:[A-Z]\.){2,})\s*$/;
+// Intl.Segmenter ends a sentence at any period before a capital letter, so "Dr. Patel" would split in two.
+// "etc." and "No." are left out because speakers often end a sentence with them.
+const ENDS_WITH_ABBREVIATION =
+  /(?:\b(?:Dr|Mr|Mrs|Ms|Prof|St|Jr|Sr|Gen|Sen|Rep|Gov|vs|cf)\.|\b(?:e\.g|i\.e)\.|\b(?:[A-Z]\.){2,})\s*$/;
 const isSpace = (character: string) => /\s/.test(character);
 
 /*
