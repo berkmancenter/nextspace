@@ -4,6 +4,7 @@ import { Transcript } from '../../components/Transcript';
 import { RetrieveData, SendData } from '../../utils';
 import { trackConversationEvent, trackFeatureUsage } from '../../utils/analytics';
 import { ConversationTypeProvider } from '../../context/ConversationTypeContext';
+import { formatTime } from '../../utils/catchUp';
 
 jest.mock('../../utils', () => ({
   RetrieveData: jest.fn(),
@@ -644,6 +645,62 @@ describe('Transcript', () => {
       chunk.getAttribute('data-message-id'),
     );
     expect(renderedIds).toEqual(['m3', 'm2', 'm1']);
+  });
+
+  it('tells the page which transcript chunks it has, including new ones', async () => {
+    const onMessagesChange = jest.fn();
+    render(<Transcript {...baseProps} onMessagesChange={onMessagesChange} />);
+    await screen.findByText('Hello world');
+
+    const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
+    act(() => {
+      messageHandler({ id: 'm3', channels: ['transcript'], createdAt: '2025-10-17T12:03:00Z', body: { text: 'New' } });
+    });
+
+    const latestChunks = onMessagesChange.mock.calls[onMessagesChange.mock.calls.length - 1][0];
+    expect(latestChunks.map((chunk: { id: string }) => chunk.id)).toEqual(['m1', 'm2', 'm3']);
+  });
+
+  it('tells the page nothing until the first load finishes', async () => {
+    let finishLoading: (messages: unknown[]) => void = () => {};
+    (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+      if (url.startsWith('messages/')) return new Promise((resolve) => (finishLoading = resolve));
+      return Promise.resolve({ transcript: { status: 'active' } });
+    });
+    const onMessagesChange = jest.fn();
+    render(<Transcript {...baseProps} onMessagesChange={onMessagesChange} />);
+    await waitFor(() => expect(RetrieveData).toHaveBeenCalledWith(expect.stringMatching(/^messages\//), expect.anything()));
+
+    expect(onMessagesChange).not.toHaveBeenCalled();
+
+    await act(async () => finishLoading([]));
+
+    expect(onMessagesChange).toHaveBeenLastCalledWith([]);
+  });
+
+  it('keeps chunks that arrive while the history is loading', async () => {
+    let finishLoading: (messages: unknown[]) => void = () => {};
+    (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+      if (url.startsWith('messages/')) return new Promise((resolve) => (finishLoading = resolve));
+      return Promise.resolve({ transcript: { status: 'active' } });
+    });
+    render(<Transcript {...baseProps} />);
+    await waitFor(() => expect(RetrieveData).toHaveBeenCalledWith(expect.stringMatching(/^messages\//), expect.anything()));
+
+    const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
+    act(() => {
+      messageHandler({ id: 'm3', channels: ['transcript'], createdAt: '2025-10-17T12:03:00Z', body: { text: 'Live' } });
+    });
+    await act(async () => finishLoading(transcriptMessages));
+
+    expect(screen.getByText('Hello world')).toBeInTheDocument();
+    expect(screen.getByText('Live')).toBeInTheDocument();
+  });
+
+  it('shows chunk times the same way Private Chat lists them', async () => {
+    render(<Transcript {...baseProps} />);
+
+    expect(await screen.findByText(formatTime(new Date('2025-10-17T12:01:00Z')))).toBeInTheDocument();
   });
 
   // Tests for transcript controls (pause, resume, delete, download)

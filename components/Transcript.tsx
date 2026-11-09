@@ -6,6 +6,7 @@ import { PseudonymousMessage } from '../types.internal';
 import { Api, RetrieveData, SendData } from '../utils';
 import { trackFeatureUsage, trackConversationEvent } from '../utils/analytics';
 import { insertMessageInOrder } from '../utils/messageModeration';
+import { formatTime } from '../utils/catchUp';
 import { useVisibilityAwareDuration } from '../hooks/useVisibilityAwareDuration';
 import { BotIcon } from './BotIcon';
 import { getAssistantAvatarStyle } from '../utils/avatarUtils';
@@ -45,6 +46,11 @@ interface TranscriptProps {
   lastReconnectTime?: number | null;
   /** Function to set an error message */
   setErrorMessage?: (message: string | null) => void;
+  /**
+   * Called with every loaded chunk whenever the list changes, even while the panel is closed.
+   * Not called until the history has loaded, so an empty list means there is no transcript yet.
+   */
+  onMessagesChange?: (messages: PseudonymousMessage[]) => void;
 }
 
 /**
@@ -81,6 +87,14 @@ export function Transcript(props: TranscriptProps) {
   const transcriptOpenDuration = useVisibilityAwareDuration();
   const manualScrollDuration = useVisibilityAwareDuration();
   const autoScrollDuration = useVisibilityAwareDuration();
+
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  // The history fetch replaces the list, so chunks the socket delivers while it's in flight are kept here.
+  const arrivedWhileLoadingRef = useRef<PseudonymousMessage[] | null>(null);
+  const { onMessagesChange } = props;
+  useEffect(() => {
+    if (historyLoaded) onMessagesChange?.(messages);
+  }, [historyLoaded, messages, onMessagesChange]);
 
   const handleToggle = () => {
     const newOpenState = !isOpen;
@@ -358,6 +372,7 @@ export function Transcript(props: TranscriptProps) {
   const fetchTranscriptData = async () => {
     if (!props.conversationId || !Api.get().getAccessToken() || !props.transcriptPasscode) return;
 
+    arrivedWhileLoadingRef.current = [];
     try {
       const conversationResponse: any = await RetrieveData(
         `conversations/${props.conversationId}`,
@@ -382,7 +397,8 @@ export function Transcript(props: TranscriptProps) {
       }
 
       if (Array.isArray(transcriptMessages)) {
-        setMessages(transcriptMessages);
+        const arrivedWhileLoading = arrivedWhileLoadingRef.current ?? [];
+        setMessages(arrivedWhileLoading.reduce(insertMessageInOrder, transcriptMessages));
 
         if (props.focusTimeRange) {
           setTimeout(() => {
@@ -396,6 +412,9 @@ export function Transcript(props: TranscriptProps) {
       console.error('Error fetching transcript data:', error);
 
       if (props.setErrorMessage) props.setErrorMessage(error as string);
+    } finally {
+      arrivedWhileLoadingRef.current = null;
+      setHistoryLoaded(true);
     }
   };
 
@@ -518,6 +537,7 @@ export function Transcript(props: TranscriptProps) {
           }
         }
 
+        arrivedWhileLoadingRef.current?.push(data);
         setMessages((prev) => insertMessageInOrder(prev, data));
       }
     };
@@ -708,15 +728,7 @@ export function Transcript(props: TranscriptProps) {
                   className="flex items-center gap-2 text-gray-300 text-sm mb-1"
                   style={props.presentation ? PRESENTATION_TEXT.meta : undefined}
                 >
-                  <span>
-                    {message.createdAt
-                      ? new Date(message.createdAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          hour12: true,
-                        })
-                      : ''}
-                  </span>
+                  <span>{message.createdAt ? formatTime(new Date(message.createdAt)) : ''}</span>
                   {isBot && (
                     <span
                       className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold"
