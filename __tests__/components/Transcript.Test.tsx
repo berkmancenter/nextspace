@@ -105,13 +105,17 @@ describe('Transcript', () => {
   it('sets transcript text to 2rem (32px) in the presentation view', async () => {
     render(<Transcript {...baseProps} presentation />);
 
-    expect(await screen.findByText('Hello world')).toHaveStyle({ fontSize: '2rem' });
+    expect(await screen.findByText('Hello world')).toHaveStyle({
+      fontSize: '2rem',
+    });
   });
 
   it('keeps the default transcript text size outside the presentation view', async () => {
     render(<Transcript {...baseProps} />);
 
-    expect(await screen.findByText('Hello world')).not.toHaveStyle({ fontSize: '2rem' });
+    expect(await screen.findByText('Hello world')).not.toHaveStyle({
+      fontSize: '2rem',
+    });
   });
 
   it('starts open and can be toggled closed and open', async () => {
@@ -599,8 +603,16 @@ describe('Transcript', () => {
 
     const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
     act(() => {
-      messageHandler({ channels: ['transcript'], createdAt: '2025-10-17T12:03:00Z', body: { text: 'First without id' } });
-      messageHandler({ channels: ['transcript'], createdAt: '2025-10-17T12:04:00Z', body: { text: 'Second without id' } });
+      messageHandler({
+        channels: ['transcript'],
+        createdAt: '2025-10-17T12:03:00Z',
+        body: { text: 'First without id' },
+      });
+      messageHandler({
+        channels: ['transcript'],
+        createdAt: '2025-10-17T12:04:00Z',
+        body: { text: 'Second without id' },
+      });
     });
 
     expect(screen.getByText('First without id')).toBeInTheDocument();
@@ -626,7 +638,7 @@ describe('Transcript', () => {
     expect(container.querySelectorAll('[data-message-id="m1"]')).toHaveLength(1);
   });
 
-  it('shows the newest message at the start of the list', async () => {
+  it('keeps chunks in spoken order in the page, so a selection can run from one chunk into the next', async () => {
     const { container } = render(<Transcript {...baseProps} />);
     await screen.findByText('Hello world');
 
@@ -643,7 +655,21 @@ describe('Transcript', () => {
     const renderedIds = [...container.querySelectorAll('[data-message-id]')].map((chunk) =>
       chunk.getAttribute('data-message-id'),
     );
-    expect(renderedIds).toEqual(['m3', 'm2', 'm1']);
+    expect(renderedIds).toEqual(['m1', 'm2', 'm3']);
+  });
+
+  it('selects the end of one chunk and the start of the next when a selection crosses them', async () => {
+    render(<Transcript {...baseProps} />);
+    const firstText = (await screen.findByText('Hello world')).firstChild as Text;
+    const secondText = screen.getByText('Second message').firstChild as Text;
+
+    const range = document.createRange();
+    range.setStart(firstText, 'Hello '.length);
+    range.setEnd(secondText, 'Second'.length);
+
+    expect(range.collapsed).toBe(false);
+    expect(range.toString()).toContain('world');
+    expect(range.toString()).toContain('Second');
   });
 
   // Tests for transcript controls (pause, resume, delete, download)
@@ -1352,7 +1378,11 @@ describe('Transcript', () => {
       it('explains that a moderator link is required when a control is refused', async () => {
         const user = setupUser();
         // SendData reports non-400 failures as bare HTTP status text.
-        (SendData as jest.Mock).mockResolvedValue({ error: true, status: 403, message: 'Forbidden' });
+        (SendData as jest.Mock).mockResolvedValue({
+          error: true,
+          status: 403,
+          message: 'Forbidden',
+        });
 
         render(<Transcript {...controlsProps} />);
         await confirmControl(user, 'Pause recording', 'Yes, Pause');
@@ -1366,7 +1396,11 @@ describe('Transcript', () => {
          the refusal rather than leave someone to discover it. */
       it('announces the refusal to assistive technology', async () => {
         const user = setupUser();
-        (SendData as jest.Mock).mockResolvedValue({ error: true, status: 403, message: 'Forbidden' });
+        (SendData as jest.Mock).mockResolvedValue({
+          error: true,
+          status: 403,
+          message: 'Forbidden',
+        });
 
         render(<Transcript {...controlsProps} />);
         await confirmControl(user, 'Pause recording', 'Yes, Pause');
@@ -1390,7 +1424,10 @@ describe('Transcript', () => {
             return Promise.resolve({
               error: true,
               status: 403,
-              message: { code: 403, message: 'Incorrect or missing passcode for channel: moderator' },
+              message: {
+                code: 403,
+                message: 'Incorrect or missing passcode for channel: moderator',
+              },
             });
           }
           return Promise.resolve(null);
@@ -1681,7 +1718,10 @@ describe('Transcript', () => {
     beforeEach(() => {
       (RetrieveData as jest.Mock).mockImplementation((url: string) => {
         if (url.startsWith('conversations/')) {
-          return Promise.resolve({ name: 'Test Conversation', transcript: { status: 'active' } });
+          return Promise.resolve({
+            name: 'Test Conversation',
+            transcript: { status: 'active' },
+          });
         } else if (url.startsWith('messages/')) {
           return Promise.resolve([botMessage, humanMessage]);
         }

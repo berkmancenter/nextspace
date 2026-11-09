@@ -693,49 +693,55 @@ export function Transcript(props: TranscriptProps) {
           className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col-reverse min-h-0 [overflow-anchor:none] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-nx-scroll-track [&::-webkit-scrollbar-thumb]:bg-nx-scroll-thumb [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-nx-scroll-thumb-hover"
         >
           <div ref={topRef} />
-          {/* flex-col-reverse draws the first element at the bottom, so the newest message goes first */}
-          {[...messages].reverse().map((message, i) => {
-            const isBot = message.fromAgent;
+          {/* Browsers select text in page order, so chunks stay oldest first inside this one wrapper. The
+              container's flex-col-reverse then only pins the wrapper to the bottom. */}
+          <div>
+            {messages.map((message, i) => {
+              const isBot = message.fromAgent;
 
-            return (
-              <div
-                id={`transcript-message-${message.id}`}
-                data-message-id={message.id}
-                key={message.id || `message-${i}`}
-                className={`mb-4 ${focusedMessageIds.includes(message.id!) ? 'bg-nx-focus-row dark:shadow-[inset_4px_0_0_var(--nx-border-interactive)]' : ''}`}
-              >
+              return (
                 <div
-                  className="flex items-center gap-2 text-gray-300 text-sm mb-1"
-                  style={props.presentation ? PRESENTATION_TEXT.meta : undefined}
+                  id={`transcript-message-${message.id}`}
+                  data-message-id={message.id}
+                  key={message.id || `message-${i}`}
+                  className={`mb-4 ${focusedMessageIds.includes(message.id!) ? 'bg-nx-focus-row dark:shadow-[inset_4px_0_0_var(--nx-border-interactive)]' : ''}`}
                 >
-                  <span>
-                    {message.createdAt
-                      ? new Date(message.createdAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          hour12: true,
-                        })
-                      : ''}
-                  </span>
-                  {isBot && (
-                    <span
-                      className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold"
-                      style={{ backgroundColor: botBadgeBackground, color: 'var(--nx-transcript-badge-fg)' }}
-                    >
-                      <BotIcon size={12} color="var(--nx-transcript-badge-fg)" />
-                      {normalizeAssistantPseudonym(message, botName)}
+                  <div
+                    className="flex items-center gap-2 text-gray-300 text-sm mb-1"
+                    style={props.presentation ? PRESENTATION_TEXT.meta : undefined}
+                  >
+                    <span>
+                      {message.createdAt
+                        ? new Date(message.createdAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true,
+                          })
+                        : ''}
                     </span>
-                  )}
+                    {isBot && (
+                      <span
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold"
+                        style={{
+                          backgroundColor: botBadgeBackground,
+                          color: 'var(--nx-transcript-badge-fg)',
+                        }}
+                      >
+                        <BotIcon size={12} color="var(--nx-transcript-badge-fg)" />
+                        {normalizeAssistantPseudonym(message, botName)}
+                      </span>
+                    )}
+                  </div>
+                  <p
+                    className="text-white text-base dark:text-nx-text"
+                    style={props.presentation ? PRESENTATION_TEXT.message : undefined}
+                  >
+                    {message.body.text ? message.body.text : message.body}
+                  </p>
                 </div>
-                <p
-                  className="text-white text-base dark:text-nx-text"
-                  style={props.presentation ? PRESENTATION_TEXT.message : undefined}
-                >
-                  {message.body.text ? message.body.text : message.body}
-                </p>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
 
