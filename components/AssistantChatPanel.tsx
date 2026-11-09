@@ -2,7 +2,7 @@ import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTheme, useMediaQuery, IconButton, Tooltip } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import { AssistantMessage, UserMessage, JargonClarificationMessage } from '../components/messages';
+import { AssistantMessage, UserMessage, JargonClarificationMessage, UnpackExplanationMessage } from '../components/messages';
 import { MessageInput } from './MessageInput';
 import { SlashCommand, createSlashCommandEnhancer } from './enhancers/slashCommandEnhancer';
 import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
@@ -246,6 +246,10 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     // Jargon clarification messages
     if (messageType === 'jargon_clarification') {
       return <JargonClarificationMessage message={msg} />;
+    }
+
+    if (messageType === 'unpack_explanation') {
+      return <UnpackExplanationMessage message={msg} />;
     }
 
     // Assistant messages
