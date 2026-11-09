@@ -83,4 +83,99 @@ describe('PresentationHeader', () => {
 
     expect(document.documentElement).not.toHaveAttribute('data-presenter-theme');
   });
+
+  describe('join QR code', () => {
+    const participantUrl = 'https://example.com/assistant/?conversationId=conv-123';
+
+    it('shows no QR toggle when there is no participant link', () => {
+      render(<PresentationHeader eventName="Legal Telescopes" onExit={jest.fn().mockResolvedValue(true)} />);
+
+      expect(screen.queryByRole('button', { name: /join qr code/i })).not.toBeInTheDocument();
+    });
+
+    it('shows the QR code by default when a participant link is present', async () => {
+      render(
+        <PresentationHeader
+          eventName="Legal Telescopes"
+          onExit={jest.fn().mockResolvedValue(true)}
+          participantUrl={participantUrl}
+        />,
+      );
+
+      expect(await screen.findByRole('img', { name: 'Scan to join as a participant' })).toBeInTheDocument();
+      expect(screen.getByText('Scan to join')).toBeInTheDocument();
+      // The open Popover marks the rest of the page aria-hidden (standard MUI modal behavior,
+      // purely for assistive tech — it doesn't block real mouse/keyboard interaction), so the
+      // toggle button itself has to be queried past that to find it, same as a sighted user can
+      // still click it.
+      expect(screen.getByRole('button', { name: 'Hide join QR code', hidden: true })).toBeInTheDocument();
+    });
+
+    it('hides the QR code on toggle click, and shows it again on a second click', async () => {
+      render(
+        <PresentationHeader
+          eventName="Legal Telescopes"
+          onExit={jest.fn().mockResolvedValue(true)}
+          participantUrl={participantUrl}
+        />,
+      );
+
+      await screen.findByRole('img', { name: 'Scan to join as a participant' });
+
+      await userEvent.click(screen.getByRole('button', { name: 'Hide join QR code', hidden: true }));
+      await waitFor(() => {
+        expect(screen.queryByRole('img', { name: 'Scan to join as a participant' })).not.toBeInTheDocument();
+      });
+
+      await userEvent.click(screen.getByRole('button', { name: 'Show join QR code' }));
+      expect(await screen.findByRole('img', { name: 'Scan to join as a participant' })).toBeInTheDocument();
+    });
+
+    it('stays open and still forwards the click when the theme toggle is clicked underneath it', async () => {
+      render(
+        <PresentationHeader
+          eventName="Legal Telescopes"
+          onExit={jest.fn().mockResolvedValue(true)}
+          participantUrl={participantUrl}
+        />,
+      );
+
+      await screen.findByRole('img', { name: 'Scan to join as a participant' });
+      expect(document.documentElement).toHaveAttribute('data-presenter-theme', 'dark');
+
+      // Queried with hidden:true for the same reason as above — it's aria-hidden while the
+      // popover's open, which doesn't affect a real click actually reaching it.
+      await userEvent.click(screen.getByRole('button', { name: 'Switch to light mode', hidden: true }));
+
+      // The click reached the real button (not swallowed by the popover's backdrop)...
+      expect(document.documentElement).toHaveAttribute('data-presenter-theme', 'light');
+      // ...and didn't also dismiss the popover as a side effect.
+      expect(screen.getByRole('img', { name: 'Scan to join as a participant' })).toBeInTheDocument();
+    });
+
+    it('lets focus (and typing) land on an input elsewhere on the page while the popover is open', async () => {
+      const user = userEvent.setup();
+      render(
+        <>
+          <PresentationHeader
+            eventName="Legal Telescopes"
+            onExit={jest.fn().mockResolvedValue(true)}
+            participantUrl={participantUrl}
+          />
+          <input aria-label="group chat message" />
+        </>,
+      );
+
+      await screen.findByRole('img', { name: 'Scan to join as a participant' });
+
+      const chatInput = screen.getByRole('textbox', { name: 'group chat message', hidden: true });
+      await user.click(chatInput);
+      await user.type(chatInput, 'hello');
+
+      // Without disableEnforceFocus, Modal's FocusTrap pulls focus straight back to the popover
+      // on the next tick, so typing would never actually land in the input.
+      expect(chatInput).toHaveFocus();
+      expect(chatInput).toHaveValue('hello');
+    });
+  });
 });
