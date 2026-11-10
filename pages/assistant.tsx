@@ -17,6 +17,7 @@ import { NavigationBar } from '../components/NavigationBar';
 import { PreferencesPanel } from '../components/PreferencesPanel';
 import { PresentationHeader } from '../components/PresentationHeader';
 import { insertMessageInOrder } from '../utils/messageModeration';
+import { BotPresence } from '../components/BotPresence';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
 import { CheckAuthHeader, parseMessageBody } from '../utils/Helpers';
 import { withStoredChannels } from '../utils/presentationChannels';
@@ -246,6 +247,13 @@ export function EventAssistantRoom({
       description: f.description ?? '',
       value: `/${f.slashCommand} `,
     }));
+
+  // Organizer's chosen destination for the bot's voice: 'zoom' means Recall's own Zoom-facing bot
+  // speaks there, so the presentation view's bot presence panel must not also play audio — that's
+  // the double-audio outcome voiceDestination exists to prevent.
+  const voiceDestination =
+    (conversationFeatures.find((f) => f.name === 'voiceOutput')?.config?.voiceDestination as string | undefined) ??
+    'presentation';
 
   // Socket event listeners — cross-cutting: messages + tab badges + loading state + resources
   useEffect(() => {
@@ -871,6 +879,17 @@ export function EventAssistantRoom({
                   </div>
                 </>
               ) : null}
+              {/* Waits for eventStatusLoaded so botName/transcriptPasscode are already resolved before
+                  the iframe's first request — otherwise it connects once without the transcript
+                  passcode and only gets it on a second, src-change-triggered navigation. */}
+              {presentation && eventStatusLoaded && (
+                <BotPresence
+                  conversationId={router.query.conversationId as string}
+                  botName={botName}
+                  transcriptPasscode={transcriptPasscode}
+                  audioEnabled={voiceDestination !== 'zoom'}
+                />
+              )}
             </div>
           </>
         )}

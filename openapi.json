@@ -7288,6 +7288,13 @@
             "items": {
               "type": "object"
             }
+          },
+          "showForPlatforms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Hint for a conversation-type-agnostic creation form, evaluated client-side against whichever platforms are currently selected: show this property when the selection includes at least one of these platforms. Not enforced server-side."
           }
         }
       },

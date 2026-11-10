@@ -444,6 +444,58 @@ const mockConfig = {
         },
       ],
     },
+    {
+      name: 'platformGated',
+      label: 'Platform Gated Test',
+      description: 'A conversation type with properties scoped to specific platforms',
+      properties: [
+        {
+          name: 'zoomMeetingUrl',
+          type: 'string',
+          label: 'Zoom Meeting URL',
+          required: true,
+        },
+        {
+          name: 'botName',
+          type: 'string',
+          label: 'Bot Name',
+          default: 'Berkie',
+          required: false,
+        },
+        {
+          name: 'zoomDialIn',
+          type: 'string',
+          label: 'Zoom Dial-In Number',
+          required: false,
+          showForPlatforms: ['zoom'],
+        },
+        {
+          name: 'nextspaceWelcome',
+          type: 'string',
+          label: 'NextSpace Welcome Message',
+          required: false,
+          showForPlatforms: ['nextspace'],
+        },
+      ],
+      features: [
+        {
+          name: 'zoomOnlyFeature',
+          label: 'Zoom-Only Feature',
+          description: 'A feature with a platform-gated sub-property',
+          userControlled: false,
+          default: false,
+          properties: [
+            {
+              name: 'zoomFeatureDetail',
+              type: 'string',
+              label: 'Zoom Feature Detail',
+              required: false,
+              showForPlatforms: ['zoom'],
+            },
+          ],
+        },
+      ],
+    },
   ],
 };
 
@@ -1722,13 +1774,137 @@ describe('EventCreationForm Component', () => {
           expect(Request).toHaveBeenCalledWith(
             'conversations/from-type',
             expect.objectContaining({
-              features: expect.arrayContaining([
-                { name: 'warmUp', enabled: true, config: { questionFormat: 'text' } },
-              ]),
+              features: expect.arrayContaining([{ name: 'warmUp', enabled: true, config: { questionFormat: 'text' } }]),
             }),
           );
         });
       });
+    });
+  });
+
+  describe('Platform-gated properties (showForPlatforms)', () => {
+    // Navigate to Step 3 with the Platform Gated Test conversation type, selecting whichever
+    // platform checkboxes are named in `platforms` (in addition to the always-required Zoom step).
+    const navigateToStep3WithPlatforms = async (user: ReturnType<typeof userEvent.setup>, platforms: string[]) => {
+      await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('NextSpace'));
+      for (const platform of platforms) {
+        await user.click(screen.getByRole('checkbox', { name: new RegExp(`^${platform}$`, 'i') }));
+      }
+      await user.click(screen.getByRole('radio', { name: /platform gated test/i }));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByLabelText(/Bot Name/i));
+    };
+
+    it('shows a property only when a platform from its showForPlatforms list is selected', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithPlatforms(user, ['zoom']);
+
+      expect(screen.getByLabelText(/Zoom Dial-In Number/i)).toBeInTheDocument();
+      expect(screen.queryByLabelText(/NextSpace Welcome Message/i)).not.toBeInTheDocument();
+    });
+
+    it('swaps which gated properties show as the selected platforms change', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithPlatforms(user, ['nextspace']);
+
+      expect(screen.getByLabelText(/NextSpace Welcome Message/i)).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Zoom Dial-In Number/i)).not.toBeInTheDocument();
+    });
+
+    it('shows a property with no showForPlatforms regardless of platform selection', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithPlatforms(user, ['nextspace']);
+
+      expect(screen.getByLabelText(/Bot Name/i)).toBeInTheDocument();
+    });
+
+    it('applies showForPlatforms to a feature sub-property too', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithPlatforms(user, ['nextspace']);
+      await user.click(screen.getByRole('checkbox', { name: /zoom-only feature/i }));
+
+      expect(screen.queryByLabelText(/Zoom Feature Detail/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Platform-gated properties (showForPlatforms)', () => {
+    // Navigate to Step 3 with the Platform Gated Test conversation type, selecting whichever
+    // platform checkboxes are named in `platforms` (in addition to the always-required Zoom step).
+    const navigateToStep3WithPlatforms = async (user: ReturnType<typeof userEvent.setup>, platforms: string[]) => {
+      await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('NextSpace'));
+      for (const platform of platforms) {
+        await user.click(screen.getByRole('checkbox', { name: new RegExp(`^${platform}$`, 'i') }));
+      }
+      await user.click(screen.getByRole('radio', { name: /platform gated test/i }));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByLabelText(/Bot Name/i));
+    };
+
+    it('shows a property only when a platform from its showForPlatforms list is selected', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithPlatforms(user, ['zoom']);
+
+      expect(screen.getByLabelText(/Zoom Dial-In Number/i)).toBeInTheDocument();
+      expect(screen.queryByLabelText(/NextSpace Welcome Message/i)).not.toBeInTheDocument();
+    });
+
+    it('swaps which gated properties show as the selected platforms change', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithPlatforms(user, ['nextspace']);
+
+      expect(screen.getByLabelText(/NextSpace Welcome Message/i)).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Zoom Dial-In Number/i)).not.toBeInTheDocument();
+    });
+
+    it('shows a property with no showForPlatforms regardless of platform selection', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithPlatforms(user, ['nextspace']);
+
+      expect(screen.getByLabelText(/Bot Name/i)).toBeInTheDocument();
+    });
+
+    it('applies showForPlatforms to a feature sub-property too', async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await navigateToStep3WithPlatforms(user, ['nextspace']);
+      await user.click(screen.getByRole('checkbox', { name: /zoom-only feature/i }));
+
+      expect(screen.queryByLabelText(/Zoom Feature Detail/i)).not.toBeInTheDocument();
     });
   });
 
