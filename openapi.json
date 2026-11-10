@@ -299,7 +299,7 @@
     "/artifacts/generate": {
       "post": {
         "summary": "Build or refine a concept graph",
-        "description": "With a `conversationId`, reads that event's transcript and group chat and writes a ConceptGraphArtifact for it. With a `topicId`, folds every conversation in the series into one topic-scoped graph — which is also how a series predating this feature gets backfilled.\nBoth run automatically when a conversation with the Concept Cartographer agent stops: the event gets its own graph, and the topic's graph is refined with it. A series unfolds over time, so the topic graph accumulates a version per event rather than being rebuilt, and the sequence of versions records how the series' understanding developed. Concepts keep stable ids across versions, so two can be diffed.\nSafe to re-run, and re-running is how a poor extraction gets redone: the second run appends a new version to the existing graph rather than replacing it or creating a duplicate, so both extractions stay readable and comparable.\nAn ordinary re-run of a topic still folds the graph's current version in as a source, which means a concept already folded away by the size cap stays folded even after raising it. `reset` (topicId only) skips that: it recomputes the whole series from its raw transcripts alone, ignoring the current graph entirely. It still only ever appends a new version, so the pre-reset graph is never lost — it's just no longer what the new one was built from. Costs a full backfill every time, so this is an operator escape hatch, not something to reach for routinely.\nThe event is treated as running under the Chatham House Rule. Nothing in the output names or otherwise identifies anyone who took part, and statements are paraphrased — a verbatim quotation survives only inside quotation marks and only when it identifies no one.\nRegistered ahead of `/artifacts/{artifactId}` so `generate` is not read as an id.",
+        "description": "With a `conversationId`, reads that event's transcript and group chat and writes a ConceptGraphArtifact for it. With a `topicId`, folds every conversation in the series into one topic-scoped graph — which is also how a series predating this feature gets backfilled.\nBoth run automatically when a conversation with the Concept Cartographer agent stops: the event gets its own graph, and the topic's graph is refined with it. A series unfolds over time, so the topic graph accumulates a version per event rather than being rebuilt, and the sequence of versions records how the series' understanding developed. Concepts keep stable ids across versions, so two can be diffed.\nSafe to re-run, and re-running is how a poor extraction gets redone: the second run appends a new version to the existing graph rather than replacing it or creating a duplicate, so both extractions stay readable and comparable.\nAn ordinary re-run of a topic still folds the graph's current version in as a source, which means a concept already folded away by the size cap stays folded even after raising it. `reset` (topicId only) skips that: it recomputes the whole series from its raw transcripts alone, ignoring the current graph entirely. It still only ever appends a new version, so the pre-reset graph is never lost — it's just no longer what the new one was built from. Costs a full backfill every time, so this is an operator escape hatch, not something to reach for routinely.\nThe event is treated as running under the Chatham House Rule. Nothing in the output names or otherwise identifies anyone who took part, and statements are paraphrased — a verbatim quotation survives only inside quotation marks and only when it identifies no one.\nRegistered ahead of `/artifacts/{artifactId}` so `generate` is not read as an id.\nRuns in a background job rather than inline in this request, since the pipeline can run long enough to exceed the load balancer's backend timeout. This call only claims (or creates) the target artifact and enqueues the run, answering 202 immediately with `generationStatus: 'pending'`. A generation already in flight for this artifact is a no-op: the same, still-pending artifact comes back rather than a second job. Poll `GET /artifacts/{artifactId}` or listen for the `artifact:version` (done) / `artifact:generationFailed` (errored, or too little to map) socket events — on the conversation's room for a conversationId run, the topic's room for a topicId run — to see the claim resolve.",
         "tags": [
           "Artifact"
         ],
@@ -337,27 +337,8 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Nothing was written because the record was too thin to map, or nothing survived the safety checks. Not an error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "generated": {
-                      "type": "boolean",
-                      "example": false
-                    },
-                    "reason": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
           "202": {
-            "description": "The graph was built and written as a version",
+            "description": "The generation run was claimed and enqueued (or was already in flight). The artifact returned here is a snapshot at claim time — `generationStatus` is `pending`, and `currentVersion`/`currentVersionNumber` still reflect whatever the artifact had before this call, or are absent entirely on a first-ever generation. Poll `GET /artifacts/{artifactId}` or listen on the socket for the result: `artifact:version` once a new version is written, or `artifact:generationFailed` if the run errored or found too little of the record to map.",
             "content": {
               "application/json": {
                 "schema": {
@@ -370,36 +351,15 @@
                     "artifact": {
                       "$ref": "#/components/schemas/Artifact"
                     },
-                    "version": {
-                      "$ref": "#/components/schemas/ArtifactVersion"
-                    },
-                    "report": {
-                      "type": "object",
-                      "description": "What assembly and the Chatham House checks removed",
-                      "properties": {
-                        "droppedConcepts": {
-                          "type": "number"
-                        },
-                        "droppedContributions": {
-                          "type": "number"
-                        },
-                        "droppedStatements": {
-                          "type": "number"
-                        },
-                        "droppedGlosses": {
-                          "type": "number"
-                        },
-                        "droppedOriginPrompts": {
-                          "type": "number"
-                        },
-                        "mergedConcepts": {
-                          "type": "number"
-                        },
-                        "foldedConcepts": {
-                          "type": "number",
-                          "description": "Concepts consolidated into a related one because the series graph outgrew its size cap — distinct from mergedConcepts, which counts concepts recognised as the same idea rather than consolidated for space."
-                        }
-                      }
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ready",
+                        "pending",
+                        "failed"
+                      ],
+                      "description": "Echoes the returned artifact's generationStatus, which is 'pending' immediately after a fresh claim",
+                      "example": "pending"
                     }
                   }
                 }
@@ -6561,6 +6521,145 @@
           }
         }
       },
+      "UnpackRequestBody": {
+        "type": "object",
+        "description": "Message body (sent with bodyType \"json\") asking the event assistant to explain part of the talk in plain language. Send it to the participant's direct channel with the assistant. Ignored unless the event's \"unpacker\" feature is on.",
+        "required": [
+          "type",
+          "mode",
+          "text"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "unpack_request"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "lastMinute"
+            ],
+            "description": "Which part of the talk to explain. lastMinute is the transcript from the 60 seconds before the request."
+          },
+          "text": {
+            "type": "string",
+            "description": "Readable label for the request (e.g. \"Unpack 10:43 AM\"), shown in chat history and by text-only clients."
+          },
+          "destination": {
+            "type": "string",
+            "enum": [
+              "privateChat"
+            ],
+            "default": "privateChat",
+            "description": "Where the explanation is posted."
+          }
+        }
+      },
+      "UnpackTerm": {
+        "type": "object",
+        "required": [
+          "term",
+          "text"
+        ],
+        "properties": {
+          "term": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain-language explanation of the term."
+          }
+        }
+      },
+      "UnpackExplanation": {
+        "type": "object",
+        "description": "Message body (bodyType \"json\") the event assistant sends in reply to an UnpackRequestBody. If no transcript arrived in the window, or the participant sent too many requests in the last minute, the assistant sends a short text message instead.",
+        "required": [
+          "type",
+          "mode",
+          "destination",
+          "requestMessage",
+          "chunkIds",
+          "passage",
+          "quote",
+          "whatTheyreSaying",
+          "whyItMatters",
+          "terms",
+          "text"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "unpack_explanation"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "lastMinute"
+            ]
+          },
+          "destination": {
+            "type": "string",
+            "enum": [
+              "privateChat"
+            ]
+          },
+          "requestMessage": {
+            "type": "string",
+            "description": "ID of the participant's request message."
+          },
+          "chunkIds": {
+            "type": "array",
+            "description": "IDs of the transcript messages that were explained, oldest first.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "passage": {
+            "type": "object",
+            "description": "When the explained passage ran. Each time is when a transcript chunk finished.",
+            "required": [
+              "start",
+              "end"
+            ],
+            "properties": {
+              "start": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "end": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "quote": {
+            "type": "string",
+            "description": "The transcript text that was explained."
+          },
+          "whatTheyreSaying": {
+            "type": "string"
+          },
+          "whyItMatters": {
+            "type": "string"
+          },
+          "terms": {
+            "type": "array",
+            "description": "Specialist terms in the passage. Empty when there are none.",
+            "items": {
+              "$ref": "#/components/schemas/UnpackTerm"
+            }
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain-text version of all sections, for chat history and clients that can't render the card."
+          }
+        }
+      },
       "Pseudonym": {
         "type": "object",
         "required": [
@@ -7143,6 +7242,7 @@
               "number",
               "boolean",
               "object",
+              "array",
               "enum"
             ]
           },
@@ -7682,6 +7782,45 @@
               },
               "purpose": {
                 "type": "string"
+              },
+              "rationale": {
+                "type": "string",
+                "description": "Why this conversation, why now."
+              },
+              "centralQuestions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The central question(s) the session is wrestling with."
+              },
+              "knownTensions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Known tensions or disagreements worth surfacing."
+              },
+              "scope": {
+                "type": "object",
+                "properties": {
+                  "inScope": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "outOfScope": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "desiredTakeaway": {
+                "type": "string",
+                "description": "What the organizer hopes people leave with."
               },
               "audience": {
                 "type": "object",
@@ -8815,6 +8954,20 @@
           "locked": {
             "type": "boolean",
             "description": "When true no further versions may be appended; the artifact stays readable"
+          },
+          "generationStatus": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "pending",
+              "failed"
+            ],
+            "description": "Tracks a background generation run (see POST /artifacts/generate). `ready` covers both \"never generated asynchronously\" and \"generation succeeded\" — an artifact predating this field reads back with this unset, which callers should treat the same as `ready`.",
+            "example": "ready"
+          },
+          "generationError": {
+            "type": "string",
+            "description": "Set alongside generationStatus `failed`; cleared once a new generation starts or succeeds"
           },
           "createdAt": {
             "type": "string",
