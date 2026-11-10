@@ -28,13 +28,16 @@ const mockStop = jest.fn(() => 5); // Return 5 seconds by default
 const mockGetActiveDuration = jest.fn(() => 5);
 const mockIsRunning = jest.fn(() => false);
 
+// The real hook returns the same object on every render; a new one each time would reset the scroll debounce.
+const mockDuration = {
+  start: mockStart,
+  stop: mockStop,
+  getActiveDuration: mockGetActiveDuration,
+  isRunning: mockIsRunning,
+};
+
 jest.mock('../../hooks/useVisibilityAwareDuration', () => ({
-  useVisibilityAwareDuration: jest.fn(() => ({
-    start: mockStart,
-    stop: mockStop,
-    getActiveDuration: mockGetActiveDuration,
-    isRunning: mockIsRunning,
-  })),
+  useVisibilityAwareDuration: jest.fn(() => mockDuration),
 }));
 
 describe('Transcript', () => {
@@ -2003,6 +2006,72 @@ describe('Transcript', () => {
       } finally {
         global.ResizeObserver = originalResizeObserver;
       }
+    });
+
+    describe('while the popover is open', () => {
+      const openOverLiveTranscript = async (startScrollTop: number) => {
+        const view = render(<Transcript {...baseProps} unpack={{}} />);
+        await screen.findByText(unpackMessages[0].body);
+        const list = chunkElement(unpackMessages[0].body).parentElement!.parentElement!;
+        // jsdom has no layout, so each chunk counts as 200px tall.
+        Object.defineProperty(list, 'scrollHeight', {
+          configurable: true,
+          get: () => list.querySelectorAll('[data-message-id]').length * 200,
+        });
+        list.scrollTop = startScrollTop;
+        highlight(unpackMessages[0].body, 'Caselaw', '.');
+        const addChunk = async (id: string, text: string) => {
+          const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
+          act(() => messageHandler({ id, channels: ['transcript'], createdAt: '2025-10-17T10:45:00Z', body: text }));
+          await screen.findByText(text);
+        };
+        return { ...view, list, addChunk };
+      };
+
+      it('holds the passage still when new chunks arrive, even while following the live transcript', async () => {
+        const { list, addChunk } = await openOverLiveTranscript(0);
+
+        await addChunk('u3', 'A new chunk arrives.');
+
+        expect(list.scrollTop).toBe(-200);
+      });
+
+      it('does not count holding the passage still as the reader scrolling', async () => {
+        const { list, addChunk } = await openOverLiveTranscript(0);
+        await addChunk('u3', 'A new chunk arrives.');
+
+        fireEvent.scroll(list);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        expect(trackConversationEvent).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.anything(),
+          'scroll_manual',
+          expect.anything(),
+        );
+      });
+
+      it('goes back to the live transcript on close when the reader was following it', async () => {
+        const user = setupUser();
+        const { addChunk } = await openOverLiveTranscript(0);
+        await addChunk('u3', 'A new chunk arrives.');
+        (Element.prototype.scrollIntoView as jest.Mock).mockClear();
+
+        await user.click(screen.getByRole('button', { name: 'Close' }));
+
+        expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+      });
+
+      it('leaves the reader where they were on close when they had scrolled back', async () => {
+        const user = setupUser();
+        const { addChunk } = await openOverLiveTranscript(-300);
+        await addChunk('u3', 'A new chunk arrives.');
+        (Element.prototype.scrollIntoView as jest.Mock).mockClear();
+
+        await user.click(screen.getByRole('button', { name: 'Close' }));
+
+        expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+      });
     });
 
     it('sends the transcript passcode with the preview request', async () => {

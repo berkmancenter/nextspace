@@ -104,6 +104,8 @@ export function Transcript(props: TranscriptProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const unpackEnabled = !!props.unpack && !props.presentation;
   const [unpackTarget, setUnpackTarget] = useState<OpenUnpackTarget | null>(null);
+  const unpackOpenRef = useRef(false);
+  unpackOpenRef.current = !!unpackTarget;
   const [unpackTipDismissed, setUnpackTipDismissed] = useState(false);
   // The one chunk Tab reaches; the arrow keys move between the rest.
   const [activeChunkId, setActiveChunkId] = useState<string | null>(null);
@@ -247,6 +249,18 @@ export function Transcript(props: TranscriptProps) {
     });
     observer.observe(root);
     return () => observer.disconnect();
+  }, [hasUnpackTarget]);
+
+  const followingLiveAtUnpackOpenRef = useRef(false);
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (hasUnpackTarget) {
+      followingLiveAtUnpackOpenRef.current = !!container && checkIsAtBottom(container);
+      return;
+    }
+    if (!followingLiveAtUnpackOpenRef.current) return;
+    followingLiveAtUnpackOpenRef.current = false;
+    scrollToBottom();
   }, [hasUnpackTarget]);
 
   const chunkElement = (id: string) => document.getElementById(`transcript-message-${id}`);
@@ -446,6 +460,8 @@ export function Transcript(props: TranscriptProps) {
   const handleScroll = useCallback(() => {
     const container = messagesContainerRef.current;
     if (!container || !isOpen) return;
+    // Holding the view still for the Unpacker popover moves scrollTop, but the reader didn't scroll.
+    if (unpackOpenRef.current) return;
 
     const currentlyAtBottom = checkIsAtBottom(container);
 
@@ -638,7 +654,8 @@ export function Transcript(props: TranscriptProps) {
         const container = messagesContainerRef.current;
         if (container) {
           const wasAtBottom = Math.abs(container.scrollTop) < 5;
-          if (!wasAtBottom) {
+          // The Unpacker popover is pinned to its passage, so a passage pushed up by new chunks drags it along.
+          if (!wasAtBottom || unpackOpenRef.current) {
             // Save scroll state to restore after render
             preserveScrollRef.current = {
               scrollHeight: container.scrollHeight,
