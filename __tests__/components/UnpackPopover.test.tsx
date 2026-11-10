@@ -105,6 +105,21 @@ describe('UnpackPopover', () => {
     expect(screen.getByText('Every ask is anonymous, including to organizers.')).toBeInTheDocument();
   });
 
+  it('shows bouncing dots that screen readers skip while Berkie reads the passage', () => {
+    neverAnswerPreview();
+    renderPopover();
+
+    expect(screen.getByTestId('unpack-loading-dots')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('removes the bouncing dots once the preview arrives', async () => {
+    respond();
+    renderPopover();
+
+    await screen.findByText('The full explanation also covers why it matters and 2 key terms.');
+    expect(screen.queryByTestId('unpack-loading-dots')).not.toBeInTheDocument();
+  });
+
   it('asks for a preview of the widened passage', async () => {
     respond();
     renderPopover();
