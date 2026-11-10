@@ -101,15 +101,17 @@ describe('UnpackPopover', () => {
     expect(screen.getByRole('dialog', { name: 'Unpack this with Berkie' })).toBeInTheDocument();
     expect(screen.getByText('What the speaker said')).toBeInTheDocument();
     expect(screen.getByText('"Precedential weight concentrates in a few circuits, then decays."')).toBeInTheDocument();
-    expect(screen.getByText('Berkie is reading this…')).toBeInTheDocument();
+    expect(screen.getByText('Berkie is reading this')).toBeInTheDocument();
     expect(screen.getByText('Every ask is anonymous, including to organizers.')).toBeInTheDocument();
   });
 
-  it('shows bouncing dots that screen readers skip while Berkie reads the passage', () => {
+  it('shows bouncing dots after the reading line that screen readers skip while Berkie reads the passage', () => {
     neverAnswerPreview();
     renderPopover();
 
-    expect(screen.getByTestId('unpack-loading-dots')).toHaveAttribute('aria-hidden', 'true');
+    const dots = screen.getByTestId('unpack-loading-dots');
+    expect(dots).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('Berkie is reading this').compareDocumentPosition(dots)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('removes the bouncing dots once the preview arrives', async () => {
@@ -137,7 +139,7 @@ describe('UnpackPopover', () => {
       await screen.findByText("A ruling's influence mostly comes from a few appeals courts. It fades at a steady rate.…"),
     ).toBeInTheDocument();
     expect(screen.getByText('The full explanation also covers why it matters and 2 key terms.')).toBeInTheDocument();
-    expect(screen.queryByText('Berkie is reading this…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Berkie is reading this')).not.toBeInTheDocument();
   });
 
   it("switches to the server's copy of the quote once the preview arrives", async () => {
@@ -367,7 +369,7 @@ describe('UnpackPopover', () => {
     );
 
     expect(screen.getByRole('dialog', { name: 'Unpack this with Juniper' })).toBeInTheDocument();
-    expect(screen.getByText('Juniper is reading this…')).toBeInTheDocument();
+    expect(screen.getByText('Juniper is reading this')).toBeInTheDocument();
   });
 
   it('moves focus into the popover when it was opened from the keyboard', () => {

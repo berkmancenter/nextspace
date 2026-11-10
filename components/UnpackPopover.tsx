@@ -165,28 +165,17 @@ const UnpackPopoverContent: FC<
             </>
           ) : (
             <div className="flex items-center gap-2">
+              <p className="m-0 text-[15px] text-[#4B5563]">{botName} is reading this</p>
               <svg
                 data-testid="unpack-loading-dots"
-                className="w-8 h-4 shrink-0"
+                className="w-6 h-3 shrink-0 fill-[#4B5563]"
                 viewBox="0 0 40 10"
-                fill="currentColor"
                 aria-hidden="true"
               >
-                <circle className="motion-safe:animate-bounce fill-sky-400" cx="5" cy="5" r="4" />
-                <circle
-                  className="motion-safe:animate-bounce [animation-delay:-0.2s] fill-medium-slate-blue"
-                  cx="20"
-                  cy="5"
-                  r="4"
-                />
-                <circle
-                  className="motion-safe:animate-bounce [animation-delay:-0.4s] fill-purple-500"
-                  cx="35"
-                  cy="5"
-                  r="4"
-                />
+                <circle className="motion-safe:animate-bounce" cx="5" cy="5" r="4" />
+                <circle className="motion-safe:animate-bounce [animation-delay:-0.2s]" cx="20" cy="5" r="4" />
+                <circle className="motion-safe:animate-bounce [animation-delay:-0.4s]" cx="35" cy="5" r="4" />
               </svg>
-              <p className="m-0 text-[15px] text-[#4B5563]">{botName} is reading this…</p>
             </div>
           )}
         </div>
