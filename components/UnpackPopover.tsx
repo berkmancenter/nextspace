@@ -1,6 +1,5 @@
 import React, { FC, useEffect, useId, useRef, useState } from 'react';
 import { ClickAwayListener, Popper } from '@mui/material';
-import type { Instance as PopperInstance } from '@popperjs/core';
 import { Close, Lock } from '@mui/icons-material';
 import { sendUnpackToPrivateChat, useUnpackPreview } from '../hooks/useUnpackPreview';
 import { isScrollbarPress } from '../utils/Helpers';
@@ -27,19 +26,20 @@ interface UnpackPopoverProps {
   onOpenPrivateChat?: () => void;
   /** Move focus into the popover, for when the keyboard opened it. */
   focusOnOpen?: boolean;
-  /**
-   * Change it whenever the page may have moved under the popover without scrolling, such as a new transcript
-   * chunk arriving, so the popover re-measures where its passage is.
-   */
-  layoutVersion?: unknown;
 }
 
 const labelClassName = 'text-[11px] font-bold uppercase tracking-[0.08em]';
 
 const TABBABLE = 'button, [href], input, [tabindex]:not([tabindex="-1"])';
 
+// MUI rebuilds the popover's positioning whenever this array changes identity, so it lives outside the component.
+const POPPER_MODIFIERS = [
+  { name: 'offset', options: { offset: [0, 8] } },
+  { name: 'preventOverflow', options: { padding: 16 } },
+];
+
 const UnpackPopoverContent: FC<
-  Omit<UnpackPopoverProps, 'target' | 'layoutVersion'> & {
+  Omit<UnpackPopoverProps, 'target'> & {
     target: UnpackTarget;
     dialogRef: React.RefObject<HTMLElement | null>;
     titleId: string;
@@ -241,16 +241,11 @@ const chunkIdsInRange = (chunks: TranscriptChunkText[], { selection }: UnpackTar
   return ids.slice(ids.indexOf(selection.startMessageId), ids.indexOf(selection.endMessageId) + 1);
 };
 
-export const UnpackPopover: FC<UnpackPopoverProps> = ({ target, onClose, layoutVersion, ...contentProps }) => {
-  const popperRef = useRef<PopperInstance | null>(null);
+export const UnpackPopover: FC<UnpackPopoverProps> = ({ target, onClose, ...contentProps }) => {
   const dialogRef = useRef<HTMLElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const titleId = useId();
-
-  useEffect(() => {
-    popperRef.current?.update();
-  }, [layoutVersion]);
 
   const targetChunkIds = target ? chunkIdsInRange(contentProps.chunks, target).join(' ') : '';
   useEffect(() => {
@@ -298,17 +293,7 @@ export const UnpackPopover: FC<UnpackPopoverProps> = ({ target, onClose, layoutV
   };
 
   return (
-    <Popper
-      open
-      anchorEl={target.anchor}
-      popperRef={popperRef}
-      placement="bottom-start"
-      style={{ zIndex: 1300 }}
-      modifiers={[
-        { name: 'offset', options: { offset: [0, 8] } },
-        { name: 'preventOverflow', options: { padding: 16 } },
-      ]}
-    >
+    <Popper open anchorEl={target.anchor} placement="bottom-start" style={{ zIndex: 1300 }} modifiers={POPPER_MODIFIERS}>
       {/* Mouse down, not click: the click that ends a drag-selection would otherwise close the popover it opened. */}
       <ClickAwayListener onClickAway={handleClickAway} mouseEvent="onMouseDown" touchEvent="onTouchStart">
         <section

@@ -671,6 +671,9 @@ export type UnpackPreviewState =
 /** pending means Berkie posts the card once the explanation is written. */
 export type UnpackSendOutcome = { ok: true; status: 'sent' | 'pending' } | { ok: false; reason?: UnpackErrorReason };
 
+/** Where a browser selection starts and ends, for telling whether a press changed it. */
+export type SelectionEnds = Pick<Selection, 'anchorNode' | 'anchorOffset' | 'focusNode' | 'focusOffset'>;
+
 export interface TranscriptSelection {
   selection: UnpackSelection;
   /** The highlighted text, without the timestamps between chunks. */

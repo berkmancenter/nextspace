@@ -947,7 +947,6 @@ export function Transcript(props: TranscriptProps) {
             onClose={closeUnpack}
             onOpenPrivateChat={props.unpack?.onOpenPrivateChat}
             focusOnOpen={!!unpackTarget?.openedFrom}
-            layoutVersion={messages.length}
           />
         </>
       )}

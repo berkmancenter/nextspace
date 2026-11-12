@@ -1,5 +1,5 @@
 import { RefObject, useEffect, useRef } from 'react';
-import { TranscriptSelection } from '../types.internal';
+import { SelectionEnds, TranscriptSelection } from '../types.internal';
 import { isScrollbarPress } from '../utils/Helpers';
 import { countWords, UNPACK_MIN_WORDS } from '../utils/unpackPassage';
 
@@ -44,8 +44,6 @@ export function readTranscriptSelection(container: HTMLElement, selection: Selec
     range: range.cloneRange(),
   };
 }
-
-type SelectionEnds = Pick<Selection, 'anchorNode' | 'anchorOffset' | 'focusNode' | 'focusOffset'>;
 
 const selectionEnds = (selection: Selection | null): SelectionEnds | null =>
   selection && {

@@ -258,7 +258,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
       return <JargonClarificationMessage message={msg} />;
     }
 
-    // A Catch me up answer has the same type but no passage of its own, so it isn't this card.
+    // A Catch me up answer has the same type, but its mode is lastMinute, so it isn't this card.
     if (messageType === 'unpack_explanation' && (msg.body as UnpackExplanation).mode === 'passage') {
       return <UnpackExplanationMessage message={msg} />;
     }
