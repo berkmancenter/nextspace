@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { FC, useEffect, useId, useRef, useState } from 'react';
 import { ClickAwayListener, Popper } from '@mui/material';
 import type { Instance as PopperInstance } from '@popperjs/core';
 import { Close, Lock } from '@mui/icons-material';
@@ -63,9 +63,7 @@ const UnpackPopoverContent: FC<
   const openPrivateChatRef = useRef<HTMLButtonElement>(null);
   const [sendState, setSendState] = useState<UnpackSendState>({ phase: 'idle' });
 
-  // Chunks change as captions arrive, but the selected ones never do, so the widened range stays put.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const widened = useMemo(() => widenSelection(chunks, target.selection), [target.selection]);
+  const widened = widenSelection(chunks, target.selection);
   const tooLong = !!widened && isPassageTooLong(widened.quote);
   const { state: preview, retry } = useUnpackPreview(
     conversationId,

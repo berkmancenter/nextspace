@@ -108,6 +108,16 @@ describe('UnpackPopover', () => {
     expect(screen.getByText('Every ask is anonymous, including to organizers.')).toBeInTheDocument();
   });
 
+  it('shows the corrected words when a caption in the passage is corrected while it is open', () => {
+    neverAnswerPreview();
+    const props = { conversationId: 'conv-1', target: { selection, anchor: document.body }, onClose: jest.fn() };
+    const { rerender } = render(<UnpackPopover {...props} chunks={chunks} />);
+
+    rerender(<UnpackPopover {...props} chunks={[{ id: 'c1', text: text.replace('concentrates', 'consolidates') }]} />);
+
+    expect(screen.getByText('"Precedential weight consolidates in a few circuits, then decays."')).toBeInTheDocument();
+  });
+
   it('shows bouncing dots after the reading line that screen readers skip while Berkie reads the passage', () => {
     neverAnswerPreview();
     renderPopover();
