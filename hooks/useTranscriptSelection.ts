@@ -1,5 +1,6 @@
 import { RefObject, useEffect, useRef } from 'react';
 import { TranscriptSelection } from '../types.internal';
+import { isScrollbarPress } from '../utils/Helpers';
 import { countWords, UNPACK_MIN_WORDS } from '../utils/unpackPassage';
 
 const CHUNK_TEXT_SELECTOR = '[data-chunk-text]';
@@ -62,11 +63,13 @@ const sameEnds = (a: SelectionEnds | null, b: SelectionEnds | null) =>
   a.focusNode === b.focusNode &&
   a.focusOffset === b.focusOffset;
 
+export const KEYBOARD_SELECTION_SETTLE_MS = 1000;
+
 /**
  * Calls onSelect when the participant highlights at least UNPACK_MIN_WORDS words of the transcript.
- * Mouse selections report on release, so the popover doesn't chase the pointer; keyboard ones as they change.
- * An emptied selection, or a press that leaves it unchanged, reports nothing: clicking a popover button or
- * inside the highlight must not reopen or close the popover.
+ * Mouse selections report on release, so the popover doesn't chase the pointer. Keyboard ones report once they
+ * hold still for KEYBOARD_SELECTION_SETTLE_MS, so each Shift+Arrow press doesn't ask for its own preview.
+ * A press that leaves the selection unchanged reports nothing, so clicking the highlight doesn't reopen the popover.
  */
 export function useTranscriptSelection(
   containerRef: RefObject<HTMLElement | null>,
@@ -81,14 +84,16 @@ export function useTranscriptSelection(
     if (!enabled || !container) return;
     let pointerIsDown = false;
     let endsAtPress: SelectionEnds | null = null;
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
 
     const report = () => {
       const result = readTranscriptSelection(container, window.getSelection());
       if (result && countWords(result.text) >= UNPACK_MIN_WORDS) onSelectRef.current(result);
     };
     const handlePointerDown = (event: PointerEvent) => {
-      // Only the scroll bar sits on the container itself; every chunk is a child of it.
-      if (event.target === container) return;
+      // A right-click's release can go to the context menu instead, which would leave pointerIsDown stuck on.
+      if (event.button !== 0 || isScrollbarPress(event)) return;
+      clearTimeout(settleTimer);
       pointerIsDown = true;
       endsAtPress = selectionEnds(window.getSelection());
     };
@@ -101,7 +106,9 @@ export function useTranscriptSelection(
       pointerIsDown = false;
     };
     const handleSelectionChange = () => {
-      if (!pointerIsDown) report();
+      if (pointerIsDown) return;
+      clearTimeout(settleTimer);
+      settleTimer = setTimeout(report, KEYBOARD_SELECTION_SETTLE_MS);
     };
 
     document.addEventListener('pointerdown', handlePointerDown);
@@ -109,6 +116,7 @@ export function useTranscriptSelection(
     document.addEventListener('pointercancel', handlePointerCancel);
     document.addEventListener('selectionchange', handleSelectionChange);
     return () => {
+      clearTimeout(settleTimer);
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('pointerup', handlePointerUp);
       document.removeEventListener('pointercancel', handlePointerCancel);

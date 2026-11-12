@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import { UnpackPopover } from '../../components/UnpackPopover';
@@ -67,6 +67,9 @@ const neverAnswerPreview = (sendResponse: unknown = { askId: 'ask-1', status: 's
   );
 
 const passcode = 'transcript-passcode';
+
+// MUI's ClickAwayListener starts listening a tick after it mounts.
+const clickAwayReady = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)));
 
 const previewCalls = () => mockSendData.mock.calls.filter(([url]) => url.endsWith('/preview'));
 const sendCalls = () => mockSendData.mock.calls.filter(([url]) => url.endsWith('/send'));
@@ -332,6 +335,59 @@ describe('UnpackPopover', () => {
     fireEvent.keyDown(outside, { key: 'Escape' });
 
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('keeps the Escape that closes it from also reaching the rest of the page', () => {
+    neverAnswerPreview();
+    const { onClose } = renderPopover();
+    const pageEscape = jest.fn();
+    window.addEventListener('keydown', pageEscape);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    window.removeEventListener('keydown', pageEscape);
+
+    expect(onClose).toHaveBeenCalledWith('escape');
+    expect(pageEscape).not.toHaveBeenCalled();
+  });
+
+  it('stays open for a right-click outside', async () => {
+    neverAnswerPreview();
+    const { onClose } = renderPopover();
+    await clickAwayReady();
+    const outside = screen.getByRole('button', { name: 'Outside' });
+
+    fireEvent.mouseDown(outside, { button: 2 });
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.mouseDown(outside);
+
+    expect(onClose).toHaveBeenCalledWith('clickAway');
+  });
+
+  it('stays open while the participant drags a scroll bar outside it', async () => {
+    neverAnswerPreview();
+    const { onClose } = renderPopover();
+    await clickAwayReady();
+    const transcript = document.createElement('div');
+    Object.defineProperties(transcript, {
+      clientWidth: { value: 300 },
+      clientHeight: { value: 200 },
+      scrollHeight: { value: 1000 },
+    });
+    transcript.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, right: 315, bottom: 200, width: 315, height: 200 }) as DOMRect;
+    document.body.appendChild(transcript);
+    // MUI reads any press past the page's width, which jsdom reports as 0, as a press on the page's scroll bar.
+    const page = { clientWidth: { value: 1024, configurable: true }, clientHeight: { value: 768, configurable: true } };
+    Object.defineProperties(document.documentElement, page);
+
+    fireEvent.mouseDown(transcript, { clientX: 305, clientY: 50 });
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.mouseDown(transcript, { clientX: 50, clientY: 50 });
+    Object.keys(page).forEach(
+      (property) => delete (document.documentElement as unknown as Record<string, unknown>)[property],
+    );
+
+    expect(onClose).toHaveBeenCalledWith('clickAway');
   });
 
   it('closes when Tab moves past the last control, instead of jumping to the end of the page', async () => {

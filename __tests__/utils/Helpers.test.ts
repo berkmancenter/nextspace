@@ -9,6 +9,7 @@ import {
   SendData,
   Api,
   isFeatureEnabled,
+  isScrollbarPress,
 } from '../../utils/Helpers';
 
 describe('resolveConversationBotName', () => {
@@ -589,5 +590,42 @@ describe('isFeatureEnabled', () => {
 
   it('is off when neither the event nor its type knows the feature', () => {
     expect(isFeatureEnabled('missing', undefined, undefined)).toBe(false);
+  });
+});
+
+describe('isScrollbarPress', () => {
+  const scrollArea = ({ overflows = true } = {}) => {
+    const element = document.createElement('div');
+    Object.defineProperties(element, {
+      clientWidth: { value: 300 },
+      clientHeight: { value: 200 },
+      scrollWidth: { value: overflows ? 600 : 300 },
+      scrollHeight: { value: overflows ? 1000 : 200 },
+    });
+    element.getBoundingClientRect = () => ({ left: 0, top: 0, right: 315, bottom: 215, width: 315, height: 215 }) as DOMRect;
+    document.body.appendChild(element);
+    return element;
+  };
+  const pressAt = (element: HTMLElement, clientX: number, clientY: number) => {
+    let pressed: MouseEvent | undefined;
+    element.addEventListener('mousedown', (event) => (pressed = event), { once: true });
+    element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX, clientY }));
+    return pressed!;
+  };
+
+  it('spots a press on the vertical scroll bar', () => {
+    expect(isScrollbarPress(pressAt(scrollArea(), 305, 50))).toBe(true);
+  });
+
+  it('spots a press on the horizontal scroll bar', () => {
+    expect(isScrollbarPress(pressAt(scrollArea(), 50, 205))).toBe(true);
+  });
+
+  it('treats a press in the padding as a press on the content', () => {
+    expect(isScrollbarPress(pressAt(scrollArea(), 5, 50))).toBe(false);
+  });
+
+  it('treats a press past the content of an element with nothing to scroll as a press on the element', () => {
+    expect(isScrollbarPress(pressAt(scrollArea({ overflows: false }), 305, 205))).toBe(false);
   });
 });

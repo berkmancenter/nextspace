@@ -3,6 +3,7 @@ import { ClickAwayListener, Popper } from '@mui/material';
 import type { Instance as PopperInstance } from '@popperjs/core';
 import { Close, Lock } from '@mui/icons-material';
 import { sendUnpackToPrivateChat, useUnpackPreview } from '../hooks/useUnpackPreview';
+import { isScrollbarPress } from '../utils/Helpers';
 import { useBotName } from '../context/ConversationTypeContext';
 import { TranscriptChunkText, UnpackCloseReason, UnpackErrorReason, UnpackSendState, UnpackTarget } from '../types.internal';
 import {
@@ -267,7 +268,10 @@ export const UnpackPopover: FC<UnpackPopoverProps> = ({ target, onClose, layoutV
         active === document.body ||
         !!dialogRef.current?.contains(active) ||
         (!!chunkId && ownChunks.includes(chunkId));
-      if (focusIsOurs) onCloseRef.current('escape');
+      if (!focusIsOurs) return;
+      // The page's own Escape listeners on window, such as leaving a slash command, would act on it too.
+      event.stopPropagation();
+      onCloseRef.current('escape');
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
@@ -289,6 +293,12 @@ export const UnpackPopover: FC<UnpackPopoverProps> = ({ target, onClose, layoutV
     onClose('tabOut');
   };
 
+  // A right-click or a scroll bar drag, such as scrolling the transcript to reread the passage, keeps it open.
+  const handleClickAway = (event: MouseEvent | TouchEvent) => {
+    if (event instanceof MouseEvent && (event.button !== 0 || isScrollbarPress(event))) return;
+    onClose('clickAway');
+  };
+
   return (
     <Popper
       open
@@ -302,7 +312,7 @@ export const UnpackPopover: FC<UnpackPopoverProps> = ({ target, onClose, layoutV
       ]}
     >
       {/* Mouse down, not click: the click that ends a drag-selection would otherwise close the popover it opened. */}
-      <ClickAwayListener onClickAway={() => onClose('clickAway')} mouseEvent="onMouseDown" touchEvent="onTouchStart">
+      <ClickAwayListener onClickAway={handleClickAway} mouseEvent="onMouseDown" touchEvent="onTouchStart">
         <section
           ref={dialogRef}
           role="dialog"

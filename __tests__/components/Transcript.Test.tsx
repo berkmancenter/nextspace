@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Transcript } from '../../components/Transcript';
+import { KEYBOARD_SELECTION_SETTLE_MS } from '../../hooks/useTranscriptSelection';
 import { RetrieveData, SendData } from '../../utils';
 import { trackConversationEvent, trackFeatureUsage } from '../../utils/analytics';
 import { ConversationTypeProvider } from '../../context/ConversationTypeContext';
@@ -98,6 +99,18 @@ describe('Transcript', () => {
   });
 
   const setupUser = () => userEvent.setup();
+
+  // Fake timers skip the wait while a keyboard selection holds still. Timers the popover starts on the fake
+  // clock, such as its preview request, run before real timers come back, or they would never fire.
+  const settleSelection = () => {
+    jest.useFakeTimers();
+    act(() => {
+      document.dispatchEvent(new Event('selectionchange'));
+    });
+    act(() => jest.advanceTimersByTime(KEYBOARD_SELECTION_SETTLE_MS));
+    act(() => jest.runOnlyPendingTimers());
+    jest.useRealTimers();
+  };
 
   const toggleTranscript = async (user: ReturnType<typeof setupUser>) => {
     // Find the toggle button - it changes aria-label based on state
@@ -2025,9 +2038,7 @@ describe('Transcript', () => {
       range.setEnd(text, body.indexOf(to));
       window.getSelection()!.removeAllRanges();
       window.getSelection()!.addRange(range);
-      act(() => {
-        document.dispatchEvent(new Event('selectionchange'));
-      });
+      settleSelection();
     };
 
     it('puts focus on the passage when a popover opened by highlighting is closed', async () => {
@@ -2195,9 +2206,7 @@ describe('Transcript', () => {
       window.getSelection()!.removeAllRanges();
       window.getSelection()!.addRange(range);
 
-      act(() => {
-        document.dispatchEvent(new Event('selectionchange'));
-      });
+      settleSelection();
 
       expect(screen.getByRole('dialog', { name: 'Unpack this with Berkie' })).not.toHaveFocus();
       expect(screen.getByText('"We built on the Caselaw Access Project."')).toBeInTheDocument();
@@ -2232,9 +2241,7 @@ describe('Transcript', () => {
       range.selectNodeContents(text);
       window.getSelection()!.removeAllRanges();
       window.getSelection()!.addRange(range);
-      act(() => {
-        document.dispatchEvent(new Event('selectionchange'));
-      });
+      settleSelection();
 
       expect(screen.queryByText(TIP)).not.toBeInTheDocument();
       expect(chunk).not.toHaveAttribute('tabindex');

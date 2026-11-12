@@ -1,6 +1,10 @@
 import React, { useRef } from 'react';
-import { fireEvent, render } from '@testing-library/react';
-import { readTranscriptSelection, useTranscriptSelection } from '../../hooks/useTranscriptSelection';
+import { act, fireEvent, render } from '@testing-library/react';
+import {
+  KEYBOARD_SELECTION_SETTLE_MS,
+  readTranscriptSelection,
+  useTranscriptSelection,
+} from '../../hooks/useTranscriptSelection';
 import { TranscriptSelection } from '../../types.internal';
 
 const FIRST = 'We built on the Caselaw Access Project.';
@@ -110,8 +114,29 @@ describe('readTranscriptSelection', () => {
   });
 });
 
+// jsdom has no PointerEvent, and a plain Event carries no button or position.
+const press = (target: Element, init: MouseEventInit = {}) =>
+  fireEvent(target, new MouseEvent('pointerdown', { bubbles: true, button: 0, ...init }));
+
+const giveScrollBar = (container: HTMLElement) => {
+  Object.defineProperties(container, {
+    clientWidth: { value: 300 },
+    clientHeight: { value: 200 },
+    scrollWidth: { value: 300 },
+    scrollHeight: { value: 1000 },
+  });
+  container.getBoundingClientRect = () => ({ left: 0, top: 0, right: 315, bottom: 200, width: 315, height: 200 }) as DOMRect;
+};
+
+const changeSelection = () => fireEvent(document, new Event('selectionchange'));
+const holdStill = (ms = KEYBOARD_SELECTION_SETTLE_MS) => act(() => jest.advanceTimersByTime(ms));
+
 describe('useTranscriptSelection', () => {
-  afterEach(() => window.getSelection()?.removeAllRanges());
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => {
+    jest.useRealTimers();
+    window.getSelection()?.removeAllRanges();
+  });
 
   it('reports a selection once the mouse button is released', () => {
     const onSelect = jest.fn();
@@ -119,9 +144,10 @@ describe('useTranscriptSelection', () => {
     const container = getByTestId('transcript');
     const text = chunkTextNode(container, 'c2');
 
-    fireEvent.pointerDown(text.parentElement!);
+    press(text.parentElement!);
     select(text, 0, text, SECOND.indexOf(' in a few'));
-    fireEvent(document, new Event('selectionchange'));
+    changeSelection();
+    holdStill();
     expect(onSelect).not.toHaveBeenCalled();
 
     fireEvent.pointerUp(document);
@@ -129,15 +155,65 @@ describe('useTranscriptSelection', () => {
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ text: 'Precedential weight concentrates' }));
   });
 
-  it('reports a selection made with the keyboard as it changes', () => {
+  it('reports a keyboard selection once it has held still', () => {
     const onSelect = jest.fn();
     const { getByTestId } = render(<Fixture onSelect={onSelect} />);
     const text = chunkTextNode(getByTestId('transcript'), 'c1');
 
     select(text, 0, text, 'We built on'.length);
-    fireEvent(document, new Event('selectionchange'));
+    changeSelection();
+    holdStill(KEYBOARD_SELECTION_SETTLE_MS - 1);
+    expect(onSelect).not.toHaveBeenCalled();
+    holdStill(1);
 
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ text: 'We built on' }));
+  });
+
+  it('reports only where a keyboard selection ends up while it keeps growing', () => {
+    const onSelect = jest.fn();
+    const { getByTestId } = render(<Fixture onSelect={onSelect} />);
+    const text = chunkTextNode(getByTestId('transcript'), 'c1');
+
+    select(text, 0, text, 'We built on'.length);
+    changeSelection();
+    holdStill(KEYBOARD_SELECTION_SETTLE_MS / 2);
+    select(text, 0, text, 'We built on the'.length);
+    changeSelection();
+    holdStill();
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ text: 'We built on the' }));
+  });
+
+  it('drops a keyboard selection still settling when the transcript goes away', () => {
+    const onSelect = jest.fn();
+    const { getByTestId, unmount } = render(<Fixture onSelect={onSelect} />);
+    const text = chunkTextNode(getByTestId('transcript'), 'c1');
+
+    select(text, 0, text, 'We built on'.length);
+    changeSelection();
+    unmount();
+    holdStill();
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('waits for the release when a mouse drag starts while a keyboard selection settles', () => {
+    const onSelect = jest.fn();
+    const { getByTestId } = render(<Fixture onSelect={onSelect} />);
+    const text = chunkTextNode(getByTestId('transcript'), 'c1');
+
+    select(text, 0, text, 'We built on'.length);
+    changeSelection();
+    press(text.parentElement!);
+    select(text, 0, text, 'We built on the'.length);
+    holdStill();
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(document);
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ text: 'We built on the' }));
   });
 
   it('skips a selection of fewer than three words', () => {
@@ -146,7 +222,8 @@ describe('useTranscriptSelection', () => {
     const text = chunkTextNode(getByTestId('transcript'), 'c1');
 
     select(text, 0, text, 'We built'.length);
-    fireEvent(document, new Event('selectionchange'));
+    changeSelection();
+    holdStill();
 
     expect(onSelect).not.toHaveBeenCalled();
   });
@@ -156,10 +233,11 @@ describe('useTranscriptSelection', () => {
     const { getByTestId } = render(<Fixture onSelect={onSelect} />);
     const text = chunkTextNode(getByTestId('transcript'), 'c1');
 
-    fireEvent.pointerDown(text.parentElement!);
+    press(text.parentElement!);
     fireEvent.pointerCancel(document);
     select(text, 0, text, 'We built on'.length);
-    fireEvent(document, new Event('selectionchange'));
+    changeSelection();
+    holdStill();
 
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ text: 'We built on' }));
   });
@@ -168,12 +246,12 @@ describe('useTranscriptSelection', () => {
     const onSelect = jest.fn();
     const { getByTestId } = render(<Fixture onSelect={onSelect} />);
     const text = chunkTextNode(getByTestId('transcript'), 'c2');
-    fireEvent.pointerDown(text.parentElement!);
+    press(text.parentElement!);
     select(text, 0, text, SECOND.indexOf(' in a few'));
     fireEvent.pointerUp(document);
     onSelect.mockClear();
 
-    fireEvent.pointerDown(text.parentElement!);
+    press(text.parentElement!);
     fireEvent.pointerUp(document);
 
     expect(onSelect).not.toHaveBeenCalled();
@@ -184,14 +262,46 @@ describe('useTranscriptSelection', () => {
     const { getByTestId } = render(<Fixture onSelect={onSelect} />);
     const container = getByTestId('transcript');
     const text = chunkTextNode(container, 'c2');
+    giveScrollBar(container);
     select(text, 0, text, SECOND.indexOf(' in a few'));
     onSelect.mockClear();
 
-    fireEvent.pointerDown(container);
+    press(container, { clientX: 305, clientY: 50 });
     select(text, 0, text, SECOND.indexOf(' a few'));
     fireEvent.pointerUp(document);
 
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('waits for the release when a drag starts in the transcript padding', () => {
+    const onSelect = jest.fn();
+    const { getByTestId } = render(<Fixture onSelect={onSelect} />);
+    const container = getByTestId('transcript');
+    const text = chunkTextNode(container, 'c2');
+    giveScrollBar(container);
+
+    press(container, { clientX: 5, clientY: 50 });
+    select(text, 0, text, SECOND.indexOf(' in a few'));
+    changeSelection();
+    holdStill();
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(document);
+
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ text: 'Precedential weight concentrates' }));
+  });
+
+  it('still reports keyboard selections after a right-click on the transcript', () => {
+    const onSelect = jest.fn();
+    const { getByTestId } = render(<Fixture onSelect={onSelect} />);
+    const text = chunkTextNode(getByTestId('transcript'), 'c1');
+
+    press(text.parentElement!, { button: 2 });
+    select(text, 0, text, 'We built on'.length);
+    changeSelection();
+    holdStill();
+
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ text: 'We built on' }));
   });
 
   it('ignores a drag that starts outside the transcript', () => {
@@ -200,9 +310,10 @@ describe('useTranscriptSelection', () => {
     const outside = getByTestId('outside');
     const text = chunkTextNode(getByTestId('transcript'), 'c1');
 
-    fireEvent.pointerDown(outside);
+    press(outside);
     select(outside.firstChild!, 0, text, FIRST.length);
-    fireEvent(document, new Event('selectionchange'));
+    changeSelection();
+    holdStill();
     fireEvent.pointerUp(document);
 
     expect(onSelect).not.toHaveBeenCalled();
@@ -213,9 +324,10 @@ describe('useTranscriptSelection', () => {
     const { getByTestId } = render(<Fixture onSelect={onSelect} />);
     const text = chunkTextNode(getByTestId('transcript'), 'c1');
 
-    fireEvent.pointerDown(getByTestId('outside'));
+    press(getByTestId('outside'));
     select(text, 0, text, 'We built on'.length);
-    fireEvent(document, new Event('selectionchange'));
+    changeSelection();
+    holdStill();
 
     expect(onSelect).not.toHaveBeenCalled();
   });
@@ -226,7 +338,8 @@ describe('useTranscriptSelection', () => {
     const text = chunkTextNode(getByTestId('transcript'), 'c1');
 
     select(text, 0, text, FIRST.length);
-    fireEvent(document, new Event('selectionchange'));
+    changeSelection();
+    holdStill();
 
     expect(onSelect).not.toHaveBeenCalled();
   });

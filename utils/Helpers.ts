@@ -299,6 +299,22 @@ export const isFeatureEnabled = (
   return !!typeFeatures?.find((feature) => feature.name === name)?.default;
 };
 
+/**
+ * Whether a mouse press landed on the scroll bar of the element it targets. Browsers report a scroll bar
+ * press as a press on the scrolling element, so only its position tells the two apart.
+ */
+export const isScrollbarPress = (event: MouseEvent): boolean => {
+  const element = event.target;
+  if (!(element instanceof Element)) return false;
+  const { left, top } = element.getBoundingClientRect();
+  const onVerticalBar = event.clientX >= left + element.clientLeft + element.clientWidth;
+  const onHorizontalBar = event.clientY >= top + element.clientTop + element.clientHeight;
+  return (
+    (onVerticalBar && element.scrollHeight > element.clientHeight) ||
+    (onHorizontalBar && element.scrollWidth > element.clientWidth)
+  );
+};
+
 // Default easing class for animations
 export const DefaultEase = ' ease-[cubic-bezier(0.075, 0.820, 0.165, 1.000)]';
 
