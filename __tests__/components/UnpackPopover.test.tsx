@@ -345,6 +345,18 @@ describe('UnpackPopover', () => {
     expect(onClose).toHaveBeenCalledWith('tabOut');
   });
 
+  it('closes when Tab leaves the confirmation after sending, with Private Chat already on screen', async () => {
+    neverAnswerPreview();
+    const user = userEvent.setup();
+    const { onClose } = renderPopover({ onOpenPrivateChat: undefined });
+    await user.click(screen.getByRole('button', { name: 'Send to my Private Chat' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveFocus());
+
+    await user.tab();
+
+    expect(onClose).toHaveBeenCalledWith('tabOut');
+  });
+
   it('closes when Shift+Tab moves back out of the popover', async () => {
     neverAnswerPreview();
     const user = userEvent.setup();

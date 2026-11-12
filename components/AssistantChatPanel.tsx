@@ -34,6 +34,8 @@ interface AssistantChatPanelProps {
   messagesWithUnreadReplies?: Set<string>;
   onMarkAsRead?: (messageId: string) => void;
   inactive?: boolean;
+  /** Puts keyboard focus in the message box when the panel opens. */
+  focusInputOnMount?: boolean;
 }
 
 export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
@@ -55,6 +57,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   messagesWithUnreadReplies = new Set(),
   onMarkAsRead,
   inactive = false,
+  focusInputOnMount = false,
 }) => {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [inputHidden, setInputHidden] = useState(false);
@@ -411,6 +414,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                   onExitControlledMode={onExitControlledMode}
                   inputValue={inputValue}
                   onInputChange={onInputChange}
+                  focusOnMount={focusInputOnMount}
                 />
               )}
             </>

@@ -279,11 +279,12 @@ export const UnpackPopover: FC<UnpackPopoverProps> = ({ target, onClose, layoutV
   // in the transcript.
   const handleTabOut = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key !== 'Tab' || !dialogRef.current) return;
-    const tabbable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(TABBABLE));
     const active = document.activeElement;
-    const leavingBackward = event.shiftKey && (active === dialogRef.current || active === tabbable[0]);
-    const leavingForward = !event.shiftKey && active === tabbable[tabbable.length - 1];
-    if (!leavingBackward && !leavingForward) return;
+    if (!active) return;
+    const tabbable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(TABBABLE));
+    // Focus can rest on an element Tab skips, such as the sent confirmation, so compare page positions.
+    const direction = event.shiftKey ? Node.DOCUMENT_POSITION_PRECEDING : Node.DOCUMENT_POSITION_FOLLOWING;
+    if (tabbable.some((element) => active.compareDocumentPosition(element) & direction)) return;
     event.preventDefault();
     onClose('tabOut');
   };

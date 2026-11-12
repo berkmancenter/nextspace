@@ -66,8 +66,8 @@ jest.mock('../../components/MessageFeedback', () => ({
 
 // Mock MessageInput component
 jest.mock('../../components/MessageInput', () => ({
-  MessageInput: ({ onSendMessage, waitingForResponse }: any) => (
-    <div data-testid="message-input">
+  MessageInput: ({ onSendMessage, waitingForResponse, focusOnMount }: any) => (
+    <div data-testid="message-input" data-focus-on-mount={!!focusOnMount}>
       <input
         data-testid="message-input-field"
         placeholder="Write a Comment"
@@ -115,6 +115,12 @@ describe('AssistantChatPanel', () => {
 
     expect(screen.getByTestId('message-input')).toBeInTheDocument();
     expect(screen.queryByTestId('assistant-message')).not.toBeInTheDocument();
+  });
+
+  it('asks the message box to take focus when the panel opens for a keyboard user', () => {
+    render(<AssistantChatPanel {...baseProps} focusInputOnMount />);
+
+    expect(screen.getByTestId('message-input')).toHaveAttribute('data-focus-on-mount', 'true');
   });
 
   it('renders assistant messages', () => {

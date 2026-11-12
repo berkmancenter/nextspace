@@ -77,6 +77,14 @@ const botBadgeBackground = `color-mix(in srgb, ${botColor} 40%, transparent)`;
 // A placeholder for a hidden chunk arrives with a null body.
 const chunkText = (message: PseudonymousMessage): string => (message.body ? parseMessageBody(message.body).text : '');
 
+const isUnpackableText = (text: string) => text.trim() !== '';
+
+/** Where an arrow, Home or End key moves among `count` chunks from `index`, or null for any other key. */
+const nextChunkIndex = (key: string, index: number, count: number): number | null => {
+  const targets: Record<string, number> = { ArrowUp: index - 1, ArrowDown: index + 1, Home: 0, End: count - 1 };
+  return key in targets ? Math.max(0, Math.min(targets[key], count - 1)) : null;
+};
+
 /** Popper reads this rect on every update, so the popover follows the passage as the transcript scrolls. */
 const anchorForRange = (range: Range) => ({
   contextElement: range.startContainer.parentElement ?? undefined,
@@ -266,10 +274,14 @@ export function Transcript(props: TranscriptProps) {
   }, [hasUnpackTarget]);
 
   const chunkElement = (id: string) => document.getElementById(`transcript-message-${id}`);
+  const unpackableChunkIds = useMemo(
+    () => chunkTexts.filter(({ text }) => isUnpackableText(text)).map(({ id }) => id),
+    [chunkTexts],
+  );
   const tabStopChunkId =
-    activeChunkId && chunkTexts.some(({ id }) => id === activeChunkId)
+    activeChunkId && unpackableChunkIds.includes(activeChunkId)
       ? activeChunkId
-      : (chunkTexts[chunkTexts.length - 1]?.id ?? null);
+      : (unpackableChunkIds[unpackableChunkIds.length - 1] ?? null);
 
   const openUnpackForChunk = (message: PseudonymousMessage, element: HTMLElement) => {
     const id = message.id!;
@@ -280,29 +292,20 @@ export function Transcript(props: TranscriptProps) {
     });
   };
 
-  const moveChunkFocus = (fromId: string, key: string): boolean => {
-    const index = chunkTexts.findIndex(({ id }) => id === fromId);
-    const next =
-      key === 'ArrowUp'
-        ? index - 1
-        : key === 'ArrowDown'
-          ? index + 1
-          : key === 'Home'
-            ? 0
-            : key === 'End'
-              ? chunkTexts.length - 1
-              : null;
-    if (next === null) return false;
-    const target = chunkTexts[Math.max(0, Math.min(next, chunkTexts.length - 1))];
-    setActiveChunkId(target.id);
-    chunkElement(target.id)?.focus();
-    return true;
+  const focusChunk = (id: string) => {
+    setActiveChunkId(id);
+    chunkElement(id)?.focus();
   };
 
   const handleChunkKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, message: PseudonymousMessage) => {
     if (event.target !== event.currentTarget) return;
-    if (moveChunkFocus(message.id!, event.key)) {
+    const hasModifier = event.shiftKey || event.ctrlKey || event.altKey || event.metaKey;
+    const next = hasModifier
+      ? null
+      : nextChunkIndex(event.key, unpackableChunkIds.indexOf(message.id!), unpackableChunkIds.length);
+    if (next !== null) {
       event.preventDefault();
+      focusChunk(unpackableChunkIds[next]);
       return;
     }
     if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -875,7 +878,7 @@ export function Transcript(props: TranscriptProps) {
           <div>
             {messages.map((message, i) => {
               const isBot = message.fromAgent;
-              const canUnpack = unpackEnabled && !!message.id;
+              const canUnpack = unpackEnabled && !!message.id && isUnpackableText(chunkText(message));
 
               return (
                 <div

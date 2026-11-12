@@ -1972,6 +1972,34 @@ describe('Transcript', () => {
       expect(chunkElement(unpackMessages[0].body)).toHaveFocus();
     });
 
+    it('leaves a blank hidden chunk out of the keyboard order', async () => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) =>
+        Promise.resolve(
+          url.startsWith('messages/')
+            ? [...unpackMessages, { id: 'u3', channels: ['transcript'], createdAt: '2025-10-17T10:45:00Z', body: null }]
+            : { transcript: { status: 'active' } },
+        ),
+      );
+      render(<Transcript {...baseProps} unpack={{}} hideToggle />);
+      await screen.findByText(unpackMessages[1].body);
+      const blank = document.querySelector('[data-message-id="u3"]')!;
+
+      expect(blank).not.toHaveAttribute('role');
+      expect(blank).not.toHaveAttribute('tabindex');
+      expect(chunkElement(unpackMessages[1].body)).toHaveAttribute('tabindex', '0');
+    });
+
+    it('lets Shift and the arrow keys extend a selection instead of moving between chunks', async () => {
+      const user = setupUser();
+      render(<Transcript {...baseProps} unpack={{}} hideToggle />);
+      await screen.findByText(unpackMessages[0].body);
+      chunkElement(unpackMessages[1].body).focus();
+
+      await user.keyboard('{Shift>}{ArrowUp}{/Shift}');
+
+      expect(chunkElement(unpackMessages[1].body)).toHaveFocus();
+    });
+
     it('opens the popover when a screen reader activates a chunk', async () => {
       render(<Transcript {...baseProps} unpack={{}} />);
       await screen.findByText(unpackMessages[1].body);
