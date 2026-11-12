@@ -1975,6 +1975,106 @@ describe('GroupChatPanel', () => {
     });
   });
 
+  describe('Three facts card', () => {
+    const agentMessage = (body: Record<string, unknown>) => ({
+      id: '1',
+      pseudonym: 'Event Assistant',
+      createdAt: '2025-10-17T12:00:00Z',
+      body,
+      channels: ['pregame'],
+      conversation: 'conv-1',
+      pseudonymId: 'ea-1',
+      fromAgent: true,
+      pause: false,
+      visible: true,
+      upVotes: [],
+      downVotes: [],
+    });
+
+    it('renders each fact and the invitation line for a threeFacts message', () => {
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[
+            agentMessage({
+              type: 'threeFacts',
+              facts: ['Fact one', 'Fact two', 'Fact three'],
+              invitation: 'Say hello below!',
+            }),
+          ]}
+        />,
+      );
+
+      expect(screen.getByText('Fun Facts')).toBeInTheDocument();
+      expect(screen.getByText('Fact one')).toBeInTheDocument();
+      expect(screen.getByText('Fact two')).toBeInTheDocument();
+      expect(screen.getByText('Fact three')).toBeInTheDocument();
+      expect(screen.getByText('Say hello below!')).toBeInTheDocument();
+    });
+
+    it('numbers the facts in order, with no connecting line between them', () => {
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[
+            agentMessage({
+              type: 'threeFacts',
+              facts: ['Fact one', 'Fact two', 'Fact three'],
+              invitation: 'Say hello below!',
+            }),
+          ]}
+        />,
+      );
+
+      const badges = screen.getAllByText(/^[123]$/);
+      expect(badges.map((b) => b.textContent)).toEqual(['1', '2', '3']);
+    });
+
+    it('alternates a strongly contrasting row background across facts', () => {
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[
+            agentMessage({
+              type: 'threeFacts',
+              facts: ['Fact one', 'Fact two', 'Fact three'],
+              invitation: 'Say hello below!',
+            }),
+          ]}
+        />,
+      );
+
+      // Every other fact's row gets a visibly contrasting tint, so they read as distinct lines.
+      expect(screen.getByText('Fact one').parentElement?.className).not.toMatch(/bg-\[#4845D2\]\/20/);
+      expect(screen.getByText('Fact two').parentElement?.className).toMatch(/bg-\[#4845D2\]\/20/);
+      expect(screen.getByText('Fact three').parentElement?.className).not.toMatch(/bg-\[#4845D2\]\/20/);
+    });
+
+    it('renders without an invitation line when none is provided', () => {
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[agentMessage({ type: 'threeFacts', facts: ['Fact one', 'Fact two', 'Fact three'] })]}
+        />,
+      );
+
+      expect(screen.getByText('Fact one')).toBeInTheDocument();
+      expect(screen.queryByText('Say hello below!')).not.toBeInTheDocument();
+    });
+
+    it('falls back to a plain assistant bubble when facts is missing or empty', () => {
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[agentMessage({ type: 'threeFacts', text: 'Just plain text, no facts array' })]}
+        />,
+      );
+
+      expect(screen.getByText('Just plain text, no facts array')).toBeInTheDocument();
+      expect(screen.queryByText('Fun Facts')).not.toBeInTheDocument();
+    });
+  });
+
   describe('Goal pill', () => {
     const agentMessage = (body: Record<string, unknown>) => ({
       id: '1',

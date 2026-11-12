@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { AssistantMessage } from '../../../components/messages/AssistantMessage';
 import { PseudonymousMessage } from '../../../types.internal';
 import { components } from '../../../types';
@@ -72,7 +73,7 @@ describe('AssistantMessage Component', () => {
       expect(screen.getByText('Simple message')).toBeInTheDocument();
     });
 
-    it('applies purple card styling when message has prompt options', () => {
+    it('applies the poll-card styling when message has prompt options', () => {
       const messageWithPrompt: PseudonymousMessage = {
         ...mockMessage,
         prompt: {
@@ -84,19 +85,60 @@ describe('AssistantMessage Component', () => {
         },
       };
 
-      const { container } = render(<AssistantMessage message={messageWithPrompt} />);
+      render(<AssistantMessage message={messageWithPrompt} />);
 
-      // Find the inner div with purple styling
-      const styledDiv = container.querySelector('.bg-purple-100');
-      expect(styledDiv).toBeInTheDocument();
-      expect(styledDiv).toHaveClass('bg-purple-100', 'border-l-4', 'border-purple-500', 'rounded-lg', 'p-3');
+      // The card itself uses the same --nx-poll-* tokens PollMessage does, not a purple fill;
+      // jsdom drops var()-based style values from the serialized style attribute, so this checks
+      // the plain properties that do survive (border-radius/overflow) as a proxy for the card.
+      const card = screen.getByText('Option 1').closest('.w-full.my-1');
+      expect(card).toHaveStyle({ borderRadius: '10px', overflow: 'hidden' });
     });
 
-    it('does not apply purple styling when message has no prompt options', () => {
+    it('does not apply the poll-card styling when message has no prompt options', () => {
       const { container } = render(<AssistantMessage message={mockMessage} />);
 
-      const styledDiv = container.querySelector('.bg-purple-100');
-      expect(styledDiv).not.toBeInTheDocument();
+      expect(container.querySelector('.w-full.my-1')).not.toHaveStyle({ borderRadius: '10px' });
+    });
+  });
+
+  describe('Starting point pill', () => {
+    it('shows the pill for a warmUpQuestion singleChoice message', () => {
+      const messageWithPrompt: PseudonymousMessage = {
+        ...mockMessage,
+        prompt: { type: 'singleChoice', options: [{ label: 'Option 1', value: 'opt1' }] },
+      };
+
+      render(<AssistantMessage messageType="warmUpQuestion" message={messageWithPrompt} />);
+
+      expect(screen.getByText('Starting point')).toBeInTheDocument();
+    });
+
+    it('shows the pill for a warmUpQuestion text message', () => {
+      const messageWithPrompt: PseudonymousMessage = { ...mockMessage, prompt: { type: 'text' } };
+
+      render(<AssistantMessage messageType="warmUpQuestion" message={messageWithPrompt} />);
+
+      expect(screen.getByText('Starting point')).toBeInTheDocument();
+    });
+
+    it('does not show the pill when message has no prompt at all', () => {
+      render(<AssistantMessage messageType="warmUpQuestion" message={mockMessage} />);
+
+      expect(screen.queryByText('Starting point')).not.toBeInTheDocument();
+    });
+
+    it('does not show the pill for a message with a prompt shape but a different messageType, though the card and buttons still render', () => {
+      // The card/buttons/textarea apply to any message with a prompt shape, regardless of why it
+      // has one — only this pill is scoped to warm-up questions specifically.
+      const messageWithPrompt: PseudonymousMessage = {
+        ...mockMessage,
+        prompt: { type: 'singleChoice', options: [{ label: 'Option 1', value: 'opt1' }] },
+      };
+
+      render(<AssistantMessage messageType="someOtherType" message={messageWithPrompt} />);
+
+      expect(screen.queryByText('Starting point')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Option 1' })).toBeInTheDocument();
     });
   });
 
@@ -241,7 +283,7 @@ describe('AssistantMessage Component', () => {
   });
 
   describe('Prompt options', () => {
-    it('renders prompt options with purple background', () => {
+    it('renders prompt options in the poll-style card', () => {
       const mockOnPromptSelect = jest.fn();
       const message: components['schemas']['Message'] = {
         id: 'msg-3',
@@ -263,11 +305,10 @@ describe('AssistantMessage Component', () => {
         },
       };
 
-      const { container } = render(<AssistantMessage message={message} onPromptSelect={mockOnPromptSelect} />);
+      render(<AssistantMessage message={message} onPromptSelect={mockOnPromptSelect} />);
 
-      // Check for purple styling on messages with prompt options
-      expect(container.querySelector('.bg-purple-100')).toBeInTheDocument();
-      expect(container.querySelector('.border-purple-500')).toBeInTheDocument();
+      const card = screen.getByText('Option 1').closest('.w-full.my-1');
+      expect(card).toHaveStyle({ borderRadius: '10px', overflow: 'hidden' });
 
       // Check buttons render
       expect(screen.getByText('Option 1')).toBeInTheDocument();
@@ -316,10 +357,10 @@ describe('AssistantMessage Component', () => {
         },
       };
 
-      const { getByText } = render(<AssistantMessage message={message} onPromptSelect={mockOnPromptSelect} />);
+      const { getByRole } = render(<AssistantMessage message={message} onPromptSelect={mockOnPromptSelect} />);
 
-      const button1 = getByText('Option 1');
-      const button2 = getByText('Option 2');
+      const button1 = getByRole('button', { name: 'Option 1' });
+      const button2 = getByRole('button', { name: 'Option 2' });
 
       expect(button1).not.toBeDisabled();
       expect(button2).not.toBeDisabled();
@@ -478,8 +519,8 @@ describe('AssistantMessage Component', () => {
 
       render(<AssistantMessage message={message} initialSelectedPrompt="opt1" />);
 
-      const button1 = screen.getByText('Option 1');
-      const button2 = screen.getByText('Option 2');
+      const button1 = screen.getByRole('button', { name: 'Option 1' });
+      const button2 = screen.getByRole('button', { name: 'Option 2' });
 
       expect(button1).toBeDisabled();
       expect(button2).toBeDisabled();
@@ -538,15 +579,15 @@ describe('AssistantMessage Component', () => {
       const { rerender } = render(<AssistantMessage message={message} initialSelectedPrompt="a" />);
 
       // Both should be disabled initially
-      expect(screen.getByText('Option A')).toBeDisabled();
-      expect(screen.getByText('Option B')).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Option A' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Option B' })).toBeDisabled();
 
       // Rerender with different initialSelectedPrompt
       rerender(<AssistantMessage message={message} initialSelectedPrompt="b" />);
 
       // Should still be disabled, but selection changed
-      expect(screen.getByText('Option A')).toBeDisabled();
-      expect(screen.getByText('Option B')).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Option A' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Option B' })).toBeDisabled();
     });
 
     it('does not call onPromptSelect when a button is clicked if already selected', () => {
@@ -573,12 +614,109 @@ describe('AssistantMessage Component', () => {
 
       render(<AssistantMessage message={message} onPromptSelect={mockOnPromptSelect} initialSelectedPrompt="opt1" />);
 
-      const button1 = screen.getByText('Option 1');
+      const button1 = screen.getByRole('button', { name: 'Option 1' });
 
       // Button is disabled, so click won't work
       // But we verify that it's disabled which prevents the handler from being called
       expect(button1).toBeDisabled();
       expect(mockOnPromptSelect).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Text prompts', () => {
+    const makeTextPromptMessage = (overrides: Partial<components['schemas']['Message']> = {}) =>
+      ({
+        id: 'msg-text-1',
+        body: 'What do you think?',
+        conversation: 'conv-1',
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        pseudonym: 'Event Assistant',
+        pseudonymId: 'ea-1',
+        upVotes: [],
+        downVotes: [],
+        prompt: { type: 'text' as const },
+        ...overrides,
+      }) as components['schemas']['Message'];
+
+    it('applies the same poll-card styling as a singleChoice prompt', () => {
+      render(<AssistantMessage message={makeTextPromptMessage()} />);
+
+      const card = screen.getByRole('textbox', { name: 'Your answer' }).closest('.w-full.my-1');
+      expect(card).toHaveStyle({ borderRadius: '10px', overflow: 'hidden' });
+    });
+
+    it('renders a textarea and Submit button instead of choice buttons', () => {
+      render(<AssistantMessage message={makeTextPromptMessage()} />);
+
+      expect(screen.getByRole('textbox', { name: 'Your answer' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Submit' })).toBeInTheDocument();
+    });
+
+    it('uses the prompt placeholder when provided', () => {
+      render(<AssistantMessage message={makeTextPromptMessage({ prompt: { type: 'text', placeholder: 'Ask away' } })} />);
+
+      expect(screen.getByPlaceholderText('Ask away')).toBeInTheDocument();
+    });
+
+    it('disables Submit until something is typed', async () => {
+      const user = userEvent.setup();
+      render(<AssistantMessage message={makeTextPromptMessage()} />);
+
+      const submitButton = screen.getByRole('button', { name: 'Submit' });
+      expect(submitButton).toBeDisabled();
+
+      await user.type(screen.getByRole('textbox', { name: 'Your answer' }), 'My answer');
+      expect(submitButton).toBeEnabled();
+    });
+
+    it('disables Submit for whitespace-only input', async () => {
+      const user = userEvent.setup();
+      render(<AssistantMessage message={makeTextPromptMessage()} />);
+
+      await user.type(screen.getByRole('textbox', { name: 'Your answer' }), '   ');
+      expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled();
+    });
+
+    it('calls onPromptSelect with the trimmed answer and the message id on submit', async () => {
+      const user = userEvent.setup();
+      const mockOnPromptSelect = jest.fn();
+      render(<AssistantMessage message={makeTextPromptMessage()} onPromptSelect={mockOnPromptSelect} />);
+
+      await user.type(screen.getByRole('textbox', { name: 'Your answer' }), '  My answer  ');
+      await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+      expect(mockOnPromptSelect).toHaveBeenCalledWith('My answer', 'msg-text-1');
+    });
+
+    it('locks the field to a read-only display of the submitted answer', async () => {
+      const user = userEvent.setup();
+      render(<AssistantMessage message={makeTextPromptMessage()} />);
+
+      await user.type(screen.getByRole('textbox', { name: 'Your answer' }), 'My answer');
+      await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+      const textarea = screen.getByRole('textbox', { name: 'Your answer' });
+      expect(textarea).toHaveValue('My answer');
+      expect(textarea).toHaveAttribute('readonly');
+      expect(textarea).toBeDisabled();
+      expect(screen.queryByRole('button', { name: 'Submit' })).not.toBeInTheDocument();
+    });
+
+    it('shows the locked answer from initialSelectedPrompt on load, with no Submit button', () => {
+      render(<AssistantMessage message={makeTextPromptMessage()} initialSelectedPrompt="Already answered" />);
+
+      const textarea = screen.getByRole('textbox', { name: 'Your answer' });
+      expect(textarea).toHaveValue('Already answered');
+      expect(textarea).toBeDisabled();
+      expect(screen.queryByRole('button', { name: 'Submit' })).not.toBeInTheDocument();
+    });
+
+    it('does not render the textarea for prompt types other than text or singleChoice', () => {
+      render(<AssistantMessage message={makeTextPromptMessage({ prompt: { type: 'number' as any } })} />);
+
+      expect(screen.queryByRole('textbox', { name: 'Your answer' })).not.toBeInTheDocument();
     });
   });
 });

@@ -287,6 +287,27 @@ describe('parseMessageBody', () => {
     const result = parseMessageBody({ text: 'Message', sourceMessage: 999 });
     expect(result.sourceMessage).toBe('999');
   });
+
+  it('parses facts and invitation for a threeFacts message', () => {
+    const result = parseMessageBody({
+      type: 'threeFacts',
+      facts: ['Fact one', 'Fact two', 'Fact three'],
+      invitation: 'Say hello below!',
+    });
+    expect(result.facts).toEqual(['Fact one', 'Fact two', 'Fact three']);
+    expect(result.invitation).toBe('Say hello below!');
+  });
+
+  it('handles non-array facts value gracefully', () => {
+    const result = parseMessageBody({ type: 'threeFacts', facts: 'not-an-array' });
+    expect(result.facts).toBeUndefined();
+  });
+
+  it('returns undefined for facts and invitation when not present', () => {
+    const result = parseMessageBody({ text: 'Regular message' });
+    expect(result.facts).toBeUndefined();
+    expect(result.invitation).toBeUndefined();
+  });
 });
 
 describe('generateEventUrls (via createConversationFromData)', () => {

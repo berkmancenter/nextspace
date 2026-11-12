@@ -193,6 +193,29 @@ export type ModeratorInsightsMessage = PseudonymousMessage & {
   };
 };
 
+/**
+ * A moderator-only synthesis of participant replies to a private prompt message (today, always a
+ * pregame warm-up question; any future private poll-style question reuses this same shape).
+ * `questionType` is whatever that original prompt's own body.type already is, so a new question
+ * kind never needs a parallel naming scheme kept in sync with this one — only its label, if any,
+ * needs frontend styling of its own.
+ */
+export type ModeratorQuestionResultsMessage = PseudonymousMessage & {
+  body: {
+    type: 'questionResults';
+    questionResults: {
+      questionType: string;
+      question: string;
+      format: 'text' | 'singleChoice';
+      results: { label: string; count: number; examples?: string[] }[];
+    };
+    timestamp: {
+      start: number;
+      end: number;
+    };
+  };
+};
+
 export interface MessageProps {
   message: components['schemas']['Message'];
 }
