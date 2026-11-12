@@ -101,6 +101,8 @@ export function Transcript(props: TranscriptProps) {
     scrollTop: number;
   } | null>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Each transcript fetch in flight collects the chunks the socket delivers before its response comes back.
+  const fetchesInFlightRef = useRef(new Set<PseudonymousMessage[]>());
   const rootRef = useRef<HTMLDivElement | null>(null);
   const unpackEnabled = !!props.unpack && !props.presentation;
   const [unpackTarget, setUnpackTarget] = useState<OpenUnpackTarget | null>(null);
@@ -503,6 +505,8 @@ export function Transcript(props: TranscriptProps) {
     if (!props.conversationId || !Api.get().getAccessToken() || !props.transcriptPasscode) return;
     // A position saved before a reconnect no longer matches the list this fetch is about to show.
     preserveScrollRef.current = null;
+    const arrivedDuringFetch: PseudonymousMessage[] = [];
+    fetchesInFlightRef.current.add(arrivedDuringFetch);
 
     try {
       const conversationResponse: any = await RetrieveData(
@@ -528,14 +532,18 @@ export function Transcript(props: TranscriptProps) {
       }
 
       if (Array.isArray(transcriptMessages)) {
-        // Chunks the socket delivered while this request was out are not in its response.
-        setMessages((current) => transcriptMessages.reduce(insertMessageInOrder, current));
+        // The server's list wins, so chunks deleted or hidden while the socket was down leave the page.
+        const container = messagesContainerRef.current;
+        if (container && unpackOpenRef.current) {
+          preserveScrollRef.current = { scrollHeight: container.scrollHeight, scrollTop: container.scrollTop };
+        }
+        setMessages(arrivedDuringFetch.reduce(insertMessageInOrder, transcriptMessages));
 
         if (props.focusTimeRange) {
           setTimeout(() => {
             applyFocusAndScroll(transcriptMessages);
           }, 0);
-        } else if (isOpen) {
+        } else if (isOpen && !unpackOpenRef.current) {
           scrollToBottom();
         }
       }
@@ -543,6 +551,8 @@ export function Transcript(props: TranscriptProps) {
       console.error('Error fetching transcript data:', error);
 
       if (props.setErrorMessage) props.setErrorMessage(error as string);
+    } finally {
+      fetchesInFlightRef.current.delete(arrivedDuringFetch);
     }
   };
 
@@ -666,6 +676,7 @@ export function Transcript(props: TranscriptProps) {
           }
         }
 
+        fetchesInFlightRef.current.forEach((arrivedDuringFetch) => arrivedDuringFetch.push(data));
         setMessages((prev) => insertMessageInOrder(prev, data));
       }
     };

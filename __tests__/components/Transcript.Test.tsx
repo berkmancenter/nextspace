@@ -651,6 +651,42 @@ describe('Transcript', () => {
     expect(list.scrollTop).toBe(-100);
   });
 
+  const reconnectWith = (rerender: (ui: React.ReactElement) => void, reloaded: unknown[]) => {
+    (RetrieveData as jest.Mock).mockImplementation((url: string) =>
+      Promise.resolve(url.startsWith('messages/') ? reloaded : { transcript: { status: 'active' } }),
+    );
+    rerender(<Transcript {...baseProps} lastReconnectTime={Date.now()} />);
+  };
+
+  it('drops chunks the server no longer returns when it reloads the transcript after a reconnect', async () => {
+    const { rerender } = render(<Transcript {...baseProps} />);
+    await screen.findByText('Hello world');
+
+    reconnectWith(rerender, [transcriptMessages[1]]);
+
+    await waitFor(() => expect(screen.queryByText('Hello world')).not.toBeInTheDocument());
+    expect(screen.getByText('Second message')).toBeInTheDocument();
+  });
+
+  it('blanks a chunk that was hidden while the socket was down', async () => {
+    const { rerender } = render(<Transcript {...baseProps} />);
+    await screen.findByText('Hello world');
+
+    reconnectWith(rerender, [{ ...transcriptMessages[0], body: null }, transcriptMessages[1]]);
+
+    await waitFor(() => expect(screen.queryByText('Hello world')).not.toBeInTheDocument());
+    expect(document.querySelector('[data-message-id="m1"]')).toBeInTheDocument();
+  });
+
+  it('empties the transcript when the reload after a reconnect finds it deleted', async () => {
+    const { rerender } = render(<Transcript {...baseProps} />);
+    await screen.findByText('Hello world');
+
+    reconnectWith(rerender, []);
+
+    await waitFor(() => expect(screen.queryByText('Second message')).not.toBeInTheDocument());
+  });
+
   it('marks each chunk with its message id', async () => {
     render(<Transcript {...baseProps} />);
 
@@ -2071,6 +2107,28 @@ describe('Transcript', () => {
         await user.click(screen.getByRole('button', { name: 'Close' }));
 
         expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+      });
+
+      it('keeps the passage in place when the transcript reloads after a reconnect', async () => {
+        const { list, rerender } = await openOverLiveTranscript(0);
+        (Element.prototype.scrollIntoView as jest.Mock).mockClear();
+        (RetrieveData as jest.Mock).mockImplementation((url: string) =>
+          Promise.resolve(
+            url.startsWith('messages/')
+              ? [
+                  ...unpackMessages,
+                  { id: 'u3', channels: ['transcript'], createdAt: '2025-10-17T10:45:00Z', body: 'Missed chunk.' },
+                ]
+              : { transcript: { status: 'active' } },
+          ),
+        );
+
+        rerender(<Transcript {...baseProps} unpack={{}} lastReconnectTime={Date.now()} />);
+        await screen.findByText('Missed chunk.');
+
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+        expect(list.scrollTop).toBe(-200);
       });
     });
 
