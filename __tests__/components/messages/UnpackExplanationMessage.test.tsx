@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { axe } from 'jest-axe';
 import { UnpackExplanationMessage } from '../../../components/messages/UnpackExplanationMessage';
 import { PseudonymousMessage } from '../../../types.internal';
@@ -44,17 +44,23 @@ const makeExplanationMessage = (bodyOverrides: Record<string, unknown> = {}): Ps
 });
 
 describe('UnpackExplanationMessage', () => {
-  it("labels the card 'Unpack this' and quotes the passage", () => {
+  it("shows the passage in its own 'Unpack this' bubble, before the explanation", () => {
     render(<UnpackExplanationMessage message={makeExplanationMessage()} />);
+    const quote = '"Courts read the Fourth Amendment narrowly when it comes to metadata."';
 
-    expect(screen.getByText('Unpack this')).toBeInTheDocument();
-    expect(screen.getByText('"Courts read the Fourth Amendment narrowly when it comes to metadata."')).toBeInTheDocument();
+    const ask = screen.getByTestId('unpack-ask');
+    const explanation = screen.getByTestId('unpack-explanation');
+
+    expect(within(ask).getByText('Unpack this')).toBeInTheDocument();
+    expect(within(ask).getByText(quote)).toBeInTheDocument();
+    expect(within(explanation).queryByText(quote)).not.toBeInTheDocument();
+    expect(ask.compareDocumentPosition(explanation)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
-  it('says when the passage was said', () => {
+  it('says when the passage was said at the top of the explanation', () => {
     render(<UnpackExplanationMessage message={makeExplanationMessage()} />);
 
-    expect(screen.getByText(/^Said at 10:43\sAM$/)).toBeInTheDocument();
+    expect(within(screen.getByTestId('unpack-explanation')).getByText(/^Said at 10:43\sAM$/)).toBeInTheDocument();
   });
 
   it("shows what the speaker is saying under an 'In plain words' heading", () => {

@@ -12,13 +12,24 @@ export const UnpackExplanationMessage: FC<MessageProps> = ({ message }) => {
   const { quote, passage, whatTheyreSaying, whyItMatters, terms } = message.body as UnpackExplanation;
 
   return (
-    <div style={{ width: '85%' }}>
-      <div className="w-full rounded-xl overflow-hidden shadow-sm border border-[#D1C4E9] text-sm text-gray-800">
-        <section className="px-4 py-3 bg-[#F3F0FF] border-l-[3px] border-l-mediumslateblue">
-          <p className="text-xs font-semibold uppercase tracking-wider mb-1 text-gray-600">Unpack this</p>
-          <p className="italic text-gray-700">&quot;{quote}&quot;</p>
-          <p className="mt-1 text-xs text-gray-600">Said at {formatSaidAt(passage.start)}</p>
-        </section>
+    <div className="flex flex-col gap-3" style={{ width: '85%' }}>
+      <div
+        data-testid="unpack-ask"
+        className="self-end max-w-[90%] rounded-2xl bg-[#F3D5DA] px-4 py-3 text-sm text-gray-900"
+      >
+        <p className="text-xs font-semibold uppercase tracking-wider mb-1 text-[#7F1D2D]">Unpack this</p>
+        <p>&quot;{quote}&quot;</p>
+      </div>
+
+      <div
+        data-testid="unpack-explanation"
+        className="w-full rounded-xl overflow-hidden shadow-sm border border-[#D1C4E9] text-sm text-gray-800"
+      >
+        <p className="px-4 pt-3 bg-white">
+          <span className="inline-block rounded-full bg-[#EEF0FF] px-2.5 py-0.5 text-xs font-semibold text-[#3730A3]">
+            Said at {formatSaidAt(passage.start)}
+          </span>
+        </p>
 
         <section className="px-4 py-3 bg-white border-l-[3px] border-l-[#7B78E5]">
           <h3 className={headingClassName}>In plain words</h3>
