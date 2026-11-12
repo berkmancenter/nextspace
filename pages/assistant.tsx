@@ -237,11 +237,7 @@ export function EventAssistantRoom({
 
   // Derive slash commands from the loaded conversation type's features.
   const slashCommands: SlashCommand[] = (conversationType?.features ?? [])
-    .filter((f) => {
-      if (f.slashCommand == null) return false;
-      const override = conversationFeatures.find((cf) => cf.name === f.name);
-      return override?.enabled !== false;
-    })
+    .filter((f) => f.slashCommand != null && isFeatureEnabled(f.name, conversationFeatures, conversationType?.features))
     .map((f) => ({
       command: f.slashCommand!,
       description: f.description ?? '',

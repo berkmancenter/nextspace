@@ -712,6 +712,54 @@ describe('EventAssistantRoom', () => {
         { timeout: 3000 },
       );
     });
+    it('does not show a command whose feature is off by default when the event saved no setting for it', async () => {
+      mockUseSessionJoin.mockReturnValue({
+        socket: mockSocket,
+        pseudonym: 'test-pseudonym',
+        userId: 'user-123',
+        isConnected: true,
+        errorMessage: null,
+      });
+      (RetrieveData as jest.Mock).mockImplementation((path: string) =>
+        Promise.resolve(path.startsWith('messages/') ? [] : { agents: [{ id: 'agent-456', agentType: 'eventAssistant' }] }),
+      );
+      const slashFeature = (name: string, isOnByDefault: boolean) => ({
+        name,
+        label: name,
+        tab: 'chat',
+        audience: 'participant',
+        slashCommand: name,
+        default: isOnByDefault,
+        agents: [],
+        description: `The ${name} command`,
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-456', agentType: 'eventAssistant' }],
+        features: [],
+        type: {
+          name: 'eventAssistant',
+          description: '',
+          platforms: [],
+          properties: [],
+          features: [slashFeature('mod', false), slashFeature('ask', true)],
+        },
+      });
+
+      await act(async () => {
+        render(
+          <ConversationTypeProvider>
+            <EventAssistantRoom authType={'guest'} />
+          </ConversationTypeProvider>,
+        );
+      });
+      await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
+      const user = userEvent.setup();
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
+      await user.type(await screen.findByPlaceholderText('Enter your message here'), '/');
+
+      expect(await screen.findByText('/ask', {}, { timeout: 3000 })).toBeInTheDocument();
+      expect(screen.queryByText('/mod')).not.toBeInTheDocument();
+    });
   });
 
   describe('Bot @mention routing in chat tab', () => {
