@@ -19,7 +19,7 @@ import { PresentationHeader } from '../components/PresentationHeader';
 import { insertMessageInOrder } from '../utils/messageModeration';
 import { BotPresence } from '../components/BotPresence';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
-import { CheckAuthHeader, parseMessageBody } from '../utils/Helpers';
+import { CheckAuthHeader, isFeatureEnabled, parseMessageBody } from '../utils/Helpers';
 import { withStoredChannels } from '../utils/presentationChannels';
 import TokenManagerDefault from '../utils/TokenManager';
 import { Alert, Button, Dialog, Snackbar } from '@mui/material';
@@ -237,17 +237,24 @@ export function EventAssistantRoom({
 
   // Derive slash commands from the loaded conversation type's features.
   const slashCommands: SlashCommand[] = (conversationType?.features ?? [])
-    .filter((f) => {
-      if (f.slashCommand == null) return false;
-      const override = conversationFeatures.find((cf) => cf.name === f.name);
-      return override?.enabled !== false;
-    })
+    .filter((f) => f.slashCommand != null && isFeatureEnabled(f.name, conversationFeatures, conversationType?.features))
     .map((f) => ({
       command: f.slashCommand!,
       description: f.description ?? '',
       value: `/${f.slashCommand} `,
     }));
 
+  const unpackerOn = isFeatureEnabled('unpacker', conversationFeatures, conversationType?.features);
+  const privateChatOnScreen = activeTab === 'assistant' && router.query.view !== 'preferences';
+  const [focusPrivateChatInput, setFocusPrivateChatInput] = useState(false);
+  // The panel reads the flag when it mounts (child effects run first), so later tab switches leave focus alone.
+  useEffect(() => {
+    if (focusPrivateChatInput) setFocusPrivateChatInput(false);
+  }, [focusPrivateChatInput]);
+  const openPrivateChatFromUnpacker = () => {
+    setFocusPrivateChatInput(true);
+    handleTabChange('assistant');
+  };
   // Organizer's chosen destination for the bot's voice: 'zoom' means Recall's own Zoom-facing bot
   // speaks there, so the presentation view's bot presence panel must not also play audio — that's
   // the double-audio outcome voiceDestination exists to prevent.
@@ -740,6 +747,11 @@ export function EventAssistantRoom({
                     lastReconnectTime={lastReconnectTime}
                     hideToggle={presentation || (router.query.view !== 'preferences' && activeTab === 'transcript')}
                     presentation={presentation}
+                    unpack={
+                      unpackerOn
+                        ? { onOpenPrivateChat: privateChatOnScreen ? undefined : openPrivateChatFromUnpacker }
+                        : undefined
+                    }
                   />
                 </div>
               )}
@@ -852,6 +864,7 @@ export function EventAssistantRoom({
                           userId={userId}
                           feedbackConfig={assistantFeedbackConfig}
                           inactive={!agentActive || eventStatus !== 'active'}
+                          focusInputOnMount={focusPrivateChatInput}
                           messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
                           onMarkAsRead={(messageId) => {
                             setAssistantMessagesWithUnreadReplies((prev) => {

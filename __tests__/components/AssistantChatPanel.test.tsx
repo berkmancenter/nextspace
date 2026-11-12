@@ -27,6 +27,9 @@ jest.mock('../../components/messages', () => ({
       </div>
     );
   },
+  UnpackExplanationMessage: ({ message }: any) => (
+    <div data-testid="unpack-explanation-message">{message.body.whatTheyreSaying}</div>
+  ),
 }));
 
 // Mock ModSuggestButton so we can inspect submitted/onSubmit props
@@ -63,8 +66,8 @@ jest.mock('../../components/MessageFeedback', () => ({
 
 // Mock MessageInput component
 jest.mock('../../components/MessageInput', () => ({
-  MessageInput: ({ onSendMessage, waitingForResponse }: any) => (
-    <div data-testid="message-input">
+  MessageInput: ({ onSendMessage, waitingForResponse, focusOnMount }: any) => (
+    <div data-testid="message-input" data-focus-on-mount={!!focusOnMount}>
       <input
         data-testid="message-input-field"
         placeholder="Write a Comment"
@@ -112,6 +115,12 @@ describe('AssistantChatPanel', () => {
 
     expect(screen.getByTestId('message-input')).toBeInTheDocument();
     expect(screen.queryByTestId('assistant-message')).not.toBeInTheDocument();
+  });
+
+  it('asks the message box to take focus when the panel opens for a keyboard user', () => {
+    render(<AssistantChatPanel {...baseProps} focusInputOnMount />);
+
+    expect(screen.getByTestId('message-input')).toHaveAttribute('data-focus-on-mount', 'true');
   });
 
   it('renders assistant messages', () => {
@@ -2064,6 +2073,55 @@ describe('AssistantChatPanel', () => {
 
       // Should show "+2 more replies" indicator for the remaining replies
       expect(screen.getByText('+ 2 more replies')).toBeInTheDocument();
+    });
+  });
+
+  describe('Unpacker passage card', () => {
+    const unpackExplanation = {
+      id: 'answer-1',
+      pseudonym: 'Berkie',
+      createdAt: '2025-10-17T10:43:05Z',
+      body: {
+        type: 'unpack_explanation',
+        mode: 'passage',
+        destination: 'privateChat',
+        chunkIds: ['chunk-1'],
+        passage: { start: '2025-10-17T10:42:10Z', end: '2025-10-17T10:43:00Z' },
+        quote: 'Courts read the Fourth Amendment narrowly.',
+        whatTheyreSaying: 'The speaker says courts give phone records less protection.',
+        whyItMatters: 'This is why the talk focuses on records.',
+        terms: [],
+        text: 'Plain-text copy',
+      },
+      bodyType: 'json',
+      channels: ['direct-test-user-id-agent-1'],
+      conversation: 'conv-1',
+      pseudonymId: 'agent-1',
+      fromAgent: true,
+      pause: false,
+      visible: true,
+      upVotes: [],
+      downVotes: [],
+    };
+
+    it('shows an unpack_explanation as the answer card', () => {
+      render(<AssistantChatPanel {...baseProps} messages={[unpackExplanation]} />);
+
+      expect(screen.getByTestId('unpack-explanation-message')).toHaveTextContent(
+        'The speaker says courts give phone records less protection.',
+      );
+      expect(screen.queryByTestId('assistant-message')).not.toBeInTheDocument();
+    });
+
+    it('leaves a Catch me up answer out of the passage card', () => {
+      const catchUpAnswer = {
+        ...unpackExplanation,
+        body: { ...unpackExplanation.body, mode: 'lastMinute', requestMessage: 'request-1' },
+      };
+
+      render(<AssistantChatPanel {...baseProps} messages={[catchUpAnswer]} />);
+
+      expect(screen.queryByTestId('unpack-explanation-message')).not.toBeInTheDocument();
     });
   });
 });

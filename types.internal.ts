@@ -1,5 +1,6 @@
 import { components, operations } from './types';
 import type { ReactNode } from 'react';
+import type { PopperProps } from '@mui/material';
 
 /**
  * Authentication type for user sessions
@@ -629,4 +630,71 @@ export interface PasswordFormProps {
   submitLabel: string;
   onSubmit: (password: string) => Promise<string | void>;
   purpose?: 'new' | 'current';
+}
+
+export type UnpackSelection = components['schemas']['UnpackSelection'];
+export type UnpackPreview = components['schemas']['UnpackPreview'];
+export type UnpackPreviewExplanation = UnpackPreview['explanation'];
+export type UnpackErrorReason = NonNullable<components['schemas']['UnpackError']['reason']>;
+export type UnpackExplanation = components['schemas']['UnpackExplanation'];
+
+/** The text of one transcript chunk as shown on the page, which is also what the server's offsets point into. */
+export interface TranscriptChunkText {
+  id: string;
+  text: string;
+}
+
+export interface WidenedPassage {
+  range: UnpackSelection;
+  quote: string;
+}
+
+export type UnpackRefusal = { error: true; status?: number; reason?: UnpackErrorReason };
+
+/** What SendData resolves to for an unpack request: the body, a refusal, or undefined when the request failed. */
+export type UnpackResponse = UnpackRefusal | Record<string, unknown> | undefined;
+
+export interface UnpackErrorCopy {
+  message: string;
+  /** Asking again for the same passage can work. */
+  canRetry: boolean;
+  /** Sending this passage to Private Chat can still work. */
+  canSend: boolean;
+}
+
+export type UnpackPreviewState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ready'; explanation: UnpackPreviewExplanation }
+  | { status: 'error'; reason?: UnpackErrorReason };
+
+/** pending means Berkie posts the card once the explanation is written. */
+export type UnpackSendOutcome = { ok: true; status: 'sent' | 'pending' } | { ok: false; reason?: UnpackErrorReason };
+
+/** Where a browser selection starts and ends, for telling whether a press changed it. */
+export type SelectionEnds = Pick<Selection, 'anchorNode' | 'anchorOffset' | 'focusNode' | 'focusOffset'>;
+
+export interface TranscriptSelection {
+  selection: UnpackSelection;
+  /** The highlighted text, without the timestamps between chunks. */
+  text: string;
+  /** A copy of the browser's range, for placing the popover next to it. */
+  range: Range;
+}
+
+/** The passage the Unpacker popover is about, and what to place the popover next to. */
+export interface UnpackTarget {
+  selection: UnpackSelection;
+  /** An element, or a virtual one wrapping the selected text (see MUI Popper's anchorEl). */
+  anchor: PopperProps['anchorEl'];
+}
+
+/** tabOut: Tab or Shift+Tab moved past the popover's first or last control. */
+export type UnpackCloseReason = 'escape' | 'closeButton' | 'clickAway' | 'tabOut' | 'openPrivateChat';
+
+export type UnpackSendState = { phase: 'idle' } | { phase: 'sending' } | { phase: 'done'; outcome: UnpackSendOutcome };
+
+export interface OpenUnpackTarget extends UnpackTarget {
+  /** The chunk a keyboard user opened the popover from; focus goes back to it on close. */
+  openedFrom?: HTMLElement;
 }

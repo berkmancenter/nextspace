@@ -2,10 +2,10 @@ import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTheme, useMediaQuery, IconButton, Tooltip } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import { AssistantMessage, UserMessage, JargonClarificationMessage } from '../components/messages';
+import { AssistantMessage, UserMessage, JargonClarificationMessage, UnpackExplanationMessage } from '../components/messages';
 import { MessageInput } from './MessageInput';
 import { SlashCommand, createSlashCommandEnhancer } from './enhancers/slashCommandEnhancer';
-import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
+import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig, UnpackExplanation } from '../types.internal';
 import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { getTimestampVisibility, parseMessageBody } from '../utils/Helpers';
@@ -34,6 +34,8 @@ interface AssistantChatPanelProps {
   messagesWithUnreadReplies?: Set<string>;
   onMarkAsRead?: (messageId: string) => void;
   inactive?: boolean;
+  /** Puts keyboard focus in the message box when the panel opens. */
+  focusInputOnMount?: boolean;
 }
 
 export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
@@ -55,6 +57,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   messagesWithUnreadReplies = new Set(),
   onMarkAsRead,
   inactive = false,
+  focusInputOnMount = false,
 }) => {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [inputHidden, setInputHidden] = useState(false);
@@ -255,6 +258,11 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
       return <JargonClarificationMessage message={msg} />;
     }
 
+    // A Catch me up answer has the same type, but its mode is lastMinute, so it isn't this card.
+    if (messageType === 'unpack_explanation' && (msg.body as UnpackExplanation).mode === 'passage') {
+      return <UnpackExplanationMessage message={msg} />;
+    }
+
     // Assistant messages
     if (isAssistant) {
       return (
@@ -406,6 +414,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                   onExitControlledMode={onExitControlledMode}
                   inputValue={inputValue}
                   onInputChange={onInputChange}
+                  focusOnMount={focusInputOnMount}
                 />
               )}
             </>
