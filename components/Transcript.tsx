@@ -1121,12 +1121,13 @@ export function Transcript(props: TranscriptProps) {
 
 const CatchUpButton = ({ catchUp }: { catchUp: TranscriptCatchUp }) => {
   const inert = catchUp.sent || !!catchUp.waiting;
+  // Browsers' default focus rings fall under 3:1 against the transcript header, so draw the app's own ring.
   return (
     <button
       type="button"
       aria-disabled={inert}
       onClick={() => !inert && catchUp.onCatchUp()}
-      className={`flex h-9 items-center gap-1.5 rounded-full border-0 px-3.5 text-[13px] ${
+      className={`flex h-9 items-center gap-1.5 rounded-full border-0 px-3.5 text-[13px] focus-visible:outline-[3px] focus-visible:outline-offset-[3px] focus-visible:outline-solid focus-visible:outline-[#B5AAEF] ${
         catchUp.sent
           ? 'bg-[#A5B4FC] font-bold text-[#200434]'
           : `bg-[#EDE9FE] font-semibold text-[#312E81] ${inert ? 'opacity-60' : 'hover:bg-white'}`
