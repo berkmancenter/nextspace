@@ -5,6 +5,7 @@ import { KEYBOARD_SELECTION_SETTLE_MS } from '../../hooks/useTranscriptSelection
 import { RetrieveData, SendData } from '../../utils';
 import { trackConversationEvent, trackFeatureUsage } from '../../utils/analytics';
 import { ConversationTypeProvider } from '../../context/ConversationTypeContext';
+import { formatTime } from '../../utils/catchUp';
 
 jest.mock('../../utils', () => ({
   RetrieveData: jest.fn(),
@@ -792,6 +793,43 @@ describe('Transcript', () => {
     expect(range.collapsed).toBe(false);
     expect(range.toString()).toContain('world');
     expect(range.toString()).toContain('Second');
+  });
+
+  it('tells the page which transcript chunks it has, including new ones', async () => {
+    const onMessagesChange = jest.fn();
+    render(<Transcript {...baseProps} onMessagesChange={onMessagesChange} />);
+    await screen.findByText('Hello world');
+
+    const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
+    act(() => {
+      messageHandler({ id: 'm3', channels: ['transcript'], createdAt: '2025-10-17T12:03:00Z', body: { text: 'New' } });
+    });
+
+    const latestChunks = onMessagesChange.mock.calls[onMessagesChange.mock.calls.length - 1][0];
+    expect(latestChunks.map((chunk: { id: string }) => chunk.id)).toEqual(['m1', 'm2', 'm3']);
+  });
+
+  it('tells the page nothing until the first load finishes', async () => {
+    let finishLoading: (messages: unknown[]) => void = () => {};
+    (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+      if (url.startsWith('messages/')) return new Promise((resolve) => (finishLoading = resolve));
+      return Promise.resolve({ transcript: { status: 'active' } });
+    });
+    const onMessagesChange = jest.fn();
+    render(<Transcript {...baseProps} onMessagesChange={onMessagesChange} />);
+    await waitFor(() => expect(RetrieveData).toHaveBeenCalledWith(expect.stringMatching(/^messages\//), expect.anything()));
+
+    expect(onMessagesChange).not.toHaveBeenCalled();
+
+    await act(async () => finishLoading([]));
+
+    expect(onMessagesChange).toHaveBeenLastCalledWith([]);
+  });
+
+  it('shows chunk times the same way Private Chat lists them', async () => {
+    render(<Transcript {...baseProps} />);
+
+    expect(await screen.findByText(formatTime(new Date('2025-10-17T12:01:00Z')))).toBeInTheDocument();
   });
 
   // Tests for transcript controls (pause, resume, delete, download)
@@ -2230,9 +2268,132 @@ describe('Transcript', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
+    describe('Catch me up', () => {
+      const header = () => screen.getByRole('heading', { name: 'LIVE TRANSCRIPT' }).closest('div.flex-shrink-0')!;
+
+      it('sits in the header and asks for a catch-up when pressed', async () => {
+        const onCatchUp = jest.fn();
+        render(<Transcript {...baseProps} unpack={{ catchUp: { onCatchUp, sent: false } }} />);
+
+        const button = screen.getByRole('button', { name: 'Catch me up' });
+        await userEvent.click(button);
+
+        expect(header()).toContainElement(button);
+        expect(onCatchUp).toHaveBeenCalledTimes(1);
+      });
+
+      it('explains what Catch me up does on hover and on keyboard focus, without renaming the button', async () => {
+        const helpText = 'A short summary of the last 60 seconds, in your Private Chat. Only you see it.';
+        render(<Transcript {...baseProps} unpack={{ catchUp: { onCatchUp: jest.fn(), sent: false } }} />);
+        const button = screen.getByRole('button', { name: 'Catch me up' });
+
+        await userEvent.hover(button);
+        expect(await screen.findByRole('tooltip')).toHaveTextContent(helpText);
+        expect(button).toHaveAccessibleDescription(helpText);
+
+        await userEvent.unhover(button);
+        await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+        for (let presses = 0; presses < 5 && document.activeElement !== button; presses++) await userEvent.tab();
+        expect(button).toHaveFocus();
+        expect(await screen.findByRole('tooltip')).toHaveTextContent(helpText);
+      });
+
+      it('says the catch-up was sent and stays focusable but inert until Private Chat is opened', async () => {
+        const onCatchUp = jest.fn();
+        render(<Transcript {...baseProps} unpack={{ catchUp: { onCatchUp, sent: true } }} />);
+        const button = screen.getByRole('button', { name: 'Sent to Private Chat' });
+
+        button.focus();
+        await userEvent.click(button);
+
+        expect(button).toHaveAttribute('aria-disabled', 'true');
+        expect(button).toHaveFocus();
+        expect(onCatchUp).not.toHaveBeenCalled();
+      });
+
+      it('stays inert while the assistant is answering something else', async () => {
+        const onCatchUp = jest.fn();
+        render(<Transcript {...baseProps} unpack={{ catchUp: { onCatchUp, sent: false, waiting: true } }} />);
+        const button = screen.getByRole('button', { name: 'Catch me up' });
+
+        await userEvent.click(button);
+
+        expect(button).toHaveAttribute('aria-disabled', 'true');
+        expect(onCatchUp).not.toHaveBeenCalled();
+      });
+
+      it('says the catch-up is ready and opens Private Chat from the banner', async () => {
+        const onOpenPrivateChat = jest.fn();
+        render(
+          <Transcript
+            {...baseProps}
+            unpack={{
+              onOpenPrivateChat,
+              catchUp: {
+                onCatchUp: jest.fn(),
+                sent: true,
+                unreadAnswer: { id: 'summary-1', refusal: null, earlierSpeech: false },
+              },
+            }}
+          />,
+        );
+
+        expect(screen.getByText('Your catch-up is ready in Private Chat')).toBeInTheDocument();
+        expect(screen.getByText('A summary of the last 60 seconds. Only you can see it.')).toBeInTheDocument();
+        await userEvent.click(screen.getByRole('button', { name: 'Open Private Chat' }));
+        expect(onOpenPrivateChat).toHaveBeenCalled();
+      });
+
+      it('says when the ready catch-up covers speech from before the last minute', () => {
+        render(
+          <Transcript
+            {...baseProps}
+            unpack={{
+              catchUp: {
+                onCatchUp: jest.fn(),
+                sent: true,
+                unreadAnswer: { id: 'summary-1', refusal: null, earlierSpeech: true },
+              },
+            }}
+          />,
+        );
+
+        expect(
+          screen.getByText('Nothing was said in the last 60 seconds, so it covers what was said just before.'),
+        ).toBeInTheDocument();
+      });
+
+      it('says why when the assistant could not catch the participant up', () => {
+        render(
+          <Transcript
+            {...baseProps}
+            unpack={{
+              catchUp: {
+                onCatchUp: jest.fn(),
+                sent: true,
+                unreadAnswer: { id: 'refusal-1', refusal: 'Nothing to catch up on yet.', earlierSpeech: false },
+              },
+            }}
+          />,
+        );
+
+        expect(screen.getByText("Berkie couldn't catch you up")).toBeInTheDocument();
+        expect(screen.getByText('Nothing to catch up on yet.')).toBeInTheDocument();
+      });
+
+      it('shows no button when the page gives no catch-up handler', () => {
+        render(<Transcript {...baseProps} unpack={{}} />);
+
+        expect(screen.queryByRole('button', { name: 'Catch me up' })).not.toBeInTheDocument();
+      });
+    });
+
     it.each([
       ['the Unpacker is off', {}],
-      ['the transcript is on the presentation screen', { unpack: {}, presentation: true }],
+      [
+        'the transcript is on the presentation screen',
+        { unpack: { catchUp: { onCatchUp: jest.fn(), sent: false } }, presentation: true },
+      ],
     ])('offers nothing when %s', async (_case, props) => {
       render(<Transcript {...baseProps} {...props} />);
       const chunk = (await screen.findByText(unpackMessages[0].body)).closest('[data-message-id]')!;
@@ -2244,6 +2405,7 @@ describe('Transcript', () => {
       settleSelection();
 
       expect(screen.queryByText(TIP)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Catch me up' })).not.toBeInTheDocument();
       expect(chunk).not.toHaveAttribute('tabindex');
       expect(chunk).not.toHaveAttribute('role');
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

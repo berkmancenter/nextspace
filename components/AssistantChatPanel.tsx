@@ -1,19 +1,29 @@
-import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
-import { useTheme, useMediaQuery, IconButton, Tooltip } from '@mui/material';
+import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTheme, useMediaQuery, Button, IconButton, Tooltip } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import { AssistantMessage, UserMessage, JargonClarificationMessage, UnpackExplanationMessage } from '../components/messages';
+import {
+  AssistantMessage,
+  UserMessage,
+  JargonClarificationMessage,
+  UnpackExplanationMessage,
+  CatchUpSummaryMessage,
+} from '../components/messages';
 import { MessageInput } from './MessageInput';
 import { SlashCommand, createSlashCommandEnhancer } from './enhancers/slashCommandEnhancer';
 import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig, UnpackExplanation } from '../types.internal';
 import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { getTimestampVisibility, parseMessageBody } from '../utils/Helpers';
+import { describeCatchUpRequest, formatTime } from '../utils/catchUp';
+import { components } from '../types';
 import { BotIcon } from './BotIcon';
 import { MediaLightbox } from './MediaLightbox';
 import { ThreadedMessage } from './ThreadedMessage';
 import { ThreadPanel } from './ThreadPanel';
 import { ModSuggestButton } from './messages/ModSuggestButton';
+
+type UnpackRequestBody = components['schemas']['UnpackRequestBody'];
 
 interface AssistantChatPanelProps {
   messages: PseudonymousMessage[];
@@ -34,6 +44,10 @@ interface AssistantChatPanelProps {
   messagesWithUnreadReplies?: Set<string>;
   onMarkAsRead?: (messageId: string) => void;
   inactive?: boolean;
+  /** Called with no argument for a fresh catch-up, or with the failed request to resend it. */
+  onCatchUp?: (retryOf?: UnpackRequestBody) => void;
+  /** Looked up by ID to list the passages in a catch-up request. */
+  transcriptChunks?: PseudonymousMessage[];
   /** Puts keyboard focus in the message box when the panel opens. */
   focusInputOnMount?: boolean;
 }
@@ -57,8 +71,15 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   messagesWithUnreadReplies = new Set(),
   onMarkAsRead,
   inactive = false,
+  onCatchUp,
+  transcriptChunks = [],
   focusInputOnMount = false,
 }) => {
+  const [inputFocusRequest, setInputFocusRequest] = useState(0);
+  const transcriptChunksById = useMemo(
+    () => new Map(transcriptChunks.map((chunk) => [chunk.id, chunk])),
+    [transcriptChunks],
+  );
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [inputHidden, setInputHidden] = useState(false);
   const theme = useTheme();
@@ -202,6 +223,20 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   const lastMessage = messages[messages.length - 1];
   const waitingForThreadedReply = waitingForResponse && lastMessage?.parentMessage;
 
+  // The refusal carries no link to its request, so resend the newest request posted before it.
+  const retryCatchUp = (refusal: PseudonymousMessage) => {
+    if (waitingForResponse || !onCatchUp) return;
+    const refusalIndex = messages.indexOf(refusal);
+    const failedRequest = messages
+      .slice(0, refusalIndex)
+      .reverse()
+      .find((message) => message.body?.type === 'unpack_request');
+    if (failedRequest) onCatchUp(failedRequest.body as UnpackRequestBody);
+    else onCatchUp();
+    // Try again disappears once the new request posts, which would drop focus to the page.
+    setInputFocusRequest((count) => count + 1);
+  };
+
   // Create enhancers for thread input (slash commands only)
   const threadEnhancers = [];
   if (slashCommands.length > 0) {
@@ -258,7 +293,58 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
       return <JargonClarificationMessage message={msg} />;
     }
 
-    // A Catch me up answer has the same type, but its mode is lastMinute, so it isn't this card.
+    if (messageType === 'catch_up_summary') {
+      return <CatchUpSummaryMessage message={msg} />;
+    }
+
+    if (messageType === 'unpack_request') {
+      const requestChunkIds = [...new Set<string>(msg.body?.chunkIds ?? [])];
+      const passages = requestChunkIds
+        .map((chunkId) => transcriptChunksById.get(chunkId))
+        .filter((chunk): chunk is PseudonymousMessage => chunk !== undefined);
+      // The server, not the browser clock, knows whether these passages came from before the last minute.
+      const summary = messages.find(
+        (message) => message.body?.type === 'catch_up_summary' && message.body?.requestMessage === msg.id,
+      );
+      const description = describeCatchUpRequest({
+        passages,
+        requestedCount: requestChunkIds.length,
+        earlierSpeech: summary?.body?.earlierSpeech === true,
+      });
+      return (
+        <div className="flex w-full max-w-[560px] flex-col gap-3 rounded-[14px] bg-[#F1D2D6] px-4 py-3.5 text-[#5B2330]">
+          <div className="flex flex-col gap-0.5">
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em]">Catch me up</p>
+            {description && <p className="text-[13px]">{description}</p>}
+          </div>
+          {passages.length > 0 && (
+            <ul className="flex flex-col rounded-[10px] bg-white px-3 py-1">
+              {passages.map((chunk) => (
+                <li key={chunk.id} className="flex items-start gap-3 border-b border-[#F3E8EA] py-2.5 last:border-b-0">
+                  <span className="w-[60px] flex-shrink-0 pt-0.5 text-xs text-gray-500">
+                    {formatTime(new Date(chunk.createdAt ?? Number.NaN))}
+                  </span>
+                  <span className="flex-grow text-[13px] leading-normal text-gray-700">
+                    {parseMessageBody(chunk.body).text}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      );
+    }
+
+    // Retrying only helps when the AI call failed, and only the newest failure should offer it.
+    const canRetryCatchUp =
+      messageType === 'catch_up_refused' &&
+      msg.body?.reason === 'unpackFailed' &&
+      onCatchUp !== undefined &&
+      !inactive &&
+      msg.id !== undefined &&
+      msg.id === lastMessage?.id;
+
+    // Early catch-up answers reused this type with mode lastMinute; only passage explanations get this card.
     if (messageType === 'unpack_explanation' && (msg.body as UnpackExplanation).mode === 'passage') {
       return <UnpackExplanationMessage message={msg} />;
     }
@@ -306,6 +392,17 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                 : {})}
             />
           </div>
+          {canRetryCatchUp && (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => retryCatchUp(msg)}
+              aria-disabled={waitingForResponse}
+              sx={{ marginTop: '6px', textTransform: 'none' }}
+            >
+              Try again
+            </Button>
+          )}
         </div>
       );
     }
@@ -415,6 +512,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                   inputValue={inputValue}
                   onInputChange={onInputChange}
                   focusOnMount={focusInputOnMount}
+                  focusRequest={inputFocusRequest}
                 />
               )}
             </>

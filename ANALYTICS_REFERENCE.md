@@ -201,6 +201,10 @@ trackConversationEvent(
 // Track ratings
 trackConversationEvent(conversationId, "assistant", "rating_submitted", rating);
 
+// Track slash commands, and Catch me up requests ("catch_up_retry" when sent from Try again)
+trackConversationEvent(conversationId, "assistant", "command_sent", commandName);
+trackConversationEvent(conversationId, "assistant", "command_sent", "catch_up");
+
 // Track user ID (pseudonym)
 setUserId(pseudonym);
 ```
@@ -356,7 +360,7 @@ setUserId(pseudonym);
 
 | Category      | Actions                                                     | Purpose                     |
 | ------------- | ----------------------------------------------------------- | --------------------------- |
-| `assistant`   | message_sent, feedback_sent, rating_submitted               | Assistant page interactions |
+| `assistant`   | message_sent, feedback_sent, rating_submitted, command_sent | Assistant page interactions |
 | `moderator`   | metrics_clicked                                             | Moderator page interactions |
 | `backchannel` | welcome_dismissed, quick_response_sent, custom_message_sent | Backchannel interactions    |
 | `session`     | start, end, location_detected                               | Session lifecycle           |

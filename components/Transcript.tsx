@@ -1,10 +1,22 @@
 import React, { useEffect, useRef, useState, useCallback, useId, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Close, Pause, PlayArrow, Delete, ReportProblem, Download } from '@mui/icons-material';
-import { Dialog, Button } from '@mui/material';
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Close,
+  Pause,
+  PlayArrow,
+  Delete,
+  ReportProblem,
+  Download,
+  History,
+} from '@mui/icons-material';
+import { Dialog, Button, Tooltip } from '@mui/material';
 import { Socket } from 'socket.io-client';
 import {
   OpenUnpackTarget,
   PseudonymousMessage,
+  TranscriptCatchUp,
   TranscriptChunkText,
   TranscriptSelection,
   UnpackCloseReason,
@@ -12,6 +24,7 @@ import {
 import { Api, RetrieveData, SendData } from '../utils';
 import { trackFeatureUsage, trackConversationEvent } from '../utils/analytics';
 import { insertMessageInOrder } from '../utils/messageModeration';
+import { formatTime } from '../utils/catchUp';
 import { useVisibilityAwareDuration } from '../hooks/useVisibilityAwareDuration';
 import { BotIcon } from './BotIcon';
 import { getAssistantAvatarStyle } from '../utils/avatarUtils';
@@ -54,12 +67,19 @@ interface TranscriptProps {
   /** Function to set an error message */
   setErrorMessage?: (message: string | null) => void;
   /**
+   * Called with every loaded chunk whenever the list changes, even while the panel is closed.
+   * Not called until the history has loaded, so an empty list means there is no transcript yet.
+   */
+  onMessagesChange?: (messages: PseudonymousMessage[]) => void;
+  /**
    * Turns on the Unpacker: participants highlight a passage, or press Enter on a chunk, to ask the assistant
    * about it. Leave unset when the event's unpacker feature is off. Ignored in the presentation view.
    */
   unpack?: {
     /** Leave out when Private Chat is already on screen beside the transcript. */
     onOpenPrivateChat?: () => void;
+    /** Shows Catch me up in the header. */
+    catchUp?: TranscriptCatchUp;
   };
 }
 
@@ -113,6 +133,7 @@ export function Transcript(props: TranscriptProps) {
   const fetchesInFlightRef = useRef(new Set<PseudonymousMessage[]>());
   const rootRef = useRef<HTMLDivElement | null>(null);
   const unpackEnabled = !!props.unpack && !props.presentation;
+  const catchUp = unpackEnabled ? props.unpack?.catchUp : undefined;
   const [unpackTarget, setUnpackTarget] = useState<OpenUnpackTarget | null>(null);
   const unpackOpenRef = useRef(false);
   unpackOpenRef.current = !!unpackTarget;
@@ -125,6 +146,12 @@ export function Transcript(props: TranscriptProps) {
   const transcriptOpenDuration = useVisibilityAwareDuration();
   const manualScrollDuration = useVisibilityAwareDuration();
   const autoScrollDuration = useVisibilityAwareDuration();
+
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const { onMessagesChange } = props;
+  useEffect(() => {
+    if (historyLoaded) onMessagesChange?.(messages);
+  }, [historyLoaded, messages, onMessagesChange]);
 
   const handleToggle = () => {
     const newOpenState = !isOpen;
@@ -556,6 +583,7 @@ export function Transcript(props: TranscriptProps) {
       if (props.setErrorMessage) props.setErrorMessage(error as string);
     } finally {
       fetchesInFlightRef.current.delete(arrivedDuringFetch);
+      setHistoryLoaded(true);
     }
   };
 
@@ -740,15 +768,18 @@ export function Transcript(props: TranscriptProps) {
                 <RecordingIndicator />
                 <h2 className="text-xl font-semibold tracking-wide">LIVE TRANSCRIPT</h2>
               </div>
-              {!props.hideToggle && (
-                <button
-                  onClick={handleToggle}
-                  className="text-white hover:bg-white/10 rounded p-1 transition-colors dark:text-nx-text dark:hover:bg-nx-active"
-                  aria-label="Close transcript"
-                >
-                  <ChevronRight className="transition-transform -rotate-270 lg:rotate-0" />
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {catchUp && <CatchUpButton catchUp={catchUp} />}
+                {!props.hideToggle && (
+                  <button
+                    onClick={handleToggle}
+                    className="text-white hover:bg-white/10 rounded p-1 transition-colors dark:text-nx-text dark:hover:bg-nx-active"
+                    aria-label="Close transcript"
+                  >
+                    <ChevronRight className="transition-transform -rotate-270 lg:rotate-0" />
+                  </button>
+                )}
+              </div>
             </div>
             {props.showControls && (
               <>
@@ -847,6 +878,14 @@ export function Transcript(props: TranscriptProps) {
         </div>
       )}
 
+      {catchUp?.unreadAnswer && isOpen && (
+        <CatchUpReadyBanner
+          answer={catchUp.unreadAnswer}
+          botName={botName}
+          onOpenPrivateChat={props.unpack?.onOpenPrivateChat}
+        />
+      )}
+
       {unpackEnabled && isOpen && !unpackTipDismissed && (
         <div className="mx-4 mt-3 flex flex-shrink-0 items-center justify-between gap-3 rounded-lg bg-[#EEF0FF] px-3.5 py-2.5 text-[13px] text-[#312E81]">
           <p className="m-0 flex items-center gap-2">
@@ -901,15 +940,7 @@ export function Transcript(props: TranscriptProps) {
                     className="flex items-center gap-2 text-gray-300 text-sm mb-1"
                     style={props.presentation ? PRESENTATION_TEXT.meta : undefined}
                   >
-                    <span>
-                      {message.createdAt
-                        ? new Date(message.createdAt).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: true,
-                          })
-                        : ''}
-                    </span>
+                    <span>{message.createdAt ? formatTime(new Date(message.createdAt)) : ''}</span>
                     {isBot && (
                       <span
                         className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold"
@@ -1087,3 +1118,88 @@ export function Transcript(props: TranscriptProps) {
     </div>
   );
 }
+
+const CATCH_UP_HELP_TEXT = 'A short summary of the last 60 seconds, in your Private Chat. Only you see it.';
+
+// MUI's default is small white text on translucent gray, which is hard to read over the dark transcript.
+const catchUpTooltipSlotProps = {
+  tooltip: {
+    sx: {
+      maxWidth: 260,
+      padding: '8px 12px',
+      backgroundColor: '#FFFFFF',
+      color: '#1F2937',
+      border: '1px solid #A5B4FC',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+      fontSize: 13,
+      lineHeight: 1.45,
+      fontWeight: 400,
+    },
+  },
+  arrow: { sx: { color: '#FFFFFF', '&::before': { border: '1px solid #A5B4FC' } } },
+};
+
+const CatchUpButton = ({ catchUp }: { catchUp: TranscriptCatchUp }) => {
+  const inert = catchUp.sent || !!catchUp.waiting;
+  // Browsers' default focus rings fall under 3:1 against the transcript header, so draw the app's own ring.
+  return (
+    // describeChild keeps "Catch me up" as the button's name; otherwise the tooltip text replaces it.
+    <Tooltip title={CATCH_UP_HELP_TEXT} describeChild arrow slotProps={catchUpTooltipSlotProps}>
+      <button
+        type="button"
+        aria-disabled={inert}
+        onClick={() => !inert && catchUp.onCatchUp()}
+        className={`flex h-9 items-center gap-1.5 rounded-full border-0 px-3.5 text-[13px] focus-visible:outline-[3px] focus-visible:outline-offset-[3px] focus-visible:outline-solid focus-visible:outline-[#B5AAEF] ${
+          catchUp.sent
+            ? 'bg-[#A5B4FC] font-bold text-[#200434]'
+            : `bg-[#EDE9FE] font-semibold text-[#312E81] ${inert ? 'opacity-60' : 'hover:bg-white'}`
+        } ${inert ? 'cursor-default' : 'cursor-pointer'}`}
+      >
+        {catchUp.sent ? (
+          <Check sx={{ fontSize: 16 }} aria-hidden="true" />
+        ) : (
+          <History sx={{ fontSize: 16 }} aria-hidden="true" />
+        )}
+        {catchUp.sent ? 'Sent to Private Chat' : 'Catch me up'}
+      </button>
+    </Tooltip>
+  );
+};
+
+const CatchUpReadyBanner = ({
+  answer,
+  botName,
+  onOpenPrivateChat,
+}: {
+  answer: NonNullable<TranscriptCatchUp['unreadAnswer']>;
+  botName: string;
+  onOpenPrivateChat?: () => void;
+}) => {
+  const [title, detail] =
+    answer.refusal !== null
+      ? [`${botName} couldn't catch you up`, answer.refusal]
+      : [
+          'Your catch-up is ready in Private Chat',
+          answer.earlierSpeech
+            ? 'Nothing was said in the last 60 seconds, so it covers what was said just before.'
+            : 'A summary of the last 60 seconds. Only you can see it.',
+        ];
+  // Not a live region: the page announces the answer itself, even when this panel is hidden.
+  return (
+    <div className="flex flex-shrink-0 items-center justify-between gap-3 bg-[#EDE9FE] px-4 py-3 text-[#312E81]">
+      <p className="m-0 flex min-w-0 flex-col gap-0.5">
+        <span className="text-sm font-bold">{title}</span>
+        <span className="text-xs text-gray-600">{detail}</span>
+      </p>
+      {onOpenPrivateChat && (
+        <button
+          type="button"
+          onClick={onOpenPrivateChat}
+          className="flex-shrink-0 cursor-pointer rounded-lg border-0 bg-[#4845D2] px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-[#3330A8]"
+        >
+          Open Private Chat
+        </button>
+      )}
+    </div>
+  );
+};

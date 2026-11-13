@@ -115,9 +115,15 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
     setShowReplyButton(false);
   };
 
+  // Parents often pass an inline function. Restarting the effects on every render would reset
+  // the 1-second timer, so a message would never be marked read while the page keeps re-rendering.
+  const onMarkAsReadRef = useRef(onMarkAsRead);
+  onMarkAsReadRef.current = onMarkAsRead;
+  const canMarkAsRead = onMarkAsRead !== undefined;
+
   // IntersectionObserver to detect when message with unread replies is visible
   useEffect(() => {
-    if (!message.id || !onMarkAsRead) {
+    if (!message.id || !canMarkAsRead) {
       return;
     }
 
@@ -130,7 +136,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
             // Only start the timer if this message has been scrolled out of view at least once
             if (hasBeenScrolledOutRef.current) {
               visibilityTimerRef.current = setTimeout(() => {
-                onMarkAsRead(message.id!);
+                onMarkAsReadRef.current?.(message.id!);
               }, 1000);
             }
           } else {
@@ -162,18 +168,18 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
       }
       observer.disconnect();
     };
-  }, [hasUnreadReplies, message.id, onMarkAsRead]);
+  }, [hasUnreadReplies, message.id, canMarkAsRead]);
 
   // When hasUnreadReplies changes to true, check if message is already visible
   useEffect(() => {
-    if (hasUnreadReplies && message.id && onMarkAsRead) {
+    if (hasUnreadReplies && message.id && canMarkAsRead) {
       // Reset the scrolled-out tracking
       hasBeenScrolledOutRef.current = false;
 
       // If the message is currently visible, start the timer immediately
       if (isCurrentlyVisibleRef.current) {
         visibilityTimerRef.current = setTimeout(() => {
-          onMarkAsRead(message.id!);
+          onMarkAsReadRef.current?.(message.id!);
         }, 1000);
       }
     }
@@ -184,7 +190,7 @@ export const ThreadedMessage: FC<ThreadedMessageProps> = ({
         visibilityTimerRef.current = null;
       }
     };
-  }, [hasUnreadReplies, message.id, onMarkAsRead]);
+  }, [hasUnreadReplies, message.id, canMarkAsRead]);
 
   /**
    * One background at a time, so paint never depends on stylesheet order. A hidden message keeps its

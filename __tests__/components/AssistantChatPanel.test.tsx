@@ -1,6 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AssistantChatPanel } from '../../components/AssistantChatPanel';
+import { describeCatchUpRequest } from '../../utils/catchUp';
+import { PseudonymousMessage } from '../../types.internal';
 
 // Mock message components. A module can only be mocked once per test file — later jest.mock
 // calls for this same path inside individual tests are silently ineffective — so this top-level
@@ -27,6 +29,7 @@ jest.mock('../../components/messages', () => ({
       </div>
     );
   },
+  CatchUpSummaryMessage: ({ message }: any) => <div data-testid="catch-up-summary-message">{message.body.inShort}</div>,
   UnpackExplanationMessage: ({ message }: any) => (
     <div data-testid="unpack-explanation-message">{message.body.whatTheyreSaying}</div>
   ),
@@ -66,8 +69,8 @@ jest.mock('../../components/MessageFeedback', () => ({
 
 // Mock MessageInput component
 jest.mock('../../components/MessageInput', () => ({
-  MessageInput: ({ onSendMessage, waitingForResponse, focusOnMount }: any) => (
-    <div data-testid="message-input" data-focus-on-mount={!!focusOnMount}>
+  MessageInput: ({ onSendMessage, waitingForResponse, focusOnMount, focusRequest }: any) => (
+    <div data-testid="message-input" data-focus-on-mount={!!focusOnMount} data-focus-request={focusRequest ?? 0}>
       <input
         data-testid="message-input-field"
         placeholder="Write a Comment"
@@ -2122,6 +2125,252 @@ describe('AssistantChatPanel', () => {
       render(<AssistantChatPanel {...baseProps} messages={[catchUpAnswer]} />);
 
       expect(screen.queryByTestId('unpack-explanation-message')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Catch me up', () => {
+    const localTime = (hours: number, minutes: number, seconds = 0) =>
+      new Date(2025, 9, 17, hours, minutes, seconds).toISOString();
+
+    const makeMessage = (overrides: Record<string, unknown>) =>
+      ({
+        body: '',
+        pseudonym: 'test-user',
+        pseudonymId: 'tu-1',
+        fromAgent: false,
+        bodyType: 'json',
+        channels: ['direct-test-user-id-agent-1'],
+        conversation: 'conv-1',
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+        ...overrides,
+      }) as PseudonymousMessage;
+
+    const transcriptChunks = [
+      makeMessage({ id: 'chunk-1', body: 'Courts read the Fourth Amendment narrowly.', createdAt: localTime(10, 43, 20) }),
+      makeMessage({ id: 'chunk-2', body: { text: 'Metadata gets less protection.' }, createdAt: localTime(10, 45) }),
+    ];
+
+    const catchUpRequest = makeMessage({
+      id: 'request-1',
+      pseudonym: 'test-user',
+      pseudonymId: 'tu-1',
+      fromAgent: false,
+      createdAt: localTime(10, 45, 5),
+      body: {
+        type: 'unpack_request',
+        mode: 'lastMinute',
+        text: 'The last 60 seconds · 2 passages, 10:43 to 10:45 AM',
+        chunkIds: ['chunk-1', 'chunk-missing', 'chunk-2'],
+        destination: 'privateChat',
+      },
+    });
+
+    const catchUpSummary = makeMessage({
+      id: 'summary-1',
+      pseudonym: 'Berkie',
+      pseudonymId: 'agent-1',
+      fromAgent: true,
+      createdAt: localTime(10, 45, 20),
+      body: {
+        type: 'catch_up_summary',
+        requestMessage: 'request-1',
+        chunkIds: ['chunk-1', 'chunk-2'],
+        passage: { start: localTime(10, 43, 20), end: localTime(10, 45) },
+        earlierSpeech: false,
+        inShort: 'The speaker argued that phone records get less protection.',
+        whatTheyCovered: ['Metadata', 'A 1979 case'],
+        comingUp: null,
+        text: 'Plain-text copy',
+      },
+    });
+
+    const makeRefusal = (id: string, reason: string) =>
+      makeMessage({
+        id,
+        pseudonym: 'Berkie',
+        pseudonymId: 'agent-1',
+        fromAgent: true,
+        createdAt: localTime(10, 46),
+        body: { type: 'catch_up_refused', reason, text: `Refused because ${reason}.` },
+      });
+
+    // Newer ICU versions put a narrow no-break space before AM and PM.
+    const plainSpaces = (text: string) => text.replace(/ /g, ' ');
+
+    it('leaves Catch me up to the transcript panel', () => {
+      render(<AssistantChatPanel {...baseProps} onCatchUp={jest.fn()} />);
+
+      expect(screen.queryByRole('button', { name: 'Catch me up' })).not.toBeInTheDocument();
+    });
+
+    it('shows a catch-up request as a bubble listing each passage with its time', () => {
+      render(<AssistantChatPanel {...baseProps} messages={[catchUpRequest]} transcriptChunks={transcriptChunks} />);
+
+      expect(screen.getByText('Catch me up')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          plainSpaces(describeCatchUpRequest({ passages: transcriptChunks, requestedCount: 3, earlierSpeech: false })),
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+        expect.stringMatching(/^10:43\sAM\s*Courts read the Fourth Amendment narrowly\.$/),
+        expect.stringMatching(/^10:45\sAM\s*Metadata gets less protection\.$/),
+      ]);
+      expect(screen.queryByTestId('user-message')).not.toBeInTheDocument();
+    });
+
+    it('says nothing new was said when the summary reports earlier speech', () => {
+      const earlierSpeechSummary = makeMessage({
+        ...catchUpSummary,
+        body: { ...catchUpSummary.body, earlierSpeech: true },
+      });
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          messages={[catchUpRequest, earlierSpeechSummary]}
+          transcriptChunks={transcriptChunks}
+        />,
+      );
+
+      expect(
+        screen.getByText(
+          plainSpaces(describeCatchUpRequest({ passages: transcriptChunks, requestedCount: 3, earlierSpeech: true })),
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('lists a passage once even when the request names it twice', () => {
+      const repeatedRequest = makeMessage({
+        ...catchUpRequest,
+        body: { ...catchUpRequest.body, chunkIds: ['chunk-1', 'chunk-1'] },
+      });
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      render(<AssistantChatPanel {...baseProps} messages={[repeatedRequest]} transcriptChunks={transcriptChunks} />);
+
+      expect(screen.getAllByRole('listitem')).toHaveLength(1);
+      expect(consoleError).not.toHaveBeenCalled();
+      consoleError.mockRestore();
+    });
+
+    it('lists a passage without a time when the chunk has none', () => {
+      const untimedChunk = makeMessage({ id: 'chunk-1', body: 'Courts read the Fourth Amendment narrowly.' });
+
+      render(<AssistantChatPanel {...baseProps} messages={[catchUpRequest]} transcriptChunks={[untimedChunk]} />);
+
+      expect(screen.getByRole('listitem')).toHaveTextContent(/^Courts read the Fourth Amendment narrowly\.$/);
+    });
+
+    it('shows only the heading when the request names no passages', () => {
+      const emptyRequest = makeMessage({ ...catchUpRequest, body: { ...catchUpRequest.body, chunkIds: [] } });
+
+      render(<AssistantChatPanel {...baseProps} messages={[emptyRequest]} transcriptChunks={transcriptChunks} />);
+
+      expect(screen.getByText('Catch me up')).toBeInTheDocument();
+      expect(screen.queryByText(/The last 60 seconds/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    });
+
+    it('shows a catch-up summary as the summary card', () => {
+      render(<AssistantChatPanel {...baseProps} messages={[catchUpSummary]} />);
+
+      expect(screen.getByTestId('catch-up-summary-message')).toHaveTextContent(
+        'The speaker argued that phone records get less protection.',
+      );
+      expect(screen.queryByTestId('assistant-message')).not.toBeInTheDocument();
+    });
+
+    it("shows a refusal as the assistant's reply", () => {
+      render(<AssistantChatPanel {...baseProps} onCatchUp={jest.fn()} messages={[makeRefusal('r-1', 'rateLimited')]} />);
+
+      expect(screen.getByTestId('assistant-message')).toHaveTextContent('Refused because rateLimited.');
+      expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    });
+
+    it('resends the failed request when Try again is pressed', async () => {
+      const onCatchUp = jest.fn();
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          onCatchUp={onCatchUp}
+          messages={[catchUpRequest, makeRefusal('r-1', 'unpackFailed')]}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+      expect(onCatchUp).toHaveBeenCalledWith(catchUpRequest.body);
+    });
+
+    it('asks for a fresh catch-up when the failed request is not loaded', async () => {
+      const onCatchUp = jest.fn();
+      render(<AssistantChatPanel {...baseProps} onCatchUp={onCatchUp} messages={[makeRefusal('r-1', 'unpackFailed')]} />);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+      expect(onCatchUp).toHaveBeenCalledWith();
+    });
+
+    it('moves focus to the message box after Try again, so keyboard users keep their place', async () => {
+      render(<AssistantChatPanel {...baseProps} onCatchUp={jest.fn()} messages={[makeRefusal('r-1', 'unpackFailed')]} />);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+      expect(screen.getByTestId('message-input')).toHaveAttribute('data-focus-request', '1');
+    });
+
+    it('stops offering to try again once a newer message arrives', () => {
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          onCatchUp={jest.fn()}
+          messages={[makeRefusal('r-1', 'unpackFailed'), catchUpSummary]}
+        />,
+      );
+
+      expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    });
+
+    it('does not offer to try again after the event ends', () => {
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          inactive={true}
+          onCatchUp={jest.fn()}
+          messages={[makeRefusal('r-1', 'unpackFailed')]}
+        />,
+      );
+
+      expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    });
+
+    it('does not offer to try again on a refusal with no ID', () => {
+      const refusalWithoutId = makeMessage({ ...makeRefusal('r-1', 'unpackFailed'), id: undefined });
+
+      render(<AssistantChatPanel {...baseProps} onCatchUp={jest.fn()} messages={[refusalWithoutId]} />);
+
+      expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    });
+
+    it('keeps Try again focusable but inert while the assistant is answering', async () => {
+      const onCatchUp = jest.fn();
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          onCatchUp={onCatchUp}
+          waitingForResponse={true}
+          messages={[makeRefusal('r-1', 'unpackFailed')]}
+        />,
+      );
+      const button = screen.getByRole('button', { name: 'Try again' });
+
+      await userEvent.click(button);
+
+      expect(button).toHaveAttribute('aria-disabled', 'true');
+      expect(onCatchUp).not.toHaveBeenCalled();
     });
   });
 });

@@ -962,6 +962,30 @@ describe('ThreadedMessage Component', () => {
       expect(mockOnMarkAsRead).not.toHaveBeenCalled();
     });
 
+    it('keeps counting when the parent re-renders with a new onMarkAsRead function', () => {
+      const firstOnMarkAsRead = jest.fn();
+      const latestOnMarkAsRead = jest.fn();
+      const { rerender } = render(
+        <ThreadedMessage {...defaultProps} replies={mockReplies} hasUnreadReplies={true} onMarkAsRead={firstOnMarkAsRead} />,
+      );
+      intersectionObserverCallback([createMockEntry(false)], {} as IntersectionObserver);
+      intersectionObserverCallback([createMockEntry(true)], {} as IntersectionObserver);
+      jest.advanceTimersByTime(500);
+
+      rerender(
+        <ThreadedMessage
+          {...defaultProps}
+          replies={mockReplies}
+          hasUnreadReplies={true}
+          onMarkAsRead={latestOnMarkAsRead}
+        />,
+      );
+      jest.advanceTimersByTime(500);
+
+      expect(firstOnMarkAsRead).not.toHaveBeenCalled();
+      expect(latestOnMarkAsRead).toHaveBeenCalledWith(mockMessage.id);
+    });
+
     it('does not set up observer when onMarkAsRead is not provided', () => {
       render(<ThreadedMessage {...defaultProps} replies={mockReplies} hasUnreadReplies={true} onMarkAsRead={undefined} />);
 

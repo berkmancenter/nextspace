@@ -8,7 +8,7 @@ import { ResourcesPanel } from '../components/ResourcesPanel';
 import { SlashCommand } from '../components/enhancers/slashCommandEnhancer';
 import { Api, RetrieveData, SendData, emitWithTokenRefresh, buildDirectChannels } from '../utils';
 import { components } from '../types';
-import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
+import { CatchUpNotice, ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
 import { useConversationType, useSetBotName, useSetConversationType } from '../context/ConversationTypeContext';
 import { AuthType } from '../types.internal';
 import { trackConversationEvent, setUserId } from '../utils/analytics';
@@ -21,6 +21,8 @@ import { BotPresence } from '../components/BotPresence';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
 import { CheckAuthHeader, isFeatureEnabled, parseMessageBody } from '../utils/Helpers';
 import { withStoredChannels } from '../utils/presentationChannels';
+import { buildCatchUpRequest, pickCatchUpChunks } from '../utils/catchUp';
+import { unpackErrorCopy } from '../utils/unpackPassage';
 import TokenManagerDefault from '../utils/TokenManager';
 import { Alert, Button, Dialog, Snackbar } from '@mui/material';
 import { Info } from '@mui/icons-material';
@@ -35,6 +37,9 @@ import {
 } from '../hooks';
 
 type Resource = components['schemas']['Resource'];
+type UnpackRequestBody = components['schemas']['UnpackRequestBody'];
+
+const CATCH_UP_TIMEOUT_MS = 2 * 60 * 1000; // 2 min
 
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
@@ -235,6 +240,21 @@ export function EventAssistantRoom({
     pendingHiddenRef,
   });
 
+  const [catchUpAnnouncement, setCatchUpAnnouncement] = useState<CatchUpNotice | null>(null);
+  // Tracked apart from waitingForResponse, which any Berkie reply clears, even one to an earlier question.
+  const [catchUpPending, setCatchUpPending] = useState(false);
+  // Null until the transcript history loads, so a catch-up can't go out with an incomplete list.
+  const [transcriptChunks, setTranscriptChunks] = useState<PseudonymousMessage[] | null>(null);
+
+  useEffect(() => {
+    if (!catchUpPending) return;
+    const timeout = setTimeout(() => {
+      setCatchUpPending(false);
+      setGeneralError(`${botName} didn't answer your catch-up. Please try again.`);
+    }, CATCH_UP_TIMEOUT_MS);
+    return () => clearTimeout(timeout);
+  }, [catchUpPending, botName, setGeneralError]);
+
   // Derive slash commands from the loaded conversation type's features.
   const slashCommands: SlashCommand[] = (conversationType?.features ?? [])
     .filter((f) => f.slashCommand != null && isFeatureEnabled(f.name, conversationFeatures, conversationType?.features))
@@ -245,7 +265,11 @@ export function EventAssistantRoom({
     }));
 
   const unpackerOn = isFeatureEnabled('unpacker', conversationFeatures, conversationType?.features);
+  const catchUpReady = unpackerOn && !presentation && (!transcriptPasscode || transcriptChunks !== null);
   const privateChatOnScreen = activeTab === 'assistant' && router.query.view !== 'preferences';
+  useEffect(() => {
+    if (privateChatOnScreen) setCatchUpAnnouncement(null);
+  }, [privateChatOnScreen]);
   const [focusPrivateChatInput, setFocusPrivateChatInput] = useState(false);
   // The panel reads the flag when it mounts (child effects run first), so later tab switches leave focus alone.
   useEffect(() => {
@@ -273,6 +297,17 @@ export function EventAssistantRoom({
         if (body?.type === 'poll' && body.whenResultsVisible === 'always') {
           const zeroCounts = Object.fromEntries((body.choices as string[]).map((c) => [c, 0]));
           setPollCounts((prev) => ({ ...prev, [body.pollId]: zeroCounts }));
+        }
+        if (body?.type === 'catch_up_summary' || body?.type === 'catch_up_refused') {
+          setCatchUpPending(false);
+          // On Private Chat the message list already reads the reply out.
+          if (activeTabRef.current !== 'assistant' && data.id) {
+            setCatchUpAnnouncement({
+              id: data.id,
+              refusal: body.type === 'catch_up_refused' ? body.text : null,
+              earlierSpeech: body.type === 'catch_up_summary' && body.earlierSpeech === true,
+            });
+          }
         }
       }
 
@@ -569,30 +604,83 @@ export function EventAssistantRoom({
       }
     }
 
-    try {
-      const response = await SendData('messages', {
-        body: finalMessage,
-        bodyType: 'text',
-        conversation: router.query.conversationId,
-        channels,
-        ...(parentMessageId !== undefined && { parentMessage: parentMessageId }),
-        ...(messageSource === 'promptResponse' && promptQuestionId && { answersPrompt: promptQuestionId }),
-      });
+    const sent = await submitMessage(finalMessage, 'text', channels, {
+      ...(parentMessageId !== undefined && { parentMessage: parentMessageId }),
+      ...(messageSource === 'promptResponse' && promptQuestionId && { answersPrompt: promptQuestionId }),
+    });
+    if (!sent) {
+      setWaitingForResponse(false);
+      setWaitingForChatResponse(false);
+    } else if (controlledMode) {
+      setControlledMode(null);
+    }
+    return sent;
+  }
 
-      if (response && response.error && response.message.toLocaleLowerCase().includes('incorrect passcode')) {
-        setGeneralError('Incorrect chat passcode. Message could not be sent.');
-        setWaitingForResponse(false);
-        return false;
-      }
+  /**
+   * Posts a message and shows an error when the server rejects it or can't be reached.
+   * @param body The message body: plain text, or a structured request such as a catch-up.
+   * @param bodyType How the server should read the body.
+   * @param channels The channels to post to.
+   * @param extraFields Other message fields, such as the parent message of a thread reply.
+   * @param wrongPasscodeError What to show when the server refuses a passcode. A catch-up carries
+   *   the transcript's passcode rather than the chat's, so it names the transcript.
+   * @returns Whether the server accepted the message.
+   */
+  async function submitMessage(
+    body: string | UnpackRequestBody,
+    bodyType: 'text' | 'json',
+    channels: { name: string; passcode?: string }[],
+    extraFields: Record<string, string> = {},
+    wrongPasscodeError = 'Incorrect chat passcode. Message could not be sent.',
+  ) {
+    const response = await SendData('messages', {
+      body,
+      bodyType,
+      conversation: router.query.conversationId,
+      channels,
+      ...extraFields,
+    });
 
-      if (controlledMode) setControlledMode(null);
-
-      return true;
-    } catch (error) {
-      console.error('Error sending message:', error);
+    if (response?.error && response.message?.toLocaleLowerCase().includes('incorrect passcode')) {
+      setGeneralError(wrongPasscodeError);
       return false;
     }
+    if (!response || response.error) {
+      console.error('Error sending message:', response);
+      setGeneralError('Message could not be sent. Please try again.');
+      return false;
+    }
+    return true;
   }
+
+  const catchUp = async (retryOf?: UnpackRequestBody) => {
+    if (!Api.get().GetTokens() || !initialJoinComplete) {
+      setGeneralError('Still connecting. Please try again in a moment.');
+      return;
+    }
+
+    // The server never saves the passcode, so a retry built from chat history needs it added back.
+    const request = {
+      ...(retryOf ?? buildCatchUpRequest(pickCatchUpChunks(transcriptChunks ?? []))),
+      ...(transcriptPasscode && { transcriptPasscode }),
+    };
+    trackConversationEvent(
+      router.query.conversationId as string,
+      'assistant',
+      'command_sent',
+      retryOf ? 'catch_up_retry' : 'catch_up',
+    );
+    setCatchUpPending(true);
+    const sent = await submitMessage(
+      request,
+      'json',
+      [{ name: `direct-${userId}-${agentId}` }],
+      {},
+      unpackErrorCopy('wrongPasscode', botName).message,
+    );
+    if (!sent) setCatchUpPending(false);
+  };
 
   const enterControlledMode = (config: ControlledInputConfig) => {
     setControlledMode(config);
@@ -747,9 +835,20 @@ export function EventAssistantRoom({
                     lastReconnectTime={lastReconnectTime}
                     hideToggle={presentation || (router.query.view !== 'preferences' && activeTab === 'transcript')}
                     presentation={presentation}
+                    onMessagesChange={unpackerOn ? setTranscriptChunks : undefined}
                     unpack={
                       unpackerOn
-                        ? { onOpenPrivateChat: privateChatOnScreen ? undefined : openPrivateChatFromUnpacker }
+                        ? {
+                            onOpenPrivateChat: privateChatOnScreen ? undefined : openPrivateChatFromUnpacker,
+                            catchUp: catchUpReady
+                              ? {
+                                  onCatchUp: () => catchUp(),
+                                  sent: catchUpPending || catchUpAnnouncement !== null,
+                                  waiting: waitingForResponse,
+                                  unreadAnswer: catchUpAnnouncement,
+                                }
+                              : undefined,
+                          }
                         : undefined
                     }
                   />
@@ -848,7 +947,7 @@ export function EventAssistantRoom({
                           messages={assistantMessages}
                           pseudonym={pseudonym}
                           pseudonymFunFact={pseudonymFunFact}
-                          waitingForResponse={waitingForResponse}
+                          waitingForResponse={waitingForResponse || catchUpPending}
                           controlledMode={controlledMode}
                           slashCommands={slashCommands}
                           eventName={eventName}
@@ -864,6 +963,8 @@ export function EventAssistantRoom({
                           userId={userId}
                           feedbackConfig={assistantFeedbackConfig}
                           inactive={!agentActive || eventStatus !== 'active'}
+                          onCatchUp={catchUpReady ? catchUp : undefined}
+                          transcriptChunks={transcriptChunks ?? undefined}
                           focusInputOnMount={focusPrivateChatInput}
                           messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
                           onMarkAsRead={(messageId) => {
@@ -905,6 +1006,16 @@ export function EventAssistantRoom({
               )}
             </div>
           </>
+        )}
+      </div>
+
+      <div role="status" className="sr-only">
+        {catchUpAnnouncement && (
+          <span key={catchUpAnnouncement.id}>
+            {catchUpAnnouncement.refusal === null
+              ? `${botName} posted your catch-up.`
+              : `${botName} couldn't catch you up. ${catchUpAnnouncement.refusal}`}
+          </span>
         )}
       </div>
 
