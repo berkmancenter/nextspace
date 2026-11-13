@@ -8,7 +8,7 @@ import { ResourcesPanel } from '../components/ResourcesPanel';
 import { SlashCommand } from '../components/enhancers/slashCommandEnhancer';
 import { Api, RetrieveData, SendData, emitWithTokenRefresh, buildDirectChannels } from '../utils';
 import { components } from '../types';
-import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
+import { CatchUpNotice, ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
 import { useConversationType, useSetBotName, useSetConversationType } from '../context/ConversationTypeContext';
 import { AuthType } from '../types.internal';
 import { trackConversationEvent, setUserId } from '../utils/analytics';
@@ -240,7 +240,7 @@ export function EventAssistantRoom({
     pendingHiddenRef,
   });
 
-  const [catchUpAnnouncement, setCatchUpAnnouncement] = useState<{ id: string; refusal: string | null } | null>(null);
+  const [catchUpAnnouncement, setCatchUpAnnouncement] = useState<CatchUpNotice | null>(null);
   // Tracked apart from waitingForResponse, which any Berkie reply clears, even one to an earlier question.
   const [catchUpPending, setCatchUpPending] = useState(false);
   // Null until the transcript history loads, so a catch-up can't go out with an incomplete list.
@@ -267,6 +267,9 @@ export function EventAssistantRoom({
   const unpackerOn = isFeatureEnabled('unpacker', conversationFeatures, conversationType?.features);
   const catchUpReady = unpackerOn && !presentation && (!transcriptPasscode || transcriptChunks !== null);
   const privateChatOnScreen = activeTab === 'assistant' && router.query.view !== 'preferences';
+  useEffect(() => {
+    if (privateChatOnScreen) setCatchUpAnnouncement(null);
+  }, [privateChatOnScreen]);
   const [focusPrivateChatInput, setFocusPrivateChatInput] = useState(false);
   // The panel reads the flag when it mounts (child effects run first), so later tab switches leave focus alone.
   useEffect(() => {
@@ -299,7 +302,11 @@ export function EventAssistantRoom({
           setCatchUpPending(false);
           // On Private Chat the message list already reads the reply out.
           if (activeTabRef.current !== 'assistant' && data.id) {
-            setCatchUpAnnouncement({ id: data.id, refusal: body.type === 'catch_up_refused' ? body.text : null });
+            setCatchUpAnnouncement({
+              id: data.id,
+              refusal: body.type === 'catch_up_refused' ? body.text : null,
+              earlierSpeech: body.type === 'catch_up_summary' && body.earlierSpeech === true,
+            });
           }
         }
       }
@@ -831,7 +838,17 @@ export function EventAssistantRoom({
                     onMessagesChange={unpackerOn ? setTranscriptChunks : undefined}
                     unpack={
                       unpackerOn
-                        ? { onOpenPrivateChat: privateChatOnScreen ? undefined : openPrivateChatFromUnpacker }
+                        ? {
+                            onOpenPrivateChat: privateChatOnScreen ? undefined : openPrivateChatFromUnpacker,
+                            catchUp: catchUpReady
+                              ? {
+                                  onCatchUp: () => catchUp(),
+                                  sent: catchUpPending || catchUpAnnouncement !== null,
+                                  waiting: waitingForResponse,
+                                  unreadAnswer: catchUpAnnouncement,
+                                }
+                              : undefined,
+                          }
                         : undefined
                     }
                   />

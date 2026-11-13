@@ -4138,7 +4138,7 @@ describe('EventAssistantRoom', () => {
       text: 'Nothing to catch up on yet.',
     });
 
-    const catchUpButton = () => screen.getByRole('button', { name: 'Catch me up' });
+    const catchUpButton = () => screen.getByRole('button', { name: /^(Catch me up|Sent to Private Chat)$/ });
 
     beforeEach(() => {
       (SendData as jest.Mock).mockResolvedValue({ id: 'request-1' });
@@ -4262,12 +4262,17 @@ describe('EventAssistantRoom', () => {
       });
     });
 
-    it('leaves the passcode out when the transcript has none', async () => {
+    it('leaves the passcode out of a retry when the page has no transcript passcode', async () => {
       mockRouter.query = { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6', channel: 'chat,chat-pass' };
-      mockConversationWithFeatures([{ name: 'unpacker', enabled: true }]);
+      mockConversationWithFeatures([{ name: 'unpacker', enabled: true }], {
+        privateChat: [
+          { ...fromBerkie('request-1', catchUpRequestBody), fromAgent: false, pseudonym: 'test-pseudonym' },
+          fromBerkie('refusal-2', { type: 'catch_up_refused', reason: 'unpackFailed', text: 'Something went wrong.' }),
+        ],
+      });
       await openPrivateChat();
 
-      await userEvent.click(await screen.findByRole('button', { name: 'Catch me up' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
 
       await waitFor(() => expect(SendData).toHaveBeenCalledWith('messages', expect.anything()));
       const [, sent] = (SendData as jest.Mock).mock.calls.find(([path]) => path === 'messages')!;
@@ -4377,6 +4382,60 @@ describe('EventAssistantRoom', () => {
 
       const announcement = await screen.findByText("Berkie couldn't catch you up. Nothing to catch up on yet.");
       expect(announcement.closest('[role="status"]')).not.toBeNull();
+    });
+
+    it('shows Catch me up in the transcript header, not in Private Chat', async () => {
+      mockConversationWithFeatures([{ name: 'unpacker', enabled: true }], { transcript: transcriptChunks });
+      await openPrivateChat();
+
+      const button = await screen.findByRole('button', { name: 'Catch me up' });
+
+      expect(screen.getByRole('heading', { name: 'LIVE TRANSCRIPT' }).closest('div.flex-shrink-0')).toContainElement(button);
+    });
+
+    describe('when Private Chat is not open', () => {
+      const askFromGroupChat = async () => {
+        mockConversationWithFeatures([{ name: 'unpacker', enabled: true }], { transcript: transcriptChunks });
+        await openPrivateChat();
+        await userEvent.click(screen.getAllByLabelText('Group Chat')[0]);
+        await userEvent.click(await screen.findByRole('button', { name: 'Catch me up' }));
+        await screen.findByRole('button', { name: 'Sent to Private Chat' });
+      };
+
+      it('says the catch-up was sent, then that it is ready, and opens Private Chat from the banner', async () => {
+        await askFromGroupChat();
+        expect(screen.queryByText('Your catch-up is ready in Private Chat')).not.toBeInTheDocument();
+
+        deliver(catchUpSummary);
+        expect(await screen.findByText('Your catch-up is ready in Private Chat')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Sent to Private Chat' })).toHaveAttribute('aria-disabled', 'true');
+
+        await userEvent.click(screen.getByRole('button', { name: 'Open Private Chat' }));
+
+        expect(await screen.findByTestId('catch-up-summary-message')).toBeInTheDocument();
+        expect(screen.queryByText('Your catch-up is ready in Private Chat')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Catch me up' })).not.toHaveAttribute('aria-disabled', 'true');
+      });
+
+      it('clears the banner when the participant opens Private Chat from the tabs', async () => {
+        await askFromGroupChat();
+        deliver(catchUpSummary);
+        await screen.findByText('Your catch-up is ready in Private Chat');
+
+        await userEvent.click(screen.getAllByLabelText('Private Chat')[0]);
+
+        await waitFor(() => expect(screen.queryByText('Your catch-up is ready in Private Chat')).not.toBeInTheDocument());
+        expect(screen.getByRole('button', { name: 'Catch me up' })).toBeInTheDocument();
+      });
+
+      it("says why in the banner when Berkie can't catch the participant up", async () => {
+        await askFromGroupChat();
+
+        deliver(noTranscriptRefusal);
+
+        expect(await screen.findByText("Berkie couldn't catch you up")).toBeInTheDocument();
+        expect(screen.getAllByText('Nothing to catch up on yet.').length).toBeGreaterThan(0);
+      });
     });
 
     it('does not announce catch-ups loaded from chat history', async () => {

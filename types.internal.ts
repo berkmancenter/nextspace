@@ -698,3 +698,21 @@ export interface OpenUnpackTarget extends UnpackTarget {
   /** The chunk a keyboard user opened the popover from; focus goes back to it on close. */
   openedFrom?: HTMLElement;
 }
+
+/** Berkie's answer to a catch-up, kept while the participant is off Private Chat and hasn't seen it. */
+export interface CatchUpNotice {
+  id: string;
+  /** The refusal's text, or null for a summary. */
+  refusal: string | null;
+  earlierSpeech: boolean;
+}
+
+/** What the transcript panel needs to show Catch me up in its header. */
+export interface TranscriptCatchUp {
+  onCatchUp: () => void;
+  /** A catch-up is on its way to Private Chat, or its answer is waiting there unseen. */
+  sent: boolean;
+  /** The assistant is answering something else, so a new catch-up has to wait. */
+  waiting?: boolean;
+  unreadAnswer?: CatchUpNotice | null;
+}

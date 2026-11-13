@@ -75,7 +75,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   transcriptChunks = [],
   focusInputOnMount = false,
 }) => {
-  const catchUpButtonRef = useRef<HTMLButtonElement>(null);
+  const [inputFocusRequest, setInputFocusRequest] = useState(0);
   const transcriptChunksById = useMemo(
     () => new Map(transcriptChunks.map((chunk) => [chunk.id, chunk])),
     [transcriptChunks],
@@ -234,7 +234,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     if (failedRequest) onCatchUp(failedRequest.body as UnpackRequestBody);
     else onCatchUp();
     // Try again disappears once the new request posts, which would drop focus to the page.
-    catchUpButtonRef.current?.focus();
+    setInputFocusRequest((count) => count + 1);
   };
 
   // Create enhancers for thread input (slash commands only)
@@ -312,20 +312,23 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
         earlierSpeech: summary?.body?.earlierSpeech === true,
       });
       return (
-        <div className="w-fit max-w-[85%] rounded-xl border border-[#C8C6F2] bg-[#EEEDFB] px-3 py-2 text-sm text-gray-800">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[#2E2BA8]">Catch me up</p>
-          {description && <p className="text-xs text-gray-700">{description}</p>}
+        <div className="flex w-full max-w-[560px] flex-col gap-3 rounded-[14px] bg-[#F1D2D6] px-4 py-3.5 text-[#5B2330]">
+          <div className="flex flex-col gap-0.5">
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em]">Catch me up</p>
+            {description && <p className="text-[13px]">{description}</p>}
+          </div>
           {passages.length > 0 && (
-            <ul className="mt-2 flex flex-col gap-1">
-              {passages.map((chunk) => {
-                const time = formatTime(new Date(chunk.createdAt ?? Number.NaN));
-                return (
-                  <li key={chunk.id}>
-                    {time && <span className="mr-2 text-xs text-gray-600">{time}</span>}
+            <ul className="flex flex-col rounded-[10px] bg-white px-3 py-1">
+              {passages.map((chunk) => (
+                <li key={chunk.id} className="flex items-start gap-3 border-b border-[#F3E8EA] py-2.5 last:border-b-0">
+                  <span className="w-[60px] flex-shrink-0 pt-0.5 text-xs text-gray-500">
+                    {formatTime(new Date(chunk.createdAt ?? Number.NaN))}
+                  </span>
+                  <span className="flex-grow text-[13px] leading-normal text-gray-700">
                     {parseMessageBody(chunk.body).text}
-                  </li>
-                );
-              })}
+                  </span>
+                </li>
+              ))}
             </ul>
           )}
         </div>
@@ -487,19 +490,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-2 py-0.5 bg-white">
-                {onCatchUp && (
-                  <Button
-                    ref={catchUpButtonRef}
-                    size="small"
-                    variant="outlined"
-                    onClick={() => !waitingForResponse && onCatchUp()}
-                    aria-disabled={waitingForResponse}
-                    sx={{ marginRight: 'auto', textTransform: 'none' }}
-                  >
-                    Catch me up
-                  </Button>
-                )}
+              <div className="flex items-center justify-end border-t border-gray-200 px-2 py-0.5 bg-white">
                 <Tooltip title={inputHidden ? 'Show input' : 'Hide input'}>
                   <IconButton
                     size="small"
@@ -521,6 +512,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                   inputValue={inputValue}
                   onInputChange={onInputChange}
                   focusOnMount={focusInputOnMount}
+                  focusRequest={inputFocusRequest}
                 />
               )}
             </>

@@ -2268,9 +2268,116 @@ describe('Transcript', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
+    describe('Catch me up', () => {
+      const header = () => screen.getByRole('heading', { name: 'LIVE TRANSCRIPT' }).closest('div.flex-shrink-0')!;
+
+      it('sits in the header and asks for a catch-up when pressed', async () => {
+        const onCatchUp = jest.fn();
+        render(<Transcript {...baseProps} unpack={{ catchUp: { onCatchUp, sent: false } }} />);
+
+        const button = screen.getByRole('button', { name: 'Catch me up' });
+        await userEvent.click(button);
+
+        expect(header()).toContainElement(button);
+        expect(onCatchUp).toHaveBeenCalledTimes(1);
+      });
+
+      it('says the catch-up was sent and stays focusable but inert until Private Chat is opened', async () => {
+        const onCatchUp = jest.fn();
+        render(<Transcript {...baseProps} unpack={{ catchUp: { onCatchUp, sent: true } }} />);
+        const button = screen.getByRole('button', { name: 'Sent to Private Chat' });
+
+        button.focus();
+        await userEvent.click(button);
+
+        expect(button).toHaveAttribute('aria-disabled', 'true');
+        expect(button).toHaveFocus();
+        expect(onCatchUp).not.toHaveBeenCalled();
+      });
+
+      it('stays inert while the assistant is answering something else', async () => {
+        const onCatchUp = jest.fn();
+        render(<Transcript {...baseProps} unpack={{ catchUp: { onCatchUp, sent: false, waiting: true } }} />);
+        const button = screen.getByRole('button', { name: 'Catch me up' });
+
+        await userEvent.click(button);
+
+        expect(button).toHaveAttribute('aria-disabled', 'true');
+        expect(onCatchUp).not.toHaveBeenCalled();
+      });
+
+      it('says the catch-up is ready and opens Private Chat from the banner', async () => {
+        const onOpenPrivateChat = jest.fn();
+        render(
+          <Transcript
+            {...baseProps}
+            unpack={{
+              onOpenPrivateChat,
+              catchUp: {
+                onCatchUp: jest.fn(),
+                sent: true,
+                unreadAnswer: { id: 'summary-1', refusal: null, earlierSpeech: false },
+              },
+            }}
+          />,
+        );
+
+        expect(screen.getByText('Your catch-up is ready in Private Chat')).toBeInTheDocument();
+        expect(screen.getByText('A summary of the last 60 seconds. Only you can see it.')).toBeInTheDocument();
+        await userEvent.click(screen.getByRole('button', { name: 'Open Private Chat' }));
+        expect(onOpenPrivateChat).toHaveBeenCalled();
+      });
+
+      it('says when the ready catch-up covers speech from before the last minute', () => {
+        render(
+          <Transcript
+            {...baseProps}
+            unpack={{
+              catchUp: {
+                onCatchUp: jest.fn(),
+                sent: true,
+                unreadAnswer: { id: 'summary-1', refusal: null, earlierSpeech: true },
+              },
+            }}
+          />,
+        );
+
+        expect(
+          screen.getByText('Nothing was said in the last 60 seconds, so it covers what was said just before.'),
+        ).toBeInTheDocument();
+      });
+
+      it('says why when the assistant could not catch the participant up', () => {
+        render(
+          <Transcript
+            {...baseProps}
+            unpack={{
+              catchUp: {
+                onCatchUp: jest.fn(),
+                sent: true,
+                unreadAnswer: { id: 'refusal-1', refusal: 'Nothing to catch up on yet.', earlierSpeech: false },
+              },
+            }}
+          />,
+        );
+
+        expect(screen.getByText("Berkie couldn't catch you up")).toBeInTheDocument();
+        expect(screen.getByText('Nothing to catch up on yet.')).toBeInTheDocument();
+      });
+
+      it('shows no button when the page gives no catch-up handler', () => {
+        render(<Transcript {...baseProps} unpack={{}} />);
+
+        expect(screen.queryByRole('button', { name: 'Catch me up' })).not.toBeInTheDocument();
+      });
+    });
+
     it.each([
       ['the Unpacker is off', {}],
-      ['the transcript is on the presentation screen', { unpack: {}, presentation: true }],
+      [
+        'the transcript is on the presentation screen',
+        { unpack: { catchUp: { onCatchUp: jest.fn(), sent: false } }, presentation: true },
+      ],
     ])('offers nothing when %s', async (_case, props) => {
       render(<Transcript {...baseProps} {...props} />);
       const chunk = (await screen.findByText(unpackMessages[0].body)).closest('[data-message-id]')!;
@@ -2282,6 +2389,7 @@ describe('Transcript', () => {
       settleSelection();
 
       expect(screen.queryByText(TIP)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Catch me up' })).not.toBeInTheDocument();
       expect(chunk).not.toHaveAttribute('tabindex');
       expect(chunk).not.toHaveAttribute('role');
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

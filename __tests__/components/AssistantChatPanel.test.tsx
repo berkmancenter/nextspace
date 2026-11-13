@@ -69,8 +69,8 @@ jest.mock('../../components/MessageFeedback', () => ({
 
 // Mock MessageInput component
 jest.mock('../../components/MessageInput', () => ({
-  MessageInput: ({ onSendMessage, waitingForResponse, focusOnMount }: any) => (
-    <div data-testid="message-input" data-focus-on-mount={!!focusOnMount}>
+  MessageInput: ({ onSendMessage, waitingForResponse, focusOnMount, focusRequest }: any) => (
+    <div data-testid="message-input" data-focus-on-mount={!!focusOnMount} data-focus-request={focusRequest ?? 0}>
       <input
         data-testid="message-input-field"
         placeholder="Write a Comment"
@@ -2200,33 +2200,10 @@ describe('AssistantChatPanel', () => {
     // Newer ICU versions put a narrow no-break space before AM and PM.
     const plainSpaces = (text: string) => text.replace(/ /g, ' ');
 
-    it('shows no Catch me up button when the page gives no handler', () => {
-      render(<AssistantChatPanel {...baseProps} />);
+    it('leaves Catch me up to the transcript panel', () => {
+      render(<AssistantChatPanel {...baseProps} onCatchUp={jest.fn()} />);
 
       expect(screen.queryByRole('button', { name: 'Catch me up' })).not.toBeInTheDocument();
-    });
-
-    it('asks for a fresh catch-up when the button is pressed', async () => {
-      const onCatchUp = jest.fn();
-      render(<AssistantChatPanel {...baseProps} onCatchUp={onCatchUp} />);
-
-      await userEvent.click(screen.getByRole('button', { name: 'Catch me up' }));
-
-      expect(onCatchUp).toHaveBeenCalledTimes(1);
-      expect(onCatchUp).toHaveBeenCalledWith();
-    });
-
-    it('keeps the Catch me up button focusable but inert while the assistant is answering', async () => {
-      const onCatchUp = jest.fn();
-      render(<AssistantChatPanel {...baseProps} onCatchUp={onCatchUp} waitingForResponse={true} />);
-      const button = screen.getByRole('button', { name: 'Catch me up' });
-
-      button.focus();
-      await userEvent.click(button);
-
-      expect(button).toHaveAttribute('aria-disabled', 'true');
-      expect(button).toHaveFocus();
-      expect(onCatchUp).not.toHaveBeenCalled();
     });
 
     it('shows a catch-up request as a bubble listing each passage with its time', () => {
@@ -2337,12 +2314,12 @@ describe('AssistantChatPanel', () => {
       expect(onCatchUp).toHaveBeenCalledWith();
     });
 
-    it('moves focus to Catch me up after Try again, so keyboard users keep their place', async () => {
+    it('moves focus to the message box after Try again, so keyboard users keep their place', async () => {
       render(<AssistantChatPanel {...baseProps} onCatchUp={jest.fn()} messages={[makeRefusal('r-1', 'unpackFailed')]} />);
 
       await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
-      expect(screen.getByRole('button', { name: 'Catch me up' })).toHaveFocus();
+      expect(screen.getByTestId('message-input')).toHaveAttribute('data-focus-request', '1');
     });
 
     it('stops offering to try again once a newer message arrives', () => {
