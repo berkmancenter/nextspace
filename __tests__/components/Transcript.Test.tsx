@@ -2282,6 +2282,22 @@ describe('Transcript', () => {
         expect(onCatchUp).toHaveBeenCalledTimes(1);
       });
 
+      it('explains what Catch me up does on hover and on keyboard focus, without renaming the button', async () => {
+        const helpText = 'A short summary of the last 60 seconds, in your Private Chat. Only you see it.';
+        render(<Transcript {...baseProps} unpack={{ catchUp: { onCatchUp: jest.fn(), sent: false } }} />);
+        const button = screen.getByRole('button', { name: 'Catch me up' });
+
+        await userEvent.hover(button);
+        expect(await screen.findByRole('tooltip')).toHaveTextContent(helpText);
+        expect(button).toHaveAccessibleDescription(helpText);
+
+        await userEvent.unhover(button);
+        await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+        for (let presses = 0; presses < 5 && document.activeElement !== button; presses++) await userEvent.tab();
+        expect(button).toHaveFocus();
+        expect(await screen.findByRole('tooltip')).toHaveTextContent(helpText);
+      });
+
       it('says the catch-up was sent and stays focusable but inert until Private Chat is opened', async () => {
         const onCatchUp = jest.fn();
         render(<Transcript {...baseProps} unpack={{ catchUp: { onCatchUp, sent: true } }} />);

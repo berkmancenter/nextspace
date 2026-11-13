@@ -11,7 +11,7 @@ import {
   Download,
   History,
 } from '@mui/icons-material';
-import { Dialog, Button } from '@mui/material';
+import { Dialog, Button, Tooltip } from '@mui/material';
 import { Socket } from 'socket.io-client';
 import {
   OpenUnpackTarget,
@@ -1119,27 +1119,50 @@ export function Transcript(props: TranscriptProps) {
   );
 }
 
+const CATCH_UP_HELP_TEXT = 'A short summary of the last 60 seconds, in your Private Chat. Only you see it.';
+
+// MUI's default is small white text on translucent gray, which is hard to read over the dark transcript.
+const catchUpTooltipSlotProps = {
+  tooltip: {
+    sx: {
+      maxWidth: 260,
+      padding: '8px 12px',
+      backgroundColor: '#FFFFFF',
+      color: '#1F2937',
+      border: '1px solid #A5B4FC',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+      fontSize: 13,
+      lineHeight: 1.45,
+      fontWeight: 400,
+    },
+  },
+  arrow: { sx: { color: '#FFFFFF', '&::before': { border: '1px solid #A5B4FC' } } },
+};
+
 const CatchUpButton = ({ catchUp }: { catchUp: TranscriptCatchUp }) => {
   const inert = catchUp.sent || !!catchUp.waiting;
   // Browsers' default focus rings fall under 3:1 against the transcript header, so draw the app's own ring.
   return (
-    <button
-      type="button"
-      aria-disabled={inert}
-      onClick={() => !inert && catchUp.onCatchUp()}
-      className={`flex h-9 items-center gap-1.5 rounded-full border-0 px-3.5 text-[13px] focus-visible:outline-[3px] focus-visible:outline-offset-[3px] focus-visible:outline-solid focus-visible:outline-[#B5AAEF] ${
-        catchUp.sent
-          ? 'bg-[#A5B4FC] font-bold text-[#200434]'
-          : `bg-[#EDE9FE] font-semibold text-[#312E81] ${inert ? 'opacity-60' : 'hover:bg-white'}`
-      } ${inert ? 'cursor-default' : 'cursor-pointer'}`}
-    >
-      {catchUp.sent ? (
-        <Check sx={{ fontSize: 16 }} aria-hidden="true" />
-      ) : (
-        <History sx={{ fontSize: 16 }} aria-hidden="true" />
-      )}
-      {catchUp.sent ? 'Sent to Private Chat' : 'Catch me up'}
-    </button>
+    // describeChild keeps "Catch me up" as the button's name; otherwise the tooltip text replaces it.
+    <Tooltip title={CATCH_UP_HELP_TEXT} describeChild arrow slotProps={catchUpTooltipSlotProps}>
+      <button
+        type="button"
+        aria-disabled={inert}
+        onClick={() => !inert && catchUp.onCatchUp()}
+        className={`flex h-9 items-center gap-1.5 rounded-full border-0 px-3.5 text-[13px] focus-visible:outline-[3px] focus-visible:outline-offset-[3px] focus-visible:outline-solid focus-visible:outline-[#B5AAEF] ${
+          catchUp.sent
+            ? 'bg-[#A5B4FC] font-bold text-[#200434]'
+            : `bg-[#EDE9FE] font-semibold text-[#312E81] ${inert ? 'opacity-60' : 'hover:bg-white'}`
+        } ${inert ? 'cursor-default' : 'cursor-pointer'}`}
+      >
+        {catchUp.sent ? (
+          <Check sx={{ fontSize: 16 }} aria-hidden="true" />
+        ) : (
+          <History sx={{ fontSize: 16 }} aria-hidden="true" />
+        )}
+        {catchUp.sent ? 'Sent to Private Chat' : 'Catch me up'}
+      </button>
+    </Tooltip>
   );
 };
 
