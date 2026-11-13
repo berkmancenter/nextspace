@@ -6686,7 +6686,7 @@
       },
       "UnpackRequestBody": {
         "type": "object",
-        "description": "Message body (sent with bodyType \"json\") asking the event assistant to catch the participant up on the transcript chunks listed in chunkIds. Send it to the participant's direct channel with the assistant. The assistant answers with a CatchUpSummary, or a CatchUpRefused that says why it can't. Ignored unless the event's \"unpacker\" feature is on.",
+        "description": "Message body (sent with bodyType \"json\") asking the event assistant to catch the participant up on the transcript chunks listed in chunkIds. Send it to the participant's direct channel with the assistant. The assistant answers with a CatchUpSummary, or a CatchUpRefused that says why it can't. A body that doesn't match this schema is refused with 400 and isn't saved. Ignored unless the event's \"unpacker\" feature is on.",
         "required": [
           "type",
           "mode",
@@ -6704,8 +6704,7 @@
             "type": "string",
             "enum": [
               "lastMinute"
-            ],
-            "description": "Which part of the talk to explain. lastMinute is the transcript from the 60 seconds before the request."
+            ]
           },
           "text": {
             "type": "string",
@@ -6713,10 +6712,15 @@
           },
           "chunkIds": {
             "type": "array",
-            "description": "IDs of the transcript messages to summarize, in any order. Usually the chunks that ended within 60 seconds of the newest chunk. Send an empty list when the event has no transcript yet. Together the chunks can hold at most 3,000 characters.",
+            "description": "IDs of the transcript messages to summarize, in any order. Usually the chunks that ended within 60 seconds of the newest chunk the participant was shown, the same window the server uses for earlierSpeech. Send an empty list when the event has no transcript yet. When the chunks hold more than 3,000 characters, the oldest are left out until the rest fit.",
+            "maxItems": 50,
             "items": {
               "type": "string"
             }
+          },
+          "transcriptPasscode": {
+            "type": "string",
+            "description": "The transcript channel's passcode, the same one the client uses to read the transcript. Required when the transcript has one, which it does by default. A missing or wrong passcode is refused with 400 and reason wrongPasscode, and the request message is not saved. The passcode is removed before the message is saved, so it never appears in chat history."
           },
           "destination": {
             "type": "string",
@@ -6831,10 +6835,6 @@
           "text": {
             "type": "string",
             "description": "Plain-text version of all sections, for chat history and clients that can't render the card."
-          },
-          "requestMessage": {
-            "type": "string",
-            "description": "ID of the participant's request message. Only \"Catch me up\" replies have one."
           }
         }
       },
@@ -6865,7 +6865,7 @@
           },
           "chunkIds": {
             "type": "array",
-            "description": "IDs of the transcript messages that were summarized, oldest first.",
+            "description": "IDs of the transcript messages that were summarized, oldest first. When the request named more than 3,000 characters of transcript, only the newest chunks that fit are listed.",
             "items": {
               "type": "string"
             }
@@ -6890,7 +6890,7 @@
           },
           "earlierSpeech": {
             "type": "boolean",
-            "description": "True when the newest chunk ended over 60 seconds before the request arrived, so the summary covers speech from before the last minute."
+            "description": "True when no transcript chunk ended in the 60 seconds before the request arrived, so the summary covers speech from before the last minute. A participant whose page is behind gets false while the speaker is still talking."
           },
           "inShort": {
             "type": "string",
@@ -6919,6 +6919,7 @@
         "description": "Message body (bodyType \"json\") the event assistant posts in the participant's direct channel when it can't answer an UnpackRequestBody message.",
         "required": [
           "type",
+          "requestMessage",
           "reason",
           "text"
         ],
@@ -6929,16 +6930,21 @@
               "catch_up_refused"
             ]
           },
+          "requestMessage": {
+            "type": "string",
+            "description": "ID of the participant's request message this refusal answers."
+          },
           "reason": {
             "type": "string",
             "enum": [
               "noTranscript",
+              "noPassagesSent",
               "rateLimited",
               "chunkNotInTranscript",
               "passageTooLong",
               "unpackFailed"
             ],
-            "description": "Why the request was refused. noTranscript, chunkIds was empty. rateLimited, the participant sent more than 3 requests in the last minute. chunkNotInTranscript, a chunk ID is not a transcript message of this event. passageTooLong, the chunks hold more than 3,000 characters. unpackFailed, the AI model call failed; trying again can work."
+            "description": "Why the request was refused. noTranscript, chunkIds was empty and the event has no transcript yet. noPassagesSent, chunkIds was empty but the event has a transcript. rateLimited, the participant already had 3 requests in the last minute that were not refused. chunkNotInTranscript, a chunk ID is not a transcript message of this event, or the transcript was deleted while the summary was being written. passageTooLong, the newest chunk alone holds more than 3,000 characters. unpackFailed, the AI model call failed; trying again can work."
           },
           "text": {
             "type": "string",
