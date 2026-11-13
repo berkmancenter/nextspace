@@ -3,7 +3,6 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { MessageProps } from '../../types.internal';
 import { parseMessageBody } from '../../utils/Helpers';
-import { cardAccentSectionClassName, cardFrameClassName, cardLabelClassName, cardPlainSectionClassName } from './cardStyles';
 
 export const JargonClarificationMessage: FC<MessageProps> = ({ message }) => {
   const parsed = parseMessageBody(message.body);
@@ -13,18 +12,18 @@ export const JargonClarificationMessage: FC<MessageProps> = ({ message }) => {
 
   return (
     <div style={{ width: '85%' }}>
-      <div className={cardFrameClassName}>
+      <div className="w-full rounded-xl overflow-hidden shadow-sm border border-[#D1C4E9]">
         {/* Original section */}
         {sourceText && (
-          <div className={cardAccentSectionClassName}>
-            <p className={`${cardLabelClassName} mb-1`}>Original</p>
+          <div className="px-4 py-3 bg-[#F3F0FF] border-l-[3px] border-l-mediumslateblue">
+            <p className="text-xs font-semibold uppercase tracking-wider mb-1 text-mediumslateblue">Original</p>
             <p className="text-sm italic text-[#333]">{sourceText}</p>
           </div>
         )}
 
         {/* Plain English section */}
-        <div className={cardPlainSectionClassName}>
-          <p className={`${cardLabelClassName} mb-4`}>Plain English</p>
+        <div className="px-4 py-3 bg-white border-l-[3px] border-l-[#7B78E5]">
+          <p className="text-xs font-semibold uppercase tracking-wider mb-4 text-mediumslateblue">Plain English</p>
           <div className="markdown-content text-sm text-gray-800">
             <Markdown
               remarkPlugins={[remarkGfm]}
