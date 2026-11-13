@@ -4187,6 +4187,7 @@ describe('EventAssistantRoom', () => {
             text: expect.stringMatching(/^Catch me up: 2 passages, /),
             chunkIds: ['chunk-1', 'chunk-2'],
             destination: 'privateChat',
+            transcriptPasscode: 'MJqaT2ii',
           },
           bodyType: 'json',
           conversation: 'a1b2c3d4e5f6a1b2c3d4e5f6',
@@ -4254,8 +4255,41 @@ describe('EventAssistantRoom', () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
 
       await waitFor(() => {
-        expect(SendData).toHaveBeenCalledWith('messages', expect.objectContaining({ body: catchUpRequestBody }));
+        expect(SendData).toHaveBeenCalledWith(
+          'messages',
+          expect.objectContaining({ body: { ...catchUpRequestBody, transcriptPasscode: 'MJqaT2ii' } }),
+        );
       });
+    });
+
+    it('leaves the passcode out when the transcript has none', async () => {
+      mockRouter.query = { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6', channel: 'chat,chat-pass' };
+      mockConversationWithFeatures([{ name: 'unpacker', enabled: true }]);
+      await openPrivateChat();
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Catch me up' }));
+
+      await waitFor(() => expect(SendData).toHaveBeenCalledWith('messages', expect.anything()));
+      const [, sent] = (SendData as jest.Mock).mock.calls.find(([path]) => path === 'messages')!;
+      expect(sent.body).not.toHaveProperty('transcriptPasscode');
+    });
+
+    it('says the transcript link changed when the server refuses the transcript passcode', async () => {
+      (SendData as jest.Mock).mockResolvedValue({
+        error: true,
+        status: 400,
+        message: 'Incorrect passcode for channel: transcript',
+        reason: 'wrongPasscode',
+      });
+      mockConversationWithFeatures([{ name: 'unpacker', enabled: true }], { transcript: transcriptChunks });
+      await openPrivateChat();
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Catch me up' }));
+
+      expect(
+        await screen.findByText("This page's transcript link has changed. Reload the page, then try again."),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Incorrect chat passcode. Message could not be sent.')).not.toBeInTheDocument();
     });
 
     it('lets the participant ask again after Berkie refuses', async () => {

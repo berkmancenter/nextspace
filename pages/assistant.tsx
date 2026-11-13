@@ -22,6 +22,7 @@ import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
 import { CheckAuthHeader, isFeatureEnabled, parseMessageBody } from '../utils/Helpers';
 import { withStoredChannels } from '../utils/presentationChannels';
 import { buildCatchUpRequest, pickCatchUpChunks } from '../utils/catchUp';
+import { unpackErrorCopy } from '../utils/unpackPassage';
 import TokenManagerDefault from '../utils/TokenManager';
 import { Alert, Button, Dialog, Snackbar } from '@mui/material';
 import { Info } from '@mui/icons-material';
@@ -615,6 +616,8 @@ export function EventAssistantRoom({
    * @param bodyType How the server should read the body.
    * @param channels The channels to post to.
    * @param extraFields Other message fields, such as the parent message of a thread reply.
+   * @param wrongPasscodeError What to show when the server refuses a passcode. A catch-up carries
+   *   the transcript's passcode rather than the chat's, so it names the transcript.
    * @returns Whether the server accepted the message.
    */
   async function submitMessage(
@@ -622,6 +625,7 @@ export function EventAssistantRoom({
     bodyType: 'text' | 'json',
     channels: { name: string; passcode?: string }[],
     extraFields: Record<string, string> = {},
+    wrongPasscodeError = 'Incorrect chat passcode. Message could not be sent.',
   ) {
     const response = await SendData('messages', {
       body,
@@ -632,7 +636,7 @@ export function EventAssistantRoom({
     });
 
     if (response?.error && response.message?.toLocaleLowerCase().includes('incorrect passcode')) {
-      setGeneralError('Incorrect chat passcode. Message could not be sent.');
+      setGeneralError(wrongPasscodeError);
       return false;
     }
     if (!response || response.error) {
@@ -649,7 +653,11 @@ export function EventAssistantRoom({
       return;
     }
 
-    const request = retryOf ?? buildCatchUpRequest(pickCatchUpChunks(transcriptChunks ?? []));
+    // The server never saves the passcode, so a retry built from chat history needs it added back.
+    const request = {
+      ...(retryOf ?? buildCatchUpRequest(pickCatchUpChunks(transcriptChunks ?? []))),
+      ...(transcriptPasscode && { transcriptPasscode }),
+    };
     trackConversationEvent(
       router.query.conversationId as string,
       'assistant',
@@ -657,7 +665,13 @@ export function EventAssistantRoom({
       retryOf ? 'catch_up_retry' : 'catch_up',
     );
     setCatchUpPending(true);
-    const sent = await submitMessage(request, 'json', [{ name: `direct-${userId}-${agentId}` }]);
+    const sent = await submitMessage(
+      request,
+      'json',
+      [{ name: `direct-${userId}-${agentId}` }],
+      {},
+      unpackErrorCopy('wrongPasscode', botName).message,
+    );
     if (!sent) setCatchUpPending(false);
   };
 
