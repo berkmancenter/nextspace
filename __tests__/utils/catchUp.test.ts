@@ -57,6 +57,16 @@ describe('pickCatchUpChunks', () => {
     expect(pickCatchUpChunks(chunks).map((chunk) => chunk.id)).toEqual(['second']);
   });
 
+  it('keeps only the newest 50 chunks, the most the server accepts', () => {
+    const chunks = Array.from({ length: 55 }, (_, index) => makeChunk(`chunk-${index}`, at(10, 44, index), 'a'));
+
+    const picked = pickCatchUpChunks(chunks).map((chunk) => chunk.id);
+
+    expect(picked).toHaveLength(50);
+    expect(picked[0]).toBe('chunk-5');
+    expect(picked[49]).toBe('chunk-54');
+  });
+
   it('picks nothing when there is no transcript yet', () => {
     expect(pickCatchUpChunks([])).toEqual([]);
   });

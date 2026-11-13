@@ -6,8 +6,14 @@ type UnpackRequestBody = components['schemas']['UnpackRequestBody'];
 
 const CATCH_UP_WINDOW_MS = 60 * 1000;
 
-/** The backend refuses a catch-up whose passages, joined with spaces, hold more characters than this. */
+/**
+ * The backend summarizes at most this many characters of passages, joined with spaces, and drops the
+ * oldest beyond it. Trimming here too keeps the request's passage count true to what gets summarized.
+ */
 export const CATCH_UP_MAX_CHARACTERS = 3000;
+
+/** The backend refuses a catch-up that names more chunks than this. */
+const CATCH_UP_MAX_CHUNKS = 50;
 
 const endTime = (chunk: PseudonymousMessage) => new Date(chunk.createdAt!).getTime();
 
@@ -17,7 +23,7 @@ const joinedLength = (chunks: PseudonymousMessage[]) =>
 /**
  * Picks the transcript chunks a catch-up covers: those that ended within 60 seconds of the newest
  * chunk, even when that chunk is older than a minute. Drops the oldest until they fit the backend's
- * character limit.
+ * chunk and character limits.
  * @param transcriptChunks - The transcript chunks the page has loaded, in any order.
  * @returns The picked chunks, oldest first. Empty when there is no transcript.
  */
@@ -28,7 +34,7 @@ export const pickCatchUpChunks = (transcriptChunks: PseudonymousMessage[]): Pseu
   if (timedChunks.length === 0) return [];
 
   const newestEnd = endTime(timedChunks[timedChunks.length - 1]);
-  const picked = timedChunks.filter((chunk) => endTime(chunk) >= newestEnd - CATCH_UP_WINDOW_MS);
+  const picked = timedChunks.filter((chunk) => endTime(chunk) >= newestEnd - CATCH_UP_WINDOW_MS).slice(-CATCH_UP_MAX_CHUNKS);
   while (picked.length > 1 && joinedLength(picked) > CATCH_UP_MAX_CHARACTERS) picked.shift();
   return picked;
 };
