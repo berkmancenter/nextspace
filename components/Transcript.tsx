@@ -1,8 +1,14 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Pause, PlayArrow, Delete, ReportProblem, Download } from '@mui/icons-material';
+import React, { useEffect, useRef, useState, useCallback, useId, useMemo } from 'react';
+import { ChevronLeft, ChevronRight, Close, Pause, PlayArrow, Delete, ReportProblem, Download } from '@mui/icons-material';
 import { Dialog, Button } from '@mui/material';
 import { Socket } from 'socket.io-client';
-import { PseudonymousMessage } from '../types.internal';
+import {
+  OpenUnpackTarget,
+  PseudonymousMessage,
+  TranscriptChunkText,
+  TranscriptSelection,
+  UnpackCloseReason,
+} from '../types.internal';
 import { Api, RetrieveData, SendData } from '../utils';
 import { trackFeatureUsage, trackConversationEvent } from '../utils/analytics';
 import { insertMessageInOrder } from '../utils/messageModeration';
@@ -10,9 +16,11 @@ import { formatTime } from '../utils/catchUp';
 import { useVisibilityAwareDuration } from '../hooks/useVisibilityAwareDuration';
 import { BotIcon } from './BotIcon';
 import { getAssistantAvatarStyle } from '../utils/avatarUtils';
-import { normalizeAssistantPseudonym } from '../utils/Helpers';
+import { normalizeAssistantPseudonym, parseMessageBody } from '../utils/Helpers';
 import { PRESENTATION_TEXT } from '../utils/presentationText';
 import { useBotName } from '../context/ConversationTypeContext';
+import { useTranscriptSelection } from '../hooks/useTranscriptSelection';
+import { UnpackPopover } from './UnpackPopover';
 
 interface TranscriptProps {
   /** The time range to focus on in the transcript */
@@ -51,6 +59,14 @@ interface TranscriptProps {
    * Not called until the history has loaded, so an empty list means there is no transcript yet.
    */
   onMessagesChange?: (messages: PseudonymousMessage[]) => void;
+  /**
+   * Turns on the Unpacker: participants highlight a passage, or press Enter on a chunk, to ask the assistant
+   * about it. Leave unset when the event's unpacker feature is off. Ignored in the presentation view.
+   */
+  unpack?: {
+    /** Leave out when Private Chat is already on screen beside the transcript. */
+    onOpenPrivateChat?: () => void;
+  };
 }
 
 /**
@@ -63,6 +79,23 @@ interface TranscriptProps {
  */
 const botColor = getAssistantAvatarStyle().avatarBg;
 const botBadgeBackground = `color-mix(in srgb, ${botColor} 40%, transparent)`;
+
+// A placeholder for a hidden chunk arrives with a null body.
+const chunkText = (message: PseudonymousMessage): string => (message.body ? parseMessageBody(message.body).text : '');
+
+const isUnpackableText = (text: string) => text.trim() !== '';
+
+/** Where an arrow, Home or End key moves among `count` chunks from `index`, or null for any other key. */
+const nextChunkIndex = (key: string, index: number, count: number): number | null => {
+  const targets: Record<string, number> = { ArrowUp: index - 1, ArrowDown: index + 1, Home: 0, End: count - 1 };
+  return key in targets ? Math.max(0, Math.min(targets[key], count - 1)) : null;
+};
+
+/** Popper reads this rect on every update, so the popover follows the passage as the transcript scrolls. */
+const anchorForRange = (range: Range) => ({
+  contextElement: range.startContainer.parentElement ?? undefined,
+  getBoundingClientRect: () => range.getBoundingClientRect(),
+});
 
 export function Transcript(props: TranscriptProps) {
   const botName = useBotName();
@@ -82,6 +115,17 @@ export function Transcript(props: TranscriptProps) {
     scrollTop: number;
   } | null>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Each transcript fetch in flight collects the chunks the socket delivers before its response comes back.
+  const fetchesInFlightRef = useRef(new Set<PseudonymousMessage[]>());
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const unpackEnabled = !!props.unpack && !props.presentation;
+  const [unpackTarget, setUnpackTarget] = useState<OpenUnpackTarget | null>(null);
+  const unpackOpenRef = useRef(false);
+  unpackOpenRef.current = !!unpackTarget;
+  const [unpackTipDismissed, setUnpackTipDismissed] = useState(false);
+  // The one chunk Tab reaches; the arrow keys move between the rest.
+  const [activeChunkId, setActiveChunkId] = useState<string | null>(null);
+  const unpackHintId = useId();
 
   // Use visibility-aware duration hooks
   const transcriptOpenDuration = useVisibilityAwareDuration();
@@ -89,8 +133,6 @@ export function Transcript(props: TranscriptProps) {
   const autoScrollDuration = useVisibilityAwareDuration();
 
   const [historyLoaded, setHistoryLoaded] = useState(false);
-  // The history fetch replaces the list, so chunks the socket delivers while it's in flight are kept here.
-  const arrivedWhileLoadingRef = useRef<PseudonymousMessage[] | null>(null);
   const { onMessagesChange } = props;
   useEffect(() => {
     if (historyLoaded) onMessagesChange?.(messages);
@@ -196,6 +238,109 @@ export function Transcript(props: TranscriptProps) {
       autoScrollDuration.start();
     }
   }, [isInManualScrollMode, props.conversationId, manualScrollDuration, autoScrollDuration]);
+
+  const chunkTexts = useMemo<TranscriptChunkText[]>(
+    () => messages.filter((message) => message.id).map((message) => ({ id: message.id!, text: chunkText(message) })),
+    [messages],
+  );
+
+  const handleTranscriptSelection = useCallback(({ selection, range }: TranscriptSelection) => {
+    setUnpackTarget({ selection, anchor: anchorForRange(range) });
+  }, []);
+  useTranscriptSelection(messagesContainerRef, unpackEnabled && isOpen, handleTranscriptSelection);
+
+  useEffect(() => {
+    if (!isOpen) setUnpackTarget(null);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!unpackTarget) return;
+    const ids = new Set(chunkTexts.map(({ id }) => id));
+    const { startMessageId, endMessageId } = unpackTarget.selection;
+    if (!ids.has(startMessageId) || !ids.has(endMessageId)) setUnpackTarget(null);
+  }, [chunkTexts, unpackTarget]);
+
+  // On narrow screens the page hides the transcript with display: none when another tab opens, and the
+  // popover, which lives outside it, would otherwise jump to the corner of the page.
+  const hasUnpackTarget = !!unpackTarget;
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!hasUnpackTarget || !root || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry && entry.contentRect.width === 0 && entry.contentRect.height === 0) setUnpackTarget(null);
+    });
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [hasUnpackTarget]);
+
+  const followingLiveAtUnpackOpenRef = useRef(false);
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (hasUnpackTarget) {
+      followingLiveAtUnpackOpenRef.current = !!container && checkIsAtBottom(container);
+      return;
+    }
+    if (!followingLiveAtUnpackOpenRef.current) return;
+    followingLiveAtUnpackOpenRef.current = false;
+    scrollToBottom();
+  }, [hasUnpackTarget]);
+
+  const chunkElement = (id: string) => document.getElementById(`transcript-message-${id}`);
+  const unpackableChunkIds = useMemo(
+    () => chunkTexts.filter(({ text }) => isUnpackableText(text)).map(({ id }) => id),
+    [chunkTexts],
+  );
+  const tabStopChunkId =
+    activeChunkId && unpackableChunkIds.includes(activeChunkId)
+      ? activeChunkId
+      : (unpackableChunkIds[unpackableChunkIds.length - 1] ?? null);
+
+  const openUnpackForChunk = (message: PseudonymousMessage, element: HTMLElement) => {
+    const id = message.id!;
+    setUnpackTarget({
+      selection: { startMessageId: id, startOffset: 0, endMessageId: id, endOffset: chunkText(message).length },
+      anchor: element,
+      openedFrom: element,
+    });
+  };
+
+  const focusChunk = (id: string) => {
+    setActiveChunkId(id);
+    chunkElement(id)?.focus();
+  };
+
+  const handleChunkKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, message: PseudonymousMessage) => {
+    if (event.target !== event.currentTarget) return;
+    const hasModifier = event.shiftKey || event.ctrlKey || event.altKey || event.metaKey;
+    const next = hasModifier
+      ? null
+      : nextChunkIndex(event.key, unpackableChunkIds.indexOf(message.id!), unpackableChunkIds.length);
+    if (next !== null) {
+      event.preventDefault();
+      focusChunk(unpackableChunkIds[next]);
+      return;
+    }
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openUnpackForChunk(message, event.currentTarget);
+  };
+
+  // Screen readers in browse mode send a click with no mouse button count instead of the Enter key. A real
+  // click (detail of 1 or more) is left alone, since mouse users unpack by highlighting.
+  const handleChunkClick = (event: React.MouseEvent<HTMLDivElement>, message: PseudonymousMessage) => {
+    if (event.detail !== 0) return;
+    openUnpackForChunk(message, event.currentTarget);
+  };
+
+  const closeUnpack = (reason: UnpackCloseReason) => {
+    // A click elsewhere, or opening Private Chat, already chose where focus goes next.
+    if (reason !== 'clickAway' && reason !== 'openPrivateChat' && unpackTarget) {
+      const chunk = unpackTarget.openedFrom ?? chunkElement(unpackTarget.selection.startMessageId);
+      setActiveChunkId(unpackTarget.selection.startMessageId);
+      chunk?.focus();
+    }
+    setUnpackTarget(null);
+  };
 
   // Recording indicator component
   const RecordingIndicator = ({ size = 'w-3 h-3' }: { size?: string }) => (
@@ -332,6 +477,8 @@ export function Transcript(props: TranscriptProps) {
   const handleScroll = useCallback(() => {
     const container = messagesContainerRef.current;
     if (!container || !isOpen) return;
+    // Holding the view still for the Unpacker popover moves scrollTop, but the reader didn't scroll.
+    if (unpackOpenRef.current) return;
 
     const currentlyAtBottom = checkIsAtBottom(container);
 
@@ -371,8 +518,11 @@ export function Transcript(props: TranscriptProps) {
   // on initial mount and when a gap-reconnect signals missed messages.
   const fetchTranscriptData = async () => {
     if (!props.conversationId || !Api.get().getAccessToken() || !props.transcriptPasscode) return;
+    // A position saved before a reconnect no longer matches the list this fetch is about to show.
+    preserveScrollRef.current = null;
+    const arrivedDuringFetch: PseudonymousMessage[] = [];
+    fetchesInFlightRef.current.add(arrivedDuringFetch);
 
-    arrivedWhileLoadingRef.current = [];
     try {
       const conversationResponse: any = await RetrieveData(
         `conversations/${props.conversationId}`,
@@ -397,14 +547,18 @@ export function Transcript(props: TranscriptProps) {
       }
 
       if (Array.isArray(transcriptMessages)) {
-        const arrivedWhileLoading = arrivedWhileLoadingRef.current ?? [];
-        setMessages(arrivedWhileLoading.reduce(insertMessageInOrder, transcriptMessages));
+        // The server's list wins, so chunks deleted or hidden while the socket was down leave the page.
+        const container = messagesContainerRef.current;
+        if (container && unpackOpenRef.current) {
+          preserveScrollRef.current = { scrollHeight: container.scrollHeight, scrollTop: container.scrollTop };
+        }
+        setMessages(arrivedDuringFetch.reduce(insertMessageInOrder, transcriptMessages));
 
         if (props.focusTimeRange) {
           setTimeout(() => {
             applyFocusAndScroll(transcriptMessages);
           }, 0);
-        } else if (isOpen) {
+        } else if (isOpen && !unpackOpenRef.current) {
           scrollToBottom();
         }
       }
@@ -413,7 +567,7 @@ export function Transcript(props: TranscriptProps) {
 
       if (props.setErrorMessage) props.setErrorMessage(error as string);
     } finally {
-      arrivedWhileLoadingRef.current = null;
+      fetchesInFlightRef.current.delete(arrivedDuringFetch);
       setHistoryLoaded(true);
     }
   };
@@ -526,7 +680,8 @@ export function Transcript(props: TranscriptProps) {
         const container = messagesContainerRef.current;
         if (container) {
           const wasAtBottom = Math.abs(container.scrollTop) < 5;
-          if (!wasAtBottom) {
+          // The Unpacker popover is pinned to its passage, so a passage pushed up by new chunks drags it along.
+          if (!wasAtBottom || unpackOpenRef.current) {
             // Save scroll state to restore after render
             preserveScrollRef.current = {
               scrollHeight: container.scrollHeight,
@@ -537,7 +692,7 @@ export function Transcript(props: TranscriptProps) {
           }
         }
 
-        arrivedWhileLoadingRef.current?.push(data);
+        fetchesInFlightRef.current.forEach((arrivedDuringFetch) => arrivedDuringFetch.push(data));
         setMessages((prev) => insertMessageInOrder(prev, data));
       }
     };
@@ -580,6 +735,7 @@ export function Transcript(props: TranscriptProps) {
 
   return (
     <div
+      ref={rootRef}
       className={`bg-nx-transcript text-white dark:text-nx-text transition-all duration-300 ease-in-out flex flex-col ${
         props.hideToggle ? 'h-full w-full' : isOpen ? 'h-[40vh] lg:h-full lg:w-[33vw]' : 'flex-shrink-0 lg:h-full lg:w-16'
       }`}
@@ -704,6 +860,23 @@ export function Transcript(props: TranscriptProps) {
         </div>
       )}
 
+      {unpackEnabled && isOpen && !unpackTipDismissed && (
+        <div className="mx-4 mt-3 flex flex-shrink-0 items-center justify-between gap-3 rounded-lg bg-[#EEF0FF] px-3.5 py-2.5 text-[13px] text-[#312E81]">
+          <p className="m-0 flex items-center gap-2">
+            <span aria-hidden="true">💡</span>
+            <span>Lost the thread? Select any passage and {botName} will unpack it while you keep listening.</span>
+          </p>
+          <button
+            type="button"
+            aria-label="Dismiss tip"
+            onClick={() => setUnpackTipDismissed(true)}
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-0 bg-transparent text-[#312E81] hover:bg-black/5"
+          >
+            <Close fontSize="small" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+
       {/* Messages */}
       {/* Scroll anchoring is off because new chunks are inserted at the bottom, and the browser would push the
           view up instead of following them. preserveScrollRef keeps the reader's place when scrolled up. */}
@@ -713,42 +886,74 @@ export function Transcript(props: TranscriptProps) {
           className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col-reverse min-h-0 [overflow-anchor:none] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-nx-scroll-track [&::-webkit-scrollbar-thumb]:bg-nx-scroll-thumb [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-nx-scroll-thumb-hover"
         >
           <div ref={topRef} />
-          {/* flex-col-reverse draws the first element at the bottom, so the newest message goes first */}
-          {[...messages].reverse().map((message, i) => {
-            const isBot = message.fromAgent;
+          {/* Browsers select text in page order, so chunks stay oldest first inside this one wrapper. The
+              container's flex-col-reverse then only pins the wrapper to the bottom. */}
+          <div>
+            {messages.map((message, i) => {
+              const isBot = message.fromAgent;
+              const canUnpack = unpackEnabled && !!message.id && isUnpackableText(chunkText(message));
 
-            return (
-              <div
-                id={`transcript-message-${message.id}`}
-                data-message-id={message.id}
-                key={message.id || `message-${i}`}
-                className={`mb-4 ${focusedMessageIds.includes(message.id!) ? 'bg-nx-focus-row dark:shadow-[inset_4px_0_0_var(--nx-border-interactive)]' : ''}`}
-              >
+              return (
                 <div
-                  className="flex items-center gap-2 text-gray-300 text-sm mb-1"
-                  style={props.presentation ? PRESENTATION_TEXT.meta : undefined}
+                  id={`transcript-message-${message.id}`}
+                  data-message-id={message.id}
+                  key={message.id || `message-${i}`}
+                  className={`mb-4 ${focusedMessageIds.includes(message.id!) ? 'bg-nx-focus-row dark:shadow-[inset_4px_0_0_var(--nx-border-interactive)]' : ''} ${canUnpack ? 'rounded cursor-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white' : ''}`}
+                  {...(canUnpack && {
+                    tabIndex: message.id === tabStopChunkId ? 0 : -1,
+                    role: 'button',
+                    'aria-haspopup': 'dialog' as const,
+                    'aria-expanded': !!unpackTarget?.openedFrom && unpackTarget.selection.startMessageId === message.id,
+                    'aria-describedby': unpackHintId,
+                    onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => handleChunkKeyDown(event, message),
+                    onClick: (event: React.MouseEvent<HTMLDivElement>) => handleChunkClick(event, message),
+                    onFocus: () => setActiveChunkId(message.id!),
+                  })}
                 >
-                  <span>{message.createdAt ? formatTime(new Date(message.createdAt)) : ''}</span>
-                  {isBot && (
-                    <span
-                      className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold"
-                      style={{ backgroundColor: botBadgeBackground, color: 'var(--nx-transcript-badge-fg)' }}
-                    >
-                      <BotIcon size={12} color="var(--nx-transcript-badge-fg)" />
-                      {normalizeAssistantPseudonym(message, botName)}
-                    </span>
-                  )}
+                  <div
+                    className="flex items-center gap-2 text-gray-300 text-sm mb-1"
+                    style={props.presentation ? PRESENTATION_TEXT.meta : undefined}
+                  >
+                    <span>{message.createdAt ? formatTime(new Date(message.createdAt)) : ''}</span>
+                    {isBot && (
+                      <span
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold"
+                        style={{ backgroundColor: botBadgeBackground, color: 'var(--nx-transcript-badge-fg)' }}
+                      >
+                        <BotIcon size={12} color="var(--nx-transcript-badge-fg)" />
+                        {normalizeAssistantPseudonym(message, botName)}
+                      </span>
+                    )}
+                  </div>
+                  <p
+                    data-chunk-text
+                    className="text-white text-base dark:text-nx-text"
+                    style={props.presentation ? PRESENTATION_TEXT.message : undefined}
+                  >
+                    {chunkText(message)}
+                  </p>
                 </div>
-                <p
-                  className="text-white text-base dark:text-nx-text"
-                  style={props.presentation ? PRESENTATION_TEXT.message : undefined}
-                >
-                  {message.body.text ? message.body.text : message.body}
-                </p>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
+      )}
+
+      {unpackEnabled && (
+        <>
+          <span id={unpackHintId} hidden>
+            Press Enter to unpack this with {botName}. Use the arrow keys to move between passages.
+          </span>
+          <UnpackPopover
+            conversationId={props.conversationId}
+            transcriptPasscode={props.transcriptPasscode}
+            target={unpackTarget}
+            chunks={chunkTexts}
+            onClose={closeUnpack}
+            onOpenPrivateChat={props.unpack?.onOpenPrivateChat}
+            focusOnOpen={!!unpackTarget?.openedFrom}
+          />
+        </>
       )}
 
       {/* Delete Confirmation Modal */}

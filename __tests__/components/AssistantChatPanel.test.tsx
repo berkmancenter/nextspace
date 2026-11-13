@@ -1,14 +1,20 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AssistantChatPanel } from '../../components/AssistantChatPanel';
-import { PseudonymousMessage } from '../../types.internal';
 import { describeCatchUpRequest } from '../../utils/catchUp';
+import { PseudonymousMessage } from '../../types.internal';
 
-// Mock message components
+// Mock message components. A module can only be mocked once per test file — later jest.mock
+// calls for this same path inside individual tests are silently ineffective — so this top-level
+// mock must itself forward anything a test wants to inspect, including initialSelectedPrompt.
 jest.mock('../../components/messages', () => ({
-  AssistantMessage: ({ message }: any) => {
+  AssistantMessage: ({ message, initialSelectedPrompt }: any) => {
     const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
-    return <div data-testid="assistant-message">{messageText}</div>;
+    return (
+      <div data-testid="assistant-message" data-initial-prompt={initialSelectedPrompt}>
+        {messageText}
+      </div>
+    );
   },
   UserMessage: ({ message }: any) => {
     const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
@@ -24,6 +30,9 @@ jest.mock('../../components/messages', () => ({
     );
   },
   CatchUpSummaryMessage: ({ message }: any) => <div data-testid="catch-up-summary-message">{message.body.inShort}</div>,
+  UnpackExplanationMessage: ({ message }: any) => (
+    <div data-testid="unpack-explanation-message">{message.body.whatTheyreSaying}</div>
+  ),
 }));
 
 // Mock ModSuggestButton so we can inspect submitted/onSubmit props
@@ -60,8 +69,8 @@ jest.mock('../../components/MessageFeedback', () => ({
 
 // Mock MessageInput component
 jest.mock('../../components/MessageInput', () => ({
-  MessageInput: ({ onSendMessage, waitingForResponse }: any) => (
-    <div data-testid="message-input">
+  MessageInput: ({ onSendMessage, waitingForResponse, focusOnMount }: any) => (
+    <div data-testid="message-input" data-focus-on-mount={!!focusOnMount}>
       <input
         data-testid="message-input-field"
         placeholder="Write a Comment"
@@ -109,6 +118,12 @@ describe('AssistantChatPanel', () => {
 
     expect(screen.getByTestId('message-input')).toBeInTheDocument();
     expect(screen.queryByTestId('assistant-message')).not.toBeInTheDocument();
+  });
+
+  it('asks the message box to take focus when the panel opens for a keyboard user', () => {
+    render(<AssistantChatPanel {...baseProps} focusInputOnMount />);
+
+    expect(screen.getByTestId('message-input')).toHaveAttribute('data-focus-on-mount', 'true');
   });
 
   it('renders assistant messages', () => {
@@ -635,31 +650,12 @@ describe('AssistantChatPanel', () => {
   });
 
   it('passes initialSelectedPrompt to AssistantMessage when a response exists', () => {
-    // Mock AssistantMessage to capture props
-    const mockAssistantMessage = jest.fn(({ message, initialSelectedPrompt }: any) => {
-      const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
-      return (
-        <div data-testid="assistant-message" data-initial-prompt={initialSelectedPrompt}>
-          {messageText}
-        </div>
-      );
-    });
-
-    jest.mock('../../components/messages', () => ({
-      AssistantMessage: mockAssistantMessage,
-      UserMessage: ({ message }: any) => {
-        const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
-        return <div data-testid="user-message">{messageText}</div>;
-      },
-      JargonClarificationMessage: () => null,
-    }));
-
     const messages = [
       {
         id: 'prompt-1',
         pseudonym: 'Event Assistant',
         createdAt: '2025-10-17T12:00:00Z',
-        body: 'Do you need help?',
+        body: { text: 'Do you need help?', type: 'warmUpQuestion' },
         channels: ['user'],
         conversation: 'conv-1',
         pseudonymId: 'ea-1',
@@ -695,11 +691,57 @@ describe('AssistantChatPanel', () => {
 
     render(<AssistantChatPanel {...baseProps} messages={messages} />);
 
-    // The prompt message should be visible
+    // The prompt message should be visible, with its prior answer passed through
     expect(screen.getByText('Do you need help?')).toBeInTheDocument();
+    expect(screen.getByTestId('assistant-message')).toHaveAttribute('data-initial-prompt', 'Yes');
 
-    // The response message should be filtered out
-    expect(screen.queryByText('Yes')).not.toBeInTheDocument();
+    // The response message should be filtered out of the normal message stream, not rendered as its own bubble
+    expect(screen.queryByTestId('user-message')).not.toBeInTheDocument();
+  });
+
+  it('passes initialSelectedPrompt to AssistantMessage for a text prompt too, not just singleChoice', () => {
+    const messages = [
+      {
+        id: 'prompt-1',
+        pseudonym: 'Event Assistant',
+        createdAt: '2025-10-17T12:00:00Z',
+        body: { text: 'What questions do you have?', type: 'warmUpQuestion' },
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'ea-1',
+        fromAgent: true,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+        prompt: {
+          type: 'text' as const,
+        },
+      },
+      {
+        id: 'response-1',
+        pseudonym: 'test-user',
+        createdAt: '2025-10-17T12:01:00Z',
+        body: 'How does the new policy affect existing contracts?',
+        channels: ['user'],
+        conversation: 'conv-1',
+        pseudonymId: 'tu-1',
+        fromAgent: false,
+        pause: false,
+        visible: true,
+        upVotes: [],
+        downVotes: [],
+        answersPrompt: 'prompt-1',
+      },
+    ];
+
+    render(<AssistantChatPanel {...baseProps} messages={messages} />);
+
+    const assistantMessageEl = screen.getByTestId('assistant-message');
+    expect(assistantMessageEl).toHaveAttribute('data-initial-prompt', 'How does the new policy affect existing contracts?');
+
+    // The response message should be filtered out of the normal message stream, not rendered as its own bubble
+    expect(screen.queryByTestId('user-message')).not.toBeInTheDocument();
   });
 
   it('shows loading indicator when waiting for response', () => {
@@ -2034,6 +2076,55 @@ describe('AssistantChatPanel', () => {
 
       // Should show "+2 more replies" indicator for the remaining replies
       expect(screen.getByText('+ 2 more replies')).toBeInTheDocument();
+    });
+  });
+
+  describe('Unpacker passage card', () => {
+    const unpackExplanation = {
+      id: 'answer-1',
+      pseudonym: 'Berkie',
+      createdAt: '2025-10-17T10:43:05Z',
+      body: {
+        type: 'unpack_explanation',
+        mode: 'passage',
+        destination: 'privateChat',
+        chunkIds: ['chunk-1'],
+        passage: { start: '2025-10-17T10:42:10Z', end: '2025-10-17T10:43:00Z' },
+        quote: 'Courts read the Fourth Amendment narrowly.',
+        whatTheyreSaying: 'The speaker says courts give phone records less protection.',
+        whyItMatters: 'This is why the talk focuses on records.',
+        terms: [],
+        text: 'Plain-text copy',
+      },
+      bodyType: 'json',
+      channels: ['direct-test-user-id-agent-1'],
+      conversation: 'conv-1',
+      pseudonymId: 'agent-1',
+      fromAgent: true,
+      pause: false,
+      visible: true,
+      upVotes: [],
+      downVotes: [],
+    };
+
+    it('shows an unpack_explanation as the answer card', () => {
+      render(<AssistantChatPanel {...baseProps} messages={[unpackExplanation]} />);
+
+      expect(screen.getByTestId('unpack-explanation-message')).toHaveTextContent(
+        'The speaker says courts give phone records less protection.',
+      );
+      expect(screen.queryByTestId('assistant-message')).not.toBeInTheDocument();
+    });
+
+    it('leaves a Catch me up answer out of the passage card', () => {
+      const catchUpAnswer = {
+        ...unpackExplanation,
+        body: { ...unpackExplanation.body, mode: 'lastMinute', requestMessage: 'request-1' },
+      };
+
+      render(<AssistantChatPanel {...baseProps} messages={[catchUpAnswer]} />);
+
+      expect(screen.queryByTestId('unpack-explanation-message')).not.toBeInTheDocument();
     });
   });
 

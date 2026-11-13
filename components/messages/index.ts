@@ -2,4 +2,5 @@ export { AssistantMessage } from './AssistantMessage';
 export { BackchannelMessage } from './BackchannelMessage';
 export { UserMessage } from './UserMessage';
 export { JargonClarificationMessage } from './JargonClarificationMessage';
+export { UnpackExplanationMessage } from './UnpackExplanationMessage';
 export { CatchUpSummaryMessage } from './CatchUpSummaryMessage';

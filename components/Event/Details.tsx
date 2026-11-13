@@ -8,6 +8,7 @@ import {
 } from '@mui/icons-material';
 import { Conversation } from '../../types.internal';
 import { deriveEventState, isValidZoomUrl } from '../../utils/eventState';
+import { isFeatureEnabled } from '../../utils/Helpers';
 import { SectionCard } from './SectionCard';
 
 // Short date-time without seconds, e.g. "7/15/2026, 4:00 PM".
@@ -55,13 +56,13 @@ const formatTimeZone = (isoString?: string) => {
  * (mindmap, visual, visualPreference, jargonFilter) are intentionally excluded — they aren't
  * organizer configuration.
  */
-const ORGANIZER_FEATURES: { name: string; label: string; defaultEnabled: boolean }[] = [
-  { name: 'moderatorSupport', label: 'Moderator Support', defaultEnabled: true },
-  { name: 'collectiveVoice', label: 'Collective Voice', defaultEnabled: true },
-  { name: 'catalyst', label: 'Catalyst', defaultEnabled: true },
-  { name: 'librarian', label: 'Reading Recommendations', defaultEnabled: true },
-  { name: 'seriesHistory', label: 'Series History', defaultEnabled: false },
-  { name: 'voiceOutput', label: 'Voice Responses', defaultEnabled: false },
+const ORGANIZER_FEATURES: { name: string; label: string; default: boolean }[] = [
+  { name: 'moderatorSupport', label: 'Moderator Support', default: true },
+  { name: 'collectiveVoice', label: 'Collective Voice', default: true },
+  { name: 'catalyst', label: 'Catalyst', default: true },
+  { name: 'librarian', label: 'Reading Recommendations', default: true },
+  { name: 'seriesHistory', label: 'Series History', default: false },
+  { name: 'voiceOutput', label: 'Voice Responses', default: false },
 ];
 
 /**
@@ -349,9 +350,8 @@ export const EventDetails: React.FC<{
         </div>
 
         <Subhead className="mt-4">Features</Subhead>
-        {ORGANIZER_FEATURES.map(({ name, label, defaultEnabled }) => {
-          const conversationFeature = conversationData.features?.find((f: { name: string }) => f.name === name);
-          const enabled = conversationFeature ? (conversationFeature.enabled ?? true) : defaultEnabled;
+        {ORGANIZER_FEATURES.map(({ name, label }) => {
+          const enabled = isFeatureEnabled(name, conversationData.features, ORGANIZER_FEATURES);
           return (
             <div
               key={name}

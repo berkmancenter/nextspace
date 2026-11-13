@@ -2,10 +2,16 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { useTheme, useMediaQuery, Button, IconButton, Tooltip } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import { AssistantMessage, UserMessage, JargonClarificationMessage, CatchUpSummaryMessage } from '../components/messages';
+import {
+  AssistantMessage,
+  UserMessage,
+  JargonClarificationMessage,
+  UnpackExplanationMessage,
+  CatchUpSummaryMessage,
+} from '../components/messages';
 import { MessageInput } from './MessageInput';
 import { SlashCommand, createSlashCommandEnhancer } from './enhancers/slashCommandEnhancer';
-import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
+import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig, UnpackExplanation } from '../types.internal';
 import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { getTimestampVisibility, parseMessageBody } from '../utils/Helpers';
@@ -42,6 +48,8 @@ interface AssistantChatPanelProps {
   onCatchUp?: (retryOf?: UnpackRequestBody) => void;
   /** Looked up by ID to list the passages in a catch-up request. */
   transcriptChunks?: PseudonymousMessage[];
+  /** Puts keyboard focus in the message box when the panel opens. */
+  focusInputOnMount?: boolean;
 }
 
 export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
@@ -65,6 +73,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   inactive = false,
   onCatchUp,
   transcriptChunks = [],
+  focusInputOnMount = false,
 }) => {
   const catchUpButtonRef = useRef<HTMLButtonElement>(null);
   const transcriptChunksById = useMemo(
@@ -257,7 +266,14 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     const messageType = parsed.type;
     const style = isAssistant ? getAssistantAvatarStyle() : getAvatarStyle(msg.pseudonym, isCurrentUser);
 
-    const hasPromptOptions = msg.prompt?.options && msg.prompt.options.length > 0 && msg.prompt.type === 'singleChoice';
+    // Mirrors AssistantMessage's own hasChoiceOptions/isTextPrompt split: a text prompt has no
+    // options, so checking options alone (as this used to) left it out of the answer-linking
+    // branch below, meaning a refresh never restored its prior answer via initialSelectedPrompt.
+    // Applies to any message with this shape, regardless of why it has one — messageType is only
+    // used further down to scope AssistantMessage's "Starting point" label to warm-up questions.
+    const hasChoiceOptions = msg.prompt?.options && msg.prompt.options.length > 0 && msg.prompt.type === 'singleChoice';
+    const isTextPrompt = msg.prompt?.type === 'text';
+    const hasPromptOptions = hasChoiceOptions || isTextPrompt;
 
     const bodyText = parsed.text;
 
@@ -325,17 +341,32 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
       msg.id !== undefined &&
       msg.id === lastMessage?.id;
 
+    // Early catch-up answers reused this type with mode lastMinute; only passage explanations get this card.
+    if (messageType === 'unpack_explanation' && (msg.body as UnpackExplanation).mode === 'passage') {
+      return <UnpackExplanationMessage message={msg} />;
+    }
+
     // Assistant messages
     if (isAssistant) {
-      if (hasPromptOptions) {
-        return (
-          <div style={{ width: '85%' }}>
-            {sourceContextText && (
-              <div className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded">
-                <span className="font-medium">In reply to: </span>
-                {sourceContextText}
-              </div>
-            )}
+      return (
+        <div style={{ width: '85%' }}>
+          {sourceContextText && (
+            <div className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded">
+              <span className="font-medium">In reply to: </span>
+              {sourceContextText}
+            </div>
+          )}
+          {/* Same outer bubble as a plain assistant message (and the same layering PollMessage
+              gets in GroupChatPanel): AssistantMessage's own white poll-style card sits inside
+              this colored bubble, rather than floating on the page background. */}
+          <div
+            className="rounded-2xl px-2 py-1 text-gray-800 self-start"
+            style={{
+              backgroundColor: style.bubbleBg,
+              width: '100%',
+              border: '1px solid rgba(0, 0, 0, 0.1)',
+            }}
+          >
             <AssistantMessage
               message={{
                 ...msg,
@@ -345,59 +376,32 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
               onPromptSelect={onPromptSelect}
               onImageClick={handleImageClick}
               onMarkmapClick={handleMarkmapClick}
-              initialSelectedPrompt={
-                msg.id
-                  ? (() => {
-                      const response = messages.find((m) => m.answersPrompt === msg.id);
-                      return response ? parseMessageBody(response.body).text : undefined;
-                    })()
-                  : undefined
-              }
+              {...(hasPromptOptions
+                ? {
+                    messageType,
+                    initialSelectedPrompt: msg.id
+                      ? (() => {
+                          const response = messages.find((m) => m.answersPrompt === msg.id);
+                          return response ? parseMessageBody(response.body).text : undefined;
+                        })()
+                      : undefined,
+                  }
+                : {})}
             />
           </div>
-        );
-      } else {
-        return (
-          <div style={{ width: '85%' }}>
-            {sourceContextText && (
-              <div className="text-xs text-gray-500 mb-1.5 pl-2 py-1 border-l-2 border-gray-300 bg-gray-50 rounded">
-                <span className="font-medium">In reply to: </span>
-                {sourceContextText}
-              </div>
-            )}
-            <div
-              className="rounded-2xl px-2 py-1 text-gray-800 self-start"
-              style={{
-                backgroundColor: style.bubbleBg,
-                width: '100%',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
-              }}
+          {canRetryCatchUp && (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => retryCatchUp(msg)}
+              aria-disabled={waitingForResponse}
+              sx={{ marginTop: '6px', textTransform: 'none' }}
             >
-              <AssistantMessage
-                message={{
-                  ...msg,
-                  body: bodyText,
-                }}
-                media={parsed.media}
-                onPromptSelect={onPromptSelect}
-                onImageClick={handleImageClick}
-                onMarkmapClick={handleMarkmapClick}
-              />
-            </div>
-            {canRetryCatchUp && (
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => retryCatchUp(msg)}
-                aria-disabled={waitingForResponse}
-                sx={{ marginTop: '6px', textTransform: 'none' }}
-              >
-                Try again
-              </Button>
-            )}
-          </div>
-        );
-      }
+              Try again
+            </Button>
+          )}
+        </div>
+      );
     }
 
     const isModSuggested = msg.id ? moderatorSuggestedIds.has(msg.id) : false;
@@ -516,6 +520,7 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
                   onExitControlledMode={onExitControlledMode}
                   inputValue={inputValue}
                   onInputChange={onInputChange}
+                  focusOnMount={focusInputOnMount}
                 />
               )}
             </>

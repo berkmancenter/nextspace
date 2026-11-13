@@ -22,6 +22,10 @@ export interface ParsedMessageBody {
   source?: string;
   sourceMessage?: string;
   content?: any;
+  /** Exactly three facts for a pregame "threeFacts" message, rendered as a structured list rather than parsed out of prose. */
+  facts?: string[];
+  /** The LLM-written line inviting people to chat, shown at the end of a "threeFacts" message. */
+  invitation?: string;
   /** The readable label of the goal a proactive agent message was generated to serve, if any. */
   goal?: string;
 }
@@ -44,6 +48,8 @@ export const parseMessageBody = (body: string | object): ParsedMessageBody => {
       source: obj.source?.toString(),
       sourceMessage: obj.sourceMessage?.toString(),
       content: obj.content,
+      facts: Array.isArray(obj.facts) ? obj.facts : undefined,
+      invitation: obj.invitation?.toString(),
       goal: obj.goal?.toString(),
     };
   }
@@ -273,8 +279,40 @@ export const SendData = async (
     const data = await response.json();
     return data;
   } catch (error) {
+    // The caller cancelled it on purpose, for example because a newer request replaced it.
+    if (error instanceof DOMException && error.name === 'AbortError') return;
     console.error('There was a problem with the send operation:', error);
   }
+};
+
+/**
+ * Whether an event has a feature on. A setting saved on the event wins; otherwise the conversation
+ * type's default applies, as in the backend's getFeatures().
+ */
+export const isFeatureEnabled = (
+  name: string,
+  savedFeatures: { name: string; enabled?: boolean }[] | undefined,
+  typeFeatures: { name: string; default?: boolean }[] | undefined,
+): boolean => {
+  const saved = savedFeatures?.find((feature) => feature.name === name);
+  if (saved) return saved.enabled !== false;
+  return !!typeFeatures?.find((feature) => feature.name === name)?.default;
+};
+
+/**
+ * Whether a mouse press landed on the scroll bar of the element it targets. Browsers report a scroll bar
+ * press as a press on the scrolling element, so only its position tells the two apart.
+ */
+export const isScrollbarPress = (event: MouseEvent): boolean => {
+  const element = event.target;
+  if (!(element instanceof Element)) return false;
+  const { left, top } = element.getBoundingClientRect();
+  const onVerticalBar = event.clientX >= left + element.clientLeft + element.clientWidth;
+  const onHorizontalBar = event.clientY >= top + element.clientTop + element.clientHeight;
+  return (
+    (onVerticalBar && element.scrollHeight > element.clientHeight) ||
+    (onHorizontalBar && element.scrollWidth > element.clientWidth)
+  );
 };
 
 // Default easing class for animations

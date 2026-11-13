@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { getUserTimezone } from '../../utils';
 import { CheckAuthHeader, getConversation } from '../../utils/Helpers';
-import { isEventMissed } from '../../utils/eventState';
+import { isEventEditable, isEventMissed } from '../../utils/eventState';
 import { useSessionJoin } from '../../hooks/useSessionJoin';
 
 import React from 'react';
@@ -75,11 +75,9 @@ const EventCard = ({
   // Check if current user is the owner of this event (used for "My Event" badge only)
   const isOwner = currentUserId && event.owner === currentUserId;
 
-  // Edit is available for future inactive events with a known type
-  const eventStarted = !!event.startTime;
   const isPast = !!event.endTime;
   const isMissed = isEventMissed(event);
-  const canEdit = !event.active && !eventStarted && !!event.type?.name;
+  const canEdit = isEventEditable(event);
 
   const handleCopyLink = async (url: string) => {
     try {

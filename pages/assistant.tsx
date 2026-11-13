@@ -17,8 +17,9 @@ import { NavigationBar } from '../components/NavigationBar';
 import { PreferencesPanel } from '../components/PreferencesPanel';
 import { PresentationHeader } from '../components/PresentationHeader';
 import { insertMessageInOrder } from '../utils/messageModeration';
+import { BotPresence } from '../components/BotPresence';
 import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
-import { CheckAuthHeader, parseMessageBody } from '../utils/Helpers';
+import { CheckAuthHeader, isFeatureEnabled, parseMessageBody } from '../utils/Helpers';
 import { withStoredChannels } from '../utils/presentationChannels';
 import { buildCatchUpRequest, pickCatchUpChunks } from '../utils/catchUp';
 import TokenManagerDefault from '../utils/TokenManager';
@@ -238,15 +239,11 @@ export function EventAssistantRoom({
     pendingHiddenRef,
   });
 
-  // An event saved before the unpacker setting existed has no entry for it, which means off.
-  const unpackerFeature = conversationFeatures.find((feature) => feature.name === 'unpacker');
-  const unpackerEnabled = !presentation && unpackerFeature !== undefined && unpackerFeature.enabled !== false;
   const [catchUpAnnouncement, setCatchUpAnnouncement] = useState<{ id: string; refusal: string | null } | null>(null);
   // Tracked apart from waitingForResponse, which any Berkie reply clears, even one to an earlier question.
   const [catchUpPending, setCatchUpPending] = useState(false);
   // Null until the transcript history loads, so a catch-up can't go out with an incomplete list.
   const [transcriptChunks, setTranscriptChunks] = useState<PseudonymousMessage[] | null>(null);
-  const catchUpReady = unpackerEnabled && (!transcriptPasscode || transcriptChunks !== null);
 
   useEffect(() => {
     if (!catchUpPending) return;
@@ -259,16 +256,31 @@ export function EventAssistantRoom({
 
   // Derive slash commands from the loaded conversation type's features.
   const slashCommands: SlashCommand[] = (conversationType?.features ?? [])
-    .filter((f) => {
-      if (f.slashCommand == null) return false;
-      const override = conversationFeatures.find((cf) => cf.name === f.name);
-      return override?.enabled !== false;
-    })
+    .filter((f) => f.slashCommand != null && isFeatureEnabled(f.name, conversationFeatures, conversationType?.features))
     .map((f) => ({
       command: f.slashCommand!,
       description: f.description ?? '',
       value: `/${f.slashCommand} `,
     }));
+
+  const unpackerOn = isFeatureEnabled('unpacker', conversationFeatures, conversationType?.features);
+  const catchUpReady = unpackerOn && !presentation && (!transcriptPasscode || transcriptChunks !== null);
+  const privateChatOnScreen = activeTab === 'assistant' && router.query.view !== 'preferences';
+  const [focusPrivateChatInput, setFocusPrivateChatInput] = useState(false);
+  // The panel reads the flag when it mounts (child effects run first), so later tab switches leave focus alone.
+  useEffect(() => {
+    if (focusPrivateChatInput) setFocusPrivateChatInput(false);
+  }, [focusPrivateChatInput]);
+  const openPrivateChatFromUnpacker = () => {
+    setFocusPrivateChatInput(true);
+    handleTabChange('assistant');
+  };
+  // Organizer's chosen destination for the bot's voice: 'zoom' means Recall's own Zoom-facing bot
+  // speaks there, so the presentation view's bot presence panel must not also play audio — that's
+  // the double-audio outcome voiceDestination exists to prevent.
+  const voiceDestination =
+    (conversationFeatures.find((f) => f.name === 'voiceOutput')?.config?.voiceDestination as string | undefined) ??
+    'presentation';
 
   // Socket event listeners — cross-cutting: messages + tab badges + loading state + resources
   useEffect(() => {
@@ -669,7 +681,9 @@ export function EventAssistantRoom({
   const handlePromptSelect = async (value: string, promptMessageId?: string) => {
     const promptMessage = assistantMessages.find((msg) => msg.id === promptMessageId);
     const threadParentId = promptMessage?.parentMessage;
-    await sendMessage(value, true, threadParentId, false, 'promptResponse', promptMessageId);
+    // A prompt answer isn't a question to the bot, so don't show the thinking indicator while
+    // waiting on it like a normal message — the backend never generates a reply to wait for.
+    await sendMessage(value, false, threadParentId, false, 'promptResponse', promptMessageId);
   };
 
   const assistantFeedbackConfig: FeedbackConfig = {
@@ -800,7 +814,12 @@ export function EventAssistantRoom({
                     lastReconnectTime={lastReconnectTime}
                     hideToggle={presentation || (router.query.view !== 'preferences' && activeTab === 'transcript')}
                     presentation={presentation}
-                    onMessagesChange={unpackerEnabled ? setTranscriptChunks : undefined}
+                    onMessagesChange={unpackerOn ? setTranscriptChunks : undefined}
+                    unpack={
+                      unpackerOn
+                        ? { onOpenPrivateChat: privateChatOnScreen ? undefined : openPrivateChatFromUnpacker }
+                        : undefined
+                    }
                   />
                 </div>
               )}
@@ -915,6 +934,7 @@ export function EventAssistantRoom({
                           inactive={!agentActive || eventStatus !== 'active'}
                           onCatchUp={catchUpReady ? catchUp : undefined}
                           transcriptChunks={transcriptChunks ?? undefined}
+                          focusInputOnMount={focusPrivateChatInput}
                           messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
                           onMarkAsRead={(messageId) => {
                             setAssistantMessagesWithUnreadReplies((prev) => {
@@ -942,6 +962,17 @@ export function EventAssistantRoom({
                   </div>
                 </>
               ) : null}
+              {/* Waits for eventStatusLoaded so botName/transcriptPasscode are already resolved before
+                  the iframe's first request — otherwise it connects once without the transcript
+                  passcode and only gets it on a second, src-change-triggered navigation. */}
+              {presentation && eventStatusLoaded && (
+                <BotPresence
+                  conversationId={router.query.conversationId as string}
+                  botName={botName}
+                  transcriptPasscode={transcriptPasscode}
+                  audioEnabled={voiceDestination !== 'zoom'}
+                />
+              )}
             </div>
           </>
         )}

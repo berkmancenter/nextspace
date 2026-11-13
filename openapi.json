@@ -299,7 +299,7 @@
     "/artifacts/generate": {
       "post": {
         "summary": "Build or refine a concept graph",
-        "description": "With a `conversationId`, reads that event's transcript and group chat and writes a ConceptGraphArtifact for it. With a `topicId`, folds every conversation in the series into one topic-scoped graph — which is also how a series predating this feature gets backfilled.\nBoth run automatically when a conversation with the Concept Cartographer agent stops: the event gets its own graph, and the topic's graph is refined with it. A series unfolds over time, so the topic graph accumulates a version per event rather than being rebuilt, and the sequence of versions records how the series' understanding developed. Concepts keep stable ids across versions, so two can be diffed.\nSafe to re-run, and re-running is how a poor extraction gets redone: the second run appends a new version to the existing graph rather than replacing it or creating a duplicate, so both extractions stay readable and comparable.\nAn ordinary re-run of a topic still folds the graph's current version in as a source, which means a concept already folded away by the size cap stays folded even after raising it. `reset` (topicId only) skips that: it recomputes the whole series from its raw transcripts alone, ignoring the current graph entirely. It still only ever appends a new version, so the pre-reset graph is never lost — it's just no longer what the new one was built from. Costs a full backfill every time, so this is an operator escape hatch, not something to reach for routinely.\nThe event is treated as running under the Chatham House Rule. Nothing in the output names or otherwise identifies anyone who took part, and statements are paraphrased — a verbatim quotation survives only inside quotation marks and only when it identifies no one.\nRegistered ahead of `/artifacts/{artifactId}` so `generate` is not read as an id.",
+        "description": "With a `conversationId`, reads that event's transcript and group chat and writes a ConceptGraphArtifact for it. With a `topicId`, folds every conversation in the series into one topic-scoped graph — which is also how a series predating this feature gets backfilled.\nBoth run automatically when a conversation with the Concept Cartographer agent stops: the event gets its own graph, and the topic's graph is refined with it. A series unfolds over time, so the topic graph accumulates a version per event rather than being rebuilt, and the sequence of versions records how the series' understanding developed. Concepts keep stable ids across versions, so two can be diffed.\nSafe to re-run, and re-running is how a poor extraction gets redone: the second run appends a new version to the existing graph rather than replacing it or creating a duplicate, so both extractions stay readable and comparable.\nAn ordinary re-run of a topic still folds the graph's current version in as a source, which means a concept already folded away by the size cap stays folded even after raising it. `reset` (topicId only) skips that: it recomputes the whole series from its raw transcripts alone, ignoring the current graph entirely. It still only ever appends a new version, so the pre-reset graph is never lost — it's just no longer what the new one was built from. Costs a full backfill every time, so this is an operator escape hatch, not something to reach for routinely.\nThe event is treated as running under the Chatham House Rule. Nothing in the output names or otherwise identifies anyone who took part, and statements are paraphrased — a verbatim quotation survives only inside quotation marks and only when it identifies no one.\nRegistered ahead of `/artifacts/{artifactId}` so `generate` is not read as an id.\nRuns in a background job rather than inline in this request, since the pipeline can run long enough to exceed the load balancer's backend timeout. This call only claims (or creates) the target artifact and enqueues the run, answering 202 immediately with `generationStatus: 'pending'`. A generation already in flight for this artifact is a no-op: the same, still-pending artifact comes back rather than a second job. Poll `GET /artifacts/{artifactId}` or listen for the `artifact:version` (done) / `artifact:generationFailed` (errored, or too little to map) socket events — on the conversation's room for a conversationId run, the topic's room for a topicId run — to see the claim resolve.",
         "tags": [
           "Artifact"
         ],
@@ -337,27 +337,8 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Nothing was written because the record was too thin to map, or nothing survived the safety checks. Not an error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "generated": {
-                      "type": "boolean",
-                      "example": false
-                    },
-                    "reason": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
           "202": {
-            "description": "The graph was built and written as a version",
+            "description": "The generation run was claimed and enqueued (or was already in flight). The artifact returned here is a snapshot at claim time — `generationStatus` is `pending`, and `currentVersion`/`currentVersionNumber` still reflect whatever the artifact had before this call, or are absent entirely on a first-ever generation. Poll `GET /artifacts/{artifactId}` or listen on the socket for the result: `artifact:version` once a new version is written, or `artifact:generationFailed` if the run errored or found too little of the record to map.",
             "content": {
               "application/json": {
                 "schema": {
@@ -370,36 +351,15 @@
                     "artifact": {
                       "$ref": "#/components/schemas/Artifact"
                     },
-                    "version": {
-                      "$ref": "#/components/schemas/ArtifactVersion"
-                    },
-                    "report": {
-                      "type": "object",
-                      "description": "What assembly and the Chatham House checks removed",
-                      "properties": {
-                        "droppedConcepts": {
-                          "type": "number"
-                        },
-                        "droppedContributions": {
-                          "type": "number"
-                        },
-                        "droppedStatements": {
-                          "type": "number"
-                        },
-                        "droppedGlosses": {
-                          "type": "number"
-                        },
-                        "droppedOriginPrompts": {
-                          "type": "number"
-                        },
-                        "mergedConcepts": {
-                          "type": "number"
-                        },
-                        "foldedConcepts": {
-                          "type": "number",
-                          "description": "Concepts consolidated into a related one because the series graph outgrew its size cap — distinct from mergedConcepts, which counts concepts recognised as the same idea rather than consolidated for space."
-                        }
-                      }
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ready",
+                        "pending",
+                        "failed"
+                      ],
+                      "description": "Echoes the returned artifact's generationStatus, which is 'pending' immediately after a fresh claim",
+                      "example": "pending"
                     }
                   }
                 }
@@ -5288,7 +5248,7 @@
     "/unpack/{conversationId}/preview": {
       "post": {
         "summary": "Preview an explanation of a transcript passage",
-        "description": "Explains the passage a participant selected and records their ask. The browser sends only chunk IDs and character positions; the server rebuilds the quote from the saved transcript and widens it to whole sentences, so people who select roughly the same words share one saved explanation. The first request for a passage waits for the AI model; later ones are answered from the saved copy. Each participant can preview a limited number of different passages per minute.\n",
+        "description": "Explains the passage a participant selected and records their ask. The browser sends only chunk IDs and character positions; the server rebuilds the quote from the saved transcript and widens it to whole sentences, so people who select roughly the same words share one saved explanation. The first request for a passage waits for the AI model, up to about 25 seconds before answering unpackFailed; the explanation is still saved for a retry. Later requests are answered from the saved copy. Each participant can preview a limited number of different passages per minute.\n",
         "tags": [
           "Unpack"
         ],
@@ -5312,7 +5272,15 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UnpackSelection"
+                "$ref": "#/components/schemas/UnpackSelection",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/UnpackSelection"
+                  },
+                  {
+                    "$ref": "#/components/schemas/UnpackTranscriptPasscode"
+                  }
+                ]
               }
             }
           }
@@ -5355,7 +5323,7 @@
     "/unpack/{conversationId}/send": {
       "post": {
         "summary": "Send a passage's explanation",
-        "description": "Posts the saved explanation of a passage to the chosen destination as an `unpack_explanation` card from the event assistant. Works before the preview has finished, or without one: the choice is stored and the card posts as soon as the explanation is written (`status: pending`). Sending the same passage again posts nothing new and returns the existing card's message ID. Only `privateChat` is accepted for now.\n",
+        "description": "Posts the saved explanation of a passage to the chosen destination as an `unpack_explanation` card from the event assistant. Works before the preview has finished, or without one: the choice is stored and the card posts as soon as the explanation is written (`status: pending`). Sending the same passage again posts nothing new and returns the existing card's message ID. If the card can't be posted, for example because the event is locked, the request fails and can be sent again. Only `privateChat` is accepted for now.\n",
         "tags": [
           "Unpack"
         ],
@@ -5382,6 +5350,9 @@
                 "allOf": [
                   {
                     "$ref": "#/components/schemas/UnpackSelection"
+                  },
+                  {
+                    "$ref": "#/components/schemas/UnpackTranscriptPasscode"
                   },
                   {
                     "type": "object",
@@ -5429,6 +5400,9 @@
             "$ref": "#/components/responses/UnpackRefused"
           },
           "429": {
+            "$ref": "#/components/responses/UnpackRefused"
+          },
+          "503": {
             "$ref": "#/components/responses/UnpackRefused"
           }
         }
@@ -6730,7 +6704,8 @@
             "type": "string",
             "enum": [
               "lastMinute"
-            ]
+            ],
+            "description": "Which part of the talk to explain. lastMinute is the transcript from the 60 seconds before the request."
           },
           "text": {
             "type": "string",
@@ -6856,6 +6831,10 @@
           "text": {
             "type": "string",
             "description": "Plain-text version of all sections, for chat history and clients that can't render the card."
+          },
+          "requestMessage": {
+            "type": "string",
+            "description": "ID of the participant's request message. Only \"Catch me up\" replies have one."
           }
         }
       },
@@ -7029,7 +7008,7 @@
           },
           "explanation": {
             "type": "object",
-            "description": "The saved explanation that send will post. whatTheyreSaying is written first, so a preview can show its opening sentences.",
+            "description": "The saved explanation. whatTheyreSaying is written first, so a preview can show its opening sentences. Send posts the explanation as it is at that moment, which a background rewrite with more of the following transcript may have changed since this preview.",
             "required": [
               "range",
               "chunkIds",
@@ -7145,9 +7124,10 @@
               "offsetPastEnd",
               "selectionBackwards",
               "selectionTooLong",
-              "unpackFailed"
+              "unpackFailed",
+              "wrongPasscode"
             ],
-            "description": "Why the request was refused. rateLimited (429), too many passages in the last minute. unpackerOff (403), the event's unpacker feature is off. noAssistant (409), the event has no assistant. noPrivateChat (409), the participant has no Private Chat with the assistant. chunkNotInTranscript (400), a chunk ID is not in this event's transcript. offsetPastEnd (400), a position is past the end of its chunk. selectionBackwards (400), the selection starts after it ends or holds no words. selectionTooLong (400), the widened passage is too long. unpackFailed (503), the AI model call failed; trying again can work. Missing or malformed fields are refused with 400 and no reason."
+            "description": "Why the request was refused. rateLimited (429), too many passages in the last minute. unpackerOff (403), the event's unpacker feature is off. noAssistant (409), the event has no assistant. wrongPasscode (400), the transcript has a passcode and the request did not give it. noPrivateChat (409), the participant has no Private Chat with the assistant. chunkNotInTranscript (400), a chunk ID is not in this event's transcript. offsetPastEnd (400), a position is past the end of its chunk. selectionBackwards (400), the selection starts after it ends or holds no words. selectionTooLong (400), the widened passage is too long. unpackFailed (503), the AI model call failed or ran too long; trying again can work. Missing or malformed fields are refused with 400 and no reason."
           }
         }
       },
@@ -7733,6 +7713,7 @@
               "number",
               "boolean",
               "object",
+              "array",
               "enum"
             ]
           },
@@ -7778,6 +7759,13 @@
             "items": {
               "type": "object"
             }
+          },
+          "showForPlatforms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Hint for a conversation-type-agnostic creation form, evaluated client-side against whichever platforms are currently selected: show this property when the selection includes at least one of these platforms. Not enforced server-side."
           }
         }
       },
@@ -8272,6 +8260,45 @@
               },
               "purpose": {
                 "type": "string"
+              },
+              "rationale": {
+                "type": "string",
+                "description": "Why this conversation, why now."
+              },
+              "centralQuestions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The central question(s) the session is wrestling with."
+              },
+              "knownTensions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Known tensions or disagreements worth surfacing."
+              },
+              "scope": {
+                "type": "object",
+                "properties": {
+                  "inScope": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "outOfScope": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "desiredTakeaway": {
+                "type": "string",
+                "description": "What the organizer hopes people leave with."
               },
               "audience": {
                 "type": "object",
@@ -9406,6 +9433,20 @@
             "type": "boolean",
             "description": "When true no further versions may be appended; the artifact stays readable"
           },
+          "generationStatus": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "pending",
+              "failed"
+            ],
+            "description": "Tracks a background generation run (see POST /artifacts/generate). `ready` covers both \"never generated asynchronously\" and \"generation succeeded\" — an artifact predating this field reads back with this unset, which callers should treat the same as `ready`.",
+            "example": "ready"
+          },
+          "generationError": {
+            "type": "string",
+            "description": "Set alongside generationStatus `failed`; cleared once a new generation starts or succeeds"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -9420,6 +9461,15 @@
           },
           "message": {
             "type": "string"
+          }
+        }
+      },
+      "UnpackTranscriptPasscode": {
+        "type": "object",
+        "properties": {
+          "transcriptPasscode": {
+            "type": "string",
+            "description": "The transcript channel's passcode, the same one the client uses to read the transcript. Required when the transcript has one, which it does by default. A missing or wrong passcode is refused with 400 and reason wrongPasscode."
           }
         }
       }

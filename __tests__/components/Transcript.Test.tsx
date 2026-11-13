@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Transcript } from '../../components/Transcript';
+import { KEYBOARD_SELECTION_SETTLE_MS } from '../../hooks/useTranscriptSelection';
 import { RetrieveData, SendData } from '../../utils';
 import { trackConversationEvent, trackFeatureUsage } from '../../utils/analytics';
 import { ConversationTypeProvider } from '../../context/ConversationTypeContext';
@@ -29,13 +30,16 @@ const mockStop = jest.fn(() => 5); // Return 5 seconds by default
 const mockGetActiveDuration = jest.fn(() => 5);
 const mockIsRunning = jest.fn(() => false);
 
+// The real hook returns the same object on every render; a new one each time would reset the scroll debounce.
+const mockDuration = {
+  start: mockStart,
+  stop: mockStop,
+  getActiveDuration: mockGetActiveDuration,
+  isRunning: mockIsRunning,
+};
+
 jest.mock('../../hooks/useVisibilityAwareDuration', () => ({
-  useVisibilityAwareDuration: jest.fn(() => ({
-    start: mockStart,
-    stop: mockStop,
-    getActiveDuration: mockGetActiveDuration,
-    isRunning: mockIsRunning,
-  })),
+  useVisibilityAwareDuration: jest.fn(() => mockDuration),
 }));
 
 describe('Transcript', () => {
@@ -73,6 +77,8 @@ describe('Transcript', () => {
 
   beforeAll(() => {
     Element.prototype.scrollIntoView = jest.fn();
+    // jsdom has no layout, so it leaves this out; the Unpacker popover is placed next to the selected text.
+    Range.prototype.getBoundingClientRect = jest.fn(() => document.body.getBoundingClientRect());
   });
 
   beforeEach(() => {
@@ -94,6 +100,18 @@ describe('Transcript', () => {
   });
 
   const setupUser = () => userEvent.setup();
+
+  // Fake timers skip the wait while a keyboard selection holds still. Timers the popover starts on the fake
+  // clock, such as its preview request, run before real timers come back, or they would never fire.
+  const settleSelection = () => {
+    jest.useFakeTimers();
+    act(() => {
+      document.dispatchEvent(new Event('selectionchange'));
+    });
+    act(() => jest.advanceTimersByTime(KEYBOARD_SELECTION_SETTLE_MS));
+    act(() => jest.runOnlyPendingTimers());
+    jest.useRealTimers();
+  };
 
   const toggleTranscript = async (user: ReturnType<typeof setupUser>) => {
     // Find the toggle button - it changes aria-label based on state
@@ -567,6 +585,122 @@ describe('Transcript', () => {
     expect(document.getElementById('transcript-message-m1')?.contains(selection.anchorNode)).toBe(true);
   });
 
+  it('shows a placeholder chunk with no body as empty, instead of crashing', async () => {
+    (RetrieveData as jest.Mock).mockImplementation((url: string) =>
+      Promise.resolve(
+        url.startsWith('messages/')
+          ? [...transcriptMessages, { id: 'stub', channels: ['transcript'], createdAt: '2025-10-17T12:03:00Z', body: null }]
+          : { transcript: { status: 'active' } },
+      ),
+    );
+    const { container } = render(<Transcript {...baseProps} />);
+    await screen.findByText('Hello world');
+
+    expect(container.querySelector('[data-message-id="stub"] [data-chunk-text]')).toBeEmptyDOMElement();
+  });
+
+  it('never shows [object Object] for a chunk whose body has no text', async () => {
+    (RetrieveData as jest.Mock).mockImplementation((url: string) =>
+      Promise.resolve(
+        url.startsWith('messages/')
+          ? [{ id: 'm9', channels: ['transcript'], createdAt: '2025-10-17T12:03:00Z', body: { type: 'caption' } }]
+          : { transcript: { status: 'active' } },
+      ),
+    );
+    const { container } = render(<Transcript {...baseProps} />);
+    await waitFor(() => expect(container.querySelector('[data-message-id="m9"]')).toBeInTheDocument());
+
+    expect(screen.queryByText('[object Object]')).not.toBeInTheDocument();
+  });
+
+  it('keeps chunks that arrive while the transcript history is loading', async () => {
+    let finishLoading: (messages: unknown) => void = () => {};
+    (RetrieveData as jest.Mock).mockImplementation((url: string) =>
+      url.startsWith('messages/')
+        ? new Promise((resolve) => (finishLoading = resolve))
+        : Promise.resolve({ transcript: { status: 'active' } }),
+    );
+    render(<Transcript {...baseProps} />);
+    await waitFor(() => expect(mockSocket.on.mock.calls.some((call) => call[0] === 'message:new')).toBe(true));
+    const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
+    act(() => {
+      messageHandler({
+        id: 'm3',
+        channels: ['transcript'],
+        createdAt: '2025-10-17T12:03:00Z',
+        body: { text: 'Live chunk' },
+      });
+    });
+
+    await act(async () => finishLoading(transcriptMessages));
+
+    expect(screen.getByText('Hello world')).toBeInTheDocument();
+    expect(screen.getByText('Live chunk')).toBeInTheDocument();
+  });
+
+  it('does not jump the scroll position with a saved position left over from before a reconnect', async () => {
+    const { container, rerender } = render(<Transcript {...baseProps} />);
+    await screen.findByText('Hello world');
+    const list = container.querySelector('[data-message-id]')!.parentElement!.parentElement!;
+    let scrollHeight = 1000;
+    Object.defineProperty(list, 'scrollHeight', { configurable: true, get: () => scrollHeight });
+    list.scrollTop = -100;
+    const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
+    // A placeholder for a chunk already on screen changes nothing, so the saved position is never used.
+    act(() => {
+      messageHandler({ id: 'm1', channels: ['transcript'], createdAt: '2025-10-17T12:01:00Z', body: null });
+    });
+    scrollHeight = 1200;
+    (RetrieveData as jest.Mock).mockImplementation((url: string) =>
+      Promise.resolve(
+        url.startsWith('messages/')
+          ? [...transcriptMessages, { id: 'm3', channels: ['transcript'], createdAt: '2025-10-17T12:03:00Z', body: 'Later' }]
+          : { transcript: { status: 'active' } },
+      ),
+    );
+
+    rerender(<Transcript {...baseProps} lastReconnectTime={Date.now()} />);
+    await screen.findByText('Later');
+
+    expect(list.scrollTop).toBe(-100);
+  });
+
+  const reconnectWith = (rerender: (ui: React.ReactElement) => void, reloaded: unknown[]) => {
+    (RetrieveData as jest.Mock).mockImplementation((url: string) =>
+      Promise.resolve(url.startsWith('messages/') ? reloaded : { transcript: { status: 'active' } }),
+    );
+    rerender(<Transcript {...baseProps} lastReconnectTime={Date.now()} />);
+  };
+
+  it('drops chunks the server no longer returns when it reloads the transcript after a reconnect', async () => {
+    const { rerender } = render(<Transcript {...baseProps} />);
+    await screen.findByText('Hello world');
+
+    reconnectWith(rerender, [transcriptMessages[1]]);
+
+    await waitFor(() => expect(screen.queryByText('Hello world')).not.toBeInTheDocument());
+    expect(screen.getByText('Second message')).toBeInTheDocument();
+  });
+
+  it('blanks a chunk that was hidden while the socket was down', async () => {
+    const { rerender } = render(<Transcript {...baseProps} />);
+    await screen.findByText('Hello world');
+
+    reconnectWith(rerender, [{ ...transcriptMessages[0], body: null }, transcriptMessages[1]]);
+
+    await waitFor(() => expect(screen.queryByText('Hello world')).not.toBeInTheDocument());
+    expect(document.querySelector('[data-message-id="m1"]')).toBeInTheDocument();
+  });
+
+  it('empties the transcript when the reload after a reconnect finds it deleted', async () => {
+    const { rerender } = render(<Transcript {...baseProps} />);
+    await screen.findByText('Hello world');
+
+    reconnectWith(rerender, []);
+
+    await waitFor(() => expect(screen.queryByText('Second message')).not.toBeInTheDocument());
+  });
+
   it('marks each chunk with its message id', async () => {
     render(<Transcript {...baseProps} />);
 
@@ -627,7 +761,7 @@ describe('Transcript', () => {
     expect(container.querySelectorAll('[data-message-id="m1"]')).toHaveLength(1);
   });
 
-  it('shows the newest message at the start of the list', async () => {
+  it('keeps chunks in spoken order in the page, so a selection can run from one chunk into the next', async () => {
     const { container } = render(<Transcript {...baseProps} />);
     await screen.findByText('Hello world');
 
@@ -644,7 +778,21 @@ describe('Transcript', () => {
     const renderedIds = [...container.querySelectorAll('[data-message-id]')].map((chunk) =>
       chunk.getAttribute('data-message-id'),
     );
-    expect(renderedIds).toEqual(['m3', 'm2', 'm1']);
+    expect(renderedIds).toEqual(['m1', 'm2', 'm3']);
+  });
+
+  it('selects the end of one chunk and the start of the next when a selection crosses them', async () => {
+    render(<Transcript {...baseProps} />);
+    const firstText = (await screen.findByText('Hello world')).firstChild as Text;
+    const secondText = screen.getByText('Second message').firstChild as Text;
+
+    const range = document.createRange();
+    range.setStart(firstText, 'Hello '.length);
+    range.setEnd(secondText, 'Second'.length);
+
+    expect(range.collapsed).toBe(false);
+    expect(range.toString()).toContain('world');
+    expect(range.toString()).toContain('Second');
   });
 
   it('tells the page which transcript chunks it has, including new ones', async () => {
@@ -676,25 +824,6 @@ describe('Transcript', () => {
     await act(async () => finishLoading([]));
 
     expect(onMessagesChange).toHaveBeenLastCalledWith([]);
-  });
-
-  it('keeps chunks that arrive while the history is loading', async () => {
-    let finishLoading: (messages: unknown[]) => void = () => {};
-    (RetrieveData as jest.Mock).mockImplementation((url: string) => {
-      if (url.startsWith('messages/')) return new Promise((resolve) => (finishLoading = resolve));
-      return Promise.resolve({ transcript: { status: 'active' } });
-    });
-    render(<Transcript {...baseProps} />);
-    await waitFor(() => expect(RetrieveData).toHaveBeenCalledWith(expect.stringMatching(/^messages\//), expect.anything()));
-
-    const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
-    act(() => {
-      messageHandler({ id: 'm3', channels: ['transcript'], createdAt: '2025-10-17T12:03:00Z', body: { text: 'Live' } });
-    });
-    await act(async () => finishLoading(transcriptMessages));
-
-    expect(screen.getByText('Hello world')).toBeInTheDocument();
-    expect(screen.getByText('Live')).toBeInTheDocument();
   });
 
   it('shows chunk times the same way Private Chat lists them', async () => {
@@ -1781,6 +1910,381 @@ describe('Transcript', () => {
 
       // Human speech all comes through one shared capture feed, so no pseudonym is shown.
       expect(screen.queryByText('quiet_heron_09')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Unpacker', () => {
+    const unpackMessages = [
+      {
+        id: 'u1',
+        channels: ['transcript'],
+        createdAt: '2025-10-17T10:43:00Z',
+        body: 'We built on the Caselaw Access Project. It has millions of decisions.',
+      },
+      {
+        id: 'u2',
+        channels: ['transcript'],
+        createdAt: '2025-10-17T10:44:00Z',
+        body: 'Precedential weight concentrates in a few circuits.',
+      },
+    ];
+
+    beforeEach(() => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+        if (url.startsWith('conversations/')) {
+          return Promise.resolve({ name: 'Test Conversation', transcript: { status: 'active' } });
+        } else if (url.startsWith('messages/')) {
+          return Promise.resolve(unpackMessages);
+        }
+        return Promise.resolve(null);
+      });
+      (SendData as jest.Mock).mockImplementation(() => new Promise(() => {}));
+    });
+
+    afterEach(() => window.getSelection()?.removeAllRanges());
+
+    const TIP = 'Lost the thread? Select any passage and Berkie will unpack it while you keep listening.';
+
+    it('shows a tip about selecting passages, above the scrolling chunks', async () => {
+      render(<Transcript {...baseProps} unpack={{}} />);
+      const chunk = (await screen.findByText(unpackMessages[0].body)).closest('[data-message-id]')!;
+      const scrollingList = chunk.parentElement!.parentElement!;
+
+      const tip = screen.getByText(TIP);
+
+      expect(tip).toBeInTheDocument();
+      expect(screen.getByText('💡')).toHaveAttribute('aria-hidden', 'true');
+      expect(scrollingList.contains(tip)).toBe(false);
+    });
+
+    it('hides the tip once dismissed', async () => {
+      const user = setupUser();
+      render(<Transcript {...baseProps} unpack={{}} />);
+      await screen.findByText(TIP);
+
+      await user.click(screen.getByRole('button', { name: 'Dismiss tip' }));
+
+      expect(screen.queryByText(TIP)).not.toBeInTheDocument();
+    });
+
+    it('lets a keyboard user Tab to a chunk, press Enter to unpack the whole chunk, and Escape to close', async () => {
+      const user = setupUser();
+      render(<Transcript {...baseProps} unpack={{}} />);
+      const chunk = (await screen.findByText(unpackMessages[1].body)).closest('[data-message-id]') as HTMLElement;
+
+      chunk.focus();
+      expect(chunk).toHaveFocus();
+      expect(chunk).toHaveAttribute('role', 'button');
+      expect(chunk).toHaveAccessibleDescription(
+        'Press Enter to unpack this with Berkie. Use the arrow keys to move between passages.',
+      );
+      await user.keyboard('{Enter}');
+
+      const dialog = screen.getByRole('dialog', { name: 'Unpack this with Berkie' });
+      expect(dialog).toHaveFocus();
+      expect(screen.getByText('"Precedential weight concentrates in a few circuits."')).toBeInTheDocument();
+      expect(chunk).toHaveAttribute('aria-expanded', 'true');
+
+      await user.keyboard('{Escape}');
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(chunk).toHaveFocus();
+    });
+
+    const chunkElement = (body: string) => screen.getByText(body).closest('[data-message-id]') as HTMLElement;
+
+    it('makes the transcript one Tab stop, starting at the newest chunk', async () => {
+      const user = setupUser();
+      render(<Transcript {...baseProps} unpack={{}} hideToggle />);
+      await screen.findByText(unpackMessages[0].body);
+
+      await user.tab();
+      await user.tab();
+
+      expect(chunkElement(unpackMessages[1].body)).toHaveFocus();
+      await user.tab();
+      expect(document.activeElement?.closest('[data-message-id]')).toBeNull();
+    });
+
+    it('moves between chunks with the arrow keys', async () => {
+      const user = setupUser();
+      render(<Transcript {...baseProps} unpack={{}} hideToggle />);
+      await screen.findByText(unpackMessages[0].body);
+      chunkElement(unpackMessages[1].body).focus();
+
+      await user.keyboard('{ArrowUp}');
+
+      expect(chunkElement(unpackMessages[0].body)).toHaveFocus();
+      expect(chunkElement(unpackMessages[0].body)).toHaveAttribute('tabindex', '0');
+      expect(chunkElement(unpackMessages[1].body)).toHaveAttribute('tabindex', '-1');
+      await user.keyboard('{End}');
+      expect(chunkElement(unpackMessages[1].body)).toHaveFocus();
+      await user.keyboard('{Home}');
+      expect(chunkElement(unpackMessages[0].body)).toHaveFocus();
+    });
+
+    it('leaves a blank hidden chunk out of the keyboard order', async () => {
+      (RetrieveData as jest.Mock).mockImplementation((url: string) =>
+        Promise.resolve(
+          url.startsWith('messages/')
+            ? [...unpackMessages, { id: 'u3', channels: ['transcript'], createdAt: '2025-10-17T10:45:00Z', body: null }]
+            : { transcript: { status: 'active' } },
+        ),
+      );
+      render(<Transcript {...baseProps} unpack={{}} hideToggle />);
+      await screen.findByText(unpackMessages[1].body);
+      const blank = document.querySelector('[data-message-id="u3"]')!;
+
+      expect(blank).not.toHaveAttribute('role');
+      expect(blank).not.toHaveAttribute('tabindex');
+      expect(chunkElement(unpackMessages[1].body)).toHaveAttribute('tabindex', '0');
+    });
+
+    it('lets Shift and the arrow keys extend a selection instead of moving between chunks', async () => {
+      const user = setupUser();
+      render(<Transcript {...baseProps} unpack={{}} hideToggle />);
+      await screen.findByText(unpackMessages[0].body);
+      chunkElement(unpackMessages[1].body).focus();
+
+      await user.keyboard('{Shift>}{ArrowUp}{/Shift}');
+
+      expect(chunkElement(unpackMessages[1].body)).toHaveFocus();
+    });
+
+    it('opens the popover when a screen reader activates a chunk', async () => {
+      render(<Transcript {...baseProps} unpack={{}} />);
+      await screen.findByText(unpackMessages[1].body);
+
+      fireEvent.click(chunkElement(unpackMessages[1].body), { detail: 0 });
+
+      expect(screen.getByRole('dialog', { name: 'Unpack this with Berkie' })).toBeInTheDocument();
+    });
+
+    it('does not open the popover for a mouse click on a chunk', async () => {
+      render(<Transcript {...baseProps} unpack={{}} />);
+      await screen.findByText(unpackMessages[1].body);
+
+      fireEvent.click(chunkElement(unpackMessages[1].body), { detail: 1 });
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    const highlight = (body: string, from: string, to: string) => {
+      const text = screen.getByText(body).firstChild as Text;
+      const range = document.createRange();
+      range.setStart(text, body.indexOf(from));
+      range.setEnd(text, body.indexOf(to));
+      window.getSelection()!.removeAllRanges();
+      window.getSelection()!.addRange(range);
+      settleSelection();
+    };
+
+    it('puts focus on the passage when a popover opened by highlighting is closed', async () => {
+      const user = setupUser();
+      render(<Transcript {...baseProps} unpack={{}} />);
+      await screen.findByText(unpackMessages[0].body);
+      highlight(unpackMessages[0].body, 'Caselaw', '.');
+
+      await user.click(screen.getByRole('button', { name: 'Close' }));
+
+      expect(chunkElement(unpackMessages[0].body)).toHaveFocus();
+    });
+
+    it('closes the popover when its passage leaves the transcript', async () => {
+      render(<Transcript {...baseProps} unpack={{}} />);
+      await screen.findByText(unpackMessages[0].body);
+      highlight(unpackMessages[0].body, 'Caselaw', '.');
+      const statusHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'transcript:status')?.[1];
+
+      act(() => statusHandler({ status: 'deleted' }));
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('closes the popover when the transcript is hidden, such as by switching tabs on a phone', async () => {
+      let reportResize: ResizeObserverCallback = () => {};
+      const originalResizeObserver = global.ResizeObserver;
+      global.ResizeObserver = jest.fn((callback: ResizeObserverCallback) => {
+        reportResize = callback;
+        return { observe: jest.fn(), unobserve: jest.fn(), disconnect: jest.fn() };
+      }) as unknown as typeof ResizeObserver;
+      try {
+        render(<Transcript {...baseProps} unpack={{}} />);
+        await screen.findByText(unpackMessages[0].body);
+        highlight(unpackMessages[0].body, 'Caselaw', '.');
+
+        act(() => reportResize([{ contentRect: { width: 0, height: 0 } } as ResizeObserverEntry], {} as ResizeObserver));
+
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      } finally {
+        global.ResizeObserver = originalResizeObserver;
+      }
+    });
+
+    describe('while the popover is open', () => {
+      const openOverLiveTranscript = async (startScrollTop: number) => {
+        const view = render(<Transcript {...baseProps} unpack={{}} />);
+        await screen.findByText(unpackMessages[0].body);
+        const list = chunkElement(unpackMessages[0].body).parentElement!.parentElement!;
+        // jsdom has no layout, so each chunk counts as 200px tall.
+        Object.defineProperty(list, 'scrollHeight', {
+          configurable: true,
+          get: () => list.querySelectorAll('[data-message-id]').length * 200,
+        });
+        list.scrollTop = startScrollTop;
+        highlight(unpackMessages[0].body, 'Caselaw', '.');
+        const addChunk = async (id: string, text: string) => {
+          const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
+          act(() => messageHandler({ id, channels: ['transcript'], createdAt: '2025-10-17T10:45:00Z', body: text }));
+          await screen.findByText(text);
+        };
+        return { ...view, list, addChunk };
+      };
+
+      it('holds the passage still when new chunks arrive, even while following the live transcript', async () => {
+        const { list, addChunk } = await openOverLiveTranscript(0);
+
+        await addChunk('u3', 'A new chunk arrives.');
+
+        expect(list.scrollTop).toBe(-200);
+      });
+
+      it('does not count holding the passage still as the reader scrolling', async () => {
+        const { list, addChunk } = await openOverLiveTranscript(0);
+        await addChunk('u3', 'A new chunk arrives.');
+
+        fireEvent.scroll(list);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        expect(trackConversationEvent).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.anything(),
+          'scroll_manual',
+          expect.anything(),
+        );
+      });
+
+      it('goes back to the live transcript on close when the reader was following it', async () => {
+        const user = setupUser();
+        const { addChunk } = await openOverLiveTranscript(0);
+        await addChunk('u3', 'A new chunk arrives.');
+        (Element.prototype.scrollIntoView as jest.Mock).mockClear();
+
+        await user.click(screen.getByRole('button', { name: 'Close' }));
+
+        expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+      });
+
+      it('leaves the reader where they were on close when they had scrolled back', async () => {
+        const user = setupUser();
+        const { addChunk } = await openOverLiveTranscript(-300);
+        await addChunk('u3', 'A new chunk arrives.');
+        (Element.prototype.scrollIntoView as jest.Mock).mockClear();
+
+        await user.click(screen.getByRole('button', { name: 'Close' }));
+
+        expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+      });
+
+      it('keeps the passage in place when the transcript reloads after a reconnect', async () => {
+        const { list, rerender } = await openOverLiveTranscript(0);
+        (Element.prototype.scrollIntoView as jest.Mock).mockClear();
+        (RetrieveData as jest.Mock).mockImplementation((url: string) =>
+          Promise.resolve(
+            url.startsWith('messages/')
+              ? [
+                  ...unpackMessages,
+                  { id: 'u3', channels: ['transcript'], createdAt: '2025-10-17T10:45:00Z', body: 'Missed chunk.' },
+                ]
+              : { transcript: { status: 'active' } },
+          ),
+        );
+
+        rerender(<Transcript {...baseProps} unpack={{}} lastReconnectTime={Date.now()} />);
+        await screen.findByText('Missed chunk.');
+
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+        expect(list.scrollTop).toBe(-200);
+      });
+    });
+
+    it('sends the transcript passcode with the preview request', async () => {
+      render(<Transcript {...baseProps} unpack={{}} />);
+      await screen.findByText(unpackMessages[0].body);
+      highlight(unpackMessages[0].body, 'Caselaw', '.');
+
+      await waitFor(() => expect((SendData as jest.Mock).mock.calls.some(([url]) => url.endsWith('/preview'))).toBe(true));
+      const [, , , options] = (SendData as jest.Mock).mock.calls.find(([url]) => url.endsWith('/preview'))!;
+      expect(JSON.parse(options.body)).toMatchObject({ transcriptPasscode: 'passcode' });
+    });
+
+    it("names the event's assistant in the tip and the chunk hint", async () => {
+      render(
+        <ConversationTypeProvider initialBotName="Juniper">
+          <Transcript {...baseProps} unpack={{}} />
+        </ConversationTypeProvider>,
+      );
+      await screen.findByText(unpackMessages[0].body);
+
+      expect(
+        screen.getByText('Lost the thread? Select any passage and Juniper will unpack it while you keep listening.'),
+      ).toBeInTheDocument();
+      expect(chunkElement(unpackMessages[0].body)).toHaveAccessibleDescription(
+        'Press Enter to unpack this with Juniper. Use the arrow keys to move between passages.',
+      );
+    });
+
+    it('opens the popover with the passage widened to whole sentences when text is highlighted', async () => {
+      render(<Transcript {...baseProps} unpack={{}} />);
+      const text = (await screen.findByText(unpackMessages[0].body)).firstChild as Text;
+      const range = document.createRange();
+      range.setStart(text, unpackMessages[0].body.indexOf('Caselaw'));
+      range.setEnd(text, unpackMessages[0].body.indexOf('.'));
+      window.getSelection()!.removeAllRanges();
+      window.getSelection()!.addRange(range);
+
+      settleSelection();
+
+      expect(screen.getByRole('dialog', { name: 'Unpack this with Berkie' })).not.toHaveFocus();
+      expect(screen.getByText('"We built on the Caselaw Access Project."')).toBeInTheDocument();
+    });
+
+    it('passes the Open Private Chat action to the popover', async () => {
+      (SendData as jest.Mock).mockImplementation((url: string) =>
+        url.endsWith('/send') ? Promise.resolve({ askId: 'ask-1', status: 'sent' }) : new Promise(() => {}),
+      );
+      const onOpenPrivateChat = jest.fn();
+      const user = setupUser();
+      render(<Transcript {...baseProps} unpack={{ onOpenPrivateChat }} />);
+      const chunk = (await screen.findByText(unpackMessages[1].body)).closest('[data-message-id]') as HTMLElement;
+      chunk.focus();
+      await user.keyboard('{Enter}');
+
+      await user.click(screen.getByRole('button', { name: 'Send to my Private Chat' }));
+      await user.click(await screen.findByRole('button', { name: 'Open Private Chat' }));
+
+      expect(onOpenPrivateChat).toHaveBeenCalled();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it.each([
+      ['the Unpacker is off', {}],
+      ['the transcript is on the presentation screen', { unpack: {}, presentation: true }],
+    ])('offers nothing when %s', async (_case, props) => {
+      render(<Transcript {...baseProps} {...props} />);
+      const chunk = (await screen.findByText(unpackMessages[0].body)).closest('[data-message-id]')!;
+      const text = screen.getByText(unpackMessages[0].body).firstChild as Text;
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      window.getSelection()!.removeAllRanges();
+      window.getSelection()!.addRange(range);
+      settleSelection();
+
+      expect(screen.queryByText(TIP)).not.toBeInTheDocument();
+      expect(chunk).not.toHaveAttribute('tabindex');
+      expect(chunk).not.toHaveAttribute('role');
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
 });

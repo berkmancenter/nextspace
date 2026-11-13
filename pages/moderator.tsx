@@ -1,7 +1,13 @@
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
 
-import { PseudonymousMessage, ModeratorInsightsMessage, ModeratorMetricsMessage, ErrorMessage } from '../types.internal';
+import {
+  PseudonymousMessage,
+  ModeratorInsightsMessage,
+  ModeratorMetricsMessage,
+  ModeratorQuestionResultsMessage,
+  ErrorMessage,
+} from '../types.internal';
 import { Api, GetChannelPasscode, RetrieveData, QueryParamsError, emitWithTokenRefresh } from '../utils';
 
 import { Errors, ParamErrors, Transcript } from '../components/';
@@ -15,6 +21,14 @@ import { trackConversationEvent } from '../utils/analytics';
 export const getServerSideProps = async (context: { req: any }) => {
   return CheckAuthHeader(context.req.headers);
 };
+
+// Which moderator-channel messages this view renders, shared by the initial fetch and the
+// gap-reconnect refetch so the two never disagree on which message shapes to keep.
+const isModeratorViewMessage = (message: PseudonymousMessage) =>
+  message.channels![0] === 'moderator' &&
+  (message.body.hasOwnProperty('insights') ||
+    message.body.hasOwnProperty('metrics') ||
+    message.body.type === 'questionResults');
 
 function ModeratorScreen({ authType }: { authType: AuthType }) {
   const router = useRouter();
@@ -150,13 +164,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
         else setGeneralError(conversationMessagesResponse.message?.message || 'Failed to fetch conversation messages.');
         return;
       } else if (Array.isArray(conversationMessagesResponse)) {
-        setMessages(
-          (conversationMessagesResponse as PseudonymousMessage[]).filter(
-            (message) =>
-              message.channels![0] === 'moderator' &&
-              (message.body.hasOwnProperty('insights') || message.body.hasOwnProperty('metrics')),
-          ),
-        );
+        setMessages((conversationMessagesResponse as PseudonymousMessage[]).filter(isModeratorViewMessage));
       }
 
       // Conversation join is handled by the dedicated useEffect below,
@@ -180,13 +188,7 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
     RetrieveData(`messages/${router.query.conversationId}?channel=moderator,${modPasscode}`, Api.get().getAccessToken())
       .then((msgs) => {
         if (Array.isArray(msgs)) {
-          setMessages(
-            (msgs as PseudonymousMessage[]).filter(
-              (message) =>
-                message.channels![0] === 'moderator' &&
-                (message.body.hasOwnProperty('insights') || message.body.hasOwnProperty('metrics')),
-            ),
-          );
+          setMessages((msgs as PseudonymousMessage[]).filter(isModeratorViewMessage));
         }
       })
       .catch((err) => console.error('Error re-fetching moderator messages:', err));
@@ -294,6 +296,57 @@ function ModeratorScreen({ authType }: { authType: AuthType }) {
           <div className="text-medium-slate-blue font-bold text-base">
             The audience is expressing&nbsp;
             {metricSpans}.
+          </div>
+        </div>
+      );
+    } else if (message.body.type === 'questionResults') {
+      const { questionType, question, results } = (message as ModeratorQuestionResultsMessage).body.questionResults;
+      const isWarmUp = questionType === 'warmUpQuestion';
+      const totalCount = results.reduce((sum: number, r: { count: number }) => sum + r.count, 0);
+      const barColor = isWarmUp ? '#2F9E6B' : '#4338CA';
+
+      return (
+        <div className="border border-[#E5E7EB] rounded-xl bg-white p-3" style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
+          <div className="flex items-center gap-2 mb-1.5">
+            {isWarmUp ? (
+              <span className="inline-flex items-center text-xs font-bold tracking-widest uppercase px-2 py-0.5 rounded-full bg-[#D1F5E0] text-[#166B3D]">
+                Warm-up Results
+              </span>
+            ) : (
+              <span className="inline-flex items-center text-xs font-bold tracking-widest uppercase px-2 py-0.5 rounded-full bg-[#E0E7FF] text-[#3730A3]">
+                Question Results
+              </span>
+            )}
+          </div>
+          <p className="text-base font-bold text-[#1F2937] mb-2">{question}</p>
+          <div className="space-y-2.5">
+            {results.map((result: { label: string; count: number; examples?: string[] }, i: number) => {
+              const pct = totalCount > 0 ? Math.round((result.count / totalCount) * 100) : 0;
+              return (
+                <div key={`${result.label}-${i}`}>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-sm font-medium text-[#1F2937]">{result.label}</span>
+                    <span className="text-sm text-[#6B7280] flex-shrink-0">
+                      {result.count} ({pct}%)
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-[#F3F4F6] overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+                  </div>
+                  {/* Warm-up answers are private prompt replies, not something participants agreed
+                      to have quoted verbatim to the moderator — only the aggregate counts are shown. */}
+                  {!isWarmUp && result.examples && result.examples.length > 0 && (
+                    <ul className="mt-1.5 space-y-0.5">
+                      {result.examples.map((example: string, exIdx: number) => (
+                        <li key={exIdx} className="text-sm text-[#6B7280] italic pl-3 border-l-2 border-[#E5E7EB]">
+                          &ldquo;{example}&rdquo;
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       );

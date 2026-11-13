@@ -39,7 +39,7 @@ import { useRouter } from 'next/router';
 import { Request } from '../utils';
 import { components } from '../types';
 import { Conversation } from '../types.internal';
-import { Api, SendData, updateConversation } from '../utils/Helpers';
+import { Api, SendData, isFeatureEnabled, updateConversation } from '../utils/Helpers';
 import SessionManager from '../utils/SessionManager';
 import { NewTopicForm, NewTopicFormValues } from './NewTopicForm';
 
@@ -53,6 +53,55 @@ const steps = ['Event Details', 'Conversation Setup', 'Configuration', 'Speakers
  */
 const sortedStringify = (obj: Record<string, unknown>): string =>
   JSON.stringify(Object.fromEntries(Object.entries(obj).sort(([a], [b]) => a.localeCompare(b))));
+
+/**
+ * Resolves the identity an enum option/default is compared and stored by:
+ * - `validationKeys` set -> the subset of the option's keys they name
+ * - no `validationKeys`, option is a `{ value, label }`-shaped object -> `option.value`
+ * - otherwise -> the option/value as-is
+ */
+const getEnumIdentity = (option: unknown, validationKeys?: string[]): unknown => {
+  if (validationKeys) {
+    if (validationKeys.length === 1 && (typeof option !== 'object' || option === null)) {
+      return { [validationKeys[0]]: option };
+    }
+    const identity: Record<string, unknown> = {};
+    validationKeys.forEach((key) => {
+      if (typeof option === 'object' && option !== null && key in option) {
+        identity[key] = (option as Record<string, unknown>)[key];
+      }
+    });
+    return identity;
+  }
+  if (typeof option === 'object' && option !== null && 'value' in option) {
+    return (option as Record<string, unknown>).value;
+  }
+  return option;
+};
+
+// Serializes an enum identity for comparison/storage as a RadioGroup value.
+const serializeEnumIdentity = (identity: unknown): string =>
+  typeof identity === 'object' && identity !== null
+    ? sortedStringify(identity as Record<string, unknown>)
+    : JSON.stringify(identity);
+
+/**
+ * Normalizes an 'array'-type property's value (held as comma-separated text while
+ * the field is edited, or as an array already when it comes from a saved event
+ * or a type's default) into a trimmed, non-empty string array for submission.
+ */
+const parseArrayPropertyValue = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+};
 
 /**
  * EventCreationForm component
@@ -246,6 +295,21 @@ export const EventCreationForm: React.FC<{
     }
   };
 
+  // Resolves an enum property's initial value, preferring an explicit `default`
+  // over the first option, then normalizing it through the same identity
+  // resolution the radio options use (see renderDynamicPropertyField) so the
+  // stored value can compare equal to one of them.
+  const getEnumDefault = (prop: components['schemas']['ConfigProperty']) => {
+    const raw =
+      prop.default !== undefined
+        ? prop.default
+        : Array.isArray(prop.options) && prop.options.length > 0
+          ? prop.options[0]
+          : undefined;
+    if (raw === undefined) return undefined;
+    return getEnumIdentity(raw, prop.validationKeys);
+  };
+
   useEffect(() => {
     if (selectedConvType) {
       const type = conversationTypes?.find((a) => a.name === selectedConvType);
@@ -254,25 +318,14 @@ export const EventCreationForm: React.FC<{
         const initialValues: Record<string, any> = {};
         type.properties?.forEach((prop) => {
           if (prop.name !== 'zoomMeetingUrl') {
-            if (prop.default !== undefined) {
-              initialValues[prop.name] = prop.default;
-            } else if (prop.type === 'enum' && prop.options) {
+            if (prop.type === 'enum' && prop.options) {
               // For enum types (single-choice like llmModel)
-              if (Array.isArray(prop.options) && prop.options.length > 0) {
-                const firstOption = prop.options[0];
-                if (prop.validationKeys) {
-                  // Extract values using validationKeys
-                  const defaultValue: Record<string, any> = {};
-                  prop.validationKeys.forEach((key) => {
-                    if (typeof firstOption === 'object' && firstOption !== null && key in firstOption) {
-                      defaultValue[key] = (firstOption as any)[key];
-                    }
-                  });
-                  initialValues[prop.name] = defaultValue;
-                } else {
-                  initialValues[prop.name] = firstOption;
-                }
+              const enumDefault = getEnumDefault(prop);
+              if (enumDefault !== undefined) {
+                initialValues[prop.name] = enumDefault;
               }
+            } else if (prop.default !== undefined) {
+              initialValues[prop.name] = prop.default;
             } else if (prop.type === 'object' && prop.schema) {
               // For object types with schema (multi-item like interventionCategories)
               const itemKey = prop.itemKey || 'name';
@@ -302,7 +355,12 @@ export const EventCreationForm: React.FC<{
         type.features?.forEach((feature) => {
           initialValues[feature.name] = feature.default;
           feature.properties?.forEach((prop) => {
-            if (prop.default !== undefined) {
+            if (prop.type === 'enum' && prop.options) {
+              const enumDefault = getEnumDefault(prop);
+              if (enumDefault !== undefined) {
+                initialValues[`${feature.name}.${prop.name}`] = enumDefault;
+              }
+            } else if (prop.default !== undefined) {
               initialValues[`${feature.name}.${prop.name}`] = prop.default;
             }
           });
@@ -412,19 +470,20 @@ export const EventCreationForm: React.FC<{
         if (key !== 'zoomMeetingUrl') dynamicPrefill[key] = value;
       });
     }
-    /* Start each feature at its type default. The saved event's features array
-       overrides this below, but features that aren't in the array stay at the
-       default. This matches what getFeatures() in the backend does for legacy events
-       whose features were never persisted, and for events created before a feature
-       was added to the type. */
+    /* A feature missing from the saved event's features array starts at its type
+       default, which covers legacy events whose features were never persisted and
+       events created before a feature was added to the type. */
     const savedTypeName = initialEvent.type?.name ?? (initialEvent as any).conversationType;
     const typeDefinition = conversationTypes?.find((t) => t.name === savedTypeName);
-    typeDefinition?.features?.forEach((featureDef) => {
-      dynamicPrefill[featureDef.name] = Boolean(featureDef.default);
+    const featureNames = new Set([
+      ...(typeDefinition?.features ?? []).map((featureDef) => featureDef.name),
+      ...(initialEvent.features ?? []).map((f) => f.name),
+    ]);
+    featureNames.forEach((name) => {
+      dynamicPrefill[name] = isFeatureEnabled(name, initialEvent.features, typeDefinition?.features);
     });
 
     initialEvent.features?.forEach((f) => {
-      dynamicPrefill[f.name] = f.enabled !== false;
       Object.entries(f.config || {}).forEach(([key, value]) => {
         dynamicPrefill[`${f.name}.${key}`] = value;
       });
@@ -621,6 +680,11 @@ export const EventCreationForm: React.FC<{
     setSpeakers(updated);
   };
 
+  // A property's `showForPlatforms` hint, when set, means it's only relevant to some platforms —
+  // show it only once the selection includes at least one of them.
+  const isVisibleForSelectedPlatforms = (prop: components['schemas']['ConfigProperty']) =>
+    !prop.showForPlatforms || prop.showForPlatforms.some((platform) => selectedPlatforms.includes(platform));
+
   // Helper function to render dynamic property fields.
   // Pass `namespace` (feature name) to scope sub-property keys and prevent
   // collisions when multiple features share the same property name.
@@ -729,9 +793,8 @@ export const EventCreationForm: React.FC<{
               <FormLabel
                 component="legend"
                 sx={{
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  color: 'rgba(0, 0, 0, 0.87)',
+                  fontSize: '0.75rem',
+                  color: 'text.secondary',
                 }}
               >
                 {prop.label}
@@ -742,7 +805,7 @@ export const EventCreationForm: React.FC<{
                 </Typography>
               )}
               <RadioGroup
-                value={sortedStringify(value || {})}
+                value={value !== undefined ? serializeEnumIdentity(value) : ''}
                 name={stateKey}
                 onChange={(e) => {
                   try {
@@ -758,39 +821,17 @@ export const EventCreationForm: React.FC<{
                 sx={{ mt: 1 }}
               >
                 {prop.options.map((option, idx) => {
-                  // Create value object from validation keys
-                  const optionValue: Record<string, any> = {};
-                  if (prop.validationKeys) {
-                    prop.validationKeys.forEach((key) => {
-                      if (typeof option === 'object' && option !== null && key in option) {
-                        optionValue[key] = option[key];
-                      }
-                    });
-                  } else {
-                    // No validation keys, use the option as-is
-                    return (
-                      <div key={idx}>
-                        <FormControlLabel
-                          value={JSON.stringify(option)}
-                          control={<Radio />}
-                          label={
-                            typeof option === 'object' && option !== null
-                              ? option.label || option.name || `Option ${idx + 1}`
-                              : String(option)
-                          }
-                        />
-                      </div>
-                    );
-                  }
+                  const identity = getEnumIdentity(option, prop.validationKeys);
+                  const label =
+                    typeof option === 'object' && option !== null
+                      ? option.label || option.name || `Option ${idx + 1}`
+                      : String(option);
+                  const description = typeof option === 'object' && option !== null ? option.description : undefined;
 
                   return (
                     <div key={idx}>
-                      <FormControlLabel
-                        value={sortedStringify(optionValue)}
-                        control={<Radio />}
-                        label={option.label || option.name || `Option ${idx + 1}`}
-                      />
-                      {option.description && <div className="text-gray-600 text-sm ml-8 -mt-2">{option.description}</div>}
+                      <FormControlLabel value={serializeEnumIdentity(identity)} control={<Radio />} label={label} />
+                      {description && <div className="text-gray-600 text-sm ml-8 -mt-2">{description}</div>}
                     </div>
                   );
                 })}
@@ -799,6 +840,29 @@ export const EventCreationForm: React.FC<{
           );
         }
         return null;
+
+      case 'array':
+        // Free-form list (e.g. tags) with no fixed option set - edited as comma-separated
+        // text and split into a trimmed string array at submission time (see parseArrayPropertyValue).
+        return (
+          <TextField
+            key={stateKey}
+            name={stateKey}
+            label={prop.label}
+            value={Array.isArray(value) ? value.join(', ') : (value ?? '')}
+            helperText={prop.description ? `${prop.description} (comma-separated)` : 'Comma-separated values'}
+            fullWidth
+            variant="outlined"
+            margin="normal"
+            required={prop.required}
+            onChange={(e) => {
+              setDynamicPropertyValues((prev) => ({
+                ...prev,
+                [stateKey]: e.target.value,
+              }));
+            }}
+          />
+        );
 
       case 'object':
         // Multi-item object configuration (like interventionCategories)
@@ -1084,6 +1148,16 @@ export const EventCreationForm: React.FC<{
 
         const value = dynamicPropertyValues[prop.name];
 
+        if (prop.type === 'array') {
+          const arrayValue = parseArrayPropertyValue(value);
+          if (arrayValue.length > 0) {
+            properties[prop.name] = arrayValue;
+          } else if (prop.required && prop.default !== undefined) {
+            properties[prop.name] = parseArrayPropertyValue(prop.default);
+          }
+          return;
+        }
+
         // Only include the property if it has a value or if it's required
         if (value !== undefined && value !== null && value !== '') {
           properties[prop.name] = value;
@@ -1105,6 +1179,15 @@ export const EventCreationForm: React.FC<{
       if (enabled) {
         feature.properties?.forEach((prop) => {
           const value = dynamicPropertyValues[`${feature.name}.${prop.name}`];
+          if (prop.type === 'array') {
+            const arrayValue = parseArrayPropertyValue(value);
+            if (arrayValue.length > 0) {
+              config[prop.name] = arrayValue;
+            } else if (prop.default !== undefined) {
+              config[prop.name] = parseArrayPropertyValue(prop.default);
+            }
+            return;
+          }
           if (value !== undefined && value !== null && value !== '') {
             config[prop.name] = value;
           } else if (prop.default !== undefined) {
@@ -1614,6 +1697,7 @@ export const EventCreationForm: React.FC<{
               {conversationTypes
                 ?.find((type) => type.name === selectedConvType)
                 ?.properties?.filter((prop) => prop.name !== 'zoomMeetingUrl')
+                .filter(isVisibleForSelectedPlatforms)
                 .map((prop) => renderDynamicPropertyField(prop))}
 
               {(() => {
@@ -1666,7 +1750,9 @@ export const EventCreationForm: React.FC<{
                           }
                         />
                         {dynamicPropertyValues[feature.name] &&
-                          feature.properties?.map((prop) => renderDynamicPropertyField(prop, feature.name))}
+                          feature.properties
+                            ?.filter(isVisibleForSelectedPlatforms)
+                            .map((prop) => renderDynamicPropertyField(prop, feature.name))}
                       </Box>
                     ))}
                   </Box>

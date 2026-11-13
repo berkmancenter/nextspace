@@ -119,12 +119,17 @@ jest.mock('../../hooks/useSessionJoin', () => ({
 
 // Mock message components
 jest.mock('../../components/messages', () => ({
-  AssistantMessage: ({ message, onPopulateFeedbackText, onSendFeedbackRating, messageType }: any) => {
+  AssistantMessage: ({ message, onPopulateFeedbackText, onSendFeedbackRating, messageType, onPromptSelect }: any) => {
     const messageText = typeof message.body === 'string' ? message.body : message.body?.text || '';
 
     return (
       <div data-testid="assistant-message">
         {messageText}
+        {message.prompt && (
+          <button data-testid={`prompt-answer-${message.id}`} onClick={() => onPromptSelect?.('test-answer', message.id)}>
+            Answer
+          </button>
+        )}
         {message.id && !messageType && (
           <div data-testid="message-feedback" data-message-id={message.id}>
             <button data-testid="rating-button-3" onClick={() => onSendFeedbackRating?.(message.id, 3)}>
@@ -723,6 +728,54 @@ describe('EventAssistantRoom', () => {
         },
         { timeout: 3000 },
       );
+    });
+    it('does not show a command whose feature is off by default when the event saved no setting for it', async () => {
+      mockUseSessionJoin.mockReturnValue({
+        socket: mockSocket,
+        pseudonym: 'test-pseudonym',
+        userId: 'user-123',
+        isConnected: true,
+        errorMessage: null,
+      });
+      (RetrieveData as jest.Mock).mockImplementation((path: string) =>
+        Promise.resolve(path.startsWith('messages/') ? [] : { agents: [{ id: 'agent-456', agentType: 'eventAssistant' }] }),
+      );
+      const slashFeature = (name: string, isOnByDefault: boolean) => ({
+        name,
+        label: name,
+        tab: 'chat',
+        audience: 'participant',
+        slashCommand: name,
+        default: isOnByDefault,
+        agents: [],
+        description: `The ${name} command`,
+      });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-456', agentType: 'eventAssistant' }],
+        features: [],
+        type: {
+          name: 'eventAssistant',
+          description: '',
+          platforms: [],
+          properties: [],
+          features: [slashFeature('mod', false), slashFeature('ask', true)],
+        },
+      });
+
+      await act(async () => {
+        render(
+          <ConversationTypeProvider>
+            <EventAssistantRoom authType={'guest'} />
+          </ConversationTypeProvider>,
+        );
+      });
+      await waitFor(() => expect(createConversationFromData).toHaveBeenCalled());
+      const user = userEvent.setup();
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
+      await user.type(await screen.findByPlaceholderText('Enter your message here'), '/');
+
+      expect(await screen.findByText('/ask', {}, { timeout: 3000 })).toBeInTheDocument();
+      expect(screen.queryByText('/mod')).not.toBeInTheDocument();
     });
   });
 
@@ -1711,9 +1764,18 @@ describe('EventAssistantRoom', () => {
         expect(screen.getAllByText('Do you need assistance?').length).toBeGreaterThan(0);
       });
 
-      // The component would render prompt buttons, but our mock doesn't render them
-      // In a real scenario, clicking a prompt button would trigger handlePromptSelect
-      // which would call sendMessage with messageSource: "promptResponse" and promptQuestionId
+      await user.click(screen.getByTestId('prompt-answer-prompt-msg-1'));
+
+      await waitFor(() => {
+        expect(SendData).toHaveBeenCalledWith(
+          'messages',
+          expect.objectContaining({ body: 'test-answer', answersPrompt: 'prompt-msg-1' }),
+        );
+      });
+
+      // A prompt answer isn't a question to the bot, so it must never show the thinking indicator
+      // the way sending a normal message would.
+      expect(screen.queryByText('thinking...')).not.toBeInTheDocument();
     });
 
     it('filters out messages with answersPrompt from display', async () => {
@@ -2944,6 +3006,112 @@ describe('EventAssistantRoom', () => {
     });
   });
 
+  describe('Unpacker', () => {
+    const TIP = 'Lost the thread? Select any passage and Berkie will unpack it while you keep listening.';
+    const chunk = {
+      id: 'chunk-1',
+      channels: ['transcript'],
+      createdAt: '2025-10-17T10:43:00Z',
+      body: 'Precedential weight concentrates in a few circuits.',
+    };
+
+    const withUnpacker = (features: { name: string; enabled?: boolean }[], typeDefault = false) => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        features,
+        type: {
+          name: 'eventAssistant',
+          features: [{ name: 'unpacker', label: 'Unpacker', default: typeDefault, agents: [], userControlled: true }],
+        },
+        name: 'Legal Telescopes',
+      });
+      (RetrieveData as jest.Mock).mockImplementation((path: string) => {
+        if (path.includes('channel=transcript')) return Promise.resolve([chunk]);
+        if (path.startsWith('messages/')) return Promise.resolve([]);
+        return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+      });
+    };
+
+    const renderRoom = async () => {
+      await act(async () => {
+        render(
+          <ConversationTypeProvider>
+            <EventAssistantRoom authType={'guest'} />
+          </ConversationTypeProvider>,
+        );
+      });
+    };
+
+    it('offers the Unpacker on the transcript when the event turns it on', async () => {
+      withUnpacker([{ name: 'unpacker', enabled: true }]);
+      await renderRoom();
+
+      expect(await screen.findByText(TIP)).toBeInTheDocument();
+    });
+
+    it("hides the Unpacker when the event doesn't turn it on, since it is off by default", async () => {
+      withUnpacker([]);
+      await renderRoom();
+      await screen.findByText(chunk.body);
+
+      expect(screen.queryByText(TIP)).not.toBeInTheDocument();
+    });
+
+    it('hides the Unpacker when the event turns it off', async () => {
+      withUnpacker([{ name: 'unpacker', enabled: false }], true);
+      await renderRoom();
+      await screen.findByText(chunk.body);
+
+      expect(screen.queryByText(TIP)).not.toBeInTheDocument();
+    });
+
+    it('hides the Unpacker on the presentation screen', async () => {
+      withUnpacker([{ name: 'unpacker', enabled: true }]);
+      await act(async () => {
+        render(<PresentationRoom authType={'guest'} />);
+      });
+      await userEvent.click(screen.getAllByLabelText('Transcript')[0]);
+      await screen.findByText(chunk.body);
+
+      expect(screen.queryByText(TIP)).not.toBeInTheDocument();
+    });
+
+    it('opens Private Chat from the popover after sending from Group Chat', async () => {
+      withUnpacker([{ name: 'unpacker', enabled: true }]);
+      (SendData as jest.Mock).mockImplementation((path: string) =>
+        path.endsWith('/send') ? Promise.resolve({ askId: 'ask-1', status: 'sent' }) : new Promise(() => {}),
+      );
+      const user = userEvent.setup();
+      await renderRoom();
+      const chunkElement = (await screen.findByText(chunk.body)).closest('[data-message-id]') as HTMLElement;
+
+      chunkElement.focus();
+      await user.keyboard('{Enter}');
+      await user.click(screen.getByRole('button', { name: 'Send to my Private Chat' }));
+      await user.click(await screen.findByRole('button', { name: 'Open Private Chat' }));
+
+      expect(await screen.findByPlaceholderText('Enter your message here')).toBeInTheDocument();
+    });
+
+    it('leaves out Open Private Chat when Private Chat is already beside the transcript', async () => {
+      withUnpacker([{ name: 'unpacker', enabled: true }]);
+      (SendData as jest.Mock).mockImplementation((path: string) =>
+        path.endsWith('/send') ? Promise.resolve({ askId: 'ask-1', status: 'sent' }) : new Promise(() => {}),
+      );
+      const user = userEvent.setup();
+      await renderRoom();
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
+      const chunkElement = (await screen.findByText(chunk.body)).closest('[data-message-id]') as HTMLElement;
+
+      chunkElement.focus();
+      await user.keyboard('{Enter}');
+      await user.click(screen.getByRole('button', { name: 'Send to my Private Chat' }));
+
+      expect(await screen.findByText('Your explanation is in your Private Chat.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Open Private Chat' })).not.toBeInTheDocument();
+    });
+  });
+
   describe('presentation view', () => {
     beforeEach(() => {
       (createConversationFromData as jest.Mock).mockResolvedValue({
@@ -3207,6 +3375,82 @@ describe('EventAssistantRoom', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Go to participant view' }));
 
       expect(mockPush).toHaveBeenCalledWith({ pathname: '/assistant/', query: mockRouter.query });
+    });
+  });
+
+  describe('bot presence panel', () => {
+    const originalBotMediaUrl = process.env.NEXT_PUBLIC_BOT_MEDIA_URL;
+
+    beforeEach(() => {
+      process.env.NEXT_PUBLIC_BOT_MEDIA_URL = 'https://bot-media.example.com';
+    });
+
+    afterEach(() => {
+      process.env.NEXT_PUBLIC_BOT_MEDIA_URL = originalBotMediaUrl;
+    });
+
+    const renderPresentationWithFeatures = async (features: { name: string; config?: object }[]) => {
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        type: { name: 'eventAssistant' },
+        name: 'Legal Telescopes',
+        features,
+      });
+
+      await act(async () => {
+        render(<PresentationRoom authType={'guest'} />);
+      });
+    };
+
+    it('plays audio by default, with no voiceOutput feature set', async () => {
+      await renderPresentationWithFeatures([]);
+
+      const iframe = await screen.findByTitle('Berkie presence');
+      expect(iframe).toHaveAttribute('src', expect.not.stringContaining('audio=false'));
+      // mockRouter.query carries channel: ['transcript,MJqaT2ii', ...] by default (see top-level beforeEach).
+      expect(iframe).toHaveAttribute('src', expect.stringContaining('transcriptPasscode=MJqaT2ii'));
+    });
+
+    it('does not request bot-media-server until the conversation has finished loading, so the first request already carries the transcript passcode', async () => {
+      let resolveConversation: (value: unknown) => void;
+      (createConversationFromData as jest.Mock).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveConversation = resolve;
+          }),
+      );
+
+      await act(async () => {
+        render(<PresentationRoom authType={'guest'} />);
+      });
+
+      expect(screen.queryByTitle(/presence$/)).not.toBeInTheDocument();
+
+      await act(async () => {
+        resolveConversation!({
+          agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+          type: { name: 'eventAssistant' },
+          name: 'Legal Telescopes',
+          features: [],
+        });
+      });
+
+      expect(await screen.findByTitle('Berkie presence')).toHaveAttribute(
+        'src',
+        expect.stringContaining('transcriptPasscode=MJqaT2ii'),
+      );
+    });
+
+    it('plays audio when the organizer routed the bot voice to the presentation', async () => {
+      await renderPresentationWithFeatures([{ name: 'voiceOutput', config: { voiceDestination: 'presentation' } }]);
+
+      expect(await screen.findByTitle('Berkie presence')).toHaveAttribute('src', expect.not.stringContaining('audio=false'));
+    });
+
+    it('stays muted when the organizer routed the bot voice to Zoom, to avoid double audio', async () => {
+      await renderPresentationWithFeatures([{ name: 'voiceOutput', config: { voiceDestination: 'zoom' } }]);
+
+      expect(await screen.findByTitle('Berkie presence')).toHaveAttribute('src', expect.stringContaining('audio=false'));
     });
   });
 
