@@ -100,14 +100,10 @@ describe('CatchUpSummaryMessage', () => {
     expect(screen.getByText(earlierSpeechNote)).toBeInTheDocument();
   });
 
-  it('says catch-ups are private and not fact-checked', () => {
+  it('ends with the summary, with no privacy or fact-check footer', () => {
     render(<CatchUpSummaryMessage message={makeSummaryMessage()} />);
 
-    expect(
-      screen.getByText(
-        "Catch-ups are only for you. They aren't shared or counted toward Group Chat posts. Berkie summarizes what the speaker said; it doesn't check whether claims are correct.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/Catch-ups are only for you/)).not.toBeInTheDocument();
   });
 
   it('has no accessibility violations', async () => {

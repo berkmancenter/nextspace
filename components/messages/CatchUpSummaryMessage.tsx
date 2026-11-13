@@ -2,14 +2,12 @@ import { FC } from 'react';
 import { MessageProps } from '../../types.internal';
 import { components } from '../../types';
 import { formatTimeRange } from '../../utils/catchUp';
-import { useBotName } from '../../context/ConversationTypeContext';
 
 type CatchUpSummary = components['schemas']['CatchUpSummary'];
 
 const headingClassName = 'text-[11px] font-bold uppercase tracking-[0.08em] text-gray-600';
 
 export const CatchUpSummaryMessage: FC<MessageProps> = ({ message }) => {
-  const botName = useBotName();
   const { passage, earlierSpeech, inShort, whatTheyCovered, comingUp } = message.body as CatchUpSummary;
   const timeRange = formatTimeRange(new Date(passage.start), new Date(passage.end));
 
@@ -52,11 +50,6 @@ export const CatchUpSummaryMessage: FC<MessageProps> = ({ message }) => {
             <p className="text-sm leading-normal">{comingUp}</p>
           </section>
         )}
-
-        <p className="border-t border-[#EDE9FE] pt-3 text-xs leading-snug text-gray-500">
-          Catch-ups are only for you. They aren&apos;t shared or counted toward Group Chat posts. {botName} summarizes what
-          the speaker said; it doesn&apos;t check whether claims are correct.
-        </p>
       </div>
     </div>
   );
