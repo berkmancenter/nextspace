@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { Dialog } from '@mui/material';
+import { useEffect, useRef, useState } from 'react';
+import { Dialog, Popover } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
+import { QRCodeSVG } from 'qrcode.react';
 import { Logo } from './Logo';
 import { usePresenterTheme } from '../hooks/usePresenterTheme';
 
@@ -13,17 +15,32 @@ interface PresentationHeaderProps {
    * or a rejection keeps the dialog open with an error.
    */
   onExit: () => Promise<boolean>;
+  /** The event's participant link, shown as a QR code on request. Omitted if there is none. */
+  participantUrl?: string;
 }
 
 /**
  * Header for the presentation view, in place of the app's navigation header. Exiting asks first,
  * because a stray click on a projected screen would otherwise drop the whole room out of the view.
  */
-export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProps) => {
+export const PresentationHeader = ({ eventName, onExit, participantUrl }: PresentationHeaderProps) => {
   const [confirmingExit, setConfirmingExit] = useState(false);
   const [exitFailed, setExitFailed] = useState(false);
   const { theme, toggleTheme } = usePresenterTheme();
   const switchTo = theme === 'dark' ? 'light' : 'dark';
+
+  // Shown by default so a presenter doesn't have to remember to open it; the toggle below just
+  // hides it once everyone's scanned in. anchorEl is only set after the button mounts, so the
+  // Popover (which needs a real DOM node to position against) appears a frame after first paint.
+  // The button itself only renders once participantUrl resolves (it arrives async, after the
+  // conversation fetch), so this depends on participantUrl to re-capture the ref once that happens
+  // — an empty dependency array would only ever see the button's pre-participantUrl absence.
+  const [showQr, setShowQr] = useState(true);
+  const qrButtonRef = useRef<HTMLButtonElement>(null);
+  const [qrAnchorEl, setQrAnchorEl] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setQrAnchorEl(qrButtonRef.current);
+  }, [participantUrl]);
 
   const closeDialog = () => {
     setConfirmingExit(false);
@@ -53,6 +70,18 @@ export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProp
         <span className="whitespace-nowrap rounded-full bg-nx-pill px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-nx-pill-text">
           Presentation view
         </span>
+        {participantUrl && (
+          <button
+            ref={qrButtonRef}
+            type="button"
+            onClick={() => setShowQr((shown) => !shown)}
+            aria-label={showQr ? 'Hide join QR code' : 'Show join QR code'}
+            title={showQr ? 'Hide join QR code' : 'Show join QR code'}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border-[1.5px] dark:border-2 border-gray-300 bg-gray-100 text-gray-800 hover:bg-gray-200 dark:hover:bg-nx-active"
+          >
+            <QrCode2Icon />
+          </button>
+        )}
         <button
           type="button"
           onClick={toggleTheme}
@@ -72,6 +101,22 @@ export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProp
           <CloseIcon />
         </button>
       </div>
+
+      {participantUrl && (
+        <Popover
+          open={showQr && Boolean(qrAnchorEl)}
+          anchorEl={qrAnchorEl}
+          onClose={() => setShowQr(false)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          slotProps={{ paper: { sx: { borderRadius: '12px', marginTop: '8px' } } }}
+        >
+          <div className="flex flex-col items-center gap-3 p-6">
+            <QRCodeSVG value={participantUrl} size={260} marginSize={2} title="Scan to join as a participant" />
+            <span className="text-lg font-bold uppercase tracking-wide text-[#4845D2]">Scan to join</span>
+          </div>
+        </Popover>
+      )}
 
       <Dialog
         open={confirmingExit}
