@@ -299,7 +299,10 @@ export function useConversationSetup({
   // pre-event window's opening (or, for missingPregameAccess, the event's real start) updates on
   // its own instead of leaving the user stuck on the "Event Not Started" dialog until they refresh.
   useEffect(() => {
-    if (pendingGateRecheckAt === null) return;
+    // An unparseable scheduledTime (e.g. a malformed or placeholder value from the backend) makes
+    // its computed epoch ms NaN rather than null, which would otherwise arm a ~0ms timer (NaN
+    // delay behaves like 0) and lift the gate immediately on an event with no real start time.
+    if (pendingGateRecheckAt === null || !Number.isFinite(pendingGateRecheckAt)) return;
 
     let timer: ReturnType<typeof setTimeout>;
 

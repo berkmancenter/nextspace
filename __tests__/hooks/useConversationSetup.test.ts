@@ -588,6 +588,29 @@ describe('useConversationSetup', () => {
           expect(result.current.eventStatus).toBe('future');
         });
 
+        it('never lifts the gate for an unparseable scheduledTime, instead of firing almost immediately', async () => {
+          mockCreateConversationFromData.mockResolvedValue(
+            makeConversation({ active: false, scheduledTime: 'not-a-real-date', preEventMinutes: 10 }),
+          );
+          mockGetChannelPasscode.mockImplementation((channel: string) =>
+            channel === 'pregame' ? 'pregame-pass' : 'chat-pass',
+          );
+
+          const { result } = renderSetup({
+            query: { conversationId: 'test-conversation-id', channel: ['chat,chat-pass', 'pregame,pregame-pass'] },
+          });
+
+          await waitFor(() => {
+            expect(result.current.eventStatus).toBe('future');
+          });
+
+          // An unparseable scheduledTime makes the computed recheck target NaN rather than null,
+          // which would otherwise arm an effectively-0ms timer (NaN delay behaves like 0) and lift
+          // the gate almost immediately on an event with no real start time at all.
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          expect(result.current.eventStatus).toBe('future');
+        });
+
         it('still lifts the gate when the recheck timer fires a few ms early, instead of giving up for good', async () => {
           const preEventMinutes = 10;
           const realDateNow = Date.now.bind(Date);
