@@ -103,7 +103,11 @@ export const PresentationHeader = ({ eventName, onExit, participantUrl }: Presen
           <Paper elevation={8} sx={{ borderRadius: '12px', marginTop: '8px' }}>
             <div className="flex flex-col items-center gap-3 p-6">
               <QRCodeSVG value={participantUrl} size={260} marginSize={2} title="Scan to join as a participant" />
-              <span className="text-lg font-bold uppercase tracking-wide text-[#4845D2]">Scan to join</span>
+              {/* Dark is the default theme, where this card's background is #350560 — plain
+                  #4845D2 text there is ~2.3:1 contrast, below WCAG AA's 4.5:1 minimum. */}
+              <span className="text-lg font-bold uppercase tracking-wide text-[#4845D2] dark:text-nx-text">
+                Scan to join
+              </span>
             </div>
           </Paper>
         </Popper>
