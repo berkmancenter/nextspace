@@ -668,7 +668,7 @@ export type UnpackPreviewState =
   | { status: 'ready'; explanation: UnpackPreviewExplanation }
   | { status: 'error'; reason?: UnpackErrorReason };
 
-/** pending means Berkie posts the card once the explanation is written. */
+/** pending means bot posts the card once the explanation is written. */
 export type UnpackSendOutcome = { ok: true; status: 'sent' | 'pending' } | { ok: false; reason?: UnpackErrorReason };
 
 /** Where a browser selection starts and ends, for telling whether a press changed it. */
