@@ -37,7 +37,7 @@ export const CatchUpSummaryMessage: FC<MessageProps> = ({ message }) => {
             <h3 className={headingClassName}>What they covered</h3>
             <ul className="list-disc pl-5 flex flex-col gap-1.5 text-sm leading-normal">
               {whatTheyCovered.map((point, index) => (
-                // The points never change after Berkie posts them, and two can share the same text.
+                // The points never change after the bot posts them, and two can share the same text.
                 <li key={index}>{point}</li>
               ))}
             </ul>

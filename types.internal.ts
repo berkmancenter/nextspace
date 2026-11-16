@@ -699,7 +699,7 @@ export interface OpenUnpackTarget extends UnpackTarget {
   openedFrom?: HTMLElement;
 }
 
-/** Berkie's answer to a catch-up, kept while the participant is off Private Chat and hasn't seen it. */
+/** The bot's answer to a catch-up, kept while the participant is off Private Chat and hasn't seen it. */
 export interface CatchUpNotice {
   id: string;
   /** The refusal's text, or null for a summary. */
