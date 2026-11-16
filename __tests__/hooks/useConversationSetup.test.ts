@@ -625,9 +625,12 @@ describe('useConversationSetup', () => {
           });
 
           try {
-            await new Promise((resolve) => setTimeout(resolve, 2300));
-
-            expect(result.current.eventStatus).toBe('active');
+            await waitFor(
+              () => {
+                expect(result.current.eventStatus).toBe('active');
+              },
+              { timeout: 5000 },
+            );
             expect(result.current.groupChatChannelName).toBe('pregame');
           } finally {
             dateNowSpy.mockRestore();
