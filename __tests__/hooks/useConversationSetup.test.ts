@@ -314,6 +314,41 @@ describe('useConversationSetup', () => {
         expect(result.current.eventStatusLoaded).toBe(true);
       });
     });
+
+    describe('participantUrl', () => {
+      it("builds the join link from the page's own query channels, not the fetched conversation", async () => {
+        // The API withholds channel passcodes from anyone but the owner/admin, so a guest-signed-in
+        // viewer's fetched conversation can have no usable channel info even when their own tab does
+        // (e.g. a venue laptop). eventUrls is deliberately left off makeConversation()'s mock here —
+        // the fix must not depend on it at all.
+        const { result } = renderSetup({
+          query: {
+            conversationId: 'test-conversation-id',
+            channel: ['chat,chat-pass', 'pregame,pregame-pass'],
+          },
+        });
+
+        await waitFor(() => {
+          expect(result.current.eventStatusLoaded).toBe(true);
+        });
+
+        expect(result.current.participantUrl).toBe(
+          `${window.location.origin}/assistant/?conversationId=test-conversation-id&channel=chat,chat-pass&channel=pregame,pregame-pass`,
+        );
+      });
+
+      it('omits channel params when the query has none', async () => {
+        const { result } = renderSetup();
+
+        await waitFor(() => {
+          expect(result.current.eventStatusLoaded).toBe(true);
+        });
+
+        expect(result.current.participantUrl).toBe(
+          `${window.location.origin}/assistant/?conversationId=test-conversation-id`,
+        );
+      });
+    });
   });
 
   describe('agent resolution', () => {

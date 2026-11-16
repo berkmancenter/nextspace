@@ -36,6 +36,7 @@ export interface UseConversationSetupReturn {
   agentActive: boolean;
   agentIds: string[];
   conversationFeatures: { name: string; enabled?: boolean; config?: { [key: string]: unknown } }[];
+  participantUrl: string;
   feedbackFrequency: number;
   transcriptPasscode: string;
   chatPasscode: string;
@@ -89,6 +90,7 @@ export function useConversationSetup({
   const [conversationFeatures, setConversationFeatures] = useState<
     { name: string; enabled?: boolean; config?: { [key: string]: unknown } }[]
   >([]);
+  const [participantUrl, setParticipantUrl] = useState<string>('');
   const [feedbackFrequency, setFeedbackFrequency] = useState<number>(1);
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>('');
   const [chatPasscode, setChatPasscode] = useState<string>('');
@@ -165,6 +167,16 @@ export function useConversationSetup({
         const conversation = await createConversationFromData(conversationData);
         setConversationType(conversation.type);
         setConversationFeatures(conversation.features ?? []);
+        // The API hides channel passcodes from non-owners/non-admins, so the fetched conversation's
+        // own eventUrls.participant link can come back with no channel= params for a guest viewer
+        // (e.g. a venue laptop signed in as a guest) — anyone who then scans it lands without group
+        // chat or the transcript. query already holds this tab's own channel access, so the QR just
+        // forwards that instead of relying on the API response.
+        const channels = [query.channel ?? []].flat();
+        setParticipantUrl(
+          `${window.location.origin}/assistant/?conversationId=${query.conversationId}` +
+            channels.map((channel) => `&channel=${channel}`).join(''),
+        );
         if (conversation.name) setEventName(conversation.name);
 
         const frequency = (conversation?.properties?.feedbackFrequency as number) || 1;
@@ -352,6 +364,7 @@ export function useConversationSetup({
     agentActive,
     agentIds,
     conversationFeatures,
+    participantUrl,
     feedbackFrequency,
     transcriptPasscode,
     chatPasscode,
