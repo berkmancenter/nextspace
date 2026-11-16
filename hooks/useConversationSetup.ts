@@ -301,20 +301,32 @@ export function useConversationSetup({
   useEffect(() => {
     if (pendingGateRecheckAt === null) return;
 
-    // setTimeout's delay is a 32-bit signed int; beyond ~24.8 days it fires almost immediately
-    // instead of waiting, so clamp to that limit. A tab still open past the clamp just needs a
-    // refresh — not worth re-arming the timer for.
-    const delay = Math.min(Math.max(pendingGateRecheckAt - Date.now(), 0), 2147483647);
-    const timer = setTimeout(() => {
-      if (Date.now() < pendingGateRecheckAt) return;
-      if (pendingGateRecheckKindRef.current === 'preEventWindow') {
-        if (pregameChannelPasscodeRef.current) setChatPasscode(pregameChannelPasscodeRef.current);
-        setGroupChatChannelName('pregame');
-      }
-      setEventStatus('active');
-      setShowEventStatusDialog(false);
-      setPendingGateRecheckAt(null);
-    }, delay);
+    let timer: ReturnType<typeof setTimeout>;
+
+    const arm = (target: number) => {
+      // setTimeout's delay is a 32-bit signed int; beyond ~24.8 days it fires almost immediately
+      // instead of waiting, so clamp to that limit. A tab still open past the clamp just needs a
+      // refresh — not worth re-arming the timer for that case specifically.
+      const delay = Math.min(Math.max(target - Date.now(), 0), 2147483647);
+      timer = setTimeout(() => {
+        // Timers can fire a few ms before their target (observed in ~11% of runs) — re-arm for
+        // whatever's left rather than giving up, or the gate can get stuck showing "Event Not
+        // Started" past the real start until the user refreshes.
+        if (Date.now() < target) {
+          arm(target);
+          return;
+        }
+        if (pendingGateRecheckKindRef.current === 'preEventWindow') {
+          if (pregameChannelPasscodeRef.current) setChatPasscode(pregameChannelPasscodeRef.current);
+          setGroupChatChannelName('pregame');
+        }
+        setEventStatus('active');
+        setShowEventStatusDialog(false);
+        setPendingGateRecheckAt(null);
+      }, delay);
+    };
+
+    arm(pendingGateRecheckAt);
 
     return () => clearTimeout(timer);
   }, [pendingGateRecheckAt]);
