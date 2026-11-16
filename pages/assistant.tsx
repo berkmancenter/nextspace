@@ -241,7 +241,7 @@ export function EventAssistantRoom({
   });
 
   const [catchUpAnnouncement, setCatchUpAnnouncement] = useState<CatchUpNotice | null>(null);
-  // Tracked apart from waitingForResponse, which any Berkie reply clears, even one to an earlier question.
+  // Tracked apart from waitingForResponse, which any bot reply clears, even one to an earlier question.
   const [catchUpPending, setCatchUpPending] = useState(false);
   // Null until the transcript history loads, so a catch-up can't go out with an incomplete list.
   const [transcriptChunks, setTranscriptChunks] = useState<PseudonymousMessage[] | null>(null);
@@ -265,9 +265,16 @@ export function EventAssistantRoom({
     }));
 
   const unpackerOn = isFeatureEnabled('unpacker', conversationFeatures, conversationType?.features);
-  const catchUpReady = unpackerOn && !presentation && (!transcriptPasscode || transcriptChunks !== null);
+  const catchUpReady =
+    unpackerOn &&
+    !presentation &&
+    agentActive &&
+    eventStatus === 'active' &&
+    (!transcriptPasscode || transcriptChunks !== null);
   const privateChatOnScreen = activeTab === 'assistant' && router.query.view !== 'preferences';
+  const privateChatOnScreenRef = useRef(privateChatOnScreen);
   useEffect(() => {
+    privateChatOnScreenRef.current = privateChatOnScreen;
     if (privateChatOnScreen) setCatchUpAnnouncement(null);
   }, [privateChatOnScreen]);
   const [focusPrivateChatInput, setFocusPrivateChatInput] = useState(false);
@@ -301,7 +308,7 @@ export function EventAssistantRoom({
         if (body?.type === 'catch_up_summary' || body?.type === 'catch_up_refused') {
           setCatchUpPending(false);
           // On Private Chat the message list already reads the reply out.
-          if (activeTabRef.current !== 'assistant' && data.id) {
+          if (!privateChatOnScreenRef.current && data.id) {
             setCatchUpAnnouncement({
               id: data.id,
               refusal: body.type === 'catch_up_refused' ? body.text : null,

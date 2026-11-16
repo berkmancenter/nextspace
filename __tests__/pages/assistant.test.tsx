@@ -56,6 +56,7 @@ jest.mock('../../utils/SessionManager', () => {
     get: jest.fn(() => ({
       restoreSession: jest.fn().mockResolvedValue(true),
       getState: jest.fn().mockReturnValue('guest'),
+      getSessionInfo: jest.fn().mockReturnValue(null),
       hasSession: jest.fn().mockReturnValue(true),
       markAuthenticated: jest.fn(),
       markGuest: jest.fn(),
@@ -4062,11 +4063,15 @@ describe('EventAssistantRoom', () => {
 
     const mockConversationWithFeatures = (
       features: { name: string; enabled?: boolean }[],
-      { transcript = Promise.resolve([]) as Promise<unknown[]> | unknown[], privateChat = [] as unknown[] } = {},
+      {
+        transcript = Promise.resolve([]) as Promise<unknown[]> | unknown[],
+        privateChat = [] as unknown[],
+        agents = [{ id: 'agent-123', agentType: 'eventAssistant' }],
+      } = {},
     ) => {
       (RetrieveData as jest.Mock).mockImplementation((path: string) => {
         if (path.startsWith('conversations/')) {
-          return Promise.resolve({ agents: [{ id: 'agent-123', agentType: 'eventAssistant' }] });
+          return Promise.resolve({ agents });
         }
         if (path.startsWith('messages/') && path.includes('channel=transcript')) return Promise.resolve(transcript);
         if (path.startsWith('messages/') && path.includes('direct-')) return Promise.resolve(privateChat);
@@ -4074,7 +4079,7 @@ describe('EventAssistantRoom', () => {
         return Promise.resolve(null);
       });
       (createConversationFromData as jest.Mock).mockResolvedValue({
-        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        agents,
         type: { name: 'eventAssistant', description: '', platforms: [], properties: [], features: [] },
         features,
       });
@@ -4134,6 +4139,7 @@ describe('EventAssistantRoom', () => {
 
     const noTranscriptRefusal = fromBerkie('refusal-1', {
       type: 'catch_up_refused',
+      requestMessage: 'request-1',
       reason: 'noTranscript',
       text: 'Nothing to catch up on yet.',
     });
@@ -4170,6 +4176,36 @@ describe('EventAssistantRoom', () => {
       await act(async () => finishLoading(transcriptChunks));
 
       expect(await screen.findByRole('button', { name: 'Catch me up' })).toBeInTheDocument();
+    });
+
+    it('hides the Catch me up button once the event ends', async () => {
+      mockConversationWithFeatures([{ name: 'unpacker', enabled: true }], { transcript: transcriptChunks });
+      await openPrivateChat();
+      await screen.findByRole('button', { name: 'Catch me up' });
+
+      act(() => {
+        socketHandlers('conversation:stopped').forEach((handler) => handler());
+      });
+
+      // The Event Has Ended dialog hides the page from the accessibility tree, so look past it.
+      await waitFor(() =>
+        expect(screen.queryByRole('button', { name: 'Catch me up', hidden: true })).not.toBeInTheDocument(),
+      );
+      expect(screen.getByText('Second passage')).toBeInTheDocument();
+    });
+
+    it('hides the Catch me up button when the event has no assistant to answer it', async () => {
+      mockConversationWithFeatures([{ name: 'unpacker', enabled: true }], { transcript: transcriptChunks, agents: [] });
+      await act(async () => {
+        render(
+          <ConversationTypeProvider>
+            <EventAssistantRoom authType={'guest'} />
+          </ConversationTypeProvider>,
+        );
+      });
+
+      await screen.findByText('Second passage');
+      expect(screen.queryByRole('button', { name: 'Catch me up' })).not.toBeInTheDocument();
     });
 
     it("sends the last minute's transcript chunks to Private Chat", async () => {
@@ -4216,7 +4252,12 @@ describe('EventAssistantRoom', () => {
       mockConversationWithFeatures([{ name: 'unpacker', enabled: true }], {
         privateChat: [
           { ...fromBerkie('request-1', catchUpRequestBody), fromAgent: false, pseudonym: 'test-pseudonym' },
-          fromBerkie('refusal-2', { type: 'catch_up_refused', reason: 'unpackFailed', text: 'Something went wrong.' }),
+          fromBerkie('refusal-2', {
+            type: 'catch_up_refused',
+            requestMessage: 'request-1',
+            reason: 'unpackFailed',
+            text: 'Something went wrong.',
+          }),
         ],
       });
       await openPrivateChat();
@@ -4247,7 +4288,12 @@ describe('EventAssistantRoom', () => {
         transcript: transcriptChunks,
         privateChat: [
           { ...fromBerkie('request-1', catchUpRequestBody), fromAgent: false, pseudonym: 'test-pseudonym' },
-          fromBerkie('refusal-2', { type: 'catch_up_refused', reason: 'unpackFailed', text: 'Something went wrong.' }),
+          fromBerkie('refusal-2', {
+            type: 'catch_up_refused',
+            requestMessage: 'request-1',
+            reason: 'unpackFailed',
+            text: 'Something went wrong.',
+          }),
         ],
       });
       await openPrivateChat();
@@ -4262,12 +4308,38 @@ describe('EventAssistantRoom', () => {
       });
     });
 
+    it('sends one retry when the participant double-clicks Try again', async () => {
+      mockConversationWithFeatures([{ name: 'unpacker', enabled: true }], {
+        transcript: transcriptChunks,
+        privateChat: [
+          { ...fromBerkie('request-1', catchUpRequestBody), fromAgent: false, pseudonym: 'test-pseudonym' },
+          fromBerkie('refusal-2', {
+            type: 'catch_up_refused',
+            requestMessage: 'request-1',
+            reason: 'unpackFailed',
+            text: 'Something went wrong.',
+          }),
+        ],
+      });
+      await openPrivateChat();
+
+      await userEvent.dblClick(await screen.findByRole('button', { name: 'Try again' }));
+
+      await waitFor(() => expect(SendData).toHaveBeenCalledWith('messages', expect.anything()));
+      expect((SendData as jest.Mock).mock.calls.filter(([path]) => path === 'messages')).toHaveLength(1);
+    });
+
     it('leaves the passcode out of a retry when the page has no transcript passcode', async () => {
       mockRouter.query = { conversationId: 'a1b2c3d4e5f6a1b2c3d4e5f6', channel: 'chat,chat-pass' };
       mockConversationWithFeatures([{ name: 'unpacker', enabled: true }], {
         privateChat: [
           { ...fromBerkie('request-1', catchUpRequestBody), fromAgent: false, pseudonym: 'test-pseudonym' },
-          fromBerkie('refusal-2', { type: 'catch_up_refused', reason: 'unpackFailed', text: 'Something went wrong.' }),
+          fromBerkie('refusal-2', {
+            type: 'catch_up_refused',
+            requestMessage: 'request-1',
+            reason: 'unpackFailed',
+            text: 'Something went wrong.',
+          }),
         ],
       });
       await openPrivateChat();
@@ -4366,6 +4438,19 @@ describe('EventAssistantRoom', () => {
       mockConversationWithFeatures([{ name: 'unpacker', enabled: true }]);
       await openPrivateChat();
       await userEvent.click(screen.getAllByLabelText('Group Chat')[0]);
+
+      deliver(catchUpSummary);
+
+      const announcement = await screen.findByText('Berkie posted your catch-up.');
+      expect(announcement.closest('[role="status"]')).not.toBeNull();
+    });
+
+    it('tells screen readers when the catch-up arrives while Preferences covers Private Chat', async () => {
+      mockConversationWithFeatures([{ name: 'unpacker', enabled: true }]);
+      await openPrivateChat();
+      mockRouter.query = { ...mockRouter.query, view: 'preferences' };
+      await userEvent.click(screen.getAllByLabelText('Group Chat')[0]);
+      await userEvent.click(screen.getAllByLabelText('Private Chat')[0]);
 
       deliver(catchUpSummary);
 
