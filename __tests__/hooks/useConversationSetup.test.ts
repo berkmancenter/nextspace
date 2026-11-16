@@ -622,6 +622,78 @@ describe('useConversationSetup', () => {
           await new Promise((resolve) => setTimeout(resolve, 800));
           expect(result.current.eventStatus).toBe('future');
         });
+
+        it('never lifts the gate for an unparseable scheduledTime, instead of firing almost immediately', async () => {
+          mockCreateConversationFromData.mockResolvedValue(
+            makeConversation({ active: false, scheduledTime: 'not-a-real-date', preEventMinutes: 10 }),
+          );
+          mockGetChannelPasscode.mockImplementation((channel: string) =>
+            channel === 'pregame' ? 'pregame-pass' : 'chat-pass',
+          );
+
+          const { result } = renderSetup({
+            query: { conversationId: 'test-conversation-id', channel: ['chat,chat-pass', 'pregame,pregame-pass'] },
+          });
+
+          await waitFor(() => {
+            expect(result.current.eventStatus).toBe('future');
+          });
+
+          // An unparseable scheduledTime makes the computed recheck target NaN rather than null,
+          // which would otherwise arm an effectively-0ms timer (NaN delay behaves like 0) and lift
+          // the gate almost immediately on an event with no real start time at all.
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          expect(result.current.eventStatus).toBe('future');
+        });
+
+        it('still lifts the gate when the recheck timer fires a few ms early, instead of giving up for good', async () => {
+          const preEventMinutes = 10;
+          const realDateNow = Date.now.bind(Date);
+          const scheduleBase = realDateNow();
+          const scheduledTime = new Date(scheduleBase + preEventMinutes * 60 * 1000 + 2000).toISOString();
+          const target = scheduleBase + 2000; // matches the hook's own windowStart computation
+
+          mockCreateConversationFromData.mockResolvedValue(
+            makeConversation({ active: false, scheduledTime, preEventMinutes }),
+          );
+          mockGetChannelPasscode.mockImplementation((channel: string) =>
+            channel === 'pregame' ? 'pregame-pass' : 'chat-pass',
+          );
+
+          const { result } = renderSetup({
+            query: { conversationId: 'test-conversation-id', channel: ['chat,chat-pass', 'pregame,pregame-pass'] },
+          });
+
+          await waitFor(() => {
+            expect(result.current.eventStatus).toBe('future');
+          });
+
+          // Simulates the real-world timer jitter the issue reports (~11% of runs): the very next
+          // Date.now() call — the fired timer's own guard check — reports 1ms before its target,
+          // as if the engine's timer fired a hair early. Everything else (the delay already
+          // computed above, and any retry after this one) sees the real clock, which has
+          // genuinely caught up by then.
+          let forceEarlyOnce = true;
+          const dateNowSpy = jest.spyOn(Date, 'now').mockImplementation(() => {
+            if (forceEarlyOnce) {
+              forceEarlyOnce = false;
+              return target - 1;
+            }
+            return realDateNow();
+          });
+
+          try {
+            await waitFor(
+              () => {
+                expect(result.current.eventStatus).toBe('active');
+              },
+              { timeout: 5000 },
+            );
+            expect(result.current.groupChatChannelName).toBe('pregame');
+          } finally {
+            dateNowSpy.mockRestore();
+          }
+        }, 8000);
       });
 
       describe('eventScheduledTime', () => {
