@@ -223,14 +223,9 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   const lastMessage = messages[messages.length - 1];
   const waitingForThreadedReply = waitingForResponse && lastMessage?.parentMessage;
 
-  // The refusal carries no link to its request, so resend the newest request posted before it.
   const retryCatchUp = (refusal: PseudonymousMessage) => {
     if (waitingForResponse || !onCatchUp) return;
-    const refusalIndex = messages.indexOf(refusal);
-    const failedRequest = messages
-      .slice(0, refusalIndex)
-      .reverse()
-      .find((message) => message.body?.type === 'unpack_request');
+    const failedRequest = messages.find((message) => message.id === refusal.body?.requestMessage);
     if (failedRequest) onCatchUp(failedRequest.body as UnpackRequestBody);
     else onCatchUp();
     // Try again disappears once the new request posts, which would drop focus to the page.

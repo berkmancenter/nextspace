@@ -2194,7 +2194,7 @@ describe('AssistantChatPanel', () => {
         pseudonymId: 'agent-1',
         fromAgent: true,
         createdAt: localTime(10, 46),
-        body: { type: 'catch_up_refused', reason, text: `Refused because ${reason}.` },
+        body: { type: 'catch_up_refused', requestMessage: 'request-1', reason, text: `Refused because ${reason}.` },
       });
 
     // Newer ICU versions put a narrow no-break space before AM and PM.
@@ -2297,6 +2297,26 @@ describe('AssistantChatPanel', () => {
           {...baseProps}
           onCatchUp={onCatchUp}
           messages={[catchUpRequest, makeRefusal('r-1', 'unpackFailed')]}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+      expect(onCatchUp).toHaveBeenCalledWith(catchUpRequest.body);
+    });
+
+    it('resends the request the refusal answers, even when a newer request came between them', async () => {
+      const onCatchUp = jest.fn();
+      const newerRequest = makeMessage({
+        ...catchUpRequest,
+        id: 'request-2',
+        body: { ...catchUpRequest.body, chunkIds: ['chunk-2'] },
+      });
+      render(
+        <AssistantChatPanel
+          {...baseProps}
+          onCatchUp={onCatchUp}
+          messages={[catchUpRequest, newerRequest, makeRefusal('r-1', 'unpackFailed')]}
         />,
       );
 
