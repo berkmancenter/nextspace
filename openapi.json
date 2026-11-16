@@ -5272,7 +5272,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UnpackSelection",
                 "allOf": [
                   {
                     "$ref": "#/components/schemas/UnpackSelection"
