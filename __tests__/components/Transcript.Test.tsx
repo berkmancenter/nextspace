@@ -826,6 +826,28 @@ describe('Transcript', () => {
     expect(onMessagesChange).toHaveBeenLastCalledWith([]);
   });
 
+  it.each([
+    ['refuses the passcode', () => Promise.resolve({ error: true, message: { message: 'Incorrect passcode' } })],
+    ['throws', () => Promise.reject(new Error('Network down'))],
+  ])('tells the page nothing when the first load %s', async (_outcome, failedLoad) => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    (RetrieveData as jest.Mock).mockImplementation((url: string) => {
+      if (url.startsWith('messages/')) return failedLoad();
+      return Promise.resolve({ transcript: { status: 'active' } });
+    });
+    const onMessagesChange = jest.fn();
+    render(<Transcript {...baseProps} onMessagesChange={onMessagesChange} />);
+    await waitFor(() => expect(RetrieveData).toHaveBeenCalledWith(expect.stringMatching(/^messages\//), expect.anything()));
+
+    const messageHandler = mockSocket.on.mock.calls.find((call) => call[0] === 'message:new')?.[1];
+    act(() => {
+      messageHandler({ id: 'm3', channels: ['transcript'], createdAt: '2025-10-17T12:03:00Z', body: { text: 'New' } });
+    });
+
+    expect(onMessagesChange).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
   it('shows chunk times the same way Private Chat lists them', async () => {
     render(<Transcript {...baseProps} />);
 

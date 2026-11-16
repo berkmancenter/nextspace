@@ -568,6 +568,7 @@ export function Transcript(props: TranscriptProps) {
           preserveScrollRef.current = { scrollHeight: container.scrollHeight, scrollTop: container.scrollTop };
         }
         setMessages(arrivedDuringFetch.reduce(insertMessageInOrder, transcriptMessages));
+        setHistoryLoaded(true);
 
         if (props.focusTimeRange) {
           setTimeout(() => {
@@ -583,7 +584,6 @@ export function Transcript(props: TranscriptProps) {
       if (props.setErrorMessage) props.setErrorMessage(error as string);
     } finally {
       fetchesInFlightRef.current.delete(arrivedDuringFetch);
-      setHistoryLoaded(true);
     }
   };
 
