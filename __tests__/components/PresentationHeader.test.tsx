@@ -104,11 +104,9 @@ describe('PresentationHeader', () => {
 
       expect(await screen.findByRole('img', { name: 'Scan to join as a participant' })).toBeInTheDocument();
       expect(screen.getByText('Scan to join')).toBeInTheDocument();
-      // The open Popover marks the rest of the page aria-hidden (standard MUI modal behavior,
-      // purely for assistive tech — it doesn't block real mouse/keyboard interaction), so the
-      // toggle button itself has to be queried past that to find it, same as a sighted user can
-      // still click it.
-      expect(screen.getByRole('button', { name: 'Hide join QR code', hidden: true })).toBeInTheDocument();
+      const toggle = screen.getByRole('button', { name: 'Hide join QR code' });
+      expect(toggle).toBeInTheDocument();
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
     });
 
     it('hides the QR code on toggle click, and shows it again on a second click', async () => {
@@ -122,10 +120,11 @@ describe('PresentationHeader', () => {
 
       await screen.findByRole('img', { name: 'Scan to join as a participant' });
 
-      await userEvent.click(screen.getByRole('button', { name: 'Hide join QR code', hidden: true }));
+      await userEvent.click(screen.getByRole('button', { name: 'Hide join QR code' }));
       await waitFor(() => {
         expect(screen.queryByRole('img', { name: 'Scan to join as a participant' })).not.toBeInTheDocument();
       });
+      expect(screen.getByRole('button', { name: 'Show join QR code' })).toHaveAttribute('aria-expanded', 'false');
 
       await userEvent.click(screen.getByRole('button', { name: 'Show join QR code' }));
       expect(await screen.findByRole('img', { name: 'Scan to join as a participant' })).toBeInTheDocument();
@@ -143,17 +142,16 @@ describe('PresentationHeader', () => {
       await screen.findByRole('img', { name: 'Scan to join as a participant' });
       expect(document.documentElement).toHaveAttribute('data-presenter-theme', 'dark');
 
-      // Queried with hidden:true for the same reason as above — it's aria-hidden while the
-      // popover's open, which doesn't affect a real click actually reaching it.
-      await userEvent.click(screen.getByRole('button', { name: 'Switch to light mode', hidden: true }));
+      // Popper has no backdrop/overlay at all (unlike Popover), so this was never actually at risk
+      // of being swallowed — this just confirms it stays that way.
+      await userEvent.click(screen.getByRole('button', { name: 'Switch to light mode' }));
 
-      // The click reached the real button (not swallowed by the popover's backdrop)...
       expect(document.documentElement).toHaveAttribute('data-presenter-theme', 'light');
-      // ...and didn't also dismiss the popover as a side effect.
+      // ...and didn't also dismiss the QR code as a side effect.
       expect(screen.getByRole('img', { name: 'Scan to join as a participant' })).toBeInTheDocument();
     });
 
-    it('lets focus (and typing) land on an input elsewhere on the page while the popover is open', async () => {
+    it('lets focus (and typing) land on an input elsewhere on the page while the QR code is open', async () => {
       const user = userEvent.setup();
       render(
         <>
@@ -168,12 +166,12 @@ describe('PresentationHeader', () => {
 
       await screen.findByRole('img', { name: 'Scan to join as a participant' });
 
-      const chatInput = screen.getByRole('textbox', { name: 'group chat message', hidden: true });
+      const chatInput = screen.getByRole('textbox', { name: 'group chat message' });
       await user.click(chatInput);
       await user.type(chatInput, 'hello');
 
-      // Without disableEnforceFocus, Modal's FocusTrap pulls focus straight back to the popover
-      // on the next tick, so typing would never actually land in the input.
+      // Popper has no focus trap — unlike Popover's Modal-based FocusTrap, nothing pulls focus
+      // back here, so typing elsewhere just works.
       expect(chatInput).toHaveFocus();
       expect(chatInput).toHaveValue('hello');
     });

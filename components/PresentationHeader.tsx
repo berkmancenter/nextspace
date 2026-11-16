@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Dialog, Popover } from '@mui/material';
+import { useState } from 'react';
+import { Dialog, Paper, Popper } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
@@ -30,17 +30,12 @@ export const PresentationHeader = ({ eventName, onExit, participantUrl }: Presen
   const switchTo = theme === 'dark' ? 'light' : 'dark';
 
   // Shown by default so a presenter doesn't have to remember to open it; the toggle below just
-  // hides it once everyone's scanned in. anchorEl is only set after the button mounts, so the
-  // Popover (which needs a real DOM node to position against) appears a frame after first paint.
-  // The button itself only renders once participantUrl resolves (it arrives async, after the
-  // conversation fetch), so this depends on participantUrl to re-capture the ref once that happens
-  // — an empty dependency array would only ever see the button's pre-participantUrl absence.
+  // hides it once everyone's scanned in. qrAnchorEl is populated by passing setQrAnchorEl directly
+  // as the button's ref — it fires whenever the button actually mounts (it only renders once
+  // participantUrl resolves, which arrives async after the conversation fetch), with no separate
+  // effect needed to re-capture it.
   const [showQr, setShowQr] = useState(true);
-  const qrButtonRef = useRef<HTMLButtonElement>(null);
   const [qrAnchorEl, setQrAnchorEl] = useState<HTMLElement | null>(null);
-  useEffect(() => {
-    setQrAnchorEl(qrButtonRef.current);
-  }, [participantUrl]);
 
   const closeDialog = () => {
     setConfirmingExit(false);
@@ -72,11 +67,12 @@ export const PresentationHeader = ({ eventName, onExit, participantUrl }: Presen
         </span>
         {participantUrl && (
           <button
-            ref={qrButtonRef}
+            ref={setQrAnchorEl}
             type="button"
             onClick={() => setShowQr((shown) => !shown)}
             aria-label={showQr ? 'Hide join QR code' : 'Show join QR code'}
             title={showQr ? 'Hide join QR code' : 'Show join QR code'}
+            aria-expanded={showQr}
             className="inline-flex h-10 w-10 items-center justify-center rounded-full border-[1.5px] dark:border-2 border-gray-300 bg-gray-100 text-gray-800 hover:bg-gray-200 dark:hover:bg-nx-active"
           >
             <QrCode2Icon />
@@ -103,40 +99,14 @@ export const PresentationHeader = ({ eventName, onExit, participantUrl }: Presen
       </div>
 
       {participantUrl && (
-        <Popover
-          open={showQr && Boolean(qrAnchorEl)}
-          anchorEl={qrAnchorEl}
-          onClose={(_event, reason) => {
-            // Shown by default so it's there whenever someone wants to scan it — only the toggle
-            // button or Escape should dismiss it, never an incidental click elsewhere.
-            if (reason === 'backdropClick') return;
-            setShowQr(false);
-          }}
-          // Not a true modal — the rest of the page (including keyboard input, e.g. typing in the
-          // group chat message box) must keep working while this is open. disableEnforceFocus stops
-          // Modal's FocusTrap from yanking focus back here whenever it moves elsewhere; disableAutoFocus
-          // stops it from stealing focus the moment it opens by default on load.
-          disableEnforceFocus
-          disableAutoFocus
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-          slotProps={{
-            // Letting clicks through to the rest of the page takes more than disabling the
-            // backdrop: Modal renders its own `position: fixed; inset: 0` root div (a separate,
-            // full-viewport element, not the backdrop) that still intercepts every click by
-            // default. Disable pointer events there too, then re-enable them only on the visible
-            // card itself (`paper`) so its own content stays clickable/selectable. Safe to give up
-            // the backdrop's click-away detection entirely here, since closing is handled solely
-            // by the toggle button/Escape.
-            root: { sx: { pointerEvents: 'none' } },
-            paper: { sx: { pointerEvents: 'auto', borderRadius: '12px', marginTop: '8px' } },
-          }}
-        >
-          <div className="flex flex-col items-center gap-3 p-6">
-            <QRCodeSVG value={participantUrl} size={260} marginSize={2} title="Scan to join as a participant" />
-            <span className="text-lg font-bold uppercase tracking-wide text-[#4845D2]">Scan to join</span>
-          </div>
-        </Popover>
+        <Popper open={showQr && Boolean(qrAnchorEl)} anchorEl={qrAnchorEl} placement="bottom-end" sx={{ zIndex: 'appBar' }}>
+          <Paper elevation={8} sx={{ borderRadius: '12px', marginTop: '8px' }}>
+            <div className="flex flex-col items-center gap-3 p-6">
+              <QRCodeSVG value={participantUrl} size={260} marginSize={2} title="Scan to join as a participant" />
+              <span className="text-lg font-bold uppercase tracking-wide text-[#4845D2]">Scan to join</span>
+            </div>
+          </Paper>
+        </Popper>
       )}
 
       <Dialog
