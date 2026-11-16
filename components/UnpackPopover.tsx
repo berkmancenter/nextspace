@@ -238,7 +238,10 @@ const UnpackPopoverContent: FC<
 
 const chunkIdsInRange = (chunks: TranscriptChunkText[], { selection }: UnpackTarget): string[] => {
   const ids = chunks.map(({ id }) => id);
-  return ids.slice(ids.indexOf(selection.startMessageId), ids.indexOf(selection.endMessageId) + 1);
+  const start = ids.indexOf(selection.startMessageId);
+  const end = ids.indexOf(selection.endMessageId);
+  if (start === -1 || end === -1) return [];
+  return ids.slice(start, end + 1);
 };
 
 export const UnpackPopover: FC<UnpackPopoverProps> = ({ target, onClose, ...contentProps }) => {
@@ -287,6 +290,7 @@ export const UnpackPopover: FC<UnpackPopoverProps> = ({ target, onClose, ...cont
   };
 
   // A right-click or a scroll bar drag, such as scrolling the transcript to reread the passage, keeps it open.
+  // Touches are left to the mousedown a browser sends after a tap but not after a touch scroll.
   const handleClickAway = (event: MouseEvent | TouchEvent) => {
     if (event instanceof MouseEvent && (event.button !== 0 || isScrollbarPress(event))) return;
     onClose('clickAway');
@@ -295,7 +299,7 @@ export const UnpackPopover: FC<UnpackPopoverProps> = ({ target, onClose, ...cont
   return (
     <Popper open anchorEl={target.anchor} placement="bottom-start" style={{ zIndex: 1300 }} modifiers={POPPER_MODIFIERS}>
       {/* Mouse down, not click: the click that ends a drag-selection would otherwise close the popover it opened. */}
-      <ClickAwayListener onClickAway={handleClickAway} mouseEvent="onMouseDown" touchEvent="onTouchStart">
+      <ClickAwayListener onClickAway={handleClickAway} mouseEvent="onMouseDown" touchEvent={false}>
         <section
           ref={dialogRef}
           role="dialog"

@@ -373,6 +373,39 @@ describe('UnpackPopover', () => {
     expect(onClose).toHaveBeenCalledWith('clickAway');
   });
 
+  it('stays open when the participant touches outside it to scroll, and closes on a tap outside', async () => {
+    neverAnswerPreview();
+    const { onClose } = renderPopover();
+    await clickAwayReady();
+    const outside = screen.getByRole('button', { name: 'Outside' });
+
+    fireEvent.touchStart(outside);
+    expect(onClose).not.toHaveBeenCalled();
+    // A tap, unlike a scroll, is followed by a mousedown the browser sends for pages built for mice.
+    fireEvent.mouseDown(outside);
+
+    expect(onClose).toHaveBeenCalledWith('clickAway');
+  });
+
+  it('ignores Escape on a chunk once the first chunk of its passage has left the transcript', () => {
+    neverAnswerPreview();
+    const hiddenStart = { ...selection, startMessageId: 'hidden', startOffset: 0 };
+    const { onClose } = renderPopover({
+      target: { selection: hiddenStart, anchor: document.body },
+      chunks: [{ id: 'c0', text: 'Earlier chunk.' }, ...chunks],
+    });
+    const lastChunk = document.createElement('div');
+    lastChunk.setAttribute('data-message-id', 'c1');
+    lastChunk.tabIndex = 0;
+    document.body.appendChild(lastChunk);
+    lastChunk.focus();
+
+    fireEvent.keyDown(lastChunk, { key: 'Escape' });
+    lastChunk.remove();
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('stays open while the participant drags a scroll bar outside it', async () => {
     neverAnswerPreview();
     const { onClose } = renderPopover();
