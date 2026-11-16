@@ -32,6 +32,8 @@ interface MessageInputProps {
   shownOnScreen?: boolean;
   /** Takes keyboard focus when it first appears, for a control that just opened this chat. */
   focusOnMount?: boolean;
+  /** Takes keyboard focus each time this number changes after mounting. */
+  focusRequest?: number;
 }
 
 export const MessageInput: FC<MessageInputProps> = ({
@@ -48,6 +50,7 @@ export const MessageInput: FC<MessageInputProps> = ({
   onHide,
   shownOnScreen = false,
   focusOnMount = false,
+  focusRequest = 0,
 }) => {
   const [internalValue, setInternalValue] = useState('');
   const isControlled = inputValue !== undefined && onInputChange !== undefined;
@@ -64,6 +67,11 @@ export const MessageInput: FC<MessageInputProps> = ({
     if (focusOnMount) messageInputRef.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const firstFocusRequest = useRef(focusRequest);
+  useEffect(() => {
+    if (focusRequest !== firstFocusRequest.current) messageInputRef.current?.focus();
+  }, [focusRequest]);
 
   // Close menu when enhancers change
   useEffect(() => {

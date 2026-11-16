@@ -4,7 +4,13 @@ import { parseMessageBody } from './Helpers';
 /**
  * Message types that should be excluded from feedback eligibility
  */
-export const INELIGIBLE_MESSAGE_TYPES = ['intro', 'moderator_offered', 'moderator_submitted', 'moderator_declined'] as const;
+export const INELIGIBLE_MESSAGE_TYPES = [
+  'intro',
+  'moderator_offered',
+  'moderator_submitted',
+  'moderator_declined',
+  'catch_up_refused',
+] as const;
 
 /**
  * Determine which messages should show feedback UI based on:
