@@ -268,4 +268,12 @@ describe('unpackErrorCopy', () => {
       canSend: false,
     });
   });
+
+  it('says the event is locked when the server refuses to post, and blocks sending', () => {
+    expect(unpackErrorCopy('eventLocked', 'Berkie')).toEqual({
+      message: "This event is locked, so Berkie can't post to your Private Chat.",
+      canRetry: false,
+      canSend: false,
+    });
+  });
 });

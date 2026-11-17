@@ -138,6 +138,11 @@ const errorCopy = (botName: string): Record<UnpackErrorReason, UnpackErrorCopy> 
       canRetry: false,
       canSend: false,
     },
+    eventLocked: {
+      message: `This event is locked, so ${botName} can't post to your Private Chat.`,
+      canRetry: false,
+      canSend: false,
+    },
     wrongPasscode: {
       message: "This page's transcript link has changed. Reload the page, then try again.",
       canRetry: false,
