@@ -291,7 +291,11 @@ The transcript channel password is provided only if you are utilizing one of the
 
 ## Deploy your changes to Vercel
 
-This repo automatically has changes deployed to Vercel via the Vercel for GitHub [app](https://github.com/apps/vercel). Changes merged to the `main` branch will be deployed to production, while any feature branch will automatically be deployed to a preview URL. If you have forked this repo and want to deploy changes without usage of this app, you can do so via [the CLI](https://vercel.com/docs/cli).
+This repo deploys to Vercel via the Vercel for GitHub [app](https://github.com/apps/vercel). Feature branches still auto-deploy to a preview URL on every push, but **production no longer deploys on merge** — merging to `main` does not go live. Instead, production updates once a night via the [`deploy-production`](.github/workflows/deploy-production.yml) GitHub Action, which calls Vercel's existing Deploy Hook for `main`. Vercel's own check on `main` commits still shows a green tick even when the build was intentionally skipped, so don't take that as a sign a merged change is live.
+
+To deploy sooner than the nightly run: go to this repo's **Actions** tab → **Nightly production deploy** → **Run workflow**.
+
+If you have forked this repo and want to deploy changes without usage of this app, you can do so via [the CLI](https://vercel.com/docs/cli).
 
 ## Analytics Integration
 
