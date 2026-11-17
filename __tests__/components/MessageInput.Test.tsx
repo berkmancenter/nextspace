@@ -46,6 +46,18 @@ describe('MessageInput Component', () => {
       expect(screen.getByPlaceholderText('Enter your message here')).toBeInTheDocument();
     });
 
+    it('puts focus in the message box when asked to on mount', () => {
+      render(<MessageInput {...defaultProps} focusOnMount />);
+
+      expect(screen.getByPlaceholderText('Enter your message here')).toHaveFocus();
+    });
+
+    it('leaves focus alone on mount by default', () => {
+      render(<MessageInput {...defaultProps} />);
+
+      expect(screen.getByPlaceholderText('Enter your message here')).not.toHaveFocus();
+    });
+
     it('reminds the writer that the message is shown on screen in the presentation view', () => {
       render(<MessageInput {...defaultProps} shownOnScreen />);
 

@@ -279,8 +279,40 @@ export const SendData = async (
     const data = await response.json();
     return data;
   } catch (error) {
+    // The caller cancelled it on purpose, for example because a newer request replaced it.
+    if (error instanceof DOMException && error.name === 'AbortError') return;
     console.error('There was a problem with the send operation:', error);
   }
+};
+
+/**
+ * Whether an event has a feature on. A setting saved on the event wins; otherwise the conversation
+ * type's default applies, as in the backend's getFeatures().
+ */
+export const isFeatureEnabled = (
+  name: string,
+  savedFeatures: { name: string; enabled?: boolean }[] | undefined,
+  typeFeatures: { name: string; default?: boolean }[] | undefined,
+): boolean => {
+  const saved = savedFeatures?.find((feature) => feature.name === name);
+  if (saved) return saved.enabled !== false;
+  return !!typeFeatures?.find((feature) => feature.name === name)?.default;
+};
+
+/**
+ * Whether a mouse press landed on the scroll bar of the element it targets. Browsers report a scroll bar
+ * press as a press on the scrolling element, so only its position tells the two apart.
+ */
+export const isScrollbarPress = (event: MouseEvent): boolean => {
+  const element = event.target;
+  if (!(element instanceof Element)) return false;
+  const { left, top } = element.getBoundingClientRect();
+  const onVerticalBar = event.clientX >= left + element.clientLeft + element.clientWidth;
+  const onHorizontalBar = event.clientY >= top + element.clientTop + element.clientHeight;
+  return (
+    (onVerticalBar && element.scrollHeight > element.clientHeight) ||
+    (onHorizontalBar && element.scrollWidth > element.clientWidth)
+  );
 };
 
 // Default easing class for animations

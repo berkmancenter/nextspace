@@ -30,6 +30,8 @@ interface MessageInputProps {
   onHide?: () => void;
   /** Reminds the writer that the message will appear on a shared screen */
   shownOnScreen?: boolean;
+  /** Takes keyboard focus when it first appears, for a control that just opened this chat. */
+  focusOnMount?: boolean;
 }
 
 export const MessageInput: FC<MessageInputProps> = ({
@@ -45,6 +47,7 @@ export const MessageInput: FC<MessageInputProps> = ({
   onSendMessage,
   onHide,
   shownOnScreen = false,
+  focusOnMount = false,
 }) => {
   const [internalValue, setInternalValue] = useState('');
   const isControlled = inputValue !== undefined && onInputChange !== undefined;
@@ -56,6 +59,11 @@ export const MessageInput: FC<MessageInputProps> = ({
 
   const messageInputRef = useRef<HTMLInputElement>(null);
   const enterUsedForCommandRef = useRef(false);
+
+  useEffect(() => {
+    if (focusOnMount) messageInputRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Close menu when enhancers change
   useEffect(() => {

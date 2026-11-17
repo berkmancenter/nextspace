@@ -5245,6 +5245,168 @@
         }
       }
     },
+    "/unpack/{conversationId}/preview": {
+      "post": {
+        "summary": "Preview an explanation of a transcript passage",
+        "description": "Explains the passage a participant selected and records their ask. The browser sends only chunk IDs and character positions; the server rebuilds the quote from the saved transcript and widens it to whole sentences, so people who select roughly the same words share one saved explanation. The first request for a passage waits for the AI model, up to about 25 seconds before answering unpackFailed; the explanation is still saved for a retry. Later requests are answered from the saved copy. Each participant can preview a limited number of different passages per minute.\n",
+        "tags": [
+          "Unpack"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/UnpackSelection"
+                  },
+                  {
+                    "$ref": "#/components/schemas/UnpackTranscriptPasscode"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The explanation, ready to preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnpackPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/UnpackRefused"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/UnpackRefused"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/UnpackRefused"
+          },
+          "429": {
+            "$ref": "#/components/responses/UnpackRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/UnpackRefused"
+          }
+        }
+      }
+    },
+    "/unpack/{conversationId}/send": {
+      "post": {
+        "summary": "Send a passage's explanation",
+        "description": "Posts the saved explanation of a passage to the chosen destination as an `unpack_explanation` card from the event assistant. Works before the preview has finished, or without one: the choice is stored and the card posts as soon as the explanation is written (`status: pending`). Sending the same passage again posts nothing new and returns the existing card's message ID. If the card can't be posted, for example because the event is locked, the request fails and can be sent again. Only `privateChat` is accepted for now.\n",
+        "tags": [
+          "Unpack"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/UnpackSelection"
+                  },
+                  {
+                    "$ref": "#/components/schemas/UnpackTranscriptPasscode"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "destination"
+                    ],
+                    "properties": {
+                      "destination": {
+                        "type": "string",
+                        "enum": [
+                          "privateChat"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The card was posted, or will be once the explanation is written",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnpackSendResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/UnpackRefused"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/UnpackRefused"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/UnpackRefused"
+          },
+          "429": {
+            "$ref": "#/components/responses/UnpackRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/UnpackRefused"
+          }
+        }
+      }
+    },
     "/users/user/{userId}": {
       "get": {
         "summary": "Retrieve a user by ID",
@@ -6575,12 +6737,11 @@
       },
       "UnpackExplanation": {
         "type": "object",
-        "description": "Message body (bodyType \"json\") the event assistant sends in reply to an UnpackRequestBody. If no transcript arrived in the window, or the participant sent too many requests in the last minute, the assistant sends a short text message instead.",
+        "description": "Message body (bodyType \"json\") the event assistant posts with an explanation. A \"Catch me up\" reply (mode lastMinute) answers an UnpackRequestBody message. A passage card (mode passage) comes from the send endpoint and has no request message. If no transcript arrived in the window, or the participant sent too many requests in the last minute, the assistant sends a short text message instead.",
         "required": [
           "type",
           "mode",
           "destination",
-          "requestMessage",
           "chunkIds",
           "passage",
           "quote",
@@ -6599,18 +6760,20 @@
           "mode": {
             "type": "string",
             "enum": [
-              "lastMinute"
+              "lastMinute",
+              "passage"
             ]
           },
           "destination": {
             "type": "string",
             "enum": [
-              "privateChat"
+              "privateChat",
+              "groupChat"
             ]
           },
           "requestMessage": {
             "type": "string",
-            "description": "ID of the participant's request message."
+            "description": "ID of the participant's request message. Only \"Catch me up\" replies have one."
           },
           "chunkIds": {
             "type": "array",
@@ -6654,9 +6817,210 @@
               "$ref": "#/components/schemas/UnpackTerm"
             }
           },
+          "headline": {
+            "type": "string",
+            "description": "Short title for sharing the explanation with the room. Passage cards only."
+          },
+          "range": {
+            "$ref": "#/components/schemas/UnpackSelection"
+          },
           "text": {
             "type": "string",
             "description": "Plain-text version of all sections, for chat history and clients that can't render the card."
+          }
+        }
+      },
+      "UnpackSelection": {
+        "type": "object",
+        "description": "A passage of the live transcript. Offsets are JavaScript string positions (UTF-16 code units) into each transcript chunk's saved body; the end is exclusive. In a request this is what the participant selected; in a response it is that selection widened to whole sentences.",
+        "required": [
+          "startMessageId",
+          "startOffset",
+          "endMessageId",
+          "endOffset"
+        ],
+        "properties": {
+          "startMessageId": {
+            "type": "string",
+            "description": "ID of the transcript chunk the passage starts in."
+          },
+          "startOffset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "endMessageId": {
+            "type": "string",
+            "description": "ID of the transcript chunk the passage ends in. Can be the start chunk."
+          },
+          "endOffset": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "UnpackTranscriptPasscode": {
+        "type": "object",
+        "properties": {
+          "transcriptPasscode": {
+            "type": "string",
+            "description": "The transcript channel's passcode, the same one the client uses to read the transcript. Required when the transcript has one, which it does by default. A missing or wrong passcode is refused with 400 and reason wrongPasscode."
+          }
+        }
+      },
+      "UnpackVisual": {
+        "type": "object",
+        "required": [
+          "description",
+          "altText",
+          "caption"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "What an image model should draw."
+          },
+          "altText": {
+            "type": "string",
+            "description": "Screen-reader description of the finished image."
+          },
+          "caption": {
+            "type": "string"
+          }
+        }
+      },
+      "UnpackPreview": {
+        "type": "object",
+        "required": [
+          "askId",
+          "explanation"
+        ],
+        "properties": {
+          "askId": {
+            "type": "string",
+            "description": "ID of this participant's ask about the passage. Previewing the same passage again returns the same ID."
+          },
+          "explanation": {
+            "type": "object",
+            "description": "The saved explanation. whatTheyreSaying is written first, so a preview can show its opening sentences. Send posts the explanation as it is at that moment, which a background rewrite with more of the following transcript may have changed since this preview.",
+            "required": [
+              "range",
+              "chunkIds",
+              "passage",
+              "quote",
+              "whatTheyreSaying",
+              "whyItMatters",
+              "terms",
+              "headline",
+              "visual"
+            ],
+            "properties": {
+              "range": {
+                "$ref": "#/components/schemas/UnpackSelection"
+              },
+              "chunkIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "passage": {
+                "type": "object",
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "end": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              },
+              "quote": {
+                "type": "string",
+                "description": "The widened passage, rebuilt from the saved transcript."
+              },
+              "whatTheyreSaying": {
+                "type": "string"
+              },
+              "whyItMatters": {
+                "type": "string"
+              },
+              "terms": {
+                "type": "array",
+                "description": "At most three specialist terms. Empty when there are none.",
+                "items": {
+                  "$ref": "#/components/schemas/UnpackTerm"
+                }
+              },
+              "headline": {
+                "type": "string"
+              },
+              "visual": {
+                "description": "Null when a visual would not help.",
+                "nullable": true,
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/UnpackVisual"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "UnpackSendResult": {
+        "type": "object",
+        "required": [
+          "askId",
+          "status"
+        ],
+        "properties": {
+          "askId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "pending"
+            ],
+            "description": "pending means the card posts as soon as the explanation is written."
+          },
+          "messageId": {
+            "type": "string",
+            "description": "ID of the posted card, when status is sent."
+          }
+        }
+      },
+      "UnpackError": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "number"
+          },
+          "message": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "rateLimited",
+              "unpackerOff",
+              "noAssistant",
+              "noPrivateChat",
+              "chunkNotInTranscript",
+              "offsetPastEnd",
+              "selectionBackwards",
+              "selectionTooLong",
+              "unpackFailed",
+              "wrongPasscode"
+            ],
+            "description": "Why the request was refused. rateLimited (429), too many passages in the last minute. unpackerOff (403), the event's unpacker feature is off. noAssistant (409), the event has no assistant. wrongPasscode (400), the transcript has a passcode and the request did not give it. noPrivateChat (409), the participant has no Private Chat with the assistant. chunkNotInTranscript (400), a chunk ID is not in this event's transcript. offsetPastEnd (400), a position is past the end of its chunk. selectionBackwards (400), the selection starts after it ends or holds no words. selectionTooLong (400), the widened passage is too long. unpackFailed (503), the AI model call failed or ran too long; trying again can work. Missing or malformed fields are refused with 400 and no reason."
           }
         }
       },
@@ -9037,6 +9401,21 @@
           }
         }
       },
+      "UnpackRefused": {
+        "description": "The Unpacker refused the request; reason says why.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/UnpackError"
+            },
+            "example": {
+              "code": 400,
+              "message": "startOffset is past the end of its chunk.",
+              "reason": "offsetPastEnd"
+            }
+          }
+        }
+      },
       "NotFound": {
         "description": "Not found",
         "content": {
@@ -9112,6 +9491,10 @@
     {
       "name": "Transcript",
       "description": "Transcript management and control"
+    },
+    {
+      "name": "Unpack",
+      "description": "Participants ask the event assistant to explain a passage of the live transcript"
     },
     {
       "name": "User",
