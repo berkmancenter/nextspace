@@ -1,0 +1,93 @@
+#
+# @fileoverview Nightly production deploy, triggered via Vercel's existing Deploy Hook for main.
+#
+# Fires Vercel hook only once a night or on demand instead of on every push to main, doing a full build + deploy to production
+# each time (not just re-aliasing an existing build — there's no separate "promote" step here).
+#
+# The automatic per-push deploy is disabled via vercel.json's `ignoreCommand`, which skips builds
+# triggered directly by a push to main/gh-pages. A Deploy Hook call bypasses that check entirely
+# (it's a deliberate request to build, not a reaction to a push), which is why this still works.
+#
+# Needs three repository secrets:
+#   VERCEL_DEPLOY_HOOK_URL - Vercel Project Settings -> Git -> Deploy Hooks
+#   VERCEL_TOKEN           - a Vercel access token with read access to deployments, used below to
+#                            poll build status after the hook call
+#   VERCEL_TEAM_ID         - the team id/slug this project lives under, if the Deployments API
+#                            404s on the deployment lookup without it
+#
+# ==========
+
+name: Nightly production deploy
+
+on:
+  schedule:
+    - cron: '0 9 * * *' # 4am EST / 5am EDT - an hour after the backend's own nightly deploy (3am ET / 8:00 UTC), so this build sees that backend's new API fields rather than racing it
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Call the Vercel Deploy Hook
+        id: trigger
+        env:
+          HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK_URL" ]; then
+            echo "Error: VERCEL_DEPLOY_HOOK_URL secret is not set" >&2
+            exit 1
+          fi
+
+          status=$(curl -sS --retry 3 --retry-all-errors --max-time 30 -o /tmp/response.json -w '%{http_code}' -X POST "$HOOK_URL")
+          echo "Deploy Hook responded with HTTP $status"
+
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "Error: Deploy Hook call failed with HTTP $status" >&2
+            exit 1
+          fi
+
+          job_id=$(jq -r '.job.id // empty' /tmp/response.json)
+          if [ -z "$job_id" ]; then
+            echo "Error: no job id in the Deploy Hook response" >&2
+            exit 1
+          fi
+          echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for the build to finish
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          JOB_ID: ${{ steps.trigger.outputs.job_id }}
+        run: |
+          # The Deploy Hook's job id doubles as the deployment id for the Deployments API.
+          url="https://api.vercel.com/v13/deployments/$JOB_ID"
+          if [ -n "$VERCEL_TEAM_ID" ]; then
+            url="$url?teamId=$VERCEL_TEAM_ID"
+          fi
+
+          for i in $(seq 1 40); do
+            state=$(curl -sS --max-time 30 -H "Authorization: Bearer $VERCEL_TOKEN" "$url" | jq -r '.readyState // empty')
+            echo "Build state: ${state:-unknown}"
+
+            case "$state" in
+              READY)
+                exit 0
+                ;;
+              ERROR|CANCELED)
+                echo "Error: production build finished with state $state" >&2
+                exit 1
+                ;;
+            esac
+
+            sleep 30
+          done
+
+          echo "Error: timed out after 20 minutes waiting for the build to finish" >&2
+          exit 1

@@ -43,3 +43,13 @@ npm run build   # needs NEXT_PUBLIC_API_URL, NEXT_PUBLIC_SOCKET_URL, NEXT_PUBLIC
 
 CI (`.github/workflows/ci.yml`) runs typecheck, tests and build with placeholder env values.
 `npm run prettier` and lint are not CI-gated (prettier currently fails on main).
+
+## Deploying
+
+Production does **not** deploy on merge to `main` anymore. It updates once a night via the
+scheduled [`deploy-production`](.github/workflows/deploy-production.yml) GitHub Action, which
+calls Vercel's Deploy Hook for `main`. Vercel's own check on `main` commits still shows a green
+tick even when the build was skipped — it does not mean a merged change is live.
+
+To deploy sooner than the nightly run: Actions tab → **Nightly production deploy** → **Run
+workflow**.
