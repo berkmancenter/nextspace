@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Dialog } from '@mui/material';
+import { Dialog, Paper, Popper } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
+import { QRCodeSVG } from 'qrcode.react';
 import { Logo } from './Logo';
 import { usePresenterTheme } from '../hooks/usePresenterTheme';
 
@@ -13,17 +15,27 @@ interface PresentationHeaderProps {
    * or a rejection keeps the dialog open with an error.
    */
   onExit: () => Promise<boolean>;
+  /** The event's participant link, shown as a QR code on request. Omitted if there is none. */
+  participantUrl?: string;
 }
 
 /**
  * Header for the presentation view, in place of the app's navigation header. Exiting asks first,
  * because a stray click on a projected screen would otherwise drop the whole room out of the view.
  */
-export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProps) => {
+export const PresentationHeader = ({ eventName, onExit, participantUrl }: PresentationHeaderProps) => {
   const [confirmingExit, setConfirmingExit] = useState(false);
   const [exitFailed, setExitFailed] = useState(false);
   const { theme, toggleTheme } = usePresenterTheme();
   const switchTo = theme === 'dark' ? 'light' : 'dark';
+
+  // Shown by default so a presenter doesn't have to remember to open it; the toggle below just
+  // hides it once everyone's scanned in. qrAnchorEl is populated by passing setQrAnchorEl directly
+  // as the button's ref — it fires whenever the button actually mounts (it only renders once
+  // participantUrl resolves, which arrives async after the conversation fetch), with no separate
+  // effect needed to re-capture it.
+  const [showQr, setShowQr] = useState(true);
+  const [qrAnchorEl, setQrAnchorEl] = useState<HTMLElement | null>(null);
 
   const closeDialog = () => {
     setConfirmingExit(false);
@@ -53,6 +65,19 @@ export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProp
         <span className="whitespace-nowrap rounded-full bg-nx-pill px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-nx-pill-text">
           Presentation view
         </span>
+        {participantUrl && (
+          <button
+            ref={setQrAnchorEl}
+            type="button"
+            onClick={() => setShowQr((shown) => !shown)}
+            aria-label={showQr ? 'Hide join QR code' : 'Show join QR code'}
+            title={showQr ? 'Hide join QR code' : 'Show join QR code'}
+            aria-expanded={showQr}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border-[1.5px] dark:border-2 border-gray-300 bg-gray-100 text-gray-800 hover:bg-gray-200 dark:hover:bg-nx-active"
+          >
+            <QrCode2Icon />
+          </button>
+        )}
         <button
           type="button"
           onClick={toggleTheme}
@@ -72,6 +97,21 @@ export const PresentationHeader = ({ eventName, onExit }: PresentationHeaderProp
           <CloseIcon />
         </button>
       </div>
+
+      {participantUrl && (
+        <Popper open={showQr && Boolean(qrAnchorEl)} anchorEl={qrAnchorEl} placement="bottom-end" sx={{ zIndex: 'appBar' }}>
+          <Paper elevation={8} sx={{ borderRadius: '12px', marginTop: '8px' }}>
+            <div className="flex flex-col items-center gap-3 p-6">
+              <QRCodeSVG value={participantUrl} size={260} marginSize={2} title="Scan to join as a participant" />
+              {/* Dark is the default theme, where this card's background is #350560 — plain
+                  #4845D2 text there is ~2.3:1 contrast, below WCAG AA's 4.5:1 minimum. */}
+              <span className="text-lg font-bold uppercase tracking-wide text-[#4845D2] dark:text-nx-text">
+                Scan to join
+              </span>
+            </div>
+          </Paper>
+        </Popper>
+      )}
 
       <Dialog
         open={confirmingExit}
