@@ -1,0 +1,44 @@
+#
+# @fileoverview Nightly production deploy, triggered via Vercel's existing Deploy Hook for main.
+#
+# Fires Vercel hook only once a night or on demand instead of on every push to main, doing a full build + deploy to production
+# each time (not just re-aliasing an existing build — there's no separate "promote" step here).
+#
+# Needs one repository secret: VERCEL_DEPLOY_HOOK_URL, copied from Vercel's Project Settings → Git → Deploy Hooks
+#
+# ==========
+
+name: Nightly production deploy
+
+on:
+  schedule:
+    - cron: '0 9 * * *' # 4am ET / 5am EDT
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call the Vercel Deploy Hook
+        env:
+          HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK_URL" ]; then
+            echo "Error: VERCEL_DEPLOY_HOOK_URL secret is not set" >&2
+            exit 1
+          fi
+
+          status=$(curl -s -o /tmp/response.json -w '%{http_code}' -X POST "$HOOK_URL")
+          echo "Response (HTTP $status):"
+          cat /tmp/response.json
+          echo
+
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "Error: Deploy Hook call failed with HTTP $status" >&2
+            exit 1
+          fi
