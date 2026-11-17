@@ -36,6 +36,7 @@ export interface UseConversationSetupReturn {
   agentActive: boolean;
   agentIds: string[];
   conversationFeatures: { name: string; enabled?: boolean; config?: { [key: string]: unknown } }[];
+  participantUrl: string;
   feedbackFrequency: number;
   transcriptPasscode: string;
   chatPasscode: string;
@@ -89,6 +90,7 @@ export function useConversationSetup({
   const [conversationFeatures, setConversationFeatures] = useState<
     { name: string; enabled?: boolean; config?: { [key: string]: unknown } }[]
   >([]);
+  const [participantUrl, setParticipantUrl] = useState<string>('');
   const [feedbackFrequency, setFeedbackFrequency] = useState<number>(1);
   const [transcriptPasscode, setTranscriptPasscode] = useState<string>('');
   const [chatPasscode, setChatPasscode] = useState<string>('');
@@ -165,6 +167,16 @@ export function useConversationSetup({
         const conversation = await createConversationFromData(conversationData);
         setConversationType(conversation.type);
         setConversationFeatures(conversation.features ?? []);
+        // The API hides channel passcodes from non-owners/non-admins, so the fetched conversation's
+        // own eventUrls.participant link can come back with no channel= params for a guest viewer
+        // (e.g. a venue laptop signed in as a guest) — anyone who then scans it lands without group
+        // chat or the transcript. query already holds this tab's own channel access, so the QR just
+        // forwards that instead of relying on the API response.
+        const channels = [query.channel ?? []].flat();
+        setParticipantUrl(
+          `${window.location.origin}/assistant/?conversationId=${query.conversationId}` +
+            channels.map((channel) => `&channel=${channel}`).join(''),
+        );
         if (conversation.name) setEventName(conversation.name);
 
         const frequency = (conversation?.properties?.feedbackFrequency as number) || 1;
@@ -299,22 +311,37 @@ export function useConversationSetup({
   // pre-event window's opening (or, for missingPregameAccess, the event's real start) updates on
   // its own instead of leaving the user stuck on the "Event Not Started" dialog until they refresh.
   useEffect(() => {
-    if (pendingGateRecheckAt === null) return;
+    // An unparseable scheduledTime (e.g. a malformed or placeholder value from the backend) makes
+    // its computed epoch ms NaN rather than null, which would otherwise arm a ~0ms timer (NaN
+    // delay behaves like 0) and lift the gate immediately on an event with no real start time.
+    if (pendingGateRecheckAt === null || !Number.isFinite(pendingGateRecheckAt)) return;
 
-    // setTimeout's delay is a 32-bit signed int; beyond ~24.8 days it fires almost immediately
-    // instead of waiting, so clamp to that limit. A tab still open past the clamp just needs a
-    // refresh — not worth re-arming the timer for.
-    const delay = Math.min(Math.max(pendingGateRecheckAt - Date.now(), 0), 2147483647);
-    const timer = setTimeout(() => {
-      if (Date.now() < pendingGateRecheckAt) return;
-      if (pendingGateRecheckKindRef.current === 'preEventWindow') {
-        if (pregameChannelPasscodeRef.current) setChatPasscode(pregameChannelPasscodeRef.current);
-        setGroupChatChannelName('pregame');
-      }
-      setEventStatus('active');
-      setShowEventStatusDialog(false);
-      setPendingGateRecheckAt(null);
-    }, delay);
+    let timer: ReturnType<typeof setTimeout>;
+
+    const arm = (target: number) => {
+      // setTimeout's delay is a 32-bit signed int; beyond ~24.8 days it fires almost immediately
+      // instead of waiting, so clamp to that limit. A tab still open past the clamp just needs a
+      // refresh — not worth re-arming the timer for that case specifically.
+      const delay = Math.min(Math.max(target - Date.now(), 0), 2147483647);
+      timer = setTimeout(() => {
+        // Timers can fire a few ms before their target (observed in ~11% of runs) — re-arm for
+        // whatever's left rather than giving up, or the gate can get stuck showing "Event Not
+        // Started" past the real start until the user refreshes.
+        if (Date.now() < target) {
+          arm(target);
+          return;
+        }
+        if (pendingGateRecheckKindRef.current === 'preEventWindow') {
+          if (pregameChannelPasscodeRef.current) setChatPasscode(pregameChannelPasscodeRef.current);
+          setGroupChatChannelName('pregame');
+        }
+        setEventStatus('active');
+        setShowEventStatusDialog(false);
+        setPendingGateRecheckAt(null);
+      }, delay);
+    };
+
+    arm(pendingGateRecheckAt);
 
     return () => clearTimeout(timer);
   }, [pendingGateRecheckAt]);
@@ -352,6 +379,7 @@ export function useConversationSetup({
     agentActive,
     agentIds,
     conversationFeatures,
+    participantUrl,
     feedbackFrequency,
     transcriptPasscode,
     chatPasscode,

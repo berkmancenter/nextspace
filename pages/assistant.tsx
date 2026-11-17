@@ -124,6 +124,7 @@ export function EventAssistantRoom({
     agentActive,
     agentIds,
     conversationFeatures,
+    participantUrl,
     feedbackFrequency,
     transcriptPasscode,
     chatPasscode,
@@ -761,7 +762,9 @@ export function EventAssistantRoom({
 
   return (
     <>
-      {presentation && <PresentationHeader eventName={eventName} onExit={exitPresentation} />}
+      {presentation && (
+        <PresentationHeader eventName={eventName} onExit={exitPresentation} participantUrl={participantUrl} />
+      )}
       {/* On mobile we add bottom padding so the fixed nav bar doesn't cover content */}
       <div
         className={`flex flex-row overflow-hidden pb-[60px] lg:pb-0 ${

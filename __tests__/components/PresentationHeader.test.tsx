@@ -83,4 +83,97 @@ describe('PresentationHeader', () => {
 
     expect(document.documentElement).not.toHaveAttribute('data-presenter-theme');
   });
+
+  describe('join QR code', () => {
+    const participantUrl = 'https://example.com/assistant/?conversationId=conv-123';
+
+    it('shows no QR toggle when there is no participant link', () => {
+      render(<PresentationHeader eventName="Legal Telescopes" onExit={jest.fn().mockResolvedValue(true)} />);
+
+      expect(screen.queryByRole('button', { name: /join qr code/i })).not.toBeInTheDocument();
+    });
+
+    it('shows the QR code by default when a participant link is present', async () => {
+      render(
+        <PresentationHeader
+          eventName="Legal Telescopes"
+          onExit={jest.fn().mockResolvedValue(true)}
+          participantUrl={participantUrl}
+        />,
+      );
+
+      expect(await screen.findByRole('img', { name: 'Scan to join as a participant' })).toBeInTheDocument();
+      expect(screen.getByText('Scan to join')).toBeInTheDocument();
+      const toggle = screen.getByRole('button', { name: 'Hide join QR code' });
+      expect(toggle).toBeInTheDocument();
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('hides the QR code on toggle click, and shows it again on a second click', async () => {
+      render(
+        <PresentationHeader
+          eventName="Legal Telescopes"
+          onExit={jest.fn().mockResolvedValue(true)}
+          participantUrl={participantUrl}
+        />,
+      );
+
+      await screen.findByRole('img', { name: 'Scan to join as a participant' });
+
+      await userEvent.click(screen.getByRole('button', { name: 'Hide join QR code' }));
+      await waitFor(() => {
+        expect(screen.queryByRole('img', { name: 'Scan to join as a participant' })).not.toBeInTheDocument();
+      });
+      expect(screen.getByRole('button', { name: 'Show join QR code' })).toHaveAttribute('aria-expanded', 'false');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Show join QR code' }));
+      expect(await screen.findByRole('img', { name: 'Scan to join as a participant' })).toBeInTheDocument();
+    });
+
+    it('stays open and still forwards the click when the theme toggle is clicked underneath it', async () => {
+      render(
+        <PresentationHeader
+          eventName="Legal Telescopes"
+          onExit={jest.fn().mockResolvedValue(true)}
+          participantUrl={participantUrl}
+        />,
+      );
+
+      await screen.findByRole('img', { name: 'Scan to join as a participant' });
+      expect(document.documentElement).toHaveAttribute('data-presenter-theme', 'dark');
+
+      // Popper has no backdrop/overlay at all (unlike Popover), so this was never actually at risk
+      // of being swallowed — this just confirms it stays that way.
+      await userEvent.click(screen.getByRole('button', { name: 'Switch to light mode' }));
+
+      expect(document.documentElement).toHaveAttribute('data-presenter-theme', 'light');
+      // ...and didn't also dismiss the QR code as a side effect.
+      expect(screen.getByRole('img', { name: 'Scan to join as a participant' })).toBeInTheDocument();
+    });
+
+    it('lets focus (and typing) land on an input elsewhere on the page while the QR code is open', async () => {
+      const user = userEvent.setup();
+      render(
+        <>
+          <PresentationHeader
+            eventName="Legal Telescopes"
+            onExit={jest.fn().mockResolvedValue(true)}
+            participantUrl={participantUrl}
+          />
+          <input aria-label="group chat message" />
+        </>,
+      );
+
+      await screen.findByRole('img', { name: 'Scan to join as a participant' });
+
+      const chatInput = screen.getByRole('textbox', { name: 'group chat message' });
+      await user.click(chatInput);
+      await user.type(chatInput, 'hello');
+
+      // Popper has no focus trap — unlike Popover's Modal-based FocusTrap, nothing pulls focus
+      // back here, so typing elsewhere just works.
+      expect(chatInput).toHaveFocus();
+      expect(chatInput).toHaveValue('hello');
+    });
+  });
 });
