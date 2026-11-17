@@ -21,7 +21,7 @@ name: Nightly production deploy
 
 on:
   schedule:
-    - cron: '0 9 * * *' # 4am EST / 5am EDT
+    - cron: '0 9 * * *' # 4am EST / 5am EDT - an hour after the backend's own nightly deploy (3am ET / 8:00 UTC), so this build sees that backend's new API fields rather than racing it
   workflow_dispatch:
 
 permissions: {}
