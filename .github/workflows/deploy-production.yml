@@ -4,16 +4,16 @@
 # Fires Vercel hook only once a night or on demand instead of on every push to main, doing a full build + deploy to production
 # each time (not just re-aliasing an existing build — there's no separate "promote" step here).
 #
-# The automatic per-push deploy is disabled via vercel.json's `ignoreCommand`, which skips builds
-# triggered directly by a push to main/gh-pages. A Deploy Hook call bypasses that check entirely
-# (it's a deliberate request to build, not a reaction to a push), which is why this still works.
+# The automatic per-push deploy is disabled via vercel.json's `git.deploymentEnabled`, which is
+# scoped to the git integration's own automatic builds. Deploy Hook calls are a separate mechanism
+# and aren't subject to it, which is why this still works.
 #
-# Needs three repository secrets:
+# Needs four repository secrets:
 #   VERCEL_DEPLOY_HOOK_URL - Vercel Project Settings -> Git -> Deploy Hooks
 #   VERCEL_TOKEN           - a Vercel access token with read access to deployments, used below to
 #                            poll build status after the hook call
-#   VERCEL_TEAM_ID         - the team id/slug this project lives under, if the Deployments API
-#                            404s on the deployment lookup without it
+#   VERCEL_TEAM_ID         - the team id/slug this project lives under (Team Settings -> General)
+#   VERCEL_PROJECT_ID      - this project's id (Project Settings -> General)
 #
 # ==========
 
@@ -45,6 +45,8 @@ jobs:
             exit 1
           fi
 
+          triggered_at=$(date +%s%3N)
+
           status=$(curl -sS --retry 3 --retry-all-errors --max-time 30 -o /tmp/response.json -w '%{http_code}' -X POST "$HOOK_URL")
           echo "Deploy Hook responded with HTTP $status"
 
@@ -53,52 +55,53 @@ jobs:
             exit 1
           fi
 
-          job_id=$(jq -r '.job.id // empty' /tmp/response.json)
-          if [ -z "$job_id" ]; then
-            echo "Error: no job id in the Deploy Hook response" >&2
-            exit 1
-          fi
-          # TEMPORARY debug logging, remove once the build-status lookup is confirmed working:
-          echo "Hook response body:" && cat /tmp/response.json && echo
-          echo "job_id=$job_id"
-          echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
+          echo "triggered_at=$triggered_at" >> "$GITHUB_OUTPUT"
 
       - name: Wait for the build to finish
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
-          JOB_ID: ${{ steps.trigger.outputs.job_id }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          TRIGGERED_AT: ${{ steps.trigger.outputs.triggered_at }}
         run: |
-          # The Deploy Hook's job id doubles as the deployment id for the Deployments API.
-          url="https://api.vercel.com/v13/deployments/$JOB_ID"
-          if [ -n "$VERCEL_TEAM_ID" ]; then
-            url="$url?teamId=$VERCEL_TEAM_ID"
+          if [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "Error: VERCEL_PROJECT_ID secret is not set" >&2
+            exit 1
           fi
-          # TEMPORARY debug logging, remove once this lookup is confirmed working:
-          echo "Querying: $url"
+
+          # The Deploy Hook's response has no usable deployment id (its "job.id" is a separate,
+          # internal identifier the Deployments API doesn't recognize), so instead we find our
+          # deployment by asking for the latest one and checking it's newer than this run's trigger.
+          url="https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&target=production&limit=1"
+          if [ -n "$VERCEL_TEAM_ID" ]; then
+            url="$url&teamId=$VERCEL_TEAM_ID"
+          fi
 
           for i in $(seq 1 40); do
-            http_status=$(curl -sS --max-time 30 -o /tmp/deployment.json -w '%{http_code}' -H "Authorization: Bearer $VERCEL_TOKEN" "$url")
-            # TEMPORARY debug logging, remove once this lookup is confirmed working:
-            echo "Lookup responded with HTTP $http_status:" && cat /tmp/deployment.json && echo
+            http_status=$(curl -sS --max-time 30 -o /tmp/deployments.json -w '%{http_code}' -H "Authorization: Bearer $VERCEL_TOKEN" "$url")
 
             if [ "$http_status" -lt 200 ] || [ "$http_status" -ge 300 ]; then
               echo "Error: deployment lookup failed with HTTP $http_status" >&2
               exit 1
             fi
 
-            state=$(jq -r '.readyState // empty' /tmp/deployment.json)
-            echo "Build state: ${state:-unknown}"
+            created_at=$(jq -r '.deployments[0].createdAt // empty' /tmp/deployments.json)
+            state=$(jq -r '.deployments[0].readyState // empty' /tmp/deployments.json)
 
-            case "$state" in
-              READY)
-                exit 0
-                ;;
-              ERROR|CANCELED)
-                echo "Error: production build finished with state $state" >&2
-                exit 1
-                ;;
-            esac
+            if [ -z "$created_at" ] || [ "$created_at" -lt "$TRIGGERED_AT" ]; then
+              echo "Latest production deployment predates this run, still waiting for ours to appear..."
+            else
+              echo "Build state: ${state:-unknown}"
+              case "$state" in
+                READY)
+                  exit 0
+                  ;;
+                ERROR|CANCELED)
+                  echo "Error: production build finished with state $state" >&2
+                  exit 1
+                  ;;
+              esac
+            fi
 
             sleep 30
           done
