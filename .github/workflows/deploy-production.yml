@@ -58,6 +58,9 @@ jobs:
             echo "Error: no job id in the Deploy Hook response" >&2
             exit 1
           fi
+          # TEMPORARY debug logging, remove once the build-status lookup is confirmed working:
+          echo "Hook response body:" && cat /tmp/response.json && echo
+          echo "job_id=$job_id"
           echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
 
       - name: Wait for the build to finish
@@ -71,9 +74,20 @@ jobs:
           if [ -n "$VERCEL_TEAM_ID" ]; then
             url="$url?teamId=$VERCEL_TEAM_ID"
           fi
+          # TEMPORARY debug logging, remove once this lookup is confirmed working:
+          echo "Querying: $url"
 
           for i in $(seq 1 40); do
-            state=$(curl -sS --max-time 30 -H "Authorization: Bearer $VERCEL_TOKEN" "$url" | jq -r '.readyState // empty')
+            http_status=$(curl -sS --max-time 30 -o /tmp/deployment.json -w '%{http_code}' -H "Authorization: Bearer $VERCEL_TOKEN" "$url")
+            # TEMPORARY debug logging, remove once this lookup is confirmed working:
+            echo "Lookup responded with HTTP $http_status:" && cat /tmp/deployment.json && echo
+
+            if [ "$http_status" -lt 200 ] || [ "$http_status" -ge 300 ]; then
+              echo "Error: deployment lookup failed with HTTP $http_status" >&2
+              exit 1
+            fi
+
+            state=$(jq -r '.readyState // empty' /tmp/deployment.json)
             echo "Build state: ${state:-unknown}"
 
             case "$state" in
