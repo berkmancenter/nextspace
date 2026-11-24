@@ -7,7 +7,7 @@ import { ThreadedMessage } from './ThreadedMessage';
 import { ThreadPanel } from './ThreadPanel';
 import type { MessageModeration } from './ModerationControls';
 import { UserMessage } from './messages/UserMessage';
-import { PseudonymousMessage, ControlledInputConfig, FeedbackConfig } from '../types.internal';
+import { PseudonymousMessage, ControlledInputConfig, FeedbackConfig, UnpackExplanation } from '../types.internal';
 import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { useOpenThread } from '../hooks/useOpenThread';
@@ -15,6 +15,7 @@ import { BotIcon } from './BotIcon';
 import { createMentionsEnhancer } from './enhancers/mentionsEnhancer';
 import { getTimestampVisibility, normalizeAssistantPseudonym, parseMessageBody } from '../utils/Helpers';
 import { PollMessage, PollMessageBody } from './messages/PollMessage';
+import { GroupChatUnpackCard, groupChatMessageElementId } from './messages/GroupChatUnpackCard';
 import { IconButton, Tooltip } from '@mui/material';
 import ArrowCircleDownIcon from '@mui/icons-material/ArrowCircleDown';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -155,6 +156,12 @@ interface GroupChatPanelProps {
   moderation?: MessageModeration;
   /** ISO timestamp for the pre-event countdown banner; omit once the event has started. */
   eventScheduledTime?: string | null;
+  /** Opens Private Chat to ask about an Unpacker post. Leave out to hide "Ask a follow-up privately". */
+  onAskUnpackFollowUp?: (explanation: UnpackExplanation) => void;
+  /** A post to scroll to and focus once it has loaded, such as one a Private Chat note links to. */
+  focusMessageId?: string | null;
+  /** Called once the post in focusMessageId has been scrolled to, so the same link can be followed again. */
+  onFocusMessageHandled?: () => void;
 }
 
 export const GroupChatPanel: FC<GroupChatPanelProps> = ({
@@ -178,6 +185,9 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   isAdmin = false,
   moderation,
   eventScheduledTime,
+  onAskUnpackFollowUp,
+  focusMessageId,
+  onFocusMessageHandled,
 }) => {
   // The shared screen is read by the whole room: it carries no hide controls, and never shows hidden messages
   // (an admin's feed includes them, greyed out, for the moderation view).
@@ -233,6 +243,15 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   const { messagesEndRef, messagesContainerRef, isAtBottom, scrollToBottom } = useAutoScroll(messages);
 
   const messageInputRef = useRef<HTMLDivElement>(null);
+
+  const focusMessageLoaded = !!focusMessageId && parentMessages.some((message) => message.id === focusMessageId);
+  useEffect(() => {
+    if (!focusMessageId || !focusMessageLoaded) return;
+    const element = document.getElementById(groupChatMessageElementId(focusMessageId));
+    element?.scrollIntoView({ block: 'center' });
+    element?.focus({ preventScroll: true });
+    onFocusMessageHandled?.();
+  }, [focusMessageId, focusMessageLoaded, onFocusMessageHandled]);
   const writeMessageButtonRef = useRef<HTMLButtonElement>(null);
   const focusAfterComposerToggle = useRef(false);
 
@@ -318,6 +337,15 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             <PollMessage body={pollBody} counts={counts} presentation={presentation} />
           </div>
         </div>
+      );
+    }
+
+    if (parsed.type === 'unpack_explanation') {
+      return (
+        <GroupChatUnpackCard
+          message={{ ...message, body: rawBody }}
+          onAskFollowUp={inactive || presentation ? undefined : onAskUnpackFollowUp}
+        />
       );
     }
 

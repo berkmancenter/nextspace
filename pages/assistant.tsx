@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import CloseIcon from '@mui/icons-material/Close';
 
@@ -8,7 +8,13 @@ import { ResourcesPanel } from '../components/ResourcesPanel';
 import { SlashCommand } from '../components/enhancers/slashCommandEnhancer';
 import { Api, RetrieveData, SendData, emitWithTokenRefresh, buildDirectChannels } from '../utils';
 import { components } from '../types';
-import { CatchUpNotice, ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
+import {
+  CatchUpNotice,
+  ControlledInputConfig,
+  PseudonymousMessage,
+  FeedbackConfig,
+  UnpackExplanation,
+} from '../types.internal';
 import { useConversationType, useSetBotName, useSetConversationType } from '../context/ConversationTypeContext';
 import { AuthType } from '../types.internal';
 import { trackConversationEvent, setUserId } from '../utils/analytics';
@@ -22,7 +28,8 @@ import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
 import { CheckAuthHeader, isFeatureEnabled, parseMessageBody } from '../utils/Helpers';
 import { withStoredChannels } from '../utils/presentationChannels';
 import { buildCatchUpRequest, pickCatchUpChunks } from '../utils/catchUp';
-import { unpackErrorCopy } from '../utils/unpackPassage';
+import { unpackErrorCopy, unpackFollowUpMode } from '../utils/unpackPassage';
+import { shareUnpackToGroupChat } from '../hooks/useUnpackPreview';
 import TokenManagerDefault from '../utils/TokenManager';
 import { Alert, Button, Dialog, Snackbar } from '@mui/material';
 import { Info } from '@mui/icons-material';
@@ -286,6 +293,27 @@ export function EventAssistantRoom({
   const openPrivateChatFromUnpacker = () => {
     setFocusPrivateChatInput(true);
     handleTabChange('assistant');
+  };
+  const askUnpackFollowUp = (explanation: UnpackExplanation) => {
+    setControlledMode(unpackFollowUpMode(explanation));
+    openPrivateChatFromUnpacker();
+  };
+  // A follow-up's prefix is for Private Chat; carried to another tab it would post the question in public.
+  useEffect(() => {
+    if (activeTab !== 'assistant' && controlledMode?.kind === 'unpackFollowUp') setControlledMode(null);
+  }, [activeTab, controlledMode]);
+  const shareUnpackCard = (messageId: string) =>
+    shareUnpackToGroupChat(router.query.conversationId as string, messageId, { transcriptPasscode, chatPasscode });
+  const [groupChatFocusMessageId, setGroupChatFocusMessageId] = useState<string | null>(null);
+  const clearGroupChatFocusMessage = useCallback(() => setGroupChatFocusMessageId(null), []);
+  // A post that never loads, such as one deleted with the transcript, mustn't pull focus on a later visit.
+  useEffect(() => {
+    if (activeTab !== 'chat') setGroupChatFocusMessageId(null);
+  }, [activeTab]);
+  const openGroupChatPost = (messageId: string) => {
+    handleTabChange('chat');
+    // A post hidden from the room, or already deleted, may never arrive, so only a loaded post is a target.
+    if (chatMessages.some((message) => message.id === messageId)) setGroupChatFocusMessageId(messageId);
   };
   // Organizer's chosen destination for the bot's voice: 'zoom' means Recall's own Zoom-facing bot
   // speaks there, so the presentation view's bot presence panel must not also play audio — that's
@@ -596,6 +624,8 @@ export function EventAssistantRoom({
       if (message.startsWith('/')) {
         const commandName = message.split(' ')[0].substring(1).split('|')[0];
         trackConversationEvent(conversationId, 'assistant', 'command_sent', commandName);
+      } else if (controlledMode?.kind === 'unpackFollowUp') {
+        trackConversationEvent(conversationId, 'assistant', 'unpack_follow_up_sent', 'groupChatCard');
       } else if (controlledMode) {
         trackConversationEvent(conversationId, 'assistant', 'feedback_sent', controlledMode.label);
       } else {
@@ -604,7 +634,8 @@ export function EventAssistantRoom({
     }
 
     const isModeratorCommand = finalMessage.trimStart().startsWith('/escalate ') || finalMessage.trim() === '/mod';
-    if (shouldWaitForResponse && !controlledMode && !isModeratorCommand) {
+    const awaitsReply = !controlledMode || controlledMode.kind === 'unpackFollowUp';
+    if (shouldWaitForResponse && awaitsReply && !isModeratorCommand) {
       if (effectiveTab === 'assistant') {
         setWaitingForResponse(true);
       } else if (effectiveTab === 'chat') {
@@ -940,6 +971,9 @@ export function EventAssistantRoom({
                           isAdmin={isAdmin}
                           moderation={moderation}
                           eventScheduledTime={groupChatChannelName === 'pregame' ? eventScheduledTime : null}
+                          onAskUnpackFollowUp={agentActive ? askUnpackFollowUp : undefined}
+                          focusMessageId={groupChatFocusMessageId}
+                          onFocusMessageHandled={clearGroupChatFocusMessage}
                         />
                       ) : activeTab === 'resources' ? (
                         <ResourcesPanel
@@ -976,6 +1010,8 @@ export function EventAssistantRoom({
                           onCatchUp={catchUpReady ? catchUp : undefined}
                           transcriptChunks={transcriptChunks ?? undefined}
                           focusInputOnMount={focusPrivateChatInput}
+                          onShareUnpackToGroupChat={unpackerOn ? shareUnpackCard : undefined}
+                          onOpenGroupChatPost={openGroupChatPost}
                           messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
                           onMarkAsRead={(messageId) => {
                             setAssistantMessagesWithUnreadReplies((prev) => {

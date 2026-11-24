@@ -175,6 +175,25 @@ jest.mock('../../components/messages', () => ({
     );
   },
   CatchUpSummaryMessage: ({ message }: any) => <div data-testid="catch-up-summary-message">{message.body.inShort}</div>,
+  UnpackExplanationMessage: ({ message, onShareToGroupChat }: any) => (
+    <div data-testid="unpack-explanation-message">
+      {onShareToGroupChat && (
+        <button type="button" onClick={() => onShareToGroupChat(message.id)}>
+          Share to Group Chat
+        </button>
+      )}
+    </div>
+  ),
+  UnpackAlreadyPostedMessage: ({ message, onOpenGroupChatPost }: any) => (
+    <div>
+      {message.body.text}
+      {onOpenGroupChatPost && (
+        <button type="button" onClick={() => onOpenGroupChatPost(message.body.groupChatMessageId)}>
+          See it in Group Chat
+        </button>
+      )}
+    </div>
+  ),
 }));
 
 jest.mock('../../utils/analytics', () => ({
@@ -3110,6 +3129,231 @@ describe('EventAssistantRoom', () => {
 
       expect(await screen.findByText('Your explanation is in your Private Chat.')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Open Private Chat' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Unpacker posts in Group Chat', () => {
+    const unpackPost = {
+      id: 'unpack-post-1',
+      body: {
+        type: 'unpack_explanation',
+        mode: 'passage',
+        destination: 'groupChat',
+        chunkIds: ['chunk-1'],
+        passage: { start: '2025-10-17T10:43:00Z', end: '2025-10-17T10:43:20Z' },
+        quote: 'Precedential weight concentrates in a few circuits.',
+        whatTheyreSaying: "A ruling's influence comes from a few appeals courts.",
+        whyItMatters: 'It explains why lower courts lean on a few rulings.',
+        terms: [],
+        headline: 'Where precedent gets its weight',
+        footer: 'A participant asked Berkie to share this.',
+        text: 'Plain-text copy',
+      },
+      bodyType: 'json',
+      fromAgent: true,
+      channels: ['chat'],
+      conversation: 'a1b2c3d4e5f6a1b2c3d4e5f6',
+      pseudonym: 'Berkie',
+      createdAt: '2025-10-17T10:44:00Z',
+      pause: false,
+      visible: true,
+      upVotes: [],
+      downVotes: [],
+    };
+
+    const fromBerkieInPrivateChat = (id: string, body: Record<string, unknown>) => ({
+      ...unpackPost,
+      id,
+      body,
+      channels: ['direct-user-123-agent-123'],
+    });
+
+    const deliver = (message: unknown) => {
+      act(() => {
+        socketHandlers('message:new').forEach((handler) => handler(message));
+      });
+    };
+
+    const renderRoomWithPost = async () => {
+      (SendData as jest.Mock).mockResolvedValue({ id: 'sent-1' });
+      (createConversationFromData as jest.Mock).mockResolvedValue({
+        agents: [{ id: 'agent-123', agentType: 'eventAssistant' }],
+        features: [{ name: 'unpacker', enabled: true }],
+        type: {
+          name: 'eventAssistant',
+          features: [{ name: 'unpacker', label: 'Unpacker', default: false, agents: [], userControlled: true }],
+        },
+      });
+      await act(async () => {
+        render(
+          <ConversationTypeProvider>
+            <EventAssistantRoom authType={'guest'} />
+          </ConversationTypeProvider>,
+        );
+      });
+      act(() => {
+        socketHandlers('message:new').forEach((handler) => handler(unpackPost));
+      });
+      await screen.findByRole('article', { name: 'Where precedent gets its weight' });
+    };
+
+    const sentMessageBodies = () =>
+      (SendData as jest.Mock).mock.calls.filter(([path]) => path === 'messages').map(([, data]) => data);
+
+    it('opens Private Chat with the topic above a focused message box', async () => {
+      const user = userEvent.setup();
+      await renderRoomWithPost();
+
+      await user.click(screen.getByRole('button', { name: 'Ask a follow-up privately' }));
+
+      const input = await screen.findByPlaceholderText('Enter your message here');
+      expect(screen.getByText('Asking about: Where precedent gets its weight')).toBeInTheDocument();
+      await waitFor(() => expect(input).toHaveFocus());
+    });
+
+    it('sends the question to Private Chat with the passage it is about, and waits for the reply', async () => {
+      const user = userEvent.setup();
+      await renderRoomWithPost();
+      await user.click(screen.getByRole('button', { name: 'Ask a follow-up privately' }));
+      const input = await screen.findByPlaceholderText('Enter your message here');
+
+      await user.type(input, 'Which circuits?{Enter}');
+
+      await waitFor(() =>
+        expect(sentMessageBodies()).toContainEqual(
+          expect.objectContaining({
+            body: 'Follow-up on the explanation of "Precedential weight concentrates in a few circuits.": Which circuits?',
+            channels: [expect.objectContaining({ name: 'direct-user-123-agent-123' })],
+          }),
+        ),
+      );
+      expect(trackConversationEvent).toHaveBeenCalledWith(
+        'a1b2c3d4e5f6a1b2c3d4e5f6',
+        'assistant',
+        'unpack_follow_up_sent',
+        'groupChatCard',
+      );
+      expect(trackConversationEvent).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        'feedback_sent',
+        expect.anything(),
+      );
+      expect(screen.queryByText('Asking about: Where precedent gets its weight')).not.toBeInTheDocument();
+    });
+
+    it('drops the topic when the participant goes back to Group Chat, so nothing private is posted there', async () => {
+      const user = userEvent.setup();
+      await renderRoomWithPost();
+      await user.click(screen.getByRole('button', { name: 'Ask a follow-up privately' }));
+      await screen.findByPlaceholderText('Enter your message here');
+
+      await user.click(screen.getAllByLabelText('Group Chat')[0]);
+      await screen.findByRole('article', { name: 'Where precedent gets its weight' });
+
+      expect(screen.queryByText(/Asking about:/)).not.toBeInTheDocument();
+    });
+
+    it('shares a Private Chat card through the share call, with the transcript and Group Chat passcodes', async () => {
+      const user = userEvent.setup();
+      await renderRoomWithPost();
+      deliver(fromBerkieInPrivateChat('card-1', { ...unpackPost.body, destination: 'privateChat', footer: undefined }));
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
+
+      await user.click(await screen.findByRole('button', { name: 'Share to Group Chat' }));
+
+      expect(SendData).toHaveBeenCalledWith(
+        'unpack/a1b2c3d4e5f6a1b2c3d4e5f6/share',
+        { messageId: 'card-1', transcriptPasscode: 'MJqaT2ii', chatPasscode: 'chat-pass' },
+        'mock-access-token',
+      );
+    });
+
+    it("opens Group Chat at the existing post from the note's link", async () => {
+      const user = userEvent.setup();
+      await renderRoomWithPost();
+      deliver(
+        fromBerkieInPrivateChat('note-1', {
+          type: 'unpack_already_posted',
+          groupChatMessageId: 'unpack-post-1',
+          text: 'A post about this part of the talk is already in Group Chat.',
+        }),
+      );
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
+
+      await user.click(await screen.findByRole('button', { name: 'See it in Group Chat' }));
+
+      const post = await screen.findByRole('article', { name: 'Where precedent gets its weight' });
+      await waitFor(() => expect(post).toHaveFocus());
+      expect(post.scrollIntoView).toHaveBeenCalled();
+    });
+
+    it('removes a post the server deletes along with the transcript', async () => {
+      await renderRoomWithPost();
+
+      act(() => {
+        socketHandlers('message:hidden').forEach((handler) =>
+          handler({ messageIds: ['unpack-post-1'], hidden: true, display: 'omit' }),
+        );
+      });
+
+      await waitFor(() =>
+        expect(screen.queryByRole('article', { name: 'Where precedent gets its weight' })).not.toBeInTheDocument(),
+      );
+    });
+
+    it("removes the deleted post's thread replies, including replies to replies", async () => {
+      await renderRoomWithPost();
+      const reply = (id: string, parentMessage: string, body: string) => ({
+        ...unpackPost,
+        id,
+        parentMessage,
+        body,
+        bodyType: 'text',
+        fromAgent: false,
+        pseudonym: 'Curious Owl',
+      });
+      act(() => {
+        socketHandlers('message:new').forEach((handler) => {
+          handler(reply('reply-1', 'unpack-post-1', 'Is this the same as stare decisis?'));
+          handler(reply('reply-2', 'reply-1', 'Close, but not quite.'));
+        });
+      });
+      expect(await screen.findByText('Is this the same as stare decisis?')).toBeInTheDocument();
+
+      act(() => {
+        socketHandlers('message:hidden').forEach((handler) =>
+          handler({ messageIds: ['unpack-post-1', 'reply-1', 'reply-2'], hidden: true, display: 'omit' }),
+        );
+      });
+
+      await waitFor(() => expect(screen.queryByText('Is this the same as stare decisis?')).not.toBeInTheDocument());
+      expect(screen.queryByText('Close, but not quite.')).not.toBeInTheDocument();
+    });
+
+    it("doesn't wait for a linked post that isn't in Group Chat, such as one hidden from the room", async () => {
+      const user = userEvent.setup();
+      await renderRoomWithPost();
+      deliver(
+        fromBerkieInPrivateChat('note-1', {
+          type: 'unpack_already_posted',
+          groupChatMessageId: 'hidden-post',
+          text: 'A post about this part of the talk is already in Group Chat.',
+        }),
+      );
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
+      await user.click(await screen.findByRole('button', { name: 'See it in Group Chat' }));
+      (HTMLElement.prototype.scrollIntoView as jest.Mock).mockClear();
+
+      act(() => {
+        socketHandlers('message:new').forEach((handler) =>
+          handler({ ...unpackPost, id: 'hidden-post', body: { ...unpackPost.body, headline: 'Shown much later' } }),
+        );
+      });
+
+      const laterPost = await screen.findByRole('article', { name: 'Shown much later' });
+      expect(laterPost).not.toHaveFocus();
+      expect(laterPost.scrollIntoView).not.toHaveBeenCalled();
     });
   });
 

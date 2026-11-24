@@ -2520,6 +2520,121 @@ describe('GroupChatPanel', () => {
     });
   });
 
+  describe('Unpacker explanation posts', () => {
+    const unpackPost = {
+      id: 'unpack-post-1',
+      pseudonym: 'Berkie',
+      createdAt: '2025-10-17T12:00:00Z',
+      bodyType: 'json',
+      body: {
+        type: 'unpack_explanation',
+        mode: 'passage',
+        destination: 'groupChat',
+        chunkIds: ['chunk-1'],
+        passage: { start: '2025-10-17T11:59:00Z', end: '2025-10-17T11:59:20Z' },
+        quote: 'Precedent decays under what we call doctrinal half-life.',
+        whatTheyreSaying: "A ruling's influence fades at a steady rate.",
+        whyItMatters: 'It explains why lower courts lean on a few rulings.',
+        terms: [],
+        headline: 'What the speaker meant by "doctrinal half-life"',
+        footer: 'A participant asked Berkie to share this.',
+        text: 'Plain-text copy.',
+      },
+      channels: ['chat'],
+      conversation: 'conv-1',
+      pseudonymId: 'agent-1',
+      fromAgent: true,
+      pause: false,
+      visible: true,
+      upVotes: [],
+      downVotes: [],
+    };
+
+    beforeEach(() => {
+      Element.prototype.scrollIntoView = jest.fn();
+    });
+
+    it('shows the post as an Unpacker card', () => {
+      render(<GroupChatPanel {...baseProps} messages={[unpackPost]} />);
+
+      expect(screen.getByRole('article', { name: 'What the speaker meant by "doctrinal half-life"' })).toBeInTheDocument();
+      expect(screen.getByText('A participant asked Berkie to share this.')).toBeInTheDocument();
+    });
+
+    it('reads a post whose body arrives as a JSON string', () => {
+      render(<GroupChatPanel {...baseProps} messages={[{ ...unpackPost, body: JSON.stringify(unpackPost.body) }]} />);
+
+      expect(screen.getByRole('article', { name: 'What the speaker meant by "doctrinal half-life"' })).toBeInTheDocument();
+    });
+
+    it('never draws a card for a participant message shaped like one', () => {
+      render(<GroupChatPanel {...baseProps} messages={[{ ...unpackPost, fromAgent: false, pseudonym: 'Alice' }]} />);
+
+      expect(screen.queryByRole('article')).not.toBeInTheDocument();
+    });
+
+    it('passes the explanation on when a participant asks a follow-up', async () => {
+      const user = userEvent.setup();
+      const onAskUnpackFollowUp = jest.fn();
+      render(<GroupChatPanel {...baseProps} messages={[unpackPost]} onAskUnpackFollowUp={onAskUnpackFollowUp} />);
+
+      await user.click(screen.getByRole('button', { name: 'Ask a follow-up privately' }));
+
+      expect(onAskUnpackFollowUp).toHaveBeenCalledWith(expect.objectContaining({ quote: unpackPost.body.quote }));
+    });
+
+    it.each([
+      ['the event is over', { inactive: true }],
+      ['the page is on the shared screen', { presentation: true }],
+    ])('offers no follow-up when %s', (_, props) => {
+      render(<GroupChatPanel {...baseProps} {...props} messages={[unpackPost]} onAskUnpackFollowUp={jest.fn()} />);
+
+      expect(screen.queryByRole('button', { name: 'Ask a follow-up privately' })).not.toBeInTheDocument();
+    });
+
+    it('scrolls to and focuses the post a Private Chat link points at, then reports it done', async () => {
+      const onFocusMessageHandled = jest.fn();
+      render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[unpackPost]}
+          focusMessageId="unpack-post-1"
+          onFocusMessageHandled={onFocusMessageHandled}
+        />,
+      );
+      const card = screen.getByRole('article');
+
+      await waitFor(() => expect(card).toHaveFocus());
+      expect(card.scrollIntoView).toHaveBeenCalled();
+      expect(onFocusMessageHandled).toHaveBeenCalled();
+    });
+
+    it('waits for a linked post that has not loaded yet', async () => {
+      const onFocusMessageHandled = jest.fn();
+      const { rerender } = render(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[]}
+          focusMessageId="unpack-post-1"
+          onFocusMessageHandled={onFocusMessageHandled}
+        />,
+      );
+      expect(onFocusMessageHandled).not.toHaveBeenCalled();
+
+      rerender(
+        <GroupChatPanel
+          {...baseProps}
+          messages={[unpackPost]}
+          focusMessageId="unpack-post-1"
+          onFocusMessageHandled={onFocusMessageHandled}
+        />,
+      );
+
+      await waitFor(() => expect(screen.getByRole('article')).toHaveFocus());
+      expect(onFocusMessageHandled).toHaveBeenCalled();
+    });
+  });
+
   describe('useAutoScroll integration', () => {
     it('passes all messages to useAutoScroll, including thread replies', () => {
       // If GroupChatPanel only passed parentMessages, the hook would never see
