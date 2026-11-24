@@ -1,5 +1,10 @@
 import { act, renderHook } from '@testing-library/react';
-import { sendUnpackToPrivateChat, useUnpackPreview, UNPACK_PREVIEW_DELAY_MS } from '../../hooks/useUnpackPreview';
+import {
+  sendUnpackToPrivateChat,
+  shareUnpackToGroupChat,
+  useUnpackPreview,
+  UNPACK_PREVIEW_DELAY_MS,
+} from '../../hooks/useUnpackPreview';
 import { SendData } from '../../utils';
 import { UnpackSelection } from '../../types.internal';
 
@@ -200,5 +205,58 @@ describe('sendUnpackToPrivateChat', () => {
     mockSendData.mockResolvedValue(undefined);
 
     expect(await sendUnpackToPrivateChat('conv-1', range, passcode)).toEqual({ ok: false, reason: undefined });
+  });
+});
+
+describe('shareUnpackToGroupChat', () => {
+  const sharePasscodes = { transcriptPasscode: passcode, chatPasscode: 'chat-passcode' };
+
+  beforeEach(() => mockSendData.mockReset());
+
+  it('shares the Private Chat card by its message ID, with the transcript and Group Chat passcodes', async () => {
+    mockSendData.mockResolvedValue({ askId: 'ask-1', status: 'sent', messageId: 'post-1' });
+
+    const result = await shareUnpackToGroupChat('conv-1', 'card-1', sharePasscodes);
+
+    expect(mockSendData).toHaveBeenCalledWith(
+      'unpack/conv-1/share',
+      { messageId: 'card-1', transcriptPasscode: passcode, chatPasscode: 'chat-passcode' },
+      'token',
+    );
+    expect(result).toEqual({ ok: true, status: 'sent', messageId: 'post-1' });
+  });
+
+  it('points at the existing post when Group Chat already explains the passage', async () => {
+    mockSendData.mockResolvedValue({ askId: 'ask-1', status: 'alreadyPosted', messageId: 'post-0' });
+
+    expect(await shareUnpackToGroupChat('conv-1', 'card-1', sharePasscodes)).toEqual({
+      ok: true,
+      status: 'alreadyPosted',
+      messageId: 'post-0',
+    });
+  });
+
+  it("returns the server's reason when sharing is refused, and logs it", async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockSendData.mockResolvedValue({ error: true, status: 429, reason: 'groupChatRateLimited' });
+
+    expect(await shareUnpackToGroupChat('conv-1', 'card-1', sharePasscodes)).toEqual({
+      ok: false,
+      reason: 'groupChatRateLimited',
+    });
+    expect(warn).toHaveBeenCalledWith(
+      'Unpack share refused',
+      expect.objectContaining({ messageId: 'card-1', reason: 'groupChatRateLimited' }),
+    );
+    warn.mockRestore();
+  });
+
+  it('logs and reports a failure when the server gives no answer', async () => {
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockSendData.mockResolvedValue(undefined);
+
+    expect(await shareUnpackToGroupChat('conv-1', 'card-1', sharePasscodes)).toEqual({ ok: false, reason: undefined });
+    expect(error).toHaveBeenCalledWith('Unpack share got no response', expect.objectContaining({ messageId: 'card-1' }));
+    error.mockRestore();
   });
 });

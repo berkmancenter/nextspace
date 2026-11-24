@@ -5,9 +5,11 @@ import {
   passageKey,
   previewOpening,
   unpackErrorCopy,
+  unpackFollowUpMode,
   widenSelection,
   UNPACK_MAX_PASSAGE_CHARACTERS,
 } from '../../utils/unpackPassage';
+import { UnpackExplanation } from '../../types.internal';
 
 const chunks = [
   { id: 'c1', text: 'We built on the Caselaw Access Project. It has 6.7 million decisions.' },
@@ -275,5 +277,41 @@ describe('unpackErrorCopy', () => {
       canRetry: false,
       canSend: false,
     });
+  });
+});
+
+describe('unpackFollowUpMode', () => {
+  const explanation: UnpackExplanation = {
+    type: 'unpack_explanation',
+    mode: 'passage',
+    destination: 'groupChat',
+    chunkIds: ['chunk-1'],
+    passage: { start: '2025-10-17T10:43:00Z', end: '2025-10-17T10:43:20Z' },
+    quote: 'Precedent decays.',
+    whatTheyreSaying: 'Rulings fade.',
+    whyItMatters: 'Lower courts lean on a few rulings.',
+    terms: [],
+    headline: 'Doctrinal half-life',
+    text: 'Plain-text copy',
+  };
+
+  it('names the topic by the headline and puts the whole quote in front of the question', () => {
+    expect(unpackFollowUpMode(explanation)).toMatchObject({
+      kind: 'unpackFollowUp',
+      label: 'Asking about: Doctrinal half-life',
+      prefix: 'Follow-up on the explanation of "Precedent decays.": ',
+    });
+  });
+
+  it('names the topic by the quote when there is no headline', () => {
+    expect(unpackFollowUpMode({ ...explanation, headline: undefined }).label).toBe('Asking about: "Precedent decays."');
+  });
+
+  it('shortens a long quote in the topic but keeps it whole in the question', () => {
+    const quote = `${'word '.repeat(30)}end.`;
+    const mode = unpackFollowUpMode({ ...explanation, headline: undefined, quote });
+
+    expect(mode.label).toBe(`Asking about: "${quote.slice(0, 80).trimEnd()}…"`);
+    expect(mode.prefix).toContain(quote);
   });
 });

@@ -1,4 +1,12 @@
-import { TranscriptChunkText, UnpackErrorCopy, UnpackErrorReason, UnpackSelection, WidenedPassage } from '../types.internal';
+import {
+  ControlledInputConfig,
+  TranscriptChunkText,
+  UnpackErrorCopy,
+  UnpackErrorReason,
+  UnpackExplanation,
+  UnpackSelection,
+  WidenedPassage,
+} from '../types.internal';
 
 /** Matches the server's limit (llm_engine UNPACK_PASSAGE_MAX_CHARACTERS) on the widened quote. */
 export const UNPACK_MAX_PASSAGE_CHARACTERS = 2000;
@@ -151,6 +159,14 @@ const errorCopy = (botName: string): Record<UnpackErrorReason, UnpackErrorCopy> 
     chunkNotInTranscript: unreadableSelection,
     offsetPastEnd: unreadableSelection,
     selectionBackwards: unreadableSelection,
+    groupChatRateLimited: {
+      message: 'You can share to Group Chat once every 2 minutes. Wait a moment, then try again.',
+      canRetry: true,
+      canSend: true,
+    },
+    noGroupChat: { message: 'This event has no Group Chat to share to.', canRetry: false, canSend: false },
+    cardNotFound: { message: 'This explanation is no longer available to share.', canRetry: false, canSend: false },
+    eventNotStarted: { message: 'You can share to Group Chat once the event starts.', canRetry: true, canSend: true },
   };
 };
 
@@ -158,3 +174,48 @@ const GENERAL_ERROR: UnpackErrorCopy = { message: 'Something went wrong. Try aga
 
 export const unpackErrorCopy = (reason: UnpackErrorReason | undefined, botName: string): UnpackErrorCopy =>
   (reason && errorCopy(botName)[reason]) || GENERAL_ERROR;
+
+/** Sharing posts a card that already exists, so a few reasons mean something different than they do for a send. */
+export function unpackShareErrorCopy(reason: UnpackErrorReason | undefined, botName: string): UnpackErrorCopy {
+  if (reason === 'eventLocked') {
+    return { message: `This event is locked, so ${botName} can't post to Group Chat.`, canRetry: false, canSend: false };
+  }
+  if (reason === 'chunkNotInTranscript') {
+    return {
+      message: "This passage is no longer in the transcript, so it can't be shared.",
+      canRetry: false,
+      canSend: false,
+    };
+  }
+  // A share only fails this way when another share of the same passage is still posting.
+  if (reason === 'unpackFailed') {
+    return {
+      message: 'Someone else is sharing this passage right now. Try again in a moment.',
+      canRetry: true,
+      canSend: true,
+    };
+  }
+  // A share carries both the transcript and Group Chat passcodes, and the refusal doesn't say which failed.
+  if (reason === 'wrongPasscode') {
+    return {
+      message: "This page's link has changed. Reload the page, then try again.",
+      canRetry: false,
+      canSend: false,
+    };
+  }
+  return unpackErrorCopy(reason, botName);
+}
+
+const FOLLOW_UP_LABEL_MAX_CHARACTERS = 80;
+
+export function unpackFollowUpMode({ headline, quote }: UnpackExplanation): ControlledInputConfig {
+  const shortQuote =
+    quote.length > FOLLOW_UP_LABEL_MAX_CHARACTERS ? `${quote.slice(0, FOLLOW_UP_LABEL_MAX_CHARACTERS).trimEnd()}…` : quote;
+  return {
+    kind: 'unpackFollowUp',
+    icon: null,
+    label: `Asking about: ${headline ?? `"${shortQuote}"`}`,
+    // The assistant only sees the text, so the question carries the passage it is about.
+    prefix: `Follow-up on the explanation of "${quote}": `,
+  };
+}

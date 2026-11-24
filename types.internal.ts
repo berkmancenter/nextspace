@@ -224,6 +224,8 @@ export interface ControlledInputConfig {
   prefix: string;
   icon: React.ReactNode;
   label: string;
+  /** Leave out for feedback, which gets no reply. A follow-up question waits for the assistant's answer. */
+  kind?: 'unpackFollowUp';
 }
 
 /**
@@ -658,7 +660,7 @@ export interface UnpackErrorCopy {
   message: string;
   /** Asking again for the same passage can work. */
   canRetry: boolean;
-  /** Sending this passage to Private Chat can still work. */
+  /** Sending this passage to Private Chat, or sharing its card to Group Chat, can still work. */
   canSend: boolean;
 }
 
@@ -670,6 +672,17 @@ export type UnpackPreviewState =
 
 /** pending means bot posts the card once the explanation is written. */
 export type UnpackSendOutcome = { ok: true; status: 'sent' | 'pending' } | { ok: false; reason?: UnpackErrorReason };
+
+type UnpackShareResult = components['schemas']['UnpackShareResult'];
+
+/** messageId is the Group Chat post to link to: the new one, or the one that already explains the passage. */
+export type UnpackShareOutcome =
+  | { ok: true; status: UnpackShareResult['status']; messageId: string }
+  | { ok: false; reason?: UnpackErrorReason };
+
+export type UnpackShareState = { phase: 'idle' } | { phase: 'sharing' } | { phase: 'done'; outcome: UnpackShareOutcome };
+
+export type UnpackAlreadyPosted = components['schemas']['UnpackAlreadyPosted'];
 
 /** Where a browser selection starts and ends, for telling whether a press changed it. */
 export type SelectionEnds = Pick<Selection, 'anchorNode' | 'anchorOffset' | 'focusNode' | 'focusOffset'>;

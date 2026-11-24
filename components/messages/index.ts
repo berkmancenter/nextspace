@@ -4,3 +4,4 @@ export { UserMessage } from './UserMessage';
 export { JargonClarificationMessage } from './JargonClarificationMessage';
 export { UnpackExplanationMessage } from './UnpackExplanationMessage';
 export { CatchUpSummaryMessage } from './CatchUpSummaryMessage';
+export { UnpackAlreadyPostedMessage } from './UnpackAlreadyPostedMessage';

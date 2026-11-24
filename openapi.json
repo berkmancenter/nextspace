@@ -5322,7 +5322,7 @@
     "/unpack/{conversationId}/send": {
       "post": {
         "summary": "Send a passage's explanation",
-        "description": "Posts the saved explanation of a passage to the chosen destination as an `unpack_explanation` card from the event assistant. Works before the preview has finished, or without one: the choice is stored and the card posts as soon as the explanation is written (`status: pending`). Sending the same passage again posts nothing new and returns the existing card's message ID. A locked event refuses the send with eventLocked. If the card can't be posted for another reason, the request fails and can be sent again. A send that has to start a new explanation counts toward the same per-minute limit as a preview. Only `privateChat` is accepted for now.\n",
+        "description": "Posts the saved explanation of a passage to the chosen destination as an `unpack_explanation` card from the event assistant. Works before the preview has finished, or without one: the choice is stored and the card posts as soon as the explanation is written (`status: pending`). Sending the same passage again posts nothing new and returns the existing card's message ID. A locked event refuses the send with eventLocked. If the card can't be posted for another reason, the request fails and can be sent again. A send that has to start a new explanation counts toward the same per-minute limit as a preview. Only `privateChat` is accepted: Group Chat posts start from a Private Chat card, through the share call.\n",
         "tags": [
           "Unpack"
         ],
@@ -5394,6 +5394,93 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/UnpackRefused"
+          },
+          "429": {
+            "$ref": "#/components/responses/UnpackRefused"
+          },
+          "503": {
+            "$ref": "#/components/responses/UnpackRefused"
+          }
+        }
+      }
+    },
+    "/unpack/{conversationId}/share": {
+      "post": {
+        "summary": "Share a Private Chat explanation card to Group Chat",
+        "description": "Posts a copy of one of the participant's own `unpack_explanation` cards from Private Chat to Group Chat, as the event assistant and without the participant's name. The copy is the card as the participant saw it, with `destination: groupChat` and a `footer`. Group Chat never gets two posts about the same transcript: if a post already covers any chunk of this passage, nothing is posted, the answer is `status: alreadyPosted` with that post's message ID, and the assistant sends the participant one UnpackAlreadyPosted note in Private Chat per existing post. If that post is still being made, the call waits for it, and answers unpackFailed (503) if it isn't done in 10 seconds. Sharing a card that was already posted from the same card answers `status: sent` with the existing post's ID. Each participant can post to Group Chat once every 2 minutes per event, counted from their last post that went through; an alreadyPosted answer doesn't count. Sharing opens when the event starts, so a share in the pre-event window is refused with eventNotStarted.\n",
+        "tags": [
+          "Unpack"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/UnpackTranscriptPasscode"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "messageId"
+                    ],
+                    "properties": {
+                      "messageId": {
+                        "type": "string",
+                        "description": "ID of the participant's Private Chat `unpack_explanation` card."
+                      },
+                      "chatPasscode": {
+                        "type": "string",
+                        "description": "The Group Chat channel's passcode, the same one the client uses to read Group Chat. Required when Group Chat has one, which it does by default. A missing or wrong passcode is refused with 400 and reason wrongPasscode."
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The card was posted to Group Chat, or a post about the same passage already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnpackShareResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/UnpackRefused"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/UnpackRefused"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnpackRefused"
           },
           "409": {
             "$ref": "#/components/responses/UnpackRefused"
@@ -6749,7 +6836,7 @@
       },
       "UnpackExplanation": {
         "type": "object",
-        "description": "Message body (bodyType \"json\") the event assistant posts with an explanation of a passage a participant highlighted. It comes from the send endpoint.",
+        "description": "Message body (bodyType \"json\") the event assistant posts with an explanation of a passage a participant highlighted. It comes from the send endpoint (Private Chat) or the share endpoint (Group Chat). A Group Chat post never names the participant who shared it.",
         "required": [
           "type",
           "mode",
@@ -6778,7 +6865,8 @@
           "destination": {
             "type": "string",
             "enum": [
-              "privateChat"
+              "privateChat",
+              "groupChat"
             ]
           },
           "chunkIds": {
@@ -6830,9 +6918,38 @@
           "range": {
             "$ref": "#/components/schemas/UnpackSelection"
           },
+          "footer": {
+            "type": "string",
+            "description": "Group Chat posts only. Says why the assistant posted it, without naming anyone, for example \"A participant asked Berkie to share this.\" Show it as written; other kinds of post will use other text."
+          },
           "text": {
             "type": "string",
-            "description": "Plain-text version of all sections, for chat history and clients that can't render the card."
+            "description": "Plain-text version of all sections, for chat history and clients that can't render the card. Ends with the footer when there is one."
+          }
+        }
+      },
+      "UnpackAlreadyPosted": {
+        "type": "object",
+        "description": "Message body (bodyType \"json\") the event assistant posts in a participant's Private Chat when they share a passage that Group Chat already has a post about. Nothing new is posted to Group Chat.",
+        "required": [
+          "type",
+          "groupChatMessageId",
+          "text"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "unpack_already_posted"
+            ]
+          },
+          "groupChatMessageId": {
+            "type": "string",
+            "description": "ID of the existing Group Chat post (in the chat channel) to link to."
+          },
+          "text": {
+            "type": "string",
+            "description": "The note to show, \"A post about this part of the talk is already in Group Chat.\""
           }
         }
       },
@@ -6978,6 +7095,15 @@
           }
         }
       },
+      "UnpackTranscriptPasscode": {
+        "type": "object",
+        "properties": {
+          "transcriptPasscode": {
+            "type": "string",
+            "description": "The transcript channel's passcode, the same one the client uses to read the transcript. Required when the transcript has one, which it does by default. A missing or wrong passcode is refused with 400 and reason wrongPasscode."
+          }
+        }
+      },
       "UnpackVisual": {
         "type": "object",
         "required": [
@@ -7108,6 +7234,31 @@
           }
         }
       },
+      "UnpackShareResult": {
+        "type": "object",
+        "required": [
+          "askId",
+          "status",
+          "messageId"
+        ],
+        "properties": {
+          "askId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "alreadyPosted"
+            ],
+            "description": "sent, the card was posted to Group Chat, now or by an earlier share of the same card. alreadyPosted, a Group Chat post already covers part of this passage, so nothing was posted and the participant got an UnpackAlreadyPosted note in Private Chat."
+          },
+          "messageId": {
+            "type": "string",
+            "description": "ID of the Group Chat post, the new one when sent and the existing one when alreadyPosted."
+          }
+        }
+      },
       "UnpackError": {
         "type": "object",
         "properties": {
@@ -7121,9 +7272,13 @@
             "type": "string",
             "enum": [
               "rateLimited",
+              "groupChatRateLimited",
               "unpackerOff",
               "noAssistant",
               "noPrivateChat",
+              "noGroupChat",
+              "cardNotFound",
+              "eventNotStarted",
               "eventLocked",
               "chunkNotInTranscript",
               "offsetPastEnd",
@@ -7132,7 +7287,7 @@
               "unpackFailed",
               "wrongPasscode"
             ],
-            "description": "Why the request was refused. rateLimited (429), the participant started too many new explanations in the last minute; answers from a saved explanation don't count. unpackerOff (403), the event's unpacker feature is off. noAssistant (409), the event has no assistant. wrongPasscode (400), the transcript has a passcode and the request did not give it. noPrivateChat (409), the participant has no Private Chat with the assistant. eventLocked (409), the event is locked, so no card can be posted. chunkNotInTranscript (400), a chunk ID is not in this event's transcript. offsetPastEnd (400), a position is past the end of its chunk. selectionBackwards (400), the selection starts after it ends or holds no words. selectionTooLong (400), the widened passage is too long. unpackFailed (503), the AI model call failed or ran too long; trying again can work. Missing or malformed fields are refused with 400 and no reason."
+            "description": "Why the request was refused. rateLimited (429), the participant started too many new explanations in the last minute; answers from a saved explanation don't count. unpackerOff (403), the event's unpacker feature is off. noAssistant (409), the event has no assistant. wrongPasscode (400), the transcript (or, for a share, Group Chat) has a passcode and the request did not give it. noPrivateChat (409), the participant has no Private Chat with the assistant. groupChatRateLimited (429), the participant already posted to Group Chat in this event in the last 2 minutes. noGroupChat (409), the event has no Group Chat. cardNotFound (404), the message to share is not one of the participant's Private Chat cards in this event. eventNotStarted (409), a share was sent before the event started. eventLocked (409), the event is locked, so no card can be posted. chunkNotInTranscript (400), a chunk ID is not in this event's transcript. offsetPastEnd (400), a position is past the end of its chunk. selectionBackwards (400), the selection starts after it ends or holds no words. selectionTooLong (400), the widened passage is too long. unpackFailed (503), the AI model call failed or ran too long; trying again can work. Missing or malformed fields are refused with 400 and no reason."
           }
         }
       },
@@ -9470,15 +9625,6 @@
           },
           "message": {
             "type": "string"
-          }
-        }
-      },
-      "UnpackTranscriptPasscode": {
-        "type": "object",
-        "properties": {
-          "transcriptPasscode": {
-            "type": "string",
-            "description": "The transcript channel's passcode, the same one the client uses to read the transcript. Required when the transcript has one, which it does by default. A missing or wrong passcode is refused with 400 and reason wrongPasscode."
           }
         }
       }
