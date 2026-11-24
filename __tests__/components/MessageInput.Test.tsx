@@ -58,6 +58,19 @@ describe('MessageInput Component', () => {
       expect(screen.getByPlaceholderText('Enter your message here')).not.toHaveFocus();
     });
 
+    it('takes focus each time the focus request changes, but not for the starting value', () => {
+      const { rerender } = render(<MessageInput {...defaultProps} focusRequest={0} />);
+      const input = screen.getByPlaceholderText('Enter your message here');
+      expect(input).not.toHaveFocus();
+
+      rerender(<MessageInput {...defaultProps} focusRequest={1} />);
+      expect(input).toHaveFocus();
+
+      input.blur();
+      rerender(<MessageInput {...defaultProps} focusRequest={2} />);
+      expect(input).toHaveFocus();
+    });
+
     it('reminds the writer that the message is shown on screen in the presentation view', () => {
       render(<MessageInput {...defaultProps} shownOnScreen />);
 

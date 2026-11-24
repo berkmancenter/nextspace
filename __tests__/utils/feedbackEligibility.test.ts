@@ -82,6 +82,15 @@ describe('getFeedbackEligibleMessages', () => {
       expect(result.size).toBe(2);
     });
 
+    it('excludes catch-up refusals', () => {
+      const messages = [createMessage('1', true), createMessage('2', true, 'catch_up_refused'), createMessage('3', true)];
+
+      const result = getFeedbackEligibleMessages(messages, 1);
+
+      expect(result.has('2')).toBe(false);
+      expect(result.size).toBe(2);
+    });
+
     it('excludes moderator_declined messages', () => {
       const messages = [createMessage('1', true), createMessage('2', true, 'moderator_declined'), createMessage('3', true)];
 
