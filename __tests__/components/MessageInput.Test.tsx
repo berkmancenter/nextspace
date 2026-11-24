@@ -102,6 +102,24 @@ describe('MessageInput Component', () => {
       expect(hideButton.parentElement).not.toContainElement(screen.getByText(/Writing as TestUser/i));
     });
 
+    it('describes the message box with the mode label, so a screen reader hears what it is writing', () => {
+      render(
+        <MessageInput
+          {...defaultProps}
+          controlledMode={{ prefix: 'Follow-up: ', icon: null, label: 'Asking about: Precedent' }}
+        />,
+      );
+
+      expect(screen.getByText('Asking about: Precedent')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Enter your message here')).toHaveAccessibleDescription('Asking about: Precedent');
+    });
+
+    it('gives the message box no description outside a mode', () => {
+      render(<MessageInput {...defaultProps} />);
+
+      expect(screen.getByPlaceholderText('Enter your message here')).not.toHaveAttribute('aria-describedby');
+    });
+
     it('has no Hide button outside the presentation view', () => {
       render(<MessageInput {...defaultProps} />);
 
