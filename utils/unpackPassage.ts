@@ -167,6 +167,11 @@ const errorCopy = (botName: string): Record<UnpackErrorReason, UnpackErrorCopy> 
     noGroupChat: { message: 'This event has no Group Chat to share to.', canRetry: false, canSend: false },
     cardNotFound: { message: 'This explanation is no longer available to share.', canRetry: false, canSend: false },
     eventNotStarted: { message: 'You can share to Group Chat once the event starts.', canRetry: true, canSend: true },
+    eventEnded: {
+      message: "This event has ended, so you can't share to Group Chat anymore.",
+      canRetry: false,
+      canSend: false,
+    },
   };
 };
 

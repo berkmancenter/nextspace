@@ -3350,7 +3350,7 @@
             }
           },
           "400": {
-            "description": "Bad request - conversation locked or validation error",
+            "description": "Bad request - conversation locked or validation error. Also refused: a `json` body whose `type` is an Unpacker card (`unpack_explanation`, `catch_up_summary` or `unpack_already_posted`), since clients draw those as cards and only the server may post them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5410,7 +5410,7 @@
     "/unpack/{conversationId}/share": {
       "post": {
         "summary": "Share a Private Chat explanation card to Group Chat",
-        "description": "Posts a copy of one of the participant's own `unpack_explanation` cards from Private Chat to Group Chat, as the event assistant and without the participant's name. The copy is the card as the participant saw it, with `destination: groupChat` and a `footer`. Group Chat never gets two posts about the same transcript: if a post already covers any chunk of this passage, nothing is posted, the answer is `status: alreadyPosted` with that post's message ID, and the assistant sends the participant one UnpackAlreadyPosted note in Private Chat per existing post. If that post is still being made, the call waits for it, and answers unpackFailed (503) if it isn't done in 10 seconds. Sharing a card that was already posted from the same card answers `status: sent` with the existing post's ID. Each participant can post to Group Chat once every 2 minutes per event, counted from their last post that went through; an alreadyPosted answer doesn't count. Sharing opens when the event starts, so a share in the pre-event window is refused with eventNotStarted.\n",
+        "description": "Posts a copy of one of the participant's own `unpack_explanation` cards from Private Chat to Group Chat, as the participant's own message under their pseudonym (`fromAgent` is false). The copy is the card as the participant saw it, with `destination: groupChat` and a `footer` saying the explanation came from the assistant. Agents don't evaluate or answer it. If a moderator has hidden the participant, the post is hidden from the room like their other messages, the participant still sees it, and it doesn't stop anyone else posting the passage. Clearing the transcript deletes these posts, and open clients get a `message:deleted` event with their IDs. Group Chat never gets two posts about the same transcript: if a post already covers any chunk of this passage, nothing is posted, the answer is `status: alreadyPosted` with that post's message ID, and the assistant sends the participant one UnpackAlreadyPosted note in Private Chat per existing post. If that post is still being made, the call waits for it, and answers unpackFailed (503) if it isn't done in 10 seconds. Sharing a card that was already posted from the same card answers `status: sent` with the existing post's ID. Each participant can post to Group Chat once every 2 minutes per event, counted from their last post that went through; an alreadyPosted answer doesn't count. A share during the pre-event window, when participants can join before the event starts, is refused with eventNotStarted, and a share after the event ends is refused with eventEnded.\n",
         "tags": [
           "Unpack"
         ],
@@ -6920,7 +6920,7 @@
           },
           "footer": {
             "type": "string",
-            "description": "Group Chat posts only. Says why the assistant posted it, without naming anyone, for example \"A participant asked Berkie to share this.\" Show it as written; other kinds of post will use other text."
+            "description": "Group Chat posts only. Says where the post came from. A participant's share reads \"<pseudonym> shared this explanation from <bot name>.\" Show it as written; other kinds of post will use other text."
           },
           "text": {
             "type": "string",
@@ -7279,6 +7279,7 @@
               "noGroupChat",
               "cardNotFound",
               "eventNotStarted",
+              "eventEnded",
               "eventLocked",
               "chunkNotInTranscript",
               "offsetPastEnd",
@@ -7287,7 +7288,7 @@
               "unpackFailed",
               "wrongPasscode"
             ],
-            "description": "Why the request was refused. rateLimited (429), the participant started too many new explanations in the last minute; answers from a saved explanation don't count. unpackerOff (403), the event's unpacker feature is off. noAssistant (409), the event has no assistant. wrongPasscode (400), the transcript (or, for a share, Group Chat) has a passcode and the request did not give it. noPrivateChat (409), the participant has no Private Chat with the assistant. groupChatRateLimited (429), the participant already posted to Group Chat in this event in the last 2 minutes. noGroupChat (409), the event has no Group Chat. cardNotFound (404), the message to share is not one of the participant's Private Chat cards in this event. eventNotStarted (409), a share was sent before the event started. eventLocked (409), the event is locked, so no card can be posted. chunkNotInTranscript (400), a chunk ID is not in this event's transcript. offsetPastEnd (400), a position is past the end of its chunk. selectionBackwards (400), the selection starts after it ends or holds no words. selectionTooLong (400), the widened passage is too long. unpackFailed (503), the AI model call failed or ran too long; trying again can work. Missing or malformed fields are refused with 400 and no reason."
+            "description": "Why the request was refused. rateLimited (429), the participant started too many new explanations in the last minute; answers from a saved explanation don't count. unpackerOff (403), the event's unpacker feature is off. noAssistant (409), the event has no assistant. wrongPasscode (400), the transcript (or, for a share, Group Chat) has a passcode and the request did not give it. noPrivateChat (409), the participant has no Private Chat with the assistant. groupChatRateLimited (429), the participant already posted to Group Chat in this event in the last 2 minutes. noGroupChat (409), the event has no Group Chat. cardNotFound (404), the message to share is not one of the participant's Private Chat cards in this event. eventNotStarted (409), a share was sent during the pre-event window, when participants can join before the event starts. eventEnded (409), a share was sent after the event ended. eventLocked (409), the event is locked, so no card can be posted. chunkNotInTranscript (400), a chunk ID is not in this event's transcript. offsetPastEnd (400), a position is past the end of its chunk. selectionBackwards (400), the selection starts after it ends or holds no words. selectionTooLong (400), the widened passage is too long. unpackFailed (503), the AI model call failed or ran too long; trying again can work. Missing or malformed fields are refused with 400 and no reason."
           }
         }
       },
