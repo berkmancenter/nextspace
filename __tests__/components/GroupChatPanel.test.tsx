@@ -2567,10 +2567,24 @@ describe('GroupChatPanel', () => {
       expect(screen.getByRole('article', { name: 'What the speaker meant by "doctrinal half-life"' })).toBeInTheDocument();
     });
 
-    it('never draws a card for a participant message shaped like one', () => {
-      render(<GroupChatPanel {...baseProps} messages={[{ ...unpackPost, fromAgent: false, pseudonym: 'Alice' }]} />);
+    it('draws the card a participant shared, with the footer naming them', () => {
+      const shared = {
+        ...unpackPost,
+        fromAgent: false,
+        pseudonym: 'Alice',
+        body: { ...unpackPost.body, footer: 'Alice shared this explanation from Berkie.' },
+      };
 
-      expect(screen.queryByRole('article')).not.toBeInTheDocument();
+      render(<GroupChatPanel {...baseProps} messages={[shared]} />);
+
+      expect(screen.getByRole('article', { name: 'What the speaker meant by "doctrinal half-life"' })).toBeInTheDocument();
+      expect(screen.getByText('Alice shared this explanation from Berkie.')).toBeInTheDocument();
+    });
+
+    it("draws the reader's own shared card", () => {
+      render(<GroupChatPanel {...baseProps} messages={[{ ...unpackPost, fromAgent: false, pseudonym: 'test-user' }]} />);
+
+      expect(screen.getByRole('article', { name: 'What the speaker meant by "doctrinal half-life"' })).toBeInTheDocument();
     });
 
     it('passes the explanation on when a participant asks a follow-up', async () => {

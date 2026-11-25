@@ -1,5 +1,5 @@
 import { FC, useId, useState } from 'react';
-import { Lock } from '@mui/icons-material';
+import { Share } from '@mui/icons-material';
 import { PseudonymousMessage, UnpackExplanation } from '../../types.internal';
 
 interface GroupChatUnpackCardProps {
@@ -71,7 +71,7 @@ export const GroupChatUnpackCard: FC<GroupChatUnpackCardProps> = ({ message, onA
 
       {footer && (
         <p className="m-0 flex items-center gap-1.5 text-xs text-[#4B5563]">
-          <Lock sx={{ fontSize: 13 }} aria-hidden="true" />
+          <Share sx={{ fontSize: 13 }} aria-hidden="true" />
           {footer}
         </p>
       )}

@@ -74,9 +74,7 @@ const ShareToGroupChat: FC<{
       <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-white border-t border-[#D1C4E9]">
         <p id={statusId} ref={statusRef} role="status" tabIndex={-1} className="font-semibold focus:outline-none">
           {/* The server posts the note in Private Chat; until it arrives, the status stays empty. */}
-          {shared.status === 'alreadyPosted'
-            ? alreadyPostedNoteTexts?.[shared.messageId]
-            : 'Shared to Group Chat, without your name.'}
+          {shared.status === 'alreadyPosted' ? alreadyPostedNoteTexts?.[shared.messageId] : 'Shared to Group Chat.'}
         </p>
         {onOpenGroupChatPost && (
           <SeeItInGroupChatButton
@@ -102,7 +100,7 @@ const ShareToGroupChat: FC<{
         Share to Group Chat
       </button>
       <span id={hintId} className="text-xs text-gray-600">
-        {shareState.phase === 'sharing' ? 'Sharing…' : 'The full explanation, posted now for everyone, without your name'}
+        {shareState.phase === 'sharing' ? 'Sharing…' : 'Posts the full explanation to Group Chat under your name'}
       </span>
       {errorCopy && (
         <p role="alert" className="text-sm text-[#B91C1C]">

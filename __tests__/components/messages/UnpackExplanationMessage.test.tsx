@@ -223,10 +223,10 @@ describe('UnpackExplanationMessage', () => {
       expect(shareButton()).toHaveAttribute('aria-disabled', 'true');
     });
 
-    it('says the share posts for everyone without a name', () => {
+    it("says the share posts under the participant's name", () => {
       renderShareable(jest.fn());
 
-      expect(shareButton()).toHaveAccessibleDescription('The full explanation, posted now for everyone, without your name');
+      expect(shareButton()).toHaveAccessibleDescription('Posts the full explanation to Group Chat under your name');
     });
 
     it('leaves the button out when sharing is not offered', () => {
@@ -257,10 +257,10 @@ describe('UnpackExplanationMessage', () => {
 
       await user.click(shareButton());
 
-      expect(await screen.findByText('Shared to Group Chat, without your name.')).toBeInTheDocument();
+      expect(await screen.findByText('Shared to Group Chat.')).toBeInTheDocument();
       const seeIt = screen.getByRole('button', { name: 'See it in Group Chat' });
       await waitFor(() => expect(seeIt).toHaveFocus());
-      expect(seeIt).toHaveAccessibleDescription('Shared to Group Chat, without your name.');
+      expect(seeIt).toHaveAccessibleDescription('Shared to Group Chat.');
       await user.click(seeIt);
       expect(onOpenGroupChatPost).toHaveBeenCalledWith('post-1');
     });
@@ -286,6 +286,7 @@ describe('UnpackExplanationMessage', () => {
       ['eventLocked', "This event is locked, so Berkie can't post to Group Chat."],
       ['chunkNotInTranscript', "This passage is no longer in the transcript, so it can't be shared."],
       ['eventNotStarted', 'You can share to Group Chat once the event starts.'],
+      ['eventEnded', "This event has ended, so you can't share to Group Chat anymore."],
       ['unpackFailed', 'Someone else is sharing this passage right now. Try again in a moment.'],
       ['wrongPasscode', "This page's link has changed. Reload the page, then try again."],
       [undefined, 'Something went wrong. Try again.'],
@@ -312,13 +313,13 @@ describe('UnpackExplanationMessage', () => {
         await screen.findByRole('alert');
         await user.click(shareButton());
 
-        expect(await screen.findByText('Shared to Group Chat, without your name.')).toBeInTheDocument();
+        expect(await screen.findByText('Shared to Group Chat.')).toBeInTheDocument();
       },
     );
 
-    it('stops offering the share when trying again cannot help', async () => {
+    it.each(['noGroupChat', 'eventEnded'])('stops offering the share after a %s refusal', async (reason) => {
       const user = userEvent.setup();
-      const onShare = jest.fn().mockResolvedValue({ ok: false, reason: 'noGroupChat' });
+      const onShare = jest.fn().mockResolvedValue({ ok: false, reason });
       renderShareable(onShare);
 
       await user.click(shareButton());
@@ -335,7 +336,7 @@ describe('UnpackExplanationMessage', () => {
 
       expect(await axe(container)).toHaveNoViolations();
       await user.click(shareButton());
-      await screen.findByText('Shared to Group Chat, without your name.');
+      await screen.findByText('Shared to Group Chat.');
 
       expect(await axe(container)).toHaveNoViolations();
     });

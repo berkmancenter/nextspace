@@ -311,6 +311,16 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
 
     const style = isAssistant ? getAssistantAvatarStyle() : getAvatarStyle(message.pseudonym || '', isCurrentUser);
 
+    // Participants share these too. Only the server can post this body type, so the author doesn't matter.
+    if (parsed.type === 'unpack_explanation') {
+      return (
+        <GroupChatUnpackCard
+          message={{ ...message, body: rawBody }}
+          onAskFollowUp={inactive || presentation ? undefined : onAskUnpackFollowUp}
+        />
+      );
+    }
+
     // User messages - use UserMessage component
     if (!isAssistant) {
       return (
@@ -337,15 +347,6 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
             <PollMessage body={pollBody} counts={counts} presentation={presentation} />
           </div>
         </div>
-      );
-    }
-
-    if (parsed.type === 'unpack_explanation') {
-      return (
-        <GroupChatUnpackCard
-          message={{ ...message, body: rawBody }}
-          onAskFollowUp={inactive || presentation ? undefined : onAskUnpackFollowUp}
-        />
       );
     }
 
