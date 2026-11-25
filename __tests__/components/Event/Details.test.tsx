@@ -345,6 +345,23 @@ describe('EventDetails', () => {
       expect(screen.getByText('Series History')).toBeInTheDocument();
     });
 
+    it('shows the Unpacker as off until the event turns it on', () => {
+      renderAt(baseConversationData);
+      expandSection('Assistant configuration');
+      const offRow = screen.getByText('Unpacker').closest('[data-testid="feature-row"]') as HTMLElement;
+      expect(within(offRow).getByText('Off')).toBeInTheDocument();
+    });
+
+    it('shows the Unpacker as on when the event turns it on', () => {
+      renderAt({
+        ...baseConversationData,
+        features: [{ name: 'unpacker', enabled: true }],
+      });
+      expandSection('Assistant configuration');
+      const onRow = screen.getByText('Unpacker').closest('[data-testid="feature-row"]') as HTMLElement;
+      expect(within(onRow).getByText('On')).toBeInTheDocument();
+    });
+
     it('reflects an explicit disabled feature from the conversation', () => {
       renderAt({
         ...baseConversationData,

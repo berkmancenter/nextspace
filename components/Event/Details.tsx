@@ -63,6 +63,7 @@ const ORGANIZER_FEATURES: { name: string; label: string; default: boolean }[] = 
   { name: 'librarian', label: 'Reading Recommendations', default: true },
   { name: 'seriesHistory', label: 'Series History', default: false },
   { name: 'voiceOutput', label: 'Voice Responses', default: false },
+  { name: 'unpacker', label: 'Unpacker', default: false },
 ];
 
 /**
