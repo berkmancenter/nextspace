@@ -118,6 +118,11 @@ export interface MessageHiddenEvent {
   display: HiddenDisplay;
 }
 
+/** Websocket `message:deleted`: messages the server removed for good, such as Unpacker posts deleted with the transcript. */
+export interface MessageDeletedEvent {
+  messageIds: string[];
+}
+
 /**
  * Websocket `message:hidden-notice`, sent only to the author of hidden messages. It travels on the
  * author's per-user room, which spans every conversation, so `conversationId` says which one it is about.

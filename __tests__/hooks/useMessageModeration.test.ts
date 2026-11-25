@@ -95,6 +95,36 @@ describe('useMessageModeration', () => {
       expect(socket!.off).toHaveBeenCalledWith('message:hidden-notice', expect.any(Function));
     });
 
+    it('removes deleted messages from both lists, for admins too', () => {
+      const { result, socket } = setup({
+        isAdmin: true,
+        chat: [msg('post'), msg('reply'), msg('other')],
+        assistant: [msg('note')],
+      });
+
+      act(() => socket!.handlers['message:deleted']({ messageIds: ['post', 'reply', 'note'] }));
+
+      expect(result.current.chatMessages.map((m) => m.id)).toEqual(['other']);
+      expect(result.current.assistantMessages).toEqual([]);
+    });
+
+    it("removes a deleted message from its own author's list", () => {
+      const { result, socket } = setup({ userId: 'owner-1', chat: [msg('mine')] });
+
+      act(() => socket!.handlers['message:deleted']({ messageIds: ['mine'] }));
+
+      expect(result.current.chatMessages).toEqual([]);
+    });
+
+    it('stops listening for deletions on unmount', () => {
+      const { socket, unmount } = setup();
+      expect(socket!.on).toHaveBeenCalledWith('message:deleted', expect.any(Function));
+
+      unmount();
+
+      expect(socket!.off).toHaveBeenCalledWith('message:deleted', expect.any(Function));
+    });
+
     it('applies message:hidden to both lists', () => {
       const { result, socket } = setup({
         isAdmin: true,

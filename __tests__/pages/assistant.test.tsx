@@ -3311,9 +3311,7 @@ describe('EventAssistantRoom', () => {
       await renderRoomWithPost();
 
       act(() => {
-        socketHandlers('message:hidden').forEach((handler) =>
-          handler({ messageIds: ['unpack-post-1'], hidden: true, display: 'omit' }),
-        );
+        socketHandlers('message:deleted').forEach((handler) => handler({ messageIds: ['unpack-post-1'] }));
       });
 
       await waitFor(() =>
@@ -3341,8 +3339,8 @@ describe('EventAssistantRoom', () => {
       expect(await screen.findByText('Is this the same as stare decisis?')).toBeInTheDocument();
 
       act(() => {
-        socketHandlers('message:hidden').forEach((handler) =>
-          handler({ messageIds: ['unpack-post-1', 'reply-1', 'reply-2'], hidden: true, display: 'omit' }),
+        socketHandlers('message:deleted').forEach((handler) =>
+          handler({ messageIds: ['unpack-post-1', 'reply-1', 'reply-2'] }),
         );
       });
 
