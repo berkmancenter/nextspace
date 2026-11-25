@@ -238,11 +238,17 @@ describe('shareUnpackToGroupChat', () => {
 
   it("returns the server's reason when sharing is refused, and logs it", async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    mockSendData.mockResolvedValue({ error: true, status: 429, reason: 'groupChatRateLimited' });
+    mockSendData.mockResolvedValue({
+      error: true,
+      status: 429,
+      reason: 'groupChatRateLimited',
+      message: 'You can post to Group Chat once every 2 minutes.',
+    });
 
     expect(await shareUnpackToGroupChat('conv-1', 'card-1', sharePasscodes)).toEqual({
       ok: false,
       reason: 'groupChatRateLimited',
+      message: 'You can post to Group Chat once every 2 minutes.',
     });
     expect(warn).toHaveBeenCalledWith(
       'Unpack share refused',

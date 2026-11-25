@@ -152,6 +152,77 @@ describe('UnpackExplanationMessage', () => {
 
     const shareButton = () => screen.getByRole('button', { name: 'Share to Group Chat' });
 
+    it('shows a share made earlier, without moving focus to it', () => {
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage()}
+          onShareToGroupChat={jest.fn()}
+          onOpenGroupChatPost={jest.fn()}
+          shareOutcome={{ ok: true, status: 'sent', messageId: 'post-1' }}
+        />,
+      );
+
+      expect(screen.getByRole('status')).toHaveTextContent('Shared to Group Chat');
+      expect(screen.queryByRole('button', { name: 'Share to Group Chat' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'See it in Group Chat' })).not.toHaveFocus();
+    });
+
+    it("shows the server's own words for the Group Chat time limit", async () => {
+      const user = userEvent.setup();
+      renderShareable(
+        jest.fn().mockResolvedValue({
+          ok: false,
+          reason: 'groupChatRateLimited',
+          message: 'You can post to Group Chat once every 3 minutes.',
+        }),
+      );
+
+      await user.click(shareButton());
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('You can post to Group Chat once every 3 minutes.');
+    });
+
+    it("says it's already in Group Chat in the words of the note the server posted", () => {
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage()}
+          onShareToGroupChat={jest.fn()}
+          onOpenGroupChatPost={jest.fn()}
+          shareOutcome={{ ok: true, status: 'alreadyPosted', messageId: 'post-0' }}
+          alreadyPostedNoteTexts={{ 'post-0': 'Someone already shared this part of the talk.' }}
+        />,
+      );
+
+      expect(screen.getByRole('status')).toHaveTextContent('Someone already shared this part of the talk.');
+    });
+
+    it('links to the existing post before the note arrives', () => {
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage()}
+          onShareToGroupChat={jest.fn()}
+          onOpenGroupChatPost={jest.fn()}
+          shareOutcome={{ ok: true, status: 'alreadyPosted', messageId: 'post-0' }}
+        />,
+      );
+
+      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      expect(screen.getByRole('button', { name: 'See it in Group Chat' })).toBeInTheDocument();
+    });
+
+    it('shows a refusal from earlier', () => {
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage()}
+          onShareToGroupChat={jest.fn()}
+          shareOutcome={{ ok: false, reason: 'noGroupChat' }}
+        />,
+      );
+
+      expect(screen.getByRole('alert')).toHaveTextContent('This event has no Group Chat to share to.');
+      expect(shareButton()).toHaveAttribute('aria-disabled', 'true');
+    });
+
     it('says the share posts for everyone without a name', () => {
       renderShareable(jest.fn());
 
@@ -204,13 +275,12 @@ describe('UnpackExplanationMessage', () => {
 
       await user.click(shareButton());
 
-      expect(await screen.findByText('A post about this part of the talk is already in Group Chat.')).toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: 'See it in Group Chat' }));
+      await user.click(await screen.findByRole('button', { name: 'See it in Group Chat' }));
       expect(onOpenGroupChatPost).toHaveBeenCalledWith('post-0');
     });
 
     it.each([
-      ['groupChatRateLimited', 'You can share to Group Chat once every 2 minutes. Wait a moment, then try again.'],
+      ['groupChatRateLimited', "You've shared to Group Chat recently. Wait a few minutes, then try again."],
       ['noGroupChat', 'This event has no Group Chat to share to.'],
       ['cardNotFound', 'This explanation is no longer available to share.'],
       ['eventLocked', "This event is locked, so Berkie can't post to Group Chat."],

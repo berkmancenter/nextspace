@@ -175,8 +175,9 @@ jest.mock('../../components/messages', () => ({
     );
   },
   CatchUpSummaryMessage: ({ message }: any) => <div data-testid="catch-up-summary-message">{message.body.inShort}</div>,
-  UnpackExplanationMessage: ({ message, onShareToGroupChat }: any) => (
+  UnpackExplanationMessage: ({ message, onShareToGroupChat, shareOutcome }: any) => (
     <div data-testid="unpack-explanation-message">
+      {shareOutcome?.ok && <p>Shared earlier</p>}
       {onShareToGroupChat && (
         <button type="button" onClick={() => onShareToGroupChat(message.id)}>
           Share to Group Chat
@@ -3269,6 +3270,24 @@ describe('EventAssistantRoom', () => {
       );
     });
 
+    it('still shows a card as shared after switching to Group Chat and back', async () => {
+      const user = userEvent.setup();
+      await renderRoomWithPost();
+      (SendData as jest.Mock).mockImplementation((path: string) =>
+        Promise.resolve(
+          path.endsWith('/share') ? { askId: 'ask-1', status: 'sent', messageId: 'post-9' } : { id: 'sent-1' },
+        ),
+      );
+      deliver(fromBerkieInPrivateChat('card-1', { ...unpackPost.body, destination: 'privateChat', footer: undefined }));
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
+      await user.click(await screen.findByRole('button', { name: 'Share to Group Chat' }));
+
+      await user.click(screen.getAllByLabelText('Group Chat')[0]);
+      await user.click(screen.getAllByLabelText('Private Chat')[0]);
+
+      expect(await screen.findByText('Shared earlier')).toBeInTheDocument();
+    });
+
     it("opens Group Chat at the existing post from the note's link", async () => {
       const user = userEvent.setup();
       await renderRoomWithPost();
@@ -3331,29 +3350,28 @@ describe('EventAssistantRoom', () => {
       expect(screen.queryByText('Close, but not quite.')).not.toBeInTheDocument();
     });
 
-    it("doesn't wait for a linked post that isn't in Group Chat, such as one hidden from the room", async () => {
+    it('scrolls to a linked post that loads after the link is followed', async () => {
       const user = userEvent.setup();
       await renderRoomWithPost();
       deliver(
         fromBerkieInPrivateChat('note-1', {
           type: 'unpack_already_posted',
-          groupChatMessageId: 'hidden-post',
+          groupChatMessageId: 'later-post',
           text: 'A post about this part of the talk is already in Group Chat.',
         }),
       );
       await user.click(screen.getAllByLabelText('Private Chat')[0]);
       await user.click(await screen.findByRole('button', { name: 'See it in Group Chat' }));
-      (HTMLElement.prototype.scrollIntoView as jest.Mock).mockClear();
 
       act(() => {
         socketHandlers('message:new').forEach((handler) =>
-          handler({ ...unpackPost, id: 'hidden-post', body: { ...unpackPost.body, headline: 'Shown much later' } }),
+          handler({ ...unpackPost, id: 'later-post', body: { ...unpackPost.body, headline: 'Arrives a moment later' } }),
         );
       });
 
-      const laterPost = await screen.findByRole('article', { name: 'Shown much later' });
-      expect(laterPost).not.toHaveFocus();
-      expect(laterPost.scrollIntoView).not.toHaveBeenCalled();
+      const laterPost = await screen.findByRole('article', { name: 'Arrives a moment later' });
+      await waitFor(() => expect(laterPost).toHaveFocus());
+      expect(laterPost.scrollIntoView).toHaveBeenCalled();
     });
   });
 

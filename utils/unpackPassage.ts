@@ -160,7 +160,7 @@ const errorCopy = (botName: string): Record<UnpackErrorReason, UnpackErrorCopy> 
     offsetPastEnd: unreadableSelection,
     selectionBackwards: unreadableSelection,
     groupChatRateLimited: {
-      message: 'You can share to Group Chat once every 2 minutes. Wait a moment, then try again.',
+      message: "You've shared to Group Chat recently. Wait a few minutes, then try again.",
       canRetry: true,
       canSend: true,
     },
@@ -175,8 +175,18 @@ const GENERAL_ERROR: UnpackErrorCopy = { message: 'Something went wrong. Try aga
 export const unpackErrorCopy = (reason: UnpackErrorReason | undefined, botName: string): UnpackErrorCopy =>
   (reason && errorCopy(botName)[reason]) || GENERAL_ERROR;
 
-/** Sharing posts a card that already exists, so a few reasons mean something different than they do for a send. */
-export function unpackShareErrorCopy(reason: UnpackErrorReason | undefined, botName: string): UnpackErrorCopy {
+/**
+ * Sharing posts a card that already exists, so a few reasons mean something different than they do for a send.
+ * @param serverMessage The refusal's own message. Used for the Group Chat time limit, which only the server knows.
+ */
+export function unpackShareErrorCopy(
+  reason: UnpackErrorReason | undefined,
+  botName: string,
+  serverMessage?: string,
+): UnpackErrorCopy {
+  if (reason === 'groupChatRateLimited' && serverMessage) {
+    return { ...unpackErrorCopy(reason, botName), message: serverMessage };
+  }
   if (reason === 'eventLocked') {
     return { message: `This event is locked, so ${botName} can't post to Group Chat.`, canRetry: false, canSend: false };
   }
@@ -206,16 +216,24 @@ export function unpackShareErrorCopy(reason: UnpackErrorReason | undefined, botN
   return unpackErrorCopy(reason, botName);
 }
 
-const FOLLOW_UP_LABEL_MAX_CHARACTERS = 80;
+/** How much of the quote a follow-up carries. The participant's message holds it, so it stays short. */
+const FOLLOW_UP_QUOTE_MAX_CHARACTERS = 60;
+
+function shortenQuote(quote: string): string {
+  if (quote.length <= FOLLOW_UP_QUOTE_MAX_CHARACTERS) return quote;
+  const upToLimit = quote.slice(0, FOLLOW_UP_QUOTE_MAX_CHARACTERS + 1);
+  const lastSpace = upToLimit.lastIndexOf(' ');
+  const cut = lastSpace > 0 ? upToLimit.slice(0, lastSpace) : quote.slice(0, FOLLOW_UP_QUOTE_MAX_CHARACTERS);
+  return `${cut.trimEnd().replace(/[\s,;:.!?]+$/, '')}...`;
+}
 
 export function unpackFollowUpMode({ headline, quote }: UnpackExplanation): ControlledInputConfig {
-  const shortQuote =
-    quote.length > FOLLOW_UP_LABEL_MAX_CHARACTERS ? `${quote.slice(0, FOLLOW_UP_LABEL_MAX_CHARACTERS).trimEnd()}…` : quote;
+  const shortQuote = shortenQuote(quote);
   return {
     kind: 'unpackFollowUp',
     icon: null,
     label: `Asking about: ${headline ?? `"${shortQuote}"`}`,
     // The assistant only sees the text, so the question carries the passage it is about.
-    prefix: `Follow-up on the explanation of "${quote}": `,
+    prefix: `Follow-up on the explanation of "${shortQuote}": `,
   };
 }

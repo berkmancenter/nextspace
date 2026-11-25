@@ -1,4 +1,4 @@
-import { FC, useEffect, useId, useRef, useState } from 'react';
+import { FC, forwardRef, useEffect, useId, useRef, useState } from 'react';
 import { MessageProps, UnpackExplanation, UnpackShareOutcome, UnpackShareState } from '../../types.internal';
 import { useBotName } from '../../context/ConversationTypeContext';
 import { unpackShareErrorCopy } from '../../utils/unpackPassage';
@@ -8,6 +8,10 @@ interface UnpackExplanationMessageProps extends MessageProps {
   onShareToGroupChat?: (messageId: string) => Promise<UnpackShareOutcome>;
   /** Opens Group Chat at the given post. */
   onOpenGroupChatPost?: (messageId: string) => void;
+  /** How an earlier share of this card went. The card is rebuilt on each tab switch, so the page keeps it. */
+  shareOutcome?: UnpackShareOutcome;
+  /** The text of each "already in Group Chat" note, by the Group Chat post it links to. */
+  alreadyPostedNoteTexts?: Record<string, string>;
 }
 
 const headingClassName = 'text-xs font-semibold uppercase tracking-wider mb-1 text-mediumslateblue';
@@ -15,30 +19,52 @@ const headingClassName = 'text-xs font-semibold uppercase tracking-wider mb-1 te
 const formatSaidAt = (isoTime: string) =>
   new Date(isoTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
 
+export const SeeItInGroupChatButton = forwardRef<HTMLButtonElement, { onClick: () => void; 'aria-describedby'?: string }>(
+  function SeeItInGroupChatButton({ onClick, 'aria-describedby': describedBy }, ref) {
+    return (
+      <button
+        ref={ref}
+        type="button"
+        aria-describedby={describedBy}
+        onClick={onClick}
+        className="rounded-lg border border-[#C7D2FE] bg-[#F5F3FF] px-3 py-1.5 text-sm font-semibold text-[#312E81] hover:bg-[#EDE9FE]"
+      >
+        See it in Group Chat
+      </button>
+    );
+  },
+);
+
 const ShareToGroupChat: FC<{
   messageId: string;
   onShare: (messageId: string) => Promise<UnpackShareOutcome>;
   onOpenGroupChatPost?: (messageId: string) => void;
-}> = ({ messageId, onShare, onOpenGroupChatPost }) => {
+  earlierOutcome?: UnpackShareOutcome;
+  alreadyPostedNoteTexts?: Record<string, string>;
+}> = ({ messageId, onShare, onOpenGroupChatPost, earlierOutcome, alreadyPostedNoteTexts }) => {
   const botName = useBotName();
   const hintId = useId();
   const statusId = useId();
   const statusRef = useRef<HTMLParagraphElement>(null);
   const seeItRef = useRef<HTMLButtonElement>(null);
-  const [shareState, setShareState] = useState<UnpackShareState>({ phase: 'idle' });
+  const [shareState, setShareState] = useState<UnpackShareState>(
+    earlierOutcome ? { phase: 'done', outcome: earlierOutcome } : { phase: 'idle' },
+  );
+  const sharedJustNow = useRef(false);
 
   const outcome = shareState.phase === 'done' ? shareState.outcome : null;
   const shared = outcome?.ok ? outcome : null;
-  const errorCopy = outcome && !outcome.ok ? unpackShareErrorCopy(outcome.reason, botName) : null;
+  const errorCopy = outcome && !outcome.ok ? unpackShareErrorCopy(outcome.reason, botName, outcome.message) : null;
   const canShare = shareState.phase !== 'sharing' && (errorCopy?.canSend ?? true);
 
   // The Share button is gone once shared, so focus would fall to the page unless it moves to what replaced it.
   useEffect(() => {
-    if (shared) (seeItRef.current ?? statusRef.current)?.focus();
+    if (shared && sharedJustNow.current) (seeItRef.current ?? statusRef.current)?.focus();
   }, [shared]);
 
   const handleShare = async () => {
     if (!canShare) return;
+    sharedJustNow.current = true;
     setShareState({ phase: 'sharing' });
     setShareState({ phase: 'done', outcome: await onShare(messageId) });
   };
@@ -47,20 +73,17 @@ const ShareToGroupChat: FC<{
     return (
       <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-white border-t border-[#D1C4E9]">
         <p id={statusId} ref={statusRef} role="status" tabIndex={-1} className="font-semibold focus:outline-none">
+          {/* The server posts the note in Private Chat; until it arrives, the status stays empty. */}
           {shared.status === 'alreadyPosted'
-            ? 'A post about this part of the talk is already in Group Chat.'
+            ? alreadyPostedNoteTexts?.[shared.messageId]
             : 'Shared to Group Chat, without your name.'}
         </p>
         {onOpenGroupChatPost && (
-          <button
+          <SeeItInGroupChatButton
             ref={seeItRef}
-            type="button"
             aria-describedby={statusId}
             onClick={() => onOpenGroupChatPost(shared.messageId)}
-            className="rounded-lg border border-[#C7D2FE] bg-[#F5F3FF] px-3 py-1.5 text-sm font-semibold text-[#312E81] hover:bg-[#EDE9FE]"
-          >
-            See it in Group Chat
-          </button>
+          />
         )}
       </div>
     );
@@ -94,6 +117,8 @@ export const UnpackExplanationMessage: FC<UnpackExplanationMessageProps> = ({
   message,
   onShareToGroupChat,
   onOpenGroupChatPost,
+  shareOutcome,
+  alreadyPostedNoteTexts,
 }) => {
   const botName = useBotName();
   const { quote, passage, whatTheyreSaying, whyItMatters, terms, destination } = message.body as UnpackExplanation;
@@ -143,7 +168,13 @@ export const UnpackExplanationMessage: FC<UnpackExplanationMessageProps> = ({
         )}
 
         {onShareToGroupChat && message.id && destination === 'privateChat' && (
-          <ShareToGroupChat messageId={message.id} onShare={onShareToGroupChat} onOpenGroupChatPost={onOpenGroupChatPost} />
+          <ShareToGroupChat
+            messageId={message.id}
+            onShare={onShareToGroupChat}
+            onOpenGroupChatPost={onOpenGroupChatPost}
+            earlierOutcome={shareOutcome}
+            alreadyPostedNoteTexts={alreadyPostedNoteTexts}
+          />
         )}
 
         <p className="px-4 py-2 bg-white border-t border-[#D1C4E9] text-xs text-gray-600">

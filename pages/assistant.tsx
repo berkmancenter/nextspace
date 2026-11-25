@@ -16,7 +16,7 @@ import {
   UnpackExplanation,
 } from '../types.internal';
 import { useConversationType, useSetBotName, useSetConversationType } from '../context/ConversationTypeContext';
-import { AuthType } from '../types.internal';
+import { AuthType, UnpackShareOutcome } from '../types.internal';
 import { trackConversationEvent, setUserId } from '../utils/analytics';
 import { Errors, ParamErrors, Transcript } from '../components/';
 import { NavigationBar } from '../components/NavigationBar';
@@ -302,8 +302,15 @@ export function EventAssistantRoom({
   useEffect(() => {
     if (activeTab !== 'assistant' && controlledMode?.kind === 'unpackFollowUp') setControlledMode(null);
   }, [activeTab, controlledMode]);
-  const shareUnpackCard = (messageId: string) =>
-    shareUnpackToGroupChat(router.query.conversationId as string, messageId, { transcriptPasscode, chatPasscode });
+  const [unpackShareOutcomes, setUnpackShareOutcomes] = useState<Record<string, UnpackShareOutcome>>({});
+  const shareUnpackCard = async (messageId: string) => {
+    const outcome = await shareUnpackToGroupChat(router.query.conversationId as string, messageId, {
+      transcriptPasscode,
+      chatPasscode,
+    });
+    setUnpackShareOutcomes((outcomes) => ({ ...outcomes, [messageId]: outcome }));
+    return outcome;
+  };
   const [groupChatFocusMessageId, setGroupChatFocusMessageId] = useState<string | null>(null);
   const clearGroupChatFocusMessage = useCallback(() => setGroupChatFocusMessageId(null), []);
   // A post that never loads, such as one deleted with the transcript, mustn't pull focus on a later visit.
@@ -312,8 +319,7 @@ export function EventAssistantRoom({
   }, [activeTab]);
   const openGroupChatPost = (messageId: string) => {
     handleTabChange('chat');
-    // A post hidden from the room, or already deleted, may never arrive, so only a loaded post is a target.
-    if (chatMessages.some((message) => message.id === messageId)) setGroupChatFocusMessageId(messageId);
+    setGroupChatFocusMessageId(messageId);
   };
   // Organizer's chosen destination for the bot's voice: 'zoom' means Recall's own Zoom-facing bot
   // speaks there, so the presentation view's bot presence panel must not also play audio — that's
@@ -1012,6 +1018,7 @@ export function EventAssistantRoom({
                           focusInputOnMount={focusPrivateChatInput}
                           onShareUnpackToGroupChat={unpackerOn ? shareUnpackCard : undefined}
                           onOpenGroupChatPost={openGroupChatPost}
+                          unpackShareOutcomes={unpackShareOutcomes}
                           messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
                           onMarkAsRead={(messageId) => {
                             setAssistantMessagesWithUnreadReplies((prev) => {

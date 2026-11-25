@@ -651,7 +651,7 @@ export interface WidenedPassage {
   quote: string;
 }
 
-export type UnpackRefusal = { error: true; status?: number; reason?: UnpackErrorReason };
+export type UnpackRefusal = { error: true; status?: number; reason?: UnpackErrorReason; message?: string };
 
 /** What SendData resolves to for an unpack request: the body, a refusal, or undefined when the request failed. */
 export type UnpackResponse = UnpackRefusal | Record<string, unknown> | undefined;
@@ -678,7 +678,7 @@ type UnpackShareResult = components['schemas']['UnpackShareResult'];
 /** messageId is the Group Chat post to link to: the new one, or the one that already explains the passage. */
 export type UnpackShareOutcome =
   | { ok: true; status: UnpackShareResult['status']; messageId: string }
-  | { ok: false; reason?: UnpackErrorReason };
+  | { ok: false; reason?: UnpackErrorReason; message?: string };
 
 export type UnpackShareState = { phase: 'idle' } | { phase: 'sharing' } | { phase: 'done'; outcome: UnpackShareOutcome };
 

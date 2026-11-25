@@ -295,7 +295,7 @@ describe('unpackFollowUpMode', () => {
     text: 'Plain-text copy',
   };
 
-  it('names the topic by the headline and puts the whole quote in front of the question', () => {
+  it('names the topic by the headline and puts a short quote in front of the question', () => {
     expect(unpackFollowUpMode(explanation)).toMatchObject({
       kind: 'unpackFollowUp',
       label: 'Asking about: Doctrinal half-life',
@@ -307,11 +307,29 @@ describe('unpackFollowUpMode', () => {
     expect(unpackFollowUpMode({ ...explanation, headline: undefined }).label).toBe('Asking about: "Precedent decays."');
   });
 
-  it('shortens a long quote in the topic but keeps it whole in the question', () => {
+  it('cuts a long quote at a word, in both the topic and the question', () => {
     const quote = `${'word '.repeat(30)}end.`;
+    const shortQuote = `${'word '.repeat(12).trimEnd()}...`;
+
     const mode = unpackFollowUpMode({ ...explanation, headline: undefined, quote });
 
-    expect(mode.label).toBe(`Asking about: "${quote.slice(0, 80).trimEnd()}…"`);
-    expect(mode.prefix).toContain(quote);
+    expect(mode.label).toBe(`Asking about: "${shortQuote}"`);
+    expect(mode.prefix).toBe(`Follow-up on the explanation of "${shortQuote}": `);
+  });
+
+  it('drops punctuation left at the cut before the "..."', () => {
+    const quote = 'Precedent carries the most weight in a few appeals courts, and then it fades.';
+
+    expect(unpackFollowUpMode({ ...explanation, quote }).prefix).toBe(
+      'Follow-up on the explanation of "Precedent carries the most weight in a few appeals courts...": ',
+    );
+  });
+
+  it('cuts a quote with no spaces at the character limit', () => {
+    const quote = 'x'.repeat(100);
+
+    expect(unpackFollowUpMode({ ...explanation, quote }).prefix).toBe(
+      `Follow-up on the explanation of "${'x'.repeat(60)}...": `,
+    );
   });
 });

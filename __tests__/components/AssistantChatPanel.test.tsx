@@ -30,9 +30,12 @@ jest.mock('../../components/messages', () => ({
     );
   },
   CatchUpSummaryMessage: ({ message }: any) => <div data-testid="catch-up-summary-message">{message.body.inShort}</div>,
-  UnpackExplanationMessage: ({ message }: any) => (
-    <div data-testid="unpack-explanation-message">{message.body.whatTheyreSaying}</div>
+  UnpackExplanationMessage: ({ message, alreadyPostedNoteTexts }: any) => (
+    <div data-testid="unpack-explanation-message" data-note-texts={JSON.stringify(alreadyPostedNoteTexts ?? {})}>
+      {message.body.whatTheyreSaying}
+    </div>
   ),
+  UnpackAlreadyPostedMessage: ({ message }: any) => <div data-testid="unpack-already-posted">{message.body.text}</div>,
 }));
 
 // Mock ModSuggestButton so we can inspect submitted/onSubmit props
@@ -2114,6 +2117,21 @@ describe('AssistantChatPanel', () => {
         'The speaker says courts give phone records less protection.',
       );
       expect(screen.queryByTestId('assistant-message')).not.toBeInTheDocument();
+    });
+
+    it('hands the card the text of each note saying a post is already in Group Chat', () => {
+      const note = {
+        ...unpackExplanation,
+        id: 'note-1',
+        body: { type: 'unpack_already_posted', groupChatMessageId: 'post-0', text: 'Already in Group Chat.' },
+      };
+
+      render(<AssistantChatPanel {...baseProps} messages={[unpackExplanation, note]} />);
+
+      expect(screen.getByTestId('unpack-explanation-message')).toHaveAttribute(
+        'data-note-texts',
+        JSON.stringify({ 'post-0': 'Already in Group Chat.' }),
+      );
     });
 
     it('leaves a Catch me up answer out of the passage card', () => {

@@ -16,6 +16,7 @@ import {
   ControlledInputConfig,
   PseudonymousMessage,
   FeedbackConfig,
+  UnpackAlreadyPosted,
   UnpackExplanation,
   UnpackShareOutcome,
 } from '../types.internal';
@@ -61,6 +62,8 @@ interface AssistantChatPanelProps {
   onShareUnpackToGroupChat?: (messageId: string) => Promise<UnpackShareOutcome>;
   /** Opens Group Chat at a post, from a card that was shared or a note that it was already explained. */
   onOpenGroupChatPost?: (messageId: string) => void;
+  /** Earlier share outcomes by card message ID, kept by the page so they outlast this panel. */
+  unpackShareOutcomes?: Record<string, UnpackShareOutcome>;
 }
 
 export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
@@ -87,12 +90,22 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   focusInputOnMount = false,
   onShareUnpackToGroupChat,
   onOpenGroupChatPost,
+  unpackShareOutcomes,
 }) => {
   const [inputFocusRequest, setInputFocusRequest] = useState(0);
   const transcriptChunksById = useMemo(
     () => new Map(transcriptChunks.map((chunk) => [chunk.id, chunk])),
     [transcriptChunks],
   );
+  const alreadyPostedNoteTexts = useMemo(() => {
+    const texts: Record<string, string> = {};
+    messages.forEach((message) => {
+      if (message.body?.type !== 'unpack_already_posted') return;
+      const note = message.body as UnpackAlreadyPosted;
+      texts[note.groupChatMessageId] = note.text;
+    });
+    return texts;
+  }, [messages]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [inputHidden, setInputHidden] = useState(false);
   const theme = useTheme();
@@ -359,6 +372,8 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
           message={msg}
           onShareToGroupChat={inactive ? undefined : onShareUnpackToGroupChat}
           onOpenGroupChatPost={onOpenGroupChatPost}
+          shareOutcome={msg.id ? unpackShareOutcomes?.[msg.id] : undefined}
+          alreadyPostedNoteTexts={alreadyPostedNoteTexts}
         />
       );
     }

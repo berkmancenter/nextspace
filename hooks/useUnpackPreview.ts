@@ -104,7 +104,7 @@ export async function shareUnpackToGroupChat(
   );
   if (!response || isRefusal(response)) {
     logFailure('share', { conversationId, messageId }, response);
-    return { ok: false, reason: response?.reason };
+    return { ok: false, reason: response?.reason, message: response?.message };
   }
   return {
     ok: true,
