@@ -315,6 +315,14 @@ const mockConfig = {
           ],
         },
         {
+          name: 'unpacker',
+          label: 'Unpacker',
+          description: 'Lets participants ask the assistant to explain what the speaker just said in plain language.',
+          userControlled: false,
+          default: false,
+          properties: [],
+        },
+        {
           name: 'mod',
           label: 'Submit to Moderator',
           description: 'Submit a private question to the moderator.',
@@ -1565,12 +1573,49 @@ describe('EventCreationForm Component', () => {
       expect(screen.getByText('Collective Voice')).toBeInTheDocument();
       expect(screen.getByText('Catalyst')).toBeInTheDocument();
       expect(screen.getByText('Reading Recommendations')).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: /unpacker/i })).not.toBeChecked();
 
       // Participant-facing features (userControlled: true) — should not appear
       expect(screen.queryByText('Submit to Moderator')).not.toBeInTheDocument();
       expect(screen.queryByText('Mind Map')).not.toBeInTheDocument();
       expect(screen.queryByText('Visual Response')).not.toBeInTheDocument();
       expect(screen.queryByText('Jargon Filter')).not.toBeInTheDocument();
+    });
+
+    it('saves the Unpacker as on when the organizer checks it', async () => {
+      const user = userEvent.setup();
+      (Request as jest.Mock).mockImplementation(
+        makeRequestMock({
+          id: 'conv-with-unpacker',
+          name: 'Test Event',
+          channels: [],
+          agents: [],
+          adapters: [],
+          conversationType: 'eventAssistantExtraTest',
+        }),
+      );
+      await act(async () => {
+        render(<EventCreationForm />);
+      });
+
+      await fillEventDetails('Test Event', 'https://huitstage.zoom.us/j/1234567890');
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('NextSpace'));
+      await user.click(screen.getByRole('checkbox', { name: /zoom/i }));
+      await user.click(screen.getByRole('radio', { name: /event assistant with additional features/i }));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Features'));
+      await user.click(screen.getByRole('checkbox', { name: /unpacker/i }));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('About the Speakers'));
+      await user.click(screen.getByRole('button', { name: /next/i }));
+      await waitFor(() => screen.getByText('Reading & Resources'));
+      await user.click(screen.getByRole('button', { name: /create conversation/i }));
+
+      await waitFor(() => {
+        const conversationCall = (Request as jest.Mock).mock.calls.find((call) => call[0] === 'conversations/from-type');
+        expect(conversationCall![1].features).toContainEqual({ name: 'unpacker', enabled: true, config: {} });
+      });
     });
 
     it('does not show Features section when conversationType has no features', async () => {
@@ -3254,6 +3299,7 @@ describe('EventCreationForm Component', () => {
                 { name: 'collectiveVoice', enabled: true, config: { minContributionInterval: 10 } },
                 { name: 'catalyst', enabled: true, config: { minContributionInterval: 10 } },
                 { name: 'librarian', enabled: true, config: { recommendationsPerInterval: 2 } },
+                { name: 'unpacker', enabled: false, config: {} },
                 { name: 'mod', enabled: true, config: {} },
                 { name: 'mindmap', enabled: false, config: {} },
                 { name: 'visual', enabled: true, config: {} },
