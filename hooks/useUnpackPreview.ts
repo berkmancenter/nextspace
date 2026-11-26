@@ -110,5 +110,6 @@ export async function shareUnpackToGroupChat(
     ok: true,
     status: response.status === 'alreadyPosted' ? 'alreadyPosted' : 'sent',
     messageId: String(response.messageId),
+    text: typeof response.text === 'string' ? response.text : undefined,
   };
 }

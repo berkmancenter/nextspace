@@ -227,12 +227,18 @@ describe('shareUnpackToGroupChat', () => {
   });
 
   it('points at the existing post when Group Chat already explains the passage', async () => {
-    mockSendData.mockResolvedValue({ askId: 'ask-1', status: 'alreadyPosted', messageId: 'post-0' });
+    mockSendData.mockResolvedValue({
+      askId: 'ask-1',
+      status: 'alreadyPosted',
+      messageId: 'post-0',
+      text: 'A post about this part of the talk is already in Group Chat.',
+    });
 
     expect(await shareUnpackToGroupChat('conv-1', 'card-1', sharePasscodes)).toEqual({
       ok: true,
       status: 'alreadyPosted',
       messageId: 'post-0',
+      text: 'A post about this part of the talk is already in Group Chat.',
     });
   });
 

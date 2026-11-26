@@ -184,13 +184,18 @@ describe('UnpackExplanationMessage', () => {
       expect(onOpenGroupChatPost).toHaveBeenCalledWith('post-1');
     });
 
-    it('shows a saved "already in Group Chat" share in the words of the note', () => {
+    it('shows a saved "already in Group Chat" share in the server\'s words', () => {
       render(
         <UnpackExplanationMessage
-          message={makeExplanationMessage({ groupChatShare: { status: 'alreadyPosted', messageId: 'post-0' } })}
+          message={makeExplanationMessage({
+            groupChatShare: {
+              status: 'alreadyPosted',
+              messageId: 'post-0',
+              text: 'Someone already shared this part of the talk.',
+            },
+          })}
           onShareToGroupChat={jest.fn()}
           onOpenGroupChatPost={jest.fn()}
-          alreadyPostedNoteTexts={{ 'post-0': 'Someone already shared this part of the talk.' }}
         />,
       );
 
@@ -212,32 +217,22 @@ describe('UnpackExplanationMessage', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('You can post to Group Chat once every 3 minutes.');
     });
 
-    it("says it's already in Group Chat in the words of the note the server posted", () => {
+    it("says it's already in Group Chat in the server's words", () => {
       render(
         <UnpackExplanationMessage
           message={makeExplanationMessage()}
           onShareToGroupChat={jest.fn()}
           onOpenGroupChatPost={jest.fn()}
-          shareOutcome={{ ok: true, status: 'alreadyPosted', messageId: 'post-0' }}
-          alreadyPostedNoteTexts={{ 'post-0': 'Someone already shared this part of the talk.' }}
+          shareOutcome={{
+            ok: true,
+            status: 'alreadyPosted',
+            messageId: 'post-0',
+            text: 'Someone already shared this part of the talk.',
+          }}
         />,
       );
 
       expect(screen.getByRole('status')).toHaveTextContent('Someone already shared this part of the talk.');
-    });
-
-    it('links to the existing post before the note arrives', () => {
-      render(
-        <UnpackExplanationMessage
-          message={makeExplanationMessage()}
-          onShareToGroupChat={jest.fn()}
-          onOpenGroupChatPost={jest.fn()}
-          shareOutcome={{ ok: true, status: 'alreadyPosted', messageId: 'post-0' }}
-        />,
-      );
-
-      expect(screen.getByRole('status')).toBeEmptyDOMElement();
-      expect(screen.getByRole('button', { name: 'See it in Group Chat' })).toBeInTheDocument();
     });
 
     it('shows a refusal from earlier', () => {

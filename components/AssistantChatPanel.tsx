@@ -8,7 +8,6 @@ import {
   JargonClarificationMessage,
   UnpackExplanationMessage,
   CatchUpSummaryMessage,
-  UnpackAlreadyPostedMessage,
 } from '../components/messages';
 import { MessageInput } from './MessageInput';
 import { SlashCommand, createSlashCommandEnhancer } from './enhancers/slashCommandEnhancer';
@@ -16,7 +15,6 @@ import {
   ControlledInputConfig,
   PseudonymousMessage,
   FeedbackConfig,
-  UnpackAlreadyPosted,
   UnpackExplanation,
   UnpackShareOutcome,
 } from '../types.internal';
@@ -97,15 +95,6 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
     () => new Map(transcriptChunks.map((chunk) => [chunk.id, chunk])),
     [transcriptChunks],
   );
-  const alreadyPostedNoteTexts = useMemo(() => {
-    const texts: Record<string, string> = {};
-    messages.forEach((message) => {
-      if (message.body?.type !== 'unpack_already_posted') return;
-      const note = message.body as UnpackAlreadyPosted;
-      texts[note.groupChatMessageId] = note.text;
-    });
-    return texts;
-  }, [messages]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [inputHidden, setInputHidden] = useState(false);
   const theme = useTheme();
@@ -373,13 +362,8 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
           onShareToGroupChat={inactive ? undefined : onShareUnpackToGroupChat}
           onOpenGroupChatPost={onOpenGroupChatPost}
           shareOutcome={msg.id ? unpackShareOutcomes?.[msg.id] : undefined}
-          alreadyPostedNoteTexts={alreadyPostedNoteTexts}
         />
       );
-    }
-
-    if (messageType === 'unpack_already_posted') {
-      return <UnpackAlreadyPostedMessage message={msg} onOpenGroupChatPost={onOpenGroupChatPost} />;
     }
 
     // Assistant messages

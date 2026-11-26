@@ -10,7 +10,6 @@ export const INELIGIBLE_MESSAGE_TYPES = [
   'moderator_submitted',
   'moderator_declined',
   'catch_up_refused',
-  'unpack_already_posted',
 ] as const;
 
 /**

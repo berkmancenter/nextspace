@@ -91,14 +91,6 @@ describe('getFeedbackEligibleMessages', () => {
       expect(result.size).toBe(2);
     });
 
-    it('excludes notes that Group Chat already explained a passage', () => {
-      const messages = [createMessage('1', true), createMessage('2', true, 'unpack_already_posted')];
-
-      const result = getFeedbackEligibleMessages(messages, 1);
-
-      expect(result.has('2')).toBe(false);
-    });
-
     it('excludes moderator_declined messages', () => {
       const messages = [createMessage('1', true), createMessage('2', true, 'moderator_declined'), createMessage('3', true)];
 

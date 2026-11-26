@@ -175,22 +175,17 @@ jest.mock('../../components/messages', () => ({
     );
   },
   CatchUpSummaryMessage: ({ message }: any) => <div data-testid="catch-up-summary-message">{message.body.inShort}</div>,
-  UnpackExplanationMessage: ({ message, onShareToGroupChat, shareOutcome }: any) => (
+  UnpackExplanationMessage: ({ message, onShareToGroupChat, onOpenGroupChatPost, shareOutcome }: any) => (
     <div data-testid="unpack-explanation-message">
       {shareOutcome?.ok && <p>Shared earlier</p>}
+      {message.body.groupChatShare && (
+        <button type="button" onClick={() => onOpenGroupChatPost(message.body.groupChatShare.messageId)}>
+          See it in Group Chat
+        </button>
+      )}
       {onShareToGroupChat && (
         <button type="button" onClick={() => onShareToGroupChat(message.id)}>
           Share to Group Chat
-        </button>
-      )}
-    </div>
-  ),
-  UnpackAlreadyPostedMessage: ({ message, onOpenGroupChatPost }: any) => (
-    <div>
-      {message.body.text}
-      {onOpenGroupChatPost && (
-        <button type="button" onClick={() => onOpenGroupChatPost(message.body.groupChatMessageId)}>
-          See it in Group Chat
         </button>
       )}
     </div>
@@ -3234,14 +3229,19 @@ describe('EventAssistantRoom', () => {
       expect(await screen.findByText('Shared earlier')).toBeInTheDocument();
     });
 
-    it("opens Group Chat at the existing post from the note's link", async () => {
+    it("opens Group Chat at the existing post from a shared card's link", async () => {
       const user = userEvent.setup();
       await renderRoomWithPost();
       deliver(
-        fromBerkieInPrivateChat('note-1', {
-          type: 'unpack_already_posted',
-          groupChatMessageId: 'unpack-post-1',
-          text: 'A post about this part of the talk is already in Group Chat.',
+        fromBerkieInPrivateChat('card-1', {
+          ...unpackPost.body,
+          destination: 'privateChat',
+          footer: undefined,
+          groupChatShare: {
+            status: 'alreadyPosted',
+            messageId: 'unpack-post-1',
+            text: 'A post about this part of the talk is already in Group Chat.',
+          },
         }),
       );
       await user.click(screen.getAllByLabelText('Private Chat')[0]);
@@ -3298,10 +3298,15 @@ describe('EventAssistantRoom', () => {
       const user = userEvent.setup();
       await renderRoomWithPost();
       deliver(
-        fromBerkieInPrivateChat('note-1', {
-          type: 'unpack_already_posted',
-          groupChatMessageId: 'later-post',
-          text: 'A post about this part of the talk is already in Group Chat.',
+        fromBerkieInPrivateChat('card-1', {
+          ...unpackPost.body,
+          destination: 'privateChat',
+          footer: undefined,
+          groupChatShare: {
+            status: 'alreadyPosted',
+            messageId: 'later-post',
+            text: 'A post about this part of the talk is already in Group Chat.',
+          },
         }),
       );
       await user.click(screen.getAllByLabelText('Private Chat')[0]);

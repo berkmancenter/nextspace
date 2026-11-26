@@ -10,8 +10,6 @@ interface UnpackExplanationMessageProps extends MessageProps {
   onOpenGroupChatPost?: (messageId: string) => void;
   /** How an earlier share of this card went. The card is rebuilt on each tab switch, so the page keeps it. */
   shareOutcome?: UnpackShareOutcome;
-  /** The text of each "already in Group Chat" note, by the Group Chat post it links to. */
-  alreadyPostedNoteTexts?: Record<string, string>;
 }
 
 const headingClassName = 'text-xs font-semibold uppercase tracking-wider mb-1 text-mediumslateblue';
@@ -40,8 +38,7 @@ const ShareToGroupChat: FC<{
   onShare: (messageId: string) => Promise<UnpackShareOutcome>;
   onOpenGroupChatPost?: (messageId: string) => void;
   earlierOutcome?: UnpackShareOutcome;
-  alreadyPostedNoteTexts?: Record<string, string>;
-}> = ({ messageId, onShare, onOpenGroupChatPost, earlierOutcome, alreadyPostedNoteTexts }) => {
+}> = ({ messageId, onShare, onOpenGroupChatPost, earlierOutcome }) => {
   const botName = useBotName();
   const hintId = useId();
   const statusId = useId();
@@ -73,8 +70,7 @@ const ShareToGroupChat: FC<{
     return (
       <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-white border-t border-[#D1C4E9]">
         <p id={statusId} ref={statusRef} role="status" tabIndex={-1} className="font-semibold focus:outline-none">
-          {/* The server posts the note in Private Chat; until it arrives, the status stays empty. */}
-          {shared.status === 'alreadyPosted' ? alreadyPostedNoteTexts?.[shared.messageId] : 'Shared to Group Chat.'}
+          {shared.status === 'alreadyPosted' ? shared.text : 'Shared to Group Chat.'}
         </p>
         {onOpenGroupChatPost && (
           <SeeItInGroupChatButton
@@ -116,7 +112,6 @@ export const UnpackExplanationMessage: FC<UnpackExplanationMessageProps> = ({
   onShareToGroupChat,
   onOpenGroupChatPost,
   shareOutcome,
-  alreadyPostedNoteTexts,
 }) => {
   const botName = useBotName();
   const { quote, passage, whatTheyreSaying, whyItMatters, terms, destination, groupChatShare } =
@@ -175,7 +170,6 @@ export const UnpackExplanationMessage: FC<UnpackExplanationMessageProps> = ({
             onShare={onShareToGroupChat}
             onOpenGroupChatPost={onOpenGroupChatPost}
             earlierOutcome={earlierShareOutcome}
-            alreadyPostedNoteTexts={alreadyPostedNoteTexts}
           />
         )}
 

@@ -3350,7 +3350,7 @@
             }
           },
           "400": {
-            "description": "Bad request - conversation locked or validation error. Also refused: a `json` body whose `type` is an Unpacker card (`unpack_explanation`, `catch_up_summary` or `unpack_already_posted`), since clients draw those as cards and only the server may post them.",
+            "description": "Bad request - conversation locked or validation error. Also refused: a `json` body whose `type` is an Unpacker card (`unpack_explanation` or `catch_up_summary`), since clients draw those as cards and only the server may post them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5410,7 +5410,7 @@
     "/unpack/{conversationId}/share": {
       "post": {
         "summary": "Share a Private Chat explanation card to Group Chat",
-        "description": "Posts a copy of one of the participant's own `unpack_explanation` cards from Private Chat to Group Chat, as the participant's own message under their pseudonym (`fromAgent` is false). The copy is the card as the participant saw it, with `destination: groupChat` and a `footer` saying the explanation came from the assistant. Agents don't evaluate or answer it. If a moderator has hidden the participant, the post is hidden from the room like their other messages, the participant still sees it, and it doesn't stop anyone else posting the passage. Clearing the transcript deletes these posts, and open clients get a `message:deleted` event with their IDs. Group Chat never gets two posts about the same transcript: if a post already covers any chunk of this passage, nothing is posted, the answer is `status: alreadyPosted` with that post's message ID, and the assistant sends the participant one UnpackAlreadyPosted note in Private Chat per existing post. If that post is still being made, the call waits for it, and answers unpackFailed (503) if it isn't done in 10 seconds. Sharing a card that was already posted from the same card answers `status: sent` with the existing post's ID. Each participant can post to Group Chat once every 2 minutes per event, counted from their last post that went through; an alreadyPosted answer doesn't count. A share during the pre-event window, when participants can join before the event starts, is refused with eventNotStarted, and a share after the event ends is refused with eventEnded.\n",
+        "description": "Posts a copy of one of the participant's own `unpack_explanation` cards from Private Chat to Group Chat, as the participant's own message under their pseudonym (`fromAgent` is false). The copy is the card as the participant saw it, with `destination: groupChat` and a `footer` saying the explanation came from the assistant. Agents don't evaluate or answer it. If a moderator has hidden the participant, the post is hidden from the room like their other messages, the participant still sees it, and it doesn't stop anyone else posting the passage. Clearing the transcript deletes these posts, and open clients get a `message:deleted` event with their IDs. Group Chat never gets two posts about the same transcript: if a post already covers any chunk of this passage, nothing is posted, the answer is `status: alreadyPosted` with that post's message ID and the `text` to show. If that post is still being made, the call waits for it, and answers unpackFailed (503) if it isn't done in 10 seconds. Every 202 answer is also saved on the participant's card as `groupChatShare`. Sharing a card that was already posted from the same card answers `status: sent` with the existing post's ID. Each participant can post to Group Chat once every 2 minutes per event, counted from their last post that went through; an alreadyPosted answer doesn't count. A share during the pre-event window, when participants can join before the event starts, is refused with eventNotStarted, and a share after the event ends is refused with eventEnded.\n",
         "tags": [
           "Unpack"
         ],
@@ -6941,37 +6941,16 @@
               "messageId": {
                 "type": "string",
                 "description": "ID of the Group Chat post, the same as the share call's messageId."
+              },
+              "text": {
+                "type": "string",
+                "description": "Present when status is alreadyPosted. The text to show, \"A post about this part of the talk is already in Group Chat.\""
               }
             }
           },
           "text": {
             "type": "string",
             "description": "Plain-text version of all sections, for chat history and clients that can't render the card. Ends with the footer when there is one."
-          }
-        }
-      },
-      "UnpackAlreadyPosted": {
-        "type": "object",
-        "description": "Message body (bodyType \"json\") the event assistant posts in a participant's Private Chat when they share a passage that Group Chat already has a post about. Nothing new is posted to Group Chat.",
-        "required": [
-          "type",
-          "groupChatMessageId",
-          "text"
-        ],
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": [
-              "unpack_already_posted"
-            ]
-          },
-          "groupChatMessageId": {
-            "type": "string",
-            "description": "ID of the existing Group Chat post (in the chat channel) to link to."
-          },
-          "text": {
-            "type": "string",
-            "description": "The note to show, \"A post about this part of the talk is already in Group Chat.\""
           }
         }
       },
@@ -7273,11 +7252,15 @@
               "sent",
               "alreadyPosted"
             ],
-            "description": "sent, the card was posted to Group Chat, now or by an earlier share of the same card. alreadyPosted, a Group Chat post already covers part of this passage, so nothing was posted and the participant got an UnpackAlreadyPosted note in Private Chat."
+            "description": "sent, the card was posted to Group Chat, now or by an earlier share of the same card. alreadyPosted, a Group Chat post already covers part of this passage, so nothing was posted."
           },
           "messageId": {
             "type": "string",
             "description": "ID of the Group Chat post, the new one when sent and the existing one when alreadyPosted."
+          },
+          "text": {
+            "type": "string",
+            "description": "Present when status is alreadyPosted. The text to show, \"A post about this part of the talk is already in Group Chat.\""
           }
         }
       },

@@ -680,12 +680,10 @@ type UnpackShareResult = components['schemas']['UnpackShareResult'];
 
 /** messageId is the Group Chat post to link to: the new one, or the one that already explains the passage. */
 export type UnpackShareOutcome =
-  | { ok: true; status: UnpackShareResult['status']; messageId: string }
+  | { ok: true; status: UnpackShareResult['status']; messageId: string; text?: string }
   | { ok: false; reason?: UnpackErrorReason; message?: string };
 
 export type UnpackShareState = { phase: 'idle' } | { phase: 'sharing' } | { phase: 'done'; outcome: UnpackShareOutcome };
-
-export type UnpackAlreadyPosted = components['schemas']['UnpackAlreadyPosted'];
 
 /** Where a browser selection starts and ends, for telling whether a press changed it. */
 export type SelectionEnds = Pick<Selection, 'anchorNode' | 'anchorOffset' | 'focusNode' | 'focusOffset'>;
