@@ -5,7 +5,6 @@ import {
   passageKey,
   previewOpening,
   unpackErrorCopy,
-  unpackFollowUpMode,
   widenSelection,
   UNPACK_MAX_PASSAGE_CHARACTERS,
 } from '../../utils/unpackPassage';
@@ -277,59 +276,5 @@ describe('unpackErrorCopy', () => {
       canRetry: false,
       canSend: false,
     });
-  });
-});
-
-describe('unpackFollowUpMode', () => {
-  const explanation: UnpackExplanation = {
-    type: 'unpack_explanation',
-    mode: 'passage',
-    destination: 'groupChat',
-    chunkIds: ['chunk-1'],
-    passage: { start: '2025-10-17T10:43:00Z', end: '2025-10-17T10:43:20Z' },
-    quote: 'Precedent decays.',
-    whatTheyreSaying: 'Rulings fade.',
-    whyItMatters: 'Lower courts lean on a few rulings.',
-    terms: [],
-    headline: 'Doctrinal half-life',
-    text: 'Plain-text copy',
-  };
-
-  it('names the topic by the headline and puts a short quote in front of the question', () => {
-    expect(unpackFollowUpMode(explanation)).toMatchObject({
-      kind: 'unpackFollowUp',
-      label: 'Asking about: Doctrinal half-life',
-      prefix: 'Follow-up on the explanation of "Precedent decays.": ',
-    });
-  });
-
-  it('names the topic by the quote when there is no headline', () => {
-    expect(unpackFollowUpMode({ ...explanation, headline: undefined }).label).toBe('Asking about: "Precedent decays."');
-  });
-
-  it('cuts a long quote at a word, in both the topic and the question', () => {
-    const quote = `${'word '.repeat(30)}end.`;
-    const shortQuote = `${'word '.repeat(12).trimEnd()}...`;
-
-    const mode = unpackFollowUpMode({ ...explanation, headline: undefined, quote });
-
-    expect(mode.label).toBe(`Asking about: "${shortQuote}"`);
-    expect(mode.prefix).toBe(`Follow-up on the explanation of "${shortQuote}": `);
-  });
-
-  it('drops punctuation left at the cut before the "..."', () => {
-    const quote = 'Precedent carries the most weight in a few appeals courts, and then it fades.';
-
-    expect(unpackFollowUpMode({ ...explanation, quote }).prefix).toBe(
-      'Follow-up on the explanation of "Precedent carries the most weight in a few appeals courts...": ',
-    );
-  });
-
-  it('cuts a quote with no spaces at the character limit', () => {
-    const quote = 'x'.repeat(100);
-
-    expect(unpackFollowUpMode({ ...explanation, quote }).prefix).toBe(
-      `Follow-up on the explanation of "${'x'.repeat(60)}...": `,
-    );
   });
 });

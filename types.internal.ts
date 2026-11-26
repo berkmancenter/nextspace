@@ -229,8 +229,6 @@ export interface ControlledInputConfig {
   prefix: string;
   icon: React.ReactNode;
   label: string;
-  /** Leave out for feedback, which gets no reply. A follow-up question waits for the assistant's answer. */
-  kind?: 'unpackFollowUp';
 }
 
 /**

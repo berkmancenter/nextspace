@@ -7,7 +7,7 @@ import { ThreadedMessage } from './ThreadedMessage';
 import { ThreadPanel } from './ThreadPanel';
 import type { MessageModeration } from './ModerationControls';
 import { UserMessage } from './messages/UserMessage';
-import { PseudonymousMessage, ControlledInputConfig, FeedbackConfig, UnpackExplanation } from '../types.internal';
+import { PseudonymousMessage, ControlledInputConfig, FeedbackConfig } from '../types.internal';
 import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { useOpenThread } from '../hooks/useOpenThread';
@@ -156,8 +156,6 @@ interface GroupChatPanelProps {
   moderation?: MessageModeration;
   /** ISO timestamp for the pre-event countdown banner; omit once the event has started. */
   eventScheduledTime?: string | null;
-  /** Opens Private Chat to ask about an Unpacker post. Leave out to hide "Ask a follow-up privately". */
-  onAskUnpackFollowUp?: (explanation: UnpackExplanation) => void;
   /** A post to scroll to and focus once it has loaded, such as one a Private Chat note links to. */
   focusMessageId?: string | null;
   /** Called once the post in focusMessageId has been scrolled to, so the same link can be followed again. */
@@ -185,7 +183,6 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
   isAdmin = false,
   moderation,
   eventScheduledTime,
-  onAskUnpackFollowUp,
   focusMessageId,
   onFocusMessageHandled,
 }) => {
@@ -313,12 +310,7 @@ export const GroupChatPanel: FC<GroupChatPanelProps> = ({
 
     // Participants share these too. Only the server can post this body type, so the author doesn't matter.
     if (parsed.type === 'unpack_explanation') {
-      return (
-        <GroupChatUnpackCard
-          message={{ ...message, body: rawBody }}
-          onAskFollowUp={inactive || presentation ? undefined : onAskUnpackFollowUp}
-        />
-      );
+      return <GroupChatUnpackCard message={{ ...message, body: rawBody }} />;
     }
 
     // User messages - use UserMessage component

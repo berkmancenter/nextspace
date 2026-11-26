@@ -1,25 +1,18 @@
-import { FC, useId, useState } from 'react';
+import { FC, useId } from 'react';
 import { Share } from '@mui/icons-material';
 import { PseudonymousMessage, UnpackExplanation } from '../../types.internal';
 
 interface GroupChatUnpackCardProps {
   message: PseudonymousMessage;
-  /** Leave out where a participant can't ask the assistant anything, which hides the follow-up button. */
-  onAskFollowUp?: (explanation: UnpackExplanation) => void;
 }
-
-const buttonClassName =
-  'rounded-lg border border-[#C7D2FE] bg-white px-[13px] py-2 text-[13px] font-semibold text-[#312E81] hover:bg-[#F5F3FF]';
 
 export const groupChatMessageElementId = (messageId: string) => `group-chat-message-${messageId}`;
 
-export const GroupChatUnpackCard: FC<GroupChatUnpackCardProps> = ({ message, onAskFollowUp }) => {
+export const GroupChatUnpackCard: FC<GroupChatUnpackCardProps> = ({ message }) => {
   const explanation = message.body as UnpackExplanation;
   const { headline, quote, whatTheyreSaying, whyItMatters, footer } = explanation;
-  const [whyItMattersOpen, setWhyItMattersOpen] = useState(false);
   const labelId = useId();
   const headlineId = useId();
-  const whyItMattersId = useId();
 
   return (
     <div className="flex w-full max-w-[560px] flex-col gap-1.5">
@@ -49,24 +42,15 @@ export const GroupChatUnpackCard: FC<GroupChatUnpackCardProps> = ({ message, onA
           <p className="m-0 text-sm leading-[1.55]">{whatTheyreSaying}</p>
         </section>
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            aria-expanded={whyItMattersOpen}
-            aria-controls={whyItMattersId}
-            onClick={() => setWhyItMattersOpen((open) => !open)}
-            className={buttonClassName}
-          >
+        <details className="group rounded-lg border border-[#C7D2FE] bg-white">
+          <summary className="cursor-pointer list-none px-[13px] py-2 text-[13px] font-semibold text-[#312E81] hover:bg-[#F5F3FF] [&::-webkit-details-marker]:hidden">
+            <span aria-hidden="true" className="mr-1.5 inline-block transition-transform group-open:rotate-90">
+              ›
+            </span>
             Why it matters
-          </button>
-          {onAskFollowUp && (
-            <button type="button" onClick={() => onAskFollowUp(explanation)} className={buttonClassName}>
-              Ask a follow-up privately
-            </button>
-          )}
-        </div>
-        {/* Stays on the page while closed so aria-controls always points at something. */}
-        <div id={whyItMattersId}>{whyItMattersOpen && <p className="m-0 text-sm leading-[1.55]">{whyItMatters}</p>}</div>
+          </summary>
+          <p className="m-0 px-[13px] pb-3 text-sm leading-[1.55]">{whyItMatters}</p>
+        </details>
       </article>
 
       {footer && (

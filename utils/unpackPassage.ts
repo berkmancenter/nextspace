@@ -1,12 +1,4 @@
-import {
-  ControlledInputConfig,
-  TranscriptChunkText,
-  UnpackErrorCopy,
-  UnpackErrorReason,
-  UnpackExplanation,
-  UnpackSelection,
-  WidenedPassage,
-} from '../types.internal';
+import { TranscriptChunkText, UnpackErrorCopy, UnpackErrorReason, UnpackSelection, WidenedPassage } from '../types.internal';
 
 /** Matches the server's limit (llm_engine UNPACK_PASSAGE_MAX_CHARACTERS) on the widened quote. */
 export const UNPACK_MAX_PASSAGE_CHARACTERS = 2000;
@@ -219,26 +211,4 @@ export function unpackShareErrorCopy(
     };
   }
   return unpackErrorCopy(reason, botName);
-}
-
-/** How much of the quote a follow-up carries. The participant's message holds it, so it stays short. */
-const FOLLOW_UP_QUOTE_MAX_CHARACTERS = 60;
-
-function shortenQuote(quote: string): string {
-  if (quote.length <= FOLLOW_UP_QUOTE_MAX_CHARACTERS) return quote;
-  const upToLimit = quote.slice(0, FOLLOW_UP_QUOTE_MAX_CHARACTERS + 1);
-  const lastSpace = upToLimit.lastIndexOf(' ');
-  const cut = lastSpace > 0 ? upToLimit.slice(0, lastSpace) : quote.slice(0, FOLLOW_UP_QUOTE_MAX_CHARACTERS);
-  return `${cut.trimEnd().replace(/[\s,;:.!?]+$/, '')}...`;
-}
-
-export function unpackFollowUpMode({ headline, quote }: UnpackExplanation): ControlledInputConfig {
-  const shortQuote = shortenQuote(quote);
-  return {
-    kind: 'unpackFollowUp',
-    icon: null,
-    label: `Asking about: ${headline ?? `"${shortQuote}"`}`,
-    // The assistant only sees the text, so the question carries the passage it is about.
-    prefix: `Follow-up on the explanation of "${shortQuote}": `,
-  };
 }

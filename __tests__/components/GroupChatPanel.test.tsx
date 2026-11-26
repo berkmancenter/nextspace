@@ -2587,25 +2587,6 @@ describe('GroupChatPanel', () => {
       expect(screen.getByRole('article', { name: 'What the speaker meant by "doctrinal half-life"' })).toBeInTheDocument();
     });
 
-    it('passes the explanation on when a participant asks a follow-up', async () => {
-      const user = userEvent.setup();
-      const onAskUnpackFollowUp = jest.fn();
-      render(<GroupChatPanel {...baseProps} messages={[unpackPost]} onAskUnpackFollowUp={onAskUnpackFollowUp} />);
-
-      await user.click(screen.getByRole('button', { name: 'Ask a follow-up privately' }));
-
-      expect(onAskUnpackFollowUp).toHaveBeenCalledWith(expect.objectContaining({ quote: unpackPost.body.quote }));
-    });
-
-    it.each([
-      ['the event is over', { inactive: true }],
-      ['the page is on the shared screen', { presentation: true }],
-    ])('offers no follow-up when %s', (_, props) => {
-      render(<GroupChatPanel {...baseProps} {...props} messages={[unpackPost]} onAskUnpackFollowUp={jest.fn()} />);
-
-      expect(screen.queryByRole('button', { name: 'Ask a follow-up privately' })).not.toBeInTheDocument();
-    });
-
     it('scrolls to and focuses the post a Private Chat link points at, then reports it done', async () => {
       const onFocusMessageHandled = jest.fn();
       render(

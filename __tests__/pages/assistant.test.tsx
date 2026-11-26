@@ -3201,60 +3201,6 @@ describe('EventAssistantRoom', () => {
     const sentMessageBodies = () =>
       (SendData as jest.Mock).mock.calls.filter(([path]) => path === 'messages').map(([, data]) => data);
 
-    it('opens Private Chat with the topic above a focused message box', async () => {
-      const user = userEvent.setup();
-      await renderRoomWithPost();
-
-      await user.click(screen.getByRole('button', { name: 'Ask a follow-up privately' }));
-
-      const input = await screen.findByPlaceholderText('Enter your message here');
-      expect(screen.getByText('Asking about: Where precedent gets its weight')).toBeInTheDocument();
-      await waitFor(() => expect(input).toHaveFocus());
-    });
-
-    it('sends the question to Private Chat with the passage it is about, and waits for the reply', async () => {
-      const user = userEvent.setup();
-      await renderRoomWithPost();
-      await user.click(screen.getByRole('button', { name: 'Ask a follow-up privately' }));
-      const input = await screen.findByPlaceholderText('Enter your message here');
-
-      await user.type(input, 'Which circuits?{Enter}');
-
-      await waitFor(() =>
-        expect(sentMessageBodies()).toContainEqual(
-          expect.objectContaining({
-            body: 'Follow-up on the explanation of "Precedential weight concentrates in a few circuits.": Which circuits?',
-            channels: [expect.objectContaining({ name: 'direct-user-123-agent-123' })],
-          }),
-        ),
-      );
-      expect(trackConversationEvent).toHaveBeenCalledWith(
-        'a1b2c3d4e5f6a1b2c3d4e5f6',
-        'assistant',
-        'unpack_follow_up_sent',
-        'groupChatCard',
-      );
-      expect(trackConversationEvent).not.toHaveBeenCalledWith(
-        expect.anything(),
-        expect.anything(),
-        'feedback_sent',
-        expect.anything(),
-      );
-      expect(screen.queryByText('Asking about: Where precedent gets its weight')).not.toBeInTheDocument();
-    });
-
-    it('drops the topic when the participant goes back to Group Chat, so nothing private is posted there', async () => {
-      const user = userEvent.setup();
-      await renderRoomWithPost();
-      await user.click(screen.getByRole('button', { name: 'Ask a follow-up privately' }));
-      await screen.findByPlaceholderText('Enter your message here');
-
-      await user.click(screen.getAllByLabelText('Group Chat')[0]);
-      await screen.findByRole('article', { name: 'Where precedent gets its weight' });
-
-      expect(screen.queryByText(/Asking about:/)).not.toBeInTheDocument();
-    });
-
     it('shares a Private Chat card through the share call, with the transcript and Group Chat passcodes', async () => {
       const user = userEvent.setup();
       await renderRoomWithPost();

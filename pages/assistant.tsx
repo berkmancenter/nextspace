@@ -8,13 +8,7 @@ import { ResourcesPanel } from '../components/ResourcesPanel';
 import { SlashCommand } from '../components/enhancers/slashCommandEnhancer';
 import { Api, RetrieveData, SendData, emitWithTokenRefresh, buildDirectChannels } from '../utils';
 import { components } from '../types';
-import {
-  CatchUpNotice,
-  ControlledInputConfig,
-  PseudonymousMessage,
-  FeedbackConfig,
-  UnpackExplanation,
-} from '../types.internal';
+import { CatchUpNotice, ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
 import { useConversationType, useSetBotName, useSetConversationType } from '../context/ConversationTypeContext';
 import { AuthType, UnpackShareOutcome } from '../types.internal';
 import { trackConversationEvent, setUserId } from '../utils/analytics';
@@ -28,7 +22,7 @@ import { getFeedbackEligibleMessages } from '../utils/feedbackEligibility';
 import { CheckAuthHeader, isFeatureEnabled, parseMessageBody } from '../utils/Helpers';
 import { withStoredChannels } from '../utils/presentationChannels';
 import { buildCatchUpRequest, pickCatchUpChunks } from '../utils/catchUp';
-import { unpackErrorCopy, unpackFollowUpMode } from '../utils/unpackPassage';
+import { unpackErrorCopy } from '../utils/unpackPassage';
 import { shareUnpackToGroupChat } from '../hooks/useUnpackPreview';
 import TokenManagerDefault from '../utils/TokenManager';
 import { Alert, Button, Dialog, Snackbar } from '@mui/material';
@@ -294,14 +288,6 @@ export function EventAssistantRoom({
     setFocusPrivateChatInput(true);
     handleTabChange('assistant');
   };
-  const askUnpackFollowUp = (explanation: UnpackExplanation) => {
-    setControlledMode(unpackFollowUpMode(explanation));
-    openPrivateChatFromUnpacker();
-  };
-  // A follow-up's prefix is for Private Chat; carried to another tab it would post the question in public.
-  useEffect(() => {
-    if (activeTab !== 'assistant' && controlledMode?.kind === 'unpackFollowUp') setControlledMode(null);
-  }, [activeTab, controlledMode]);
   const [unpackShareOutcomes, setUnpackShareOutcomes] = useState<Record<string, UnpackShareOutcome>>({});
   const shareUnpackCard = async (messageId: string) => {
     const outcome = await shareUnpackToGroupChat(router.query.conversationId as string, messageId, {
@@ -630,8 +616,6 @@ export function EventAssistantRoom({
       if (message.startsWith('/')) {
         const commandName = message.split(' ')[0].substring(1).split('|')[0];
         trackConversationEvent(conversationId, 'assistant', 'command_sent', commandName);
-      } else if (controlledMode?.kind === 'unpackFollowUp') {
-        trackConversationEvent(conversationId, 'assistant', 'unpack_follow_up_sent', 'groupChatCard');
       } else if (controlledMode) {
         trackConversationEvent(conversationId, 'assistant', 'feedback_sent', controlledMode.label);
       } else {
@@ -640,8 +624,7 @@ export function EventAssistantRoom({
     }
 
     const isModeratorCommand = finalMessage.trimStart().startsWith('/escalate ') || finalMessage.trim() === '/mod';
-    const awaitsReply = !controlledMode || controlledMode.kind === 'unpackFollowUp';
-    if (shouldWaitForResponse && awaitsReply && !isModeratorCommand) {
+    if (shouldWaitForResponse && !controlledMode && !isModeratorCommand) {
       if (effectiveTab === 'assistant') {
         setWaitingForResponse(true);
       } else if (effectiveTab === 'chat') {
@@ -977,7 +960,6 @@ export function EventAssistantRoom({
                           isAdmin={isAdmin}
                           moderation={moderation}
                           eventScheduledTime={groupChatChannelName === 'pregame' ? eventScheduledTime : null}
-                          onAskUnpackFollowUp={agentActive ? askUnpackFollowUp : undefined}
                           focusMessageId={groupChatFocusMessageId}
                           onFocusMessageHandled={clearGroupChatFocusMessage}
                         />

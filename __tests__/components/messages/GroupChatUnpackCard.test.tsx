@@ -53,52 +53,24 @@ describe('GroupChatUnpackCard', () => {
     expect(screen.getByText(explanation.whatTheyreSaying)).toBeInTheDocument();
   });
 
-  it('keeps why it matters closed until the button opens it in place', async () => {
+  it('keeps why it matters in a collapsed section until it is opened', async () => {
     const user = userEvent.setup();
     render(<GroupChatUnpackCard message={makeMessage()} />);
-    const toggle = screen.getByRole('button', { name: 'Why it matters' });
+    const section = screen.getByText('Why it matters').closest('details')!;
 
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByText(explanation.whyItMatters)).not.toBeInTheDocument();
+    expect(section).not.toHaveAttribute('open');
+    expect(screen.getByText(explanation.whyItMatters)).not.toBeVisible();
 
-    await user.click(toggle);
+    await user.click(screen.getByText('Why it matters'));
 
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(toggle).toHaveFocus();
-    expect(screen.getByText(explanation.whyItMatters)).toBeInTheDocument();
-    expect(document.getElementById(toggle.getAttribute('aria-controls')!)).toHaveTextContent(explanation.whyItMatters);
-
-    await user.click(toggle);
-
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByText(explanation.whyItMatters)).not.toBeInTheDocument();
+    expect(section).toHaveAttribute('open');
+    expect(screen.getByText(explanation.whyItMatters)).toBeVisible();
   });
 
-  it('opens why it matters from the keyboard', async () => {
-    const user = userEvent.setup();
+  it('offers no follow-up or other buttons', () => {
     render(<GroupChatUnpackCard message={makeMessage()} />);
 
-    await user.tab();
-    expect(screen.getByRole('button', { name: 'Why it matters' })).toHaveFocus();
-    await user.keyboard('{Enter}');
-
-    expect(screen.getByText(explanation.whyItMatters)).toBeInTheDocument();
-  });
-
-  it('hands the explanation to the follow-up handler when asked', async () => {
-    const user = userEvent.setup();
-    const onAskFollowUp = jest.fn();
-    render(<GroupChatUnpackCard message={makeMessage()} onAskFollowUp={onAskFollowUp} />);
-
-    await user.click(screen.getByRole('button', { name: 'Ask a follow-up privately' }));
-
-    expect(onAskFollowUp).toHaveBeenCalledWith(expect.objectContaining({ headline: explanation.headline }));
-  });
-
-  it('leaves out the follow-up button when there is nowhere to ask it', () => {
-    render(<GroupChatUnpackCard message={makeMessage()} />);
-
-    expect(screen.queryByRole('button', { name: 'Ask a follow-up privately' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('shows the footer the server sent, word for word', () => {
@@ -125,11 +97,11 @@ describe('GroupChatUnpackCard', () => {
 
   it('has no accessibility violations, closed or open', async () => {
     const user = userEvent.setup();
-    const { container } = render(<GroupChatUnpackCard message={makeMessage()} onAskFollowUp={jest.fn()} />);
+    const { container } = render(<GroupChatUnpackCard message={makeMessage()} />);
 
     expect(await axe(container)).toHaveNoViolations();
 
-    await user.click(screen.getByRole('button', { name: 'Why it matters' }));
+    await user.click(screen.getByText('Why it matters'));
 
     expect(await axe(container)).toHaveNoViolations();
   });
