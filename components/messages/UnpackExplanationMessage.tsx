@@ -1,4 +1,4 @@
-import { FC, forwardRef, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { FC, forwardRef, useEffect, useId, useRef, useState } from 'react';
 import { MessageProps, UnpackExplanation, UnpackShareOutcome, UnpackShareState } from '../../types.internal';
 import { useBotName } from '../../context/ConversationTypeContext';
 import { unpackShareErrorCopy } from '../../utils/unpackPassage';
@@ -39,14 +39,13 @@ const ShareToGroupChat: FC<{
   onOpenGroupChatPost?: (messageId: string) => void;
   earlierOutcome?: UnpackShareOutcome;
   sharingDisabled?: boolean;
-  /** Called when a share is refused for good and the button disappears, so focus has somewhere to go. */
-  onSharingClosed: () => void;
-}> = ({ messageId, onShare, onOpenGroupChatPost, earlierOutcome, sharingDisabled, onSharingClosed }) => {
+}> = ({ messageId, onShare, onOpenGroupChatPost, earlierOutcome, sharingDisabled }) => {
   const botName = useBotName();
   const hintId = useId();
   const statusId = useId();
   const statusRef = useRef<HTMLParagraphElement>(null);
   const seeItRef = useRef<HTMLButtonElement>(null);
+  const refusedRef = useRef<HTMLParagraphElement>(null);
   const [shareState, setShareState] = useState<UnpackShareState>(
     earlierOutcome ? { phase: 'done', outcome: earlierOutcome } : { phase: 'idle' },
   );
@@ -64,8 +63,8 @@ const ShareToGroupChat: FC<{
   }, [shared]);
 
   useEffect(() => {
-    if (refusedForGood && sharedJustNow.current) onSharingClosed();
-  }, [refusedForGood, onSharingClosed]);
+    if (refusedForGood && sharedJustNow.current) refusedRef.current?.focus();
+  }, [refusedForGood]);
 
   const handleShare = async () => {
     if (!canShare) return;
@@ -75,8 +74,13 @@ const ShareToGroupChat: FC<{
   };
 
   if (sharingDisabled || refusedForGood) {
-    if (!earlierOutcome?.ok) return null;
-    return <p className="px-4 py-3 bg-white border-t border-[#D1C4E9]">Sharing options are not enabled for this post.</p>;
+    // A card that was never shared and loaded without sharing just has no button; a click needs an answer.
+    if (!earlierOutcome?.ok && !refusedForGood) return null;
+    return (
+      <p ref={refusedRef} tabIndex={-1} className="px-4 py-3 bg-white border-t border-[#D1C4E9] focus:outline-none">
+        Sharing options are not enabled for this post.
+      </p>
+    );
   }
 
   if (shared) {
@@ -127,8 +131,6 @@ export const UnpackExplanationMessage: FC<UnpackExplanationMessageProps> = ({
   shareOutcome,
 }) => {
   const botName = useBotName();
-  const explanationRef = useRef<HTMLDivElement>(null);
-  const focusExplanation = useCallback(() => explanationRef.current?.focus(), []);
   const { quote, passage, whatTheyreSaying, whyItMatters, terms, destination, groupChatShare, sharingDisabled } =
     message.body as UnpackExplanation;
   // A share made on this visit is newer than what the card had when it loaded
@@ -146,8 +148,6 @@ export const UnpackExplanationMessage: FC<UnpackExplanationMessageProps> = ({
       </div>
 
       <div
-        ref={explanationRef}
-        tabIndex={-1}
         data-testid="unpack-explanation"
         className="w-full rounded-xl overflow-hidden shadow-sm border border-[#D1C4E9] text-sm text-gray-800"
       >
@@ -188,7 +188,6 @@ export const UnpackExplanationMessage: FC<UnpackExplanationMessageProps> = ({
             onOpenGroupChatPost={onOpenGroupChatPost}
             earlierOutcome={earlierShareOutcome}
             sharingDisabled={sharingDisabled}
-            onSharingClosed={focusExplanation}
           />
         )}
 

@@ -237,7 +237,7 @@ describe('UnpackExplanationMessage', () => {
       expect(screen.queryByRole('button')).not.toBeInTheDocument();
     });
 
-    it('removes the share button without a message when the server says sharing is not enabled', async () => {
+    it('says sharing is not enabled, in place of the button, when the server refuses the share for good', async () => {
       const user = userEvent.setup();
       renderShareable(
         jest.fn().mockResolvedValue({
@@ -250,8 +250,20 @@ describe('UnpackExplanationMessage', () => {
       await user.click(shareButton());
 
       await waitFor(() => expect(screen.queryByRole('button', { name: 'Share to Group Chat' })).not.toBeInTheDocument());
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-      expect(screen.getByTestId('unpack-explanation')).toHaveFocus();
+      expect(screen.getByText('Sharing options are not enabled for this post.')).toHaveFocus();
+    });
+
+    it('still says sharing is not enabled when the card is drawn again after that refusal', () => {
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage()}
+          onShareToGroupChat={jest.fn()}
+          shareOutcome={{ ok: false, reason: 'sharingDisabled' }}
+        />,
+      );
+
+      expect(screen.getByText('Sharing options are not enabled for this post.')).toBeInTheDocument();
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
     });
 
     it("shows the server's own words for the Group Chat time limit", async () => {
