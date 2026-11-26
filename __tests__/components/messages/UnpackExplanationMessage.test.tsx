@@ -202,6 +202,58 @@ describe('UnpackExplanationMessage', () => {
       expect(screen.getByRole('status')).toHaveTextContent('Someone already shared this part of the talk.');
     });
 
+    it("leaves out the share button, with no explanation, when the card's passage can't be shared", () => {
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage({ sharingDisabled: true })}
+          onShareToGroupChat={jest.fn()}
+          onOpenGroupChatPost={jest.fn()}
+        />,
+      );
+
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it("says sharing isn't enabled, with no link, when the card's earlier share can't be shown", () => {
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage({
+            sharingDisabled: true,
+            groupChatShare: {
+              status: 'alreadyPosted',
+              messageId: 'post-0',
+              text: 'A post about this part of the talk is already in Group Chat.',
+            },
+          })}
+          onShareToGroupChat={jest.fn()}
+          onOpenGroupChatPost={jest.fn()}
+        />,
+      );
+
+      expect(screen.getByText('Sharing options are not enabled for this post.')).toBeInTheDocument();
+      expect(screen.queryByText('A post about this part of the talk is already in Group Chat.')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    });
+
+    it('removes the share button without a message when the server says sharing is not enabled', async () => {
+      const user = userEvent.setup();
+      renderShareable(
+        jest.fn().mockResolvedValue({
+          ok: false,
+          reason: 'sharingDisabled',
+          message: 'Sharing options are not enabled for this post.',
+        }),
+      );
+
+      await user.click(shareButton());
+
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Share to Group Chat' })).not.toBeInTheDocument());
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.getByTestId('unpack-explanation')).toHaveFocus();
+    });
+
     it("shows the server's own words for the Group Chat time limit", async () => {
       const user = userEvent.setup();
       renderShareable(

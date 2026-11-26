@@ -1,4 +1,4 @@
-import { FC, forwardRef, useEffect, useId, useRef, useState } from 'react';
+import { FC, forwardRef, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { MessageProps, UnpackExplanation, UnpackShareOutcome, UnpackShareState } from '../../types.internal';
 import { useBotName } from '../../context/ConversationTypeContext';
 import { unpackShareErrorCopy } from '../../utils/unpackPassage';
@@ -38,7 +38,10 @@ const ShareToGroupChat: FC<{
   onShare: (messageId: string) => Promise<UnpackShareOutcome>;
   onOpenGroupChatPost?: (messageId: string) => void;
   earlierOutcome?: UnpackShareOutcome;
-}> = ({ messageId, onShare, onOpenGroupChatPost, earlierOutcome }) => {
+  sharingDisabled?: boolean;
+  /** Called when a share is refused for good and the button disappears, so focus has somewhere to go. */
+  onSharingClosed: () => void;
+}> = ({ messageId, onShare, onOpenGroupChatPost, earlierOutcome, sharingDisabled, onSharingClosed }) => {
   const botName = useBotName();
   const hintId = useId();
   const statusId = useId();
@@ -53,11 +56,16 @@ const ShareToGroupChat: FC<{
   const shared = outcome?.ok ? outcome : null;
   const errorCopy = outcome && !outcome.ok ? unpackShareErrorCopy(outcome.reason, botName, outcome.message) : null;
   const canShare = shareState.phase !== 'sharing' && (errorCopy?.canSend ?? true);
+  const refusedForGood = !!outcome && !outcome.ok && outcome.reason === 'sharingDisabled';
 
   // The Share button is gone once shared, so focus would fall to the page unless it moves to what replaced it.
   useEffect(() => {
     if (shared && sharedJustNow.current) (seeItRef.current ?? statusRef.current)?.focus();
   }, [shared]);
+
+  useEffect(() => {
+    if (refusedForGood && sharedJustNow.current) onSharingClosed();
+  }, [refusedForGood, onSharingClosed]);
 
   const handleShare = async () => {
     if (!canShare) return;
@@ -65,6 +73,11 @@ const ShareToGroupChat: FC<{
     setShareState({ phase: 'sharing' });
     setShareState({ phase: 'done', outcome: await onShare(messageId) });
   };
+
+  if (sharingDisabled || refusedForGood) {
+    if (!earlierOutcome?.ok) return null;
+    return <p className="px-4 py-3 bg-white border-t border-[#D1C4E9]">Sharing options are not enabled for this post.</p>;
+  }
 
   if (shared) {
     return (
@@ -114,7 +127,9 @@ export const UnpackExplanationMessage: FC<UnpackExplanationMessageProps> = ({
   shareOutcome,
 }) => {
   const botName = useBotName();
-  const { quote, passage, whatTheyreSaying, whyItMatters, terms, destination, groupChatShare } =
+  const explanationRef = useRef<HTMLDivElement>(null);
+  const focusExplanation = useCallback(() => explanationRef.current?.focus(), []);
+  const { quote, passage, whatTheyreSaying, whyItMatters, terms, destination, groupChatShare, sharingDisabled } =
     message.body as UnpackExplanation;
   // A share made on this visit is newer than what the card had when it loaded
   const earlierShareOutcome: UnpackShareOutcome | undefined =
@@ -131,6 +146,8 @@ export const UnpackExplanationMessage: FC<UnpackExplanationMessageProps> = ({
       </div>
 
       <div
+        ref={explanationRef}
+        tabIndex={-1}
         data-testid="unpack-explanation"
         className="w-full rounded-xl overflow-hidden shadow-sm border border-[#D1C4E9] text-sm text-gray-800"
       >
@@ -170,6 +187,8 @@ export const UnpackExplanationMessage: FC<UnpackExplanationMessageProps> = ({
             onShare={onShareToGroupChat}
             onOpenGroupChatPost={onOpenGroupChatPost}
             earlierOutcome={earlierShareOutcome}
+            sharingDisabled={sharingDisabled}
+            onSharingClosed={focusExplanation}
           />
         )}
 

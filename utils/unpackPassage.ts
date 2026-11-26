@@ -164,6 +164,7 @@ const errorCopy = (botName: string): Record<UnpackErrorReason, UnpackErrorCopy> 
       canRetry: false,
       canSend: false,
     },
+    sharingDisabled: { message: 'Sharing options are not enabled for this post.', canRetry: false, canSend: false },
   };
 };
 
