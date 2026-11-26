@@ -119,7 +119,11 @@ export const UnpackExplanationMessage: FC<UnpackExplanationMessageProps> = ({
   alreadyPostedNoteTexts,
 }) => {
   const botName = useBotName();
-  const { quote, passage, whatTheyreSaying, whyItMatters, terms, destination } = message.body as UnpackExplanation;
+  const { quote, passage, whatTheyreSaying, whyItMatters, terms, destination, groupChatShare } =
+    message.body as UnpackExplanation;
+  // A share made on this visit is newer than what the card had when it loaded
+  const earlierShareOutcome: UnpackShareOutcome | undefined =
+    shareOutcome ?? (groupChatShare && { ok: true, ...groupChatShare });
 
   return (
     <div className="flex flex-col gap-3" style={{ width: '85%' }}>
@@ -170,7 +174,7 @@ export const UnpackExplanationMessage: FC<UnpackExplanationMessageProps> = ({
             messageId={message.id}
             onShare={onShareToGroupChat}
             onOpenGroupChatPost={onOpenGroupChatPost}
-            earlierOutcome={shareOutcome}
+            earlierOutcome={earlierShareOutcome}
             alreadyPostedNoteTexts={alreadyPostedNoteTexts}
           />
         )}

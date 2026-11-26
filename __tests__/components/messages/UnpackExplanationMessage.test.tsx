@@ -167,6 +167,36 @@ describe('UnpackExplanationMessage', () => {
       expect(screen.getByRole('button', { name: 'See it in Group Chat' })).not.toHaveFocus();
     });
 
+    it('shows a share the server saved on the card, so it survives a reload', async () => {
+      const user = userEvent.setup();
+      const onOpenGroupChatPost = jest.fn();
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage({ groupChatShare: { status: 'sent', messageId: 'post-1' } })}
+          onShareToGroupChat={jest.fn()}
+          onOpenGroupChatPost={onOpenGroupChatPost}
+        />,
+      );
+
+      expect(screen.getByRole('status')).toHaveTextContent('Shared to Group Chat');
+      expect(screen.queryByRole('button', { name: 'Share to Group Chat' })).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'See it in Group Chat' }));
+      expect(onOpenGroupChatPost).toHaveBeenCalledWith('post-1');
+    });
+
+    it('shows a saved "already in Group Chat" share in the words of the note', () => {
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage({ groupChatShare: { status: 'alreadyPosted', messageId: 'post-0' } })}
+          onShareToGroupChat={jest.fn()}
+          onOpenGroupChatPost={jest.fn()}
+          alreadyPostedNoteTexts={{ 'post-0': 'Someone already shared this part of the talk.' }}
+        />,
+      );
+
+      expect(screen.getByRole('status')).toHaveTextContent('Someone already shared this part of the talk.');
+    });
+
     it("shows the server's own words for the Group Chat time limit", async () => {
       const user = userEvent.setup();
       renderShareable(
