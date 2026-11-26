@@ -6922,6 +6922,28 @@
             "type": "string",
             "description": "Group Chat posts only. Says where the post came from. A participant's share reads \"<pseudonym> shared this explanation from <bot name>.\" Show it as written; other kinds of post will use other text."
           },
+          "groupChatShare": {
+            "type": "object",
+            "description": "Private Chat cards only, once the participant has shared the card to Group Chat. The result of their latest share, saved so it survives a reload. Never on a Group Chat post.",
+            "required": [
+              "status",
+              "messageId"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "sent",
+                  "alreadyPosted"
+                ],
+                "description": "sent, the card is in Group Chat. alreadyPosted, another post already covered this passage, so nothing new was posted."
+              },
+              "messageId": {
+                "type": "string",
+                "description": "ID of the Group Chat post, the same as the share call's messageId."
+              }
+            }
+          },
           "text": {
             "type": "string",
             "description": "Plain-text version of all sections, for chat history and clients that can't render the card. Ends with the footer when there is one."
