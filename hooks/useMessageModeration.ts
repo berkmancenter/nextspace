@@ -6,6 +6,7 @@ import { applyModerationEvent } from '../utils/messageModeration';
 import type { MessageModeration } from '../components/ModerationControls';
 import type {
   HideResult,
+  MessageDeletedEvent,
   MessageHiddenEvent,
   MessageHiddenNoticeEvent,
   ModerationReason,
@@ -87,6 +88,15 @@ export function useMessageModeration({
       setAssistantMessages((prev) => applyModerationEvent(prev, event, viewer));
     };
 
+    // Unlike a hide, a deletion is final, so admins and authors lose the messages too.
+    const onDeleted = ({ messageIds }: MessageDeletedEvent) => {
+      const deleted = new Set(messageIds);
+      const keep = (prev: PseudonymousMessage[]) =>
+        prev.some((m) => m.id && deleted.has(m.id)) ? prev.filter((m) => !m.id || !deleted.has(m.id)) : prev;
+      setChatMessages(keep);
+      setAssistantMessages(keep);
+    };
+
     // Also arrives on the per-user room, so it is only this conversation's when the id matches.
     const onHiddenNotice = (notice?: MessageHiddenNoticeEvent) => {
       if (!conversationId || notice?.conversationId !== conversationId) return;
@@ -94,9 +104,11 @@ export function useMessageModeration({
     };
 
     socket.on('message:hidden', onHidden);
+    socket.on('message:deleted', onDeleted);
     socket.on('message:hidden-notice', onHiddenNotice);
     return () => {
       socket.off('message:hidden', onHidden);
+      socket.off('message:deleted', onDeleted);
       socket.off('message:hidden-notice', onHiddenNotice);
     };
   }, [socket, isAdmin, userId, conversationId, setChatMessages, setAssistantMessages]);

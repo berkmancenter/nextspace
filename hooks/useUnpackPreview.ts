@@ -7,6 +7,7 @@ import {
   UnpackResponse,
   UnpackSelection,
   UnpackSendOutcome,
+  UnpackShareOutcome,
 } from '../types.internal';
 import { passageKey } from '../utils/unpackPassage';
 
@@ -15,16 +16,15 @@ export const UNPACK_PREVIEW_DELAY_MS = 300;
 const isRefusal = (response: UnpackResponse): response is UnpackRefusal => !!response && response.error === true;
 
 const logFailure = (
-  action: 'preview' | 'send',
-  conversationId: string,
-  range: UnpackSelection,
+  action: 'preview' | 'send' | 'share',
+  context: { conversationId: string; range?: UnpackSelection; messageId?: string },
   response: UnpackRefusal | undefined,
 ) => {
   if (!response) {
-    console.error(`Unpack ${action} got no response`, { conversationId, range });
+    console.error(`Unpack ${action} got no response`, context);
     return;
   }
-  console.warn(`Unpack ${action} refused`, { conversationId, range, status: response.status, reason: response.reason });
+  console.warn(`Unpack ${action} refused`, { ...context, status: response.status, reason: response.reason });
 };
 
 /**
@@ -52,7 +52,7 @@ export function useUnpackPreview(conversationId: string, range: UnpackSelection 
       });
       if (controller.signal.aborted) return;
       if (!response || isRefusal(response)) {
-        logFailure('preview', conversationId, range, response);
+        logFailure('preview', { conversationId, range }, response);
         setState({ status: 'error', reason: response?.reason });
         return;
       }
@@ -86,8 +86,30 @@ export async function sendUnpackToPrivateChat(
     Api.get().getAccessToken(),
   );
   if (!response || isRefusal(response)) {
-    logFailure('send', conversationId, range, response);
+    logFailure('send', { conversationId, range }, response);
     return { ok: false, reason: response?.reason };
   }
   return { ok: true, status: response.status === 'pending' ? 'pending' : 'sent' };
+}
+
+export async function shareUnpackToGroupChat(
+  conversationId: string,
+  messageId: string,
+  passcodes: { transcriptPasscode?: string; chatPasscode?: string },
+): Promise<UnpackShareOutcome> {
+  const response: UnpackResponse = await SendData(
+    `unpack/${conversationId}/share`,
+    { messageId, ...passcodes },
+    Api.get().getAccessToken(),
+  );
+  if (!response || isRefusal(response)) {
+    logFailure('share', { conversationId, messageId }, response);
+    return { ok: false, reason: response?.reason, message: response?.message };
+  }
+  return {
+    ok: true,
+    status: response.status === 'alreadyPosted' ? 'alreadyPosted' : 'sent',
+    messageId: String(response.messageId),
+    text: typeof response.text === 'string' ? response.text : undefined,
+  };
 }

@@ -261,7 +261,11 @@ export const SendData = async (
 
     if (!response.ok) {
       const errorData = await readErrorBody(response);
-      const reason = typeof errorData?.reason === 'string' ? { reason: errorData.reason } : {};
+      // A refusal with a reason comes from a route that writes its message for people to read.
+      const reason =
+        typeof errorData?.reason === 'string'
+          ? { reason: errorData.reason, ...(typeof errorData.message === 'string' && { message: errorData.message }) }
+          : {};
 
       if (response.status === 400) {
         return { error: true, status: 400, message: errorData?.message || 'Bad Request', ...reason };

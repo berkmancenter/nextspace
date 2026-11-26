@@ -8,6 +8,7 @@ import {
   widenSelection,
   UNPACK_MAX_PASSAGE_CHARACTERS,
 } from '../../utils/unpackPassage';
+import { UnpackExplanation } from '../../types.internal';
 
 const chunks = [
   { id: 'c1', text: 'We built on the Caselaw Access Project. It has 6.7 million decisions.' },

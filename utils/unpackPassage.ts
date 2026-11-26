@@ -151,6 +151,20 @@ const errorCopy = (botName: string): Record<UnpackErrorReason, UnpackErrorCopy> 
     chunkNotInTranscript: unreadableSelection,
     offsetPastEnd: unreadableSelection,
     selectionBackwards: unreadableSelection,
+    groupChatRateLimited: {
+      message: "You've shared to Group Chat recently. Wait a few minutes, then try again.",
+      canRetry: true,
+      canSend: true,
+    },
+    noGroupChat: { message: 'This event has no Group Chat to share to.', canRetry: false, canSend: false },
+    cardNotFound: { message: 'This explanation is no longer available to share.', canRetry: false, canSend: false },
+    eventNotStarted: { message: 'You can share to Group Chat once the event starts.', canRetry: true, canSend: true },
+    eventEnded: {
+      message: "This event has ended, so you can't share to Group Chat anymore.",
+      canRetry: false,
+      canSend: false,
+    },
+    sharingDisabled: { message: 'Sharing options are not enabled for this post.', canRetry: false, canSend: false },
   };
 };
 
@@ -158,3 +172,44 @@ const GENERAL_ERROR: UnpackErrorCopy = { message: 'Something went wrong. Try aga
 
 export const unpackErrorCopy = (reason: UnpackErrorReason | undefined, botName: string): UnpackErrorCopy =>
   (reason && errorCopy(botName)[reason]) || GENERAL_ERROR;
+
+/**
+ * Sharing posts a card that already exists, so a few reasons mean something different than they do for a send.
+ * @param serverMessage The refusal's own message. Used for the Group Chat time limit, which only the server knows.
+ */
+export function unpackShareErrorCopy(
+  reason: UnpackErrorReason | undefined,
+  botName: string,
+  serverMessage?: string,
+): UnpackErrorCopy {
+  if (reason === 'groupChatRateLimited' && serverMessage) {
+    return { ...unpackErrorCopy(reason, botName), message: serverMessage };
+  }
+  if (reason === 'eventLocked') {
+    return { message: `This event is locked, so ${botName} can't post to Group Chat.`, canRetry: false, canSend: false };
+  }
+  if (reason === 'chunkNotInTranscript') {
+    return {
+      message: "This passage is no longer in the transcript, so it can't be shared.",
+      canRetry: false,
+      canSend: false,
+    };
+  }
+  // A share only fails this way when another share of the same passage is still posting.
+  if (reason === 'unpackFailed') {
+    return {
+      message: 'Someone else is sharing this passage right now. Try again in a moment.',
+      canRetry: true,
+      canSend: true,
+    };
+  }
+  // A share carries both the transcript and Group Chat passcodes, and the refusal doesn't say which failed.
+  if (reason === 'wrongPasscode') {
+    return {
+      message: "This page's link has changed. Reload the page, then try again.",
+      canRetry: false,
+      canSend: false,
+    };
+  }
+  return unpackErrorCopy(reason, botName);
+}

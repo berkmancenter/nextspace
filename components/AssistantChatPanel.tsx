@@ -11,7 +11,13 @@ import {
 } from '../components/messages';
 import { MessageInput } from './MessageInput';
 import { SlashCommand, createSlashCommandEnhancer } from './enhancers/slashCommandEnhancer';
-import { ControlledInputConfig, PseudonymousMessage, FeedbackConfig, UnpackExplanation } from '../types.internal';
+import {
+  ControlledInputConfig,
+  PseudonymousMessage,
+  FeedbackConfig,
+  UnpackExplanation,
+  UnpackShareOutcome,
+} from '../types.internal';
 import { getAvatarStyle, getAssistantAvatarStyle } from '../utils/avatarUtils';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { getTimestampVisibility, parseMessageBody } from '../utils/Helpers';
@@ -50,6 +56,12 @@ interface AssistantChatPanelProps {
   transcriptChunks?: PseudonymousMessage[];
   /** Puts keyboard focus in the message box when the panel opens. */
   focusInputOnMount?: boolean;
+  /** Leave out to hide "Share to Group Chat" on explanation cards. */
+  onShareUnpackToGroupChat?: (messageId: string) => Promise<UnpackShareOutcome>;
+  /** Opens Group Chat at a post, from a card that was shared or a note that it was already explained. */
+  onOpenGroupChatPost?: (messageId: string) => void;
+  /** Earlier share outcomes by card message ID, kept by the page so they outlast this panel. */
+  unpackShareOutcomes?: Record<string, UnpackShareOutcome>;
 }
 
 export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
@@ -74,6 +86,9 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
   onCatchUp,
   transcriptChunks = [],
   focusInputOnMount = false,
+  onShareUnpackToGroupChat,
+  onOpenGroupChatPost,
+  unpackShareOutcomes,
 }) => {
   const [inputFocusRequest, setInputFocusRequest] = useState(0);
   const transcriptChunksById = useMemo(
@@ -341,7 +356,14 @@ export const AssistantChatPanel: FC<AssistantChatPanelProps> = ({
 
     // Early catch-up answers reused this type with mode lastMinute; only passage explanations get this card.
     if (messageType === 'unpack_explanation' && (msg.body as UnpackExplanation).mode === 'passage') {
-      return <UnpackExplanationMessage message={msg} />;
+      return (
+        <UnpackExplanationMessage
+          message={msg}
+          onShareToGroupChat={inactive ? undefined : onShareUnpackToGroupChat}
+          onOpenGroupChatPost={onOpenGroupChatPost}
+          shareOutcome={msg.id ? unpackShareOutcomes?.[msg.id] : undefined}
+        />
+      );
     }
 
     // Assistant messages

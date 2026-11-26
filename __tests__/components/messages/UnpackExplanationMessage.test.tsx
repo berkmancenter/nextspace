@@ -1,8 +1,9 @@
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import { UnpackExplanationMessage } from '../../../components/messages/UnpackExplanationMessage';
-import { PseudonymousMessage } from '../../../types.internal';
+import { PseudonymousMessage, UnpackShareOutcome } from '../../../types.internal';
 import { ConversationTypeProvider } from '../../../context/ConversationTypeContext';
 
 // Built from local time so the "Said at" assertion holds in any time zone.
@@ -132,5 +133,301 @@ describe('UnpackExplanationMessage', () => {
     const { container } = render(<UnpackExplanationMessage message={makeExplanationMessage()} />);
 
     expect(await axe(container)).toHaveNoViolations();
+  });
+  describe('Share to Group Chat', () => {
+    const deferred = () => {
+      let resolve!: (outcome: UnpackShareOutcome) => void;
+      const promise = new Promise<UnpackShareOutcome>((r) => (resolve = r));
+      return { promise, resolve };
+    };
+
+    const renderShareable = (onShare: jest.Mock, onOpenGroupChatPost = jest.fn()) =>
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage()}
+          onShareToGroupChat={onShare}
+          onOpenGroupChatPost={onOpenGroupChatPost}
+        />,
+      );
+
+    const shareButton = () => screen.getByRole('button', { name: 'Share to Group Chat' });
+
+    it('shows a share made earlier, without moving focus to it', () => {
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage()}
+          onShareToGroupChat={jest.fn()}
+          onOpenGroupChatPost={jest.fn()}
+          shareOutcome={{ ok: true, status: 'sent', messageId: 'post-1' }}
+        />,
+      );
+
+      expect(screen.getByRole('status')).toHaveTextContent('Shared to Group Chat');
+      expect(screen.queryByRole('button', { name: 'Share to Group Chat' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'See it in Group Chat' })).not.toHaveFocus();
+    });
+
+    it('shows a share the server saved on the card, so it survives a reload', async () => {
+      const user = userEvent.setup();
+      const onOpenGroupChatPost = jest.fn();
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage({ groupChatShare: { status: 'sent', messageId: 'post-1' } })}
+          onShareToGroupChat={jest.fn()}
+          onOpenGroupChatPost={onOpenGroupChatPost}
+        />,
+      );
+
+      expect(screen.getByRole('status')).toHaveTextContent('Shared to Group Chat');
+      expect(screen.queryByRole('button', { name: 'Share to Group Chat' })).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'See it in Group Chat' }));
+      expect(onOpenGroupChatPost).toHaveBeenCalledWith('post-1');
+    });
+
+    it('shows a saved "already in Group Chat" share in the server\'s words', () => {
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage({
+            groupChatShare: {
+              status: 'alreadyPosted',
+              messageId: 'post-0',
+              text: 'Someone already shared this part of the talk.',
+            },
+          })}
+          onShareToGroupChat={jest.fn()}
+          onOpenGroupChatPost={jest.fn()}
+        />,
+      );
+
+      expect(screen.getByRole('status')).toHaveTextContent('Someone already shared this part of the talk.');
+    });
+
+    it("leaves out the share button, with no explanation, when the card's passage can't be shared", () => {
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage({ sharingDisabled: true })}
+          onShareToGroupChat={jest.fn()}
+          onOpenGroupChatPost={jest.fn()}
+        />,
+      );
+
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it("says sharing isn't enabled, with no link, when the card's earlier share can't be shown", () => {
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage({
+            sharingDisabled: true,
+            groupChatShare: {
+              status: 'alreadyPosted',
+              messageId: 'post-0',
+              text: 'A post about this part of the talk is already in Group Chat.',
+            },
+          })}
+          onShareToGroupChat={jest.fn()}
+          onOpenGroupChatPost={jest.fn()}
+        />,
+      );
+
+      expect(screen.getByText('Sharing options are not enabled for this post.')).toBeInTheDocument();
+      expect(screen.queryByText('A post about this part of the talk is already in Group Chat.')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    });
+
+    it('says sharing is not enabled, in place of the button, when the server refuses the share for good', async () => {
+      const user = userEvent.setup();
+      renderShareable(
+        jest.fn().mockResolvedValue({
+          ok: false,
+          reason: 'sharingDisabled',
+          message: 'Sharing options are not enabled for this post.',
+        }),
+      );
+
+      await user.click(shareButton());
+
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Share to Group Chat' })).not.toBeInTheDocument());
+      expect(screen.getByText('Sharing options are not enabled for this post.')).toHaveFocus();
+    });
+
+    it('still says sharing is not enabled when the card is drawn again after that refusal', () => {
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage()}
+          onShareToGroupChat={jest.fn()}
+          shareOutcome={{ ok: false, reason: 'sharingDisabled' }}
+        />,
+      );
+
+      expect(screen.getByText('Sharing options are not enabled for this post.')).toBeInTheDocument();
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    });
+
+    it("shows the server's own words for the Group Chat time limit", async () => {
+      const user = userEvent.setup();
+      renderShareable(
+        jest.fn().mockResolvedValue({
+          ok: false,
+          reason: 'groupChatRateLimited',
+          message: 'You can post to Group Chat once every 3 minutes.',
+        }),
+      );
+
+      await user.click(shareButton());
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('You can post to Group Chat once every 3 minutes.');
+    });
+
+    it("says it's already in Group Chat in the server's words", () => {
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage()}
+          onShareToGroupChat={jest.fn()}
+          onOpenGroupChatPost={jest.fn()}
+          shareOutcome={{
+            ok: true,
+            status: 'alreadyPosted',
+            messageId: 'post-0',
+            text: 'Someone already shared this part of the talk.',
+          }}
+        />,
+      );
+
+      expect(screen.getByRole('status')).toHaveTextContent('Someone already shared this part of the talk.');
+    });
+
+    it('shows a refusal from earlier', () => {
+      render(
+        <UnpackExplanationMessage
+          message={makeExplanationMessage()}
+          onShareToGroupChat={jest.fn()}
+          shareOutcome={{ ok: false, reason: 'noGroupChat' }}
+        />,
+      );
+
+      expect(screen.getByRole('alert')).toHaveTextContent('This event has no Group Chat to share to.');
+      expect(shareButton()).toHaveAttribute('aria-disabled', 'true');
+    });
+
+    it("says the share posts under the participant's name", () => {
+      renderShareable(jest.fn());
+
+      expect(shareButton()).toHaveAccessibleDescription('Posts the full explanation to Group Chat under your name');
+    });
+
+    it('leaves the button out when sharing is not offered', () => {
+      render(<UnpackExplanationMessage message={makeExplanationMessage()} />);
+
+      expect(screen.queryByRole('button', { name: 'Share to Group Chat' })).not.toBeInTheDocument();
+    });
+
+    it('shares this card by its message ID, once, while the first share is in flight', async () => {
+      const user = userEvent.setup();
+      const pending = deferred();
+      const onShare = jest.fn(() => pending.promise);
+      renderShareable(onShare);
+
+      await user.click(shareButton());
+      await user.click(shareButton());
+
+      expect(onShare).toHaveBeenCalledTimes(1);
+      expect(onShare).toHaveBeenCalledWith('msg-1');
+      expect(shareButton()).toHaveAttribute('aria-disabled', 'true');
+      expect(shareButton()).toHaveAccessibleDescription('Sharing…');
+    });
+
+    it('confirms the post and moves focus to a way to see it', async () => {
+      const user = userEvent.setup();
+      const onOpenGroupChatPost = jest.fn();
+      renderShareable(jest.fn().mockResolvedValue({ ok: true, status: 'sent', messageId: 'post-1' }), onOpenGroupChatPost);
+
+      await user.click(shareButton());
+
+      expect(await screen.findByText('Shared to Group Chat.')).toBeInTheDocument();
+      const seeIt = screen.getByRole('button', { name: 'See it in Group Chat' });
+      await waitFor(() => expect(seeIt).toHaveFocus());
+      expect(seeIt).toHaveAccessibleDescription('Shared to Group Chat.');
+      await user.click(seeIt);
+      expect(onOpenGroupChatPost).toHaveBeenCalledWith('post-1');
+    });
+
+    it('links to the existing post when Group Chat already explains the passage', async () => {
+      const user = userEvent.setup();
+      const onOpenGroupChatPost = jest.fn();
+      renderShareable(
+        jest.fn().mockResolvedValue({ ok: true, status: 'alreadyPosted', messageId: 'post-0' }),
+        onOpenGroupChatPost,
+      );
+
+      await user.click(shareButton());
+
+      await user.click(await screen.findByRole('button', { name: 'See it in Group Chat' }));
+      expect(onOpenGroupChatPost).toHaveBeenCalledWith('post-0');
+    });
+
+    it.each([
+      ['groupChatRateLimited', "You've shared to Group Chat recently. Wait a few minutes, then try again."],
+      ['noGroupChat', 'This event has no Group Chat to share to.'],
+      ['cardNotFound', 'This explanation is no longer available to share.'],
+      ['eventLocked', "This event is locked, so Berkie can't post to Group Chat."],
+      ['chunkNotInTranscript', "This passage is no longer in the transcript, so it can't be shared."],
+      ['eventNotStarted', 'You can share to Group Chat once the event starts.'],
+      ['eventEnded', "This event has ended, so you can't share to Group Chat anymore."],
+      ['unpackFailed', 'Someone else is sharing this passage right now. Try again in a moment.'],
+      ['wrongPasscode', "This page's link has changed. Reload the page, then try again."],
+      [undefined, 'Something went wrong. Try again.'],
+    ])('explains a %s refusal by its reason', async (reason, message) => {
+      const user = userEvent.setup();
+      renderShareable(jest.fn().mockResolvedValue({ ok: false, reason }));
+
+      await user.click(shareButton());
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    });
+
+    it.each(['groupChatRateLimited', 'eventNotStarted', 'unpackFailed'])(
+      'lets the participant try again after a %s refusal, which may pass',
+      async (reason) => {
+        const user = userEvent.setup();
+        const onShare = jest
+          .fn()
+          .mockResolvedValueOnce({ ok: false, reason })
+          .mockResolvedValueOnce({ ok: true, status: 'sent', messageId: 'post-1' });
+        renderShareable(onShare);
+
+        await user.click(shareButton());
+        await screen.findByRole('alert');
+        await user.click(shareButton());
+
+        expect(await screen.findByText('Shared to Group Chat.')).toBeInTheDocument();
+      },
+    );
+
+    it.each(['noGroupChat', 'eventEnded'])('stops offering the share after a %s refusal', async (reason) => {
+      const user = userEvent.setup();
+      const onShare = jest.fn().mockResolvedValue({ ok: false, reason });
+      renderShareable(onShare);
+
+      await user.click(shareButton());
+      await screen.findByRole('alert');
+      await user.click(shareButton());
+
+      expect(shareButton()).toHaveAttribute('aria-disabled', 'true');
+      expect(onShare).toHaveBeenCalledTimes(1);
+    });
+
+    it('has no accessibility violations after sharing', async () => {
+      const user = userEvent.setup();
+      const { container } = renderShareable(jest.fn().mockResolvedValue({ ok: true, status: 'sent', messageId: 'post-1' }));
+
+      expect(await axe(container)).toHaveNoViolations();
+      await user.click(shareButton());
+      await screen.findByText('Shared to Group Chat.');
+
+      expect(await axe(container)).toHaveNoViolations();
+    });
   });
 });

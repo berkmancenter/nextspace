@@ -1,4 +1,4 @@
-import { FC, useState, useRef, KeyboardEvent, ChangeEvent, useEffect, useCallback } from 'react';
+import { FC, useState, useRef, KeyboardEvent, ChangeEvent, useEffect, useCallback, useId } from 'react';
 import { Box, IconButton, InputAdornment, TextField, Popover, Typography } from '@mui/material';
 import { Send, Close, InfoOutlined, KeyboardArrowDown } from '@mui/icons-material';
 import { ControlledInputConfig } from '../types.internal';
@@ -61,6 +61,7 @@ export const MessageInput: FC<MessageInputProps> = ({
   const [pseudonymInfoAnchor, setPseudonymInfoAnchor] = useState<HTMLButtonElement | null>(null);
 
   const messageInputRef = useRef<HTMLInputElement>(null);
+  const modeLabelId = useId();
   const enterUsedForCommandRef = useRef(false);
 
   useEffect(() => {
@@ -253,7 +254,7 @@ export const MessageInput: FC<MessageInputProps> = ({
                 {controlledMode && (
                   <span className="normal-case">
                     {' • '}
-                    {controlledMode.icon} {controlledMode.label}
+                    {controlledMode.icon} <span id={modeLabelId}>{controlledMode.label}</span>
                   </span>
                 )}
               </span>
@@ -314,6 +315,7 @@ export const MessageInput: FC<MessageInputProps> = ({
                 id="message-input"
                 ref={messageInputRef as any}
                 placeholder="Enter your message here"
+                aria-describedby={controlledMode ? modeLabelId : undefined}
                 value={currentMessage}
                 onChange={handleChange as any}
                 onKeyDown={handleKeyDown as any}

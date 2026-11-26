@@ -118,6 +118,11 @@ export interface MessageHiddenEvent {
   display: HiddenDisplay;
 }
 
+/** Websocket `message:deleted`: messages the server removed for good, such as Unpacker posts deleted with the transcript. */
+export interface MessageDeletedEvent {
+  messageIds: string[];
+}
+
 /**
  * Websocket `message:hidden-notice`, sent only to the author of hidden messages. It travels on the
  * author's per-user room, which spans every conversation, so `conversationId` says which one it is about.
@@ -649,7 +654,7 @@ export interface WidenedPassage {
   quote: string;
 }
 
-export type UnpackRefusal = { error: true; status?: number; reason?: UnpackErrorReason };
+export type UnpackRefusal = { error: true; status?: number; reason?: UnpackErrorReason; message?: string };
 
 /** What SendData resolves to for an unpack request: the body, a refusal, or undefined when the request failed. */
 export type UnpackResponse = UnpackRefusal | Record<string, unknown> | undefined;
@@ -658,7 +663,7 @@ export interface UnpackErrorCopy {
   message: string;
   /** Asking again for the same passage can work. */
   canRetry: boolean;
-  /** Sending this passage to Private Chat can still work. */
+  /** Sending this passage to Private Chat, or sharing its card to Group Chat, can still work. */
   canSend: boolean;
 }
 
@@ -670,6 +675,15 @@ export type UnpackPreviewState =
 
 /** pending means bot posts the card once the explanation is written. */
 export type UnpackSendOutcome = { ok: true; status: 'sent' | 'pending' } | { ok: false; reason?: UnpackErrorReason };
+
+type UnpackShareResult = components['schemas']['UnpackShareResult'];
+
+/** messageId is the Group Chat post to link to: the new one, or the one that already explains the passage. */
+export type UnpackShareOutcome =
+  | { ok: true; status: UnpackShareResult['status']; messageId: string; text?: string }
+  | { ok: false; reason?: UnpackErrorReason; message?: string };
+
+export type UnpackShareState = { phase: 'idle' } | { phase: 'sharing' } | { phase: 'done'; outcome: UnpackShareOutcome };
 
 /** Where a browser selection starts and ends, for telling whether a press changed it. */
 export type SelectionEnds = Pick<Selection, 'anchorNode' | 'anchorOffset' | 'focusNode' | 'focusOffset'>;

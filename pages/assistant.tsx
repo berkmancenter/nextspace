@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import CloseIcon from '@mui/icons-material/Close';
 
@@ -10,7 +10,7 @@ import { Api, RetrieveData, SendData, emitWithTokenRefresh, buildDirectChannels 
 import { components } from '../types';
 import { CatchUpNotice, ControlledInputConfig, PseudonymousMessage, FeedbackConfig } from '../types.internal';
 import { useConversationType, useSetBotName, useSetConversationType } from '../context/ConversationTypeContext';
-import { AuthType } from '../types.internal';
+import { AuthType, UnpackShareOutcome } from '../types.internal';
 import { trackConversationEvent, setUserId } from '../utils/analytics';
 import { Errors, ParamErrors, Transcript } from '../components/';
 import { NavigationBar } from '../components/NavigationBar';
@@ -23,6 +23,7 @@ import { CheckAuthHeader, isFeatureEnabled, parseMessageBody } from '../utils/He
 import { withStoredChannels } from '../utils/presentationChannels';
 import { buildCatchUpRequest, pickCatchUpChunks } from '../utils/catchUp';
 import { unpackErrorCopy } from '../utils/unpackPassage';
+import { shareUnpackToGroupChat } from '../hooks/useUnpackPreview';
 import TokenManagerDefault from '../utils/TokenManager';
 import { Alert, Button, Dialog, Snackbar } from '@mui/material';
 import { Info } from '@mui/icons-material';
@@ -286,6 +287,25 @@ export function EventAssistantRoom({
   const openPrivateChatFromUnpacker = () => {
     setFocusPrivateChatInput(true);
     handleTabChange('assistant');
+  };
+  const [unpackShareOutcomes, setUnpackShareOutcomes] = useState<Record<string, UnpackShareOutcome>>({});
+  const shareUnpackCard = async (messageId: string) => {
+    const outcome = await shareUnpackToGroupChat(router.query.conversationId as string, messageId, {
+      transcriptPasscode,
+      chatPasscode,
+    });
+    setUnpackShareOutcomes((outcomes) => ({ ...outcomes, [messageId]: outcome }));
+    return outcome;
+  };
+  const [groupChatFocusMessageId, setGroupChatFocusMessageId] = useState<string | null>(null);
+  const clearGroupChatFocusMessage = useCallback(() => setGroupChatFocusMessageId(null), []);
+  // A post that never loads, such as one deleted with the transcript, mustn't pull focus on a later visit.
+  useEffect(() => {
+    if (activeTab !== 'chat') setGroupChatFocusMessageId(null);
+  }, [activeTab]);
+  const openGroupChatPost = (messageId: string) => {
+    handleTabChange('chat');
+    setGroupChatFocusMessageId(messageId);
   };
   // Organizer's chosen destination for the bot's voice: 'zoom' means Recall's own Zoom-facing bot
   // speaks there, so the presentation view's bot presence panel must not also play audio — that's
@@ -940,6 +960,8 @@ export function EventAssistantRoom({
                           isAdmin={isAdmin}
                           moderation={moderation}
                           eventScheduledTime={groupChatChannelName === 'pregame' ? eventScheduledTime : null}
+                          focusMessageId={groupChatFocusMessageId}
+                          onFocusMessageHandled={clearGroupChatFocusMessage}
                         />
                       ) : activeTab === 'resources' ? (
                         <ResourcesPanel
@@ -976,6 +998,9 @@ export function EventAssistantRoom({
                           onCatchUp={catchUpReady ? catchUp : undefined}
                           transcriptChunks={transcriptChunks ?? undefined}
                           focusInputOnMount={focusPrivateChatInput}
+                          onShareUnpackToGroupChat={unpackerOn ? shareUnpackCard : undefined}
+                          onOpenGroupChatPost={openGroupChatPost}
+                          unpackShareOutcomes={unpackShareOutcomes}
                           messagesWithUnreadReplies={assistantMessagesWithUnreadReplies}
                           onMarkAsRead={(messageId) => {
                             setAssistantMessagesWithUnreadReplies((prev) => {

@@ -530,14 +530,22 @@ describe('SendData', () => {
     });
   });
 
-  it("passes the server's reason through on other refusals", async () => {
+  it("passes the server's reason and message through on other refusals", async () => {
     respondWith(409, 'Conflict', () =>
       Promise.resolve({ code: 409, message: 'That name is taken.', reason: 'real_name_taken' }),
     );
 
     const response = await SendData('users/pseudonyms/real-name', {});
 
-    expect(response).toEqual({ error: true, status: 409, message: 'Conflict', reason: 'real_name_taken' });
+    expect(response).toEqual({ error: true, status: 409, message: 'That name is taken.', reason: 'real_name_taken' });
+  });
+
+  it('keeps the status text when a refusal without a reason has a message', async () => {
+    respondWith(404, 'Not Found', () => Promise.resolve({ code: 404, message: 'Conversation not found' }));
+
+    const response = await SendData('messages', {});
+
+    expect(response).toEqual({ error: true, status: 404, message: 'Not Found' });
   });
 
   it('leaves the reason out when the refusal has no readable body', async () => {
