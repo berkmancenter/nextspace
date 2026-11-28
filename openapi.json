@@ -6978,6 +6978,15 @@
           }
         }
       },
+      "UnpackTranscriptPasscode": {
+        "type": "object",
+        "properties": {
+          "transcriptPasscode": {
+            "type": "string",
+            "description": "The transcript channel's passcode, the same one the client uses to read the transcript. Required when the transcript has one, which it does by default. A missing or wrong passcode is refused with 400 and reason wrongPasscode."
+          }
+        }
+      },
       "UnpackVisual": {
         "type": "object",
         "required": [
@@ -9470,15 +9479,6 @@
           },
           "message": {
             "type": "string"
-          }
-        }
-      },
-      "UnpackTranscriptPasscode": {
-        "type": "object",
-        "properties": {
-          "transcriptPasscode": {
-            "type": "string",
-            "description": "The transcript channel's passcode, the same one the client uses to read the transcript. Required when the transcript has one, which it does by default. A missing or wrong passcode is refused with 400 and reason wrongPasscode."
           }
         }
       }
